@@ -56,7 +56,11 @@ struct AutoStartTests {
 
     @Test func cancelCountdownResetsToIdle() async throws {
         let db = try Self.makeTempDB()
-        let coordinator = RecordingCoordinator(recordingDB: db)
+        let coordinator = RecordingCoordinator(
+            recordingDB: db,
+            audioRecorder: MockAudioRecorder(),
+            transcriptionService: MockTranscriptionService()
+        )
 
         // Manually set to countdown state, then cancel
         await MainActor.run {

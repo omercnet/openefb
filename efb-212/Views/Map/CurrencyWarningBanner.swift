@@ -5,6 +5,8 @@
 //  Non-blocking currency warning banner for the map tab.
 //  Displays yellow (warning) or red (expired) banner when any pilot currency
 //  (medical, flight review, night) is approaching or past expiry.
+//  If the profile fetch fails the banner shows "Currency unknown" (amber): a failed
+//  read must never be reported as current.
 //  Pilot can dismiss the banner for the current session.
 //
 
@@ -15,19 +17,28 @@ struct CurrencyWarningBanner: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
 
-    @State private var overallStatus: CurrencyStatus = .current
+    /// nil until computed, or when the profile fetch failed (currency unknown).
+    @State private var overallStatus: CurrencyStatus?
+    @State private var fetchFailed: Bool = false
     @State private var warningMessages: [String] = []
     @State private var isDismissed: Bool = false
 
+    private var shouldShow: Bool {
+        guard !isDismissed, !appState.currencyWarningDismissed else { return false }
+        if fetchFailed { return true }
+        guard let status = overallStatus else { return false }
+        return status != .current
+    }
+
     var body: some View {
-        if !isDismissed && !appState.currencyWarningDismissed && overallStatus != .current {
+        if shouldShow {
             HStack(spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(overallStatus == .expired ? .red : .yellow)
                     .font(.title3)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Currency Warning")
+                    Text(fetchFailed ? "Currency unknown" : "Currency Warning")
                         .font(.caption.bold())
                     ForEach(Array(warningMessages.enumerated()), id: \.offset) { _, message in
                         Text(message)
@@ -65,9 +76,21 @@ struct CurrencyWarningBanner: View {
             predicate: #Predicate<SchemaV1.PilotProfile> { $0.isActive == true }
         )
 
-        guard let activeProfiles = try? modelContext.fetch(descriptor),
-              let profile = activeProfiles.first else {
-            overallStatus = .current
+        let activeProfiles: [SchemaV1.PilotProfile]
+        do {
+            activeProfiles = try modelContext.fetch(descriptor)
+        } catch {
+            // A failed read is not "current": show the pilot that currency could not be checked.
+            fetchFailed = true
+            overallStatus = nil
+            warningMessages = ["Could not read the pilot profile. Check currency in the Aircraft tab."]
+            return
+        }
+        fetchFailed = false
+
+        guard let profile = activeProfiles.first else {
+            // No active profile: nothing to check (absence of data, not a failed read).
+            overallStatus = nil
             warningMessages = []
             return
         }

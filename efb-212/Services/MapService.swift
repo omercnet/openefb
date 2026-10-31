@@ -2,14 +2,12 @@
 //  MapService.swift
 //  efb-212
 //
-//  MapLibre layer management -- GeoJSON sources, style layers, ownship,
-//  sectional overlay, chart expiration metadata (INFRA-03).
+//  MapLibre layer management -- GeoJSON sources, style layers, ownship, base map style.
 //  Runs on MainActor because MLNMapView is UIKit (main thread only).
 //
 
 import UIKit
 import MapLibre
-import SQLite3
 
 @MainActor
 final class MapService {
@@ -23,23 +21,32 @@ final class MapService {
     private var airspaceSource: MLNShapeSource?
     private var weatherSource: MLNShapeSource?
     private var tfrSource: MLNShapeSource?
+    private var advisorySource: MLNShapeSource?
     private var ownshipSource: MLNShapeSource?
     private var routeSource: MLNShapeSource?
     private var routeAnnotations: [MLNAnnotation] = []
     private var replayTrackSource: MLNShapeSource?
     private var replayMarkerSource: MLNShapeSource?
-    private var sectionalLayer: MLNRasterStyleLayer?
-
-    /// Chart expiration date read from MBTiles metadata (INFRA-03)
-    private(set) var chartExpirationDate: Date?
-    /// Chart effective date read from MBTiles metadata (INFRA-03)
-    private(set) var chartEffectiveDate: Date?
+    /// Georeferenced FAA airport diagrams (T11); drawn below the airport layer at zoom >= 14.
+    let airportDiagramOverlay = AirportDiagramOverlay()
 
     // MARK: - Configuration
 
-    /// Store reference to map view and set initial center (CONUS: 39N, 98W, zoom 5)
+    /// Bundled base style. The style document itself is local so it loads with no connectivity:
+    /// every flight layer is added from `onStyleLoaded`, which only runs after the style loads,
+    /// and an iPad in flight is typically offline. Its raster basemap tiles are fetched (and
+    /// cached by MapLibre) when online; offline, the plain background shows beneath the layers.
+    static let baseStyleURL: URL? = Bundle.main.url(forResource: "base-style", withExtension: "json")
+
+    /// Store reference to map view, load the bundled style, and set initial center (CONUS: 39N, 98W, zoom 5)
     func configure(mapView: MLNMapView) {
         self.mapView = mapView
+        #if DEBUG
+        OfflineBlockingURLProtocol.installIfRequested()
+        #endif
+        if let styleURL = Self.baseStyleURL {
+            mapView.styleURL = styleURL
+        }
         mapView.setCenter(
             CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0),
             zoomLevel: 5.0,
@@ -51,34 +58,37 @@ final class MapService {
 
     /// Called when map style finishes loading. Creates all GeoJSON sources and style layers.
     func onStyleLoaded(style: MLNStyle) {
+        appliedMapStyle = nil  // fresh style: base layers back to their JSON defaults
         addOwnshipLayer(to: style)
         addAirportLayer(to: style)
         addNavaidLayer(to: style)
-        addSectionalOverlay(to: style)
         addAirspaceLayer(to: style)
         addWeatherDotLayer(to: style)
         addTFRLayer(to: style)
+        addAdvisoryLayer(to: style)
         addRouteLayer(to: style)
+        if let mapView { airportDiagramOverlay.attach(style: style, mapView: mapView) }
     }
 
     // MARK: - Ownship Layer
 
     private func addOwnshipLayer(to style: MLNStyle) {
-        // Create chevron icon programmatically (32x32pt, blue fill, aviation triangle)
-        let chevronImage = createOwnshipChevron()
-        style.setImage(chevronImage, forName: "ownship-chevron")
+        // Create chevron icons programmatically (32x32pt aviation triangle): blue for a live
+        // fix, grey when the last fix is stale (F5) so a frozen position never looks current.
+        style.setImage(createOwnshipChevron(fill: .systemBlue), forName: Self.ownshipLiveIcon)
+        style.setImage(createOwnshipChevron(fill: .systemGray), forName: Self.ownshipStaleIcon)
 
         // Single point feature for ownship
         let point = MLNPointFeature()
         point.coordinate = CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0)
-        point.attributes = ["heading": 0]
+        point.attributes = ["heading": 0, "icon": Self.ownshipLiveIcon]
 
         let source = MLNShapeSource(identifier: "ownship", shape: point, options: nil)
         style.addSource(source)
         self.ownshipSource = source
 
         let layer = MLNSymbolStyleLayer(identifier: "ownship-symbol", source: source)
-        layer.iconImageName = NSExpression(forConstantValue: "ownship-chevron")
+        layer.iconImageName = NSExpression(forKeyPath: "icon")
         layer.iconRotation = NSExpression(forKeyPath: "heading")
         layer.iconAllowsOverlap = NSExpression(forConstantValue: true)
         layer.iconIgnoresPlacement = NSExpression(forConstantValue: true)
@@ -87,14 +97,22 @@ final class MapService {
         style.addLayer(layer)
     }
 
+    static let ownshipLiveIcon = "ownship-chevron"
+    static let ownshipStaleIcon = "ownship-chevron-stale"
+
+    /// Last ownship fix drawn, so the icon can be swapped when staleness changes.
+    private var lastOwnshipLocation: CLLocation?
+    private var lastOwnshipHeading: Double = 0   // degrees true
+    private var ownshipStale: Bool = false
+
     /// Create a 32x32pt aviation chevron icon using UIGraphicsImageRenderer
-    private func createOwnshipChevron() -> UIImage {
+    private func createOwnshipChevron(fill: UIColor) -> UIImage {
         let size = CGSize(width: 32, height: 32)
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
             let ctx = context.cgContext
             // Aviation chevron pointing up: triangle shape
-            ctx.setFillColor(UIColor.systemBlue.cgColor)
+            ctx.setFillColor(fill.cgColor)
             ctx.beginPath()
             ctx.move(to: CGPoint(x: 16, y: 2))     // top center (nose)
             ctx.addLine(to: CGPoint(x: 26, y: 28))  // bottom right
@@ -158,120 +176,6 @@ final class MapService {
         style.addLayer(circleLayer)
     }
 
-    // MARK: - Sectional Overlay
-
-    private func addSectionalOverlay(to style: MLNStyle) {
-        // Check for MBTiles file in Application Support
-        let fileManager = FileManager.default
-        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            return
-        }
-        let mbtilesPath = appSupport.appendingPathComponent("efb-212/sectional.mbtiles")
-
-        guard fileManager.fileExists(atPath: mbtilesPath.path) else {
-            // No MBTiles file -- charts not downloaded yet. Fail silently.
-            return
-        }
-
-        // MBTiles raster tile source with mbtiles:// URL scheme
-        let tileURL = "mbtiles:///\(mbtilesPath.path)"
-        let source = MLNRasterTileSource(
-            identifier: "sectional-tiles",
-            tileURLTemplates: [tileURL],
-            options: [
-                .tileSize: 256,
-                .minimumZoomLevel: 5,
-                .maximumZoomLevel: 12
-            ]
-        )
-        style.addSource(source)
-
-        let rasterLayer = MLNRasterStyleLayer(identifier: "sectional-overlay", source: source)
-        rasterLayer.rasterOpacity = NSExpression(forConstantValue: 0.70)
-        // Insert sectional below other data layers
-        if let firstLayer = style.layers.first {
-            style.insertLayer(rasterLayer, above: firstLayer)
-        } else {
-            style.addLayer(rasterLayer)
-        }
-        self.sectionalLayer = rasterLayer
-
-        // Read chart expiration metadata (INFRA-03)
-        readChartExpirationMetadata(from: mbtilesPath)
-    }
-
-    // MARK: - Chart Expiration Metadata (INFRA-03)
-
-    /// Read MBTiles SQLite metadata table for chart cycle dates.
-    /// MBTiles files have a `metadata` table with key-value pairs.
-    /// Looks for `effective_date` and `expiration_date` keys set by the
-    /// server-side GDAL pipeline when generating MBTiles from FAA GeoTIFFs.
-    func readChartExpirationMetadata(from mbtilesURL: URL? = nil) {
-        let fileManager = FileManager.default
-        let url: URL
-        if let provided = mbtilesURL {
-            url = provided
-        } else {
-            guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-                return
-            }
-            url = appSupport.appendingPathComponent("efb-212/sectional.mbtiles")
-        }
-
-        guard fileManager.fileExists(atPath: url.path) else {
-            chartExpirationDate = nil
-            chartEffectiveDate = nil
-            return
-        }
-
-        // Open MBTiles as SQLite and query metadata table
-        var db: OpaquePointer?
-        guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
-            chartExpirationDate = nil
-            chartEffectiveDate = nil
-            return
-        }
-        defer { sqlite3_close(db) }
-
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        // Also try without fractional seconds
-        let fallbackFormatter = ISO8601DateFormatter()
-        fallbackFormatter.formatOptions = [.withInternetDateTime]
-
-        // Read effective_date
-        chartEffectiveDate = queryMetadata(db: db, key: "effective_date", formatters: [formatter, fallbackFormatter])
-
-        // Read expiration_date
-        chartExpirationDate = queryMetadata(db: db, key: "expiration_date", formatters: [formatter, fallbackFormatter])
-    }
-
-    private func queryMetadata(db: OpaquePointer?, key: String, formatters: [ISO8601DateFormatter]) -> Date? {
-        var statement: OpaquePointer?
-        let sql = "SELECT value FROM metadata WHERE name = ?"
-        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return nil }
-        defer { sqlite3_finalize(statement) }
-
-        sqlite3_bind_text(statement, 1, (key as NSString).utf8String, -1, nil)
-
-        guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
-        guard let cStr = sqlite3_column_text(statement, 0) else { return nil }
-        let value = String(cString: cStr)
-
-        for fmt in formatters {
-            if let date = fmt.date(from: value) {
-                return date
-            }
-        }
-
-        // Try plain date format (yyyy-MM-dd)
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-        return dateFormatter.date(from: value)
-    }
-
     // MARK: - Airspace Layer
 
     private func addAirspaceLayer(to style: MLNStyle) {
@@ -302,6 +206,7 @@ final class MapService {
         // Symbol layer for floor/ceiling labels
         let labelLayer = MLNSymbolStyleLayer(identifier: "airspace-labels", source: source)
         labelLayer.text = NSExpression(forKeyPath: "label")
+        labelLayer.textFontNames = NSExpression(forConstantValue: ["Noto Sans Regular"])  // must exist on the style's glyph server
         labelLayer.textFontSize = NSExpression(forConstantValue: 10)
         labelLayer.textColor = NSExpression(forConstantValue: UIColor.secondaryLabel)
         labelLayer.textAllowsOverlap = NSExpression(forConstantValue: false)
@@ -341,10 +246,10 @@ final class MapService {
         style.addSource(source)
         self.tfrSource = source
 
-        // Red fill at 20% opacity
+        // Red fill: 25% for TFRs in effect now, 8% for published-but-not-yet-active ones
         let fillLayer = MLNFillStyleLayer(identifier: "tfr-fill", source: source)
         fillLayer.fillColor = NSExpression(forConstantValue: UIColor.systemRed)
-        fillLayer.fillOpacity = NSExpression(forConstantValue: 0.20)
+        fillLayer.fillOpacity = NSExpression(forKeyPath: "opacity")
         style.addLayer(fillLayer)
 
         // 2pt solid red border
@@ -354,13 +259,62 @@ final class MapService {
         style.addLayer(lineLayer)
     }
 
+    // MARK: - Advisory Layer (AIRMET / SIGMET / G-AIRMET)
+
+    /// Fill + outline colored per feature ("color" hex attribute from `AdvisoryStyle`).
+    /// Inserted below ownship (the lowest flight-data layer) so airports, TFRs and the
+    /// ownship chevron stay readable on top of large advisory areas.
+    private func addAdvisoryLayer(to style: MLNStyle) {
+        let source = MLNShapeSource(
+            identifier: "advisories",
+            shape: MLNShapeCollectionFeature(shapes: []),
+            options: nil
+        )
+        style.addSource(source)
+        self.advisorySource = source
+
+        let fillLayer = MLNFillStyleLayer(identifier: "advisory-fill", source: source)
+        fillLayer.fillColor = NSExpression(forKeyPath: "color")
+        fillLayer.fillOpacity = NSExpression(forConstantValue: 0.15)
+
+        let lineLayer = MLNLineStyleLayer(identifier: "advisory-border", source: source)
+        lineLayer.lineColor = NSExpression(forKeyPath: "color")
+        lineLayer.lineWidth = NSExpression(forConstantValue: 1.5)
+        lineLayer.lineDashPattern = NSExpression(forConstantValue: [4, 2])
+
+        if let ownship = style.layer(withIdentifier: "ownship-symbol") {
+            style.insertLayer(fillLayer, below: ownship)
+            style.insertLayer(lineLayer, below: ownship)
+        } else {
+            style.addLayer(fillLayer)
+            style.addLayer(lineLayer)
+        }
+    }
+
     // MARK: - Update Methods
 
-    /// Update ownship GeoJSON point with new coordinates and heading.
+    /// Update ownship GeoJSON point with new coordinates and heading (degrees true).
     func updateOwnship(location: CLLocation, heading: Double) {
+        lastOwnshipLocation = location
+        lastOwnshipHeading = heading
+        redrawOwnship()
+    }
+
+    /// Grey the chevron when the last fix is older than the stale limit (F5), blue when live.
+    func setOwnshipStale(_ stale: Bool) {
+        guard stale != ownshipStale else { return }
+        ownshipStale = stale
+        redrawOwnship()
+    }
+
+    private func redrawOwnship() {
+        guard let location = lastOwnshipLocation else { return }
         let point = MLNPointFeature()
         point.coordinate = location.coordinate
-        point.attributes = ["heading": heading]
+        point.attributes = [
+            "heading": lastOwnshipHeading,
+            "icon": ownshipStale ? Self.ownshipStaleIcon : Self.ownshipLiveIcon
+        ]
         ownshipSource?.shape = point
     }
 
@@ -462,41 +416,46 @@ final class MapService {
         weatherSource?.shape = collection
     }
 
-    /// Build GeoJSON FeatureCollection from TFR array.
-    func updateTFRs(_ tfrs: [TFR]) {
-        let features: [MLNShape] = tfrs.compactMap { tfr in
-            if let radiusNM = tfr.radiusNM, radiusNM > 0 {
-                // Circular TFR - approximate as polygon
-                let radiusMeters = radiusNM * 1852.0
-                var coords = (0..<36).map { i -> CLLocationCoordinate2D in
-                    let angle = Double(i) * (360.0 / 36.0) * .pi / 180.0
-                    let lat = tfr.latitude + (radiusMeters / 111320.0) * cos(angle)
-                    let lon = tfr.longitude + (radiusMeters / (111320.0 * cos(tfr.latitude * .pi / 180.0))) * sin(angle)
-                    return CLLocationCoordinate2D(latitude: lat, longitude: lon)
-                }
-                let polygon = MLNPolygonFeature(coordinates: &coords, count: UInt(coords.count))
-                polygon.attributes = [
-                    "id": tfr.id,
-                    "type": tfr.type.rawValue
-                ]
-                return polygon
-            } else if !tfr.boundaries.isEmpty {
-                // Polygon TFR
-                var coords = tfr.boundaries.map {
-                    CLLocationCoordinate2D(latitude: $0[0], longitude: $0[1])
-                }
-                guard coords.count >= 3 else { return nil }
-                let polygon = MLNPolygonFeature(coordinates: &coords, count: UInt(coords.count))
-                polygon.attributes = [
-                    "id": tfr.id,
-                    "type": tfr.type.rawValue
-                ]
-                return polygon
-            }
-            return nil
+    /// Draw TFR polygons. In-effect TFRs get a stronger fill than upcoming ones; expired
+    /// TFRs (possible when serving a stale cache) are skipped.
+    func updateTFRs(_ tfrs: [TFR], now: Date = Date()) {
+        let features: [MLNShape] = tfrs.compactMap { tfr -> MLNShape? in
+            if let expiration = tfr.expirationDate, expiration < now { return nil }
+            guard let polygon = Self.polygonFeature(tfr.boundaries) else { return nil }
+            polygon.attributes = [
+                "id": tfr.id,
+                "notam": tfr.notamID,
+                "type": tfr.type.rawValue,
+                "altitudes": tfr.altitudeDescription,
+                "opacity": tfr.isActive(at: now) ? 0.25 : 0.08
+            ]
+            return polygon
         }
-        let collection = MLNShapeCollectionFeature(shapes: features)
-        tfrSource?.shape = collection
+        tfrSource?.shape = MLNShapeCollectionFeature(shapes: features)
+    }
+
+    /// Draw advisory polygons, colored by hazard. Callers pass only currently valid advisories.
+    func updateAdvisories(_ advisories: [AviationAdvisory]) {
+        let features: [MLNShape] = advisories.compactMap { advisory -> MLNShape? in
+            guard let polygon = Self.polygonFeature(advisory.boundaries) else { return nil }
+            polygon.attributes = [
+                "id": advisory.id,
+                "kind": advisory.kind.rawValue,
+                "hazard": advisory.hazardCode,
+                "color": advisory.colorHex
+            ]
+            return polygon
+        }
+        advisorySource?.shape = MLNShapeCollectionFeature(shapes: features)
+    }
+
+    /// Polygon feature from a [lat, lon] ring; nil for degenerate rings.
+    private static func polygonFeature(_ ring: [[Double]]) -> MLNPolygonFeature? {
+        var coords = ring.compactMap { point -> CLLocationCoordinate2D? in
+            point.count >= 2 ? CLLocationCoordinate2D(latitude: point[0], longitude: point[1]) : nil
+        }
+        guard coords.count >= 3 else { return nil }
+        return MLNPolygonFeature(coordinates: &coords, count: UInt(coords.count))
     }
 
     // MARK: - Route Layer
@@ -722,17 +681,40 @@ final class MapService {
         case .airspace: return ["airspace-fill", "airspace-border", "airspace-labels"]
         case .weatherDots: return ["weather-circles"]
         case .tfrs: return ["tfr-fill", "tfr-border"]
+        case .advisories: return ["advisory-fill", "advisory-border"]
         case .ownship: return ["ownship-symbol"]
-        case .sectional: return ["sectional-overlay"]
+        case .sectional: return []  // the sectional is a base-style.json layer driven by `setMapStyle`
         case .route: return ["route-line-layer"]
         }
     }
 
+    // MARK: - Base Map Style
+
+    /// Base map last applied to the current style; nil until applied after a style load.
+    private var appliedMapStyle: MapStyle?
+
+    /// Show the base-style.json layers for `mapStyle`, hide the rest. Toggles visibility
+    /// instead of swapping styles, so the flight data layers added in `onStyleLoaded` survive.
+    func setMapStyle(_ mapStyle: MapStyle) {
+        guard mapStyle != appliedMapStyle, let style = mapView?.style else { return }
+
+        // VFR draws the FAA sectional over the street map (sectional tiles cover zoom 8-12 only)
+        let showStreet = mapStyle == .street || mapStyle == .vfrSectional
+        for layer in style.layers where layer.identifier.hasPrefix("street-") {
+            layer.isVisible = showStreet
+        }
+        style.layer(withIdentifier: "base-satellite")?.isVisible = mapStyle == .satellite
+        style.layer(withIdentifier: "base-terrain")?.isVisible = mapStyle == .terrain
+        style.layer(withIdentifier: "base-vfr-sectional")?.isVisible = mapStyle == .vfrSectional
+        appliedMapStyle = mapStyle
+    }
+
     // MARK: - Sectional Opacity
 
-    /// Update raster layer opacity for sectional overlay.
+    /// Update raster opacity of the FAA sectional base layer.
     func setSectionalOpacity(_ opacity: Double) {
-        sectionalLayer?.rasterOpacity = NSExpression(forConstantValue: opacity)
+        let value = NSExpression(forConstantValue: opacity)
+        (mapView?.style?.layer(withIdentifier: "base-vfr-sectional") as? MLNRasterStyleLayer)?.rasterOpacity = value
     }
 
     // MARK: - Animation
@@ -741,5 +723,24 @@ final class MapService {
     func animateToLocation(_ coordinate: CLLocationCoordinate2D, zoom: Double) {
         mapView?.setCenter(coordinate, zoomLevel: zoom, direction: mapView?.direction ?? 0, animated: true)
     }
+
+    // MARK: - Camera (follow ownship / track-up)
+
+    /// Move the camera. Nil `center` keeps the current centre; nil `zoom` keeps the current
+    /// zoom; `direction` is degrees clockwise from north (0 = north-up, GPS track for
+    /// track-up). Always a plain camera move: MapLibre's user-tracking mode is never used
+    /// because it draws the system location puck next to our chevron (F4).
+    func setCamera(center: CLLocationCoordinate2D?, zoom: Double?, direction: Double, animated: Bool) {
+        guard let mapView else { return }
+        mapView.setCenter(
+            center ?? mapView.centerCoordinate,
+            zoomLevel: zoom ?? mapView.zoomLevel,
+            direction: direction,
+            animated: animated
+        )
+    }
+
+    /// Current map rotation in degrees clockwise from north.
+    var currentDirection: Double { mapView?.direction ?? 0 }
 
 }

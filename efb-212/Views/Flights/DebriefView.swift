@@ -15,6 +15,10 @@ struct DebriefView: View {
     let recordingDB: RecordingDatabase
     let metadata: FlightMetadata
 
+    /// Error from FlightSummaryBuilder.buildPrompt (a recording-database read failure).
+    /// DebriefEngine never sees the prompt in that case, so the view tracks it itself.
+    @State private var promptError: Error?
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -37,7 +41,7 @@ struct DebriefView: View {
                     ProgressView("Generating debrief...")
                         .padding(.top, 8)
 
-                } else if let error = debriefEngine.error {
+                } else if let error = debriefEngine.error ?? promptError {
                     // MARK: - Error State
                     errorContent(error)
 
@@ -249,6 +253,7 @@ struct DebriefView: View {
     // MARK: - Actions
 
     private func generateDebrief() {
+        promptError = nil
         Task {
             do {
                 let prompt = try FlightSummaryBuilder.buildPrompt(
@@ -262,8 +267,9 @@ struct DebriefView: View {
                     flightID: flightID
                 )
             } catch {
-                // FlightSummaryBuilder.buildPrompt can throw if DB read fails.
-                // DebriefEngine will show error state.
+                // FlightSummaryBuilder.buildPrompt throws when the recording database read fails.
+                // Surface it in the error state so the pilot can retry instead of seeing nothing.
+                promptError = EFBError.debriefFailed(underlying: error)
             }
         }
     }

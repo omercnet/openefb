@@ -22,6 +22,16 @@ final class DatabaseManager: DatabaseServiceProtocol, @unchecked Sendable {
         self.aviationDB = try AviationDatabase()
     }
 
+    /// Initialize from an explicit bundled file and install directory (tests).
+    /// Throws EFBError.databaseCorrupted if `bundledURL` does not exist.
+    nonisolated init(bundledURL: URL, installDirectory: URL, dataVersion: String = AviationDatabase.bundledDataVersion) throws {
+        self.aviationDB = try AviationDatabase(
+            bundledURL: bundledURL,
+            installDirectory: installDirectory,
+            dataVersion: dataVersion
+        )
+    }
+
     /// Internal init for testing with a pre-configured AviationDatabase.
     nonisolated init(aviationDB: AviationDatabase) {
         self.aviationDB = aviationDB
@@ -51,5 +61,39 @@ final class DatabaseManager: DatabaseServiceProtocol, @unchecked Sendable {
 
     nonisolated func navaids(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Navaid] {
         try aviationDB.navaids(near: coordinate, radiusNM: radiusNM)
+    }
+}
+
+// MARK: - Unavailable Database
+
+/// Database service used when the aviation database failed to open.
+/// Every query throws EFBError.databaseCorrupted so callers surface the failure
+/// instead of showing an empty sky. AppState.databaseError carries the original error.
+final class UnavailableDatabaseService: DatabaseServiceProtocol, @unchecked Sendable {
+
+    nonisolated init() {}
+
+    nonisolated func airport(byICAO icao: String) throws -> Airport? {
+        throw EFBError.databaseCorrupted
+    }
+
+    nonisolated func airports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] {
+        throw EFBError.databaseCorrupted
+    }
+
+    nonisolated func nearestAirports(to coordinate: CLLocationCoordinate2D, count: Int) throws -> [Airport] {
+        throw EFBError.databaseCorrupted
+    }
+
+    nonisolated func searchAirports(query: String, limit: Int) throws -> [Airport] {
+        throw EFBError.databaseCorrupted
+    }
+
+    nonisolated func airspaces(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airspace] {
+        throw EFBError.databaseCorrupted
+    }
+
+    nonisolated func navaids(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Navaid] {
+        throw EFBError.databaseCorrupted
     }
 }

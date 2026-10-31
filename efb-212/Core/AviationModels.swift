@@ -213,54 +213,104 @@ struct Airspace: Identifiable, Codable, Equatable, Sendable {
 
 // MARK: - TFR (Temporary Flight Restriction)
 
-struct TFR: Identifiable, Codable, Equatable, Sendable {
-    let id: String                       // NOTAM number (e.g., "FDC 4/0254")
+/// One TFR area. A NOTAM with several areas (e.g. FDC 6/4348 Areas A and B) becomes several
+/// `TFR` values sharing `notamID`, each with its own boundary and altitudes.
+/// Optional schedule/altitude fields are nil when tfr.faa.gov does not publish them or the
+/// NOTAM detail could not be fetched; the UI shows "See NOTAM" instead of a guessed value.
+nonisolated struct TFR: Identifiable, Codable, Equatable, Sendable {
+    let id: String                       // Unique per area: "<notamID>#<area index>"
+    let notamID: String                  // FDC NOTAM number, e.g. "6/4348"
     let type: TFRType
-    let description: String              // Human-readable TFR description
-    let effectiveDate: Date
-    let expirationDate: Date
-    let latitude: Double                 // Center latitude (for circular TFRs)
-    let longitude: Double                // Center longitude
-    let radiusNM: Double?                // Radius in nautical miles (nil for polygon TFRs)
-    let boundaries: [[Double]]           // Array of [lat, lon] pairs (for polygon TFRs)
-    let floorAltitude: Int               // feet MSL
-    let ceilingAltitude: Int             // feet MSL
+    let title: String                    // FAA title, e.g. "GRAND FORKS AFB, ND, Sunday, March 8, 2026 ..."
+    let state: String?                   // US state code, e.g. "ND"
+    let facility: String?                // Responsible ARTCC, e.g. "ZMP"
+    let effectiveDate: Date?             // UTC; nil = effective immediately (or unknown)
+    let expirationDate: Date?            // UTC; nil = until further notice (or unknown)
+    let boundaries: [[Double]]           // Outer ring as [lat, lon] pairs
+    let floor: TFRAltitude?              // nil = see NOTAM
+    let ceiling: TFRAltitude?            // nil = see NOTAM
+    let lastModified: Date?              // UTC, FAA LAST_MODIFICATION_DATETIME
 
-    /// Whether the TFR is currently active based on effective/expiration dates.
-    nonisolated var isActive: Bool {
-        let now = Date()
-        return now >= effectiveDate && now <= expirationDate
+    /// Whether the TFR is in effect at `date`. Missing dates are treated as open-ended,
+    /// so a TFR with unknown times is conservatively considered active.
+    func isActive(at date: Date) -> Bool {
+        if let effectiveDate, date < effectiveDate { return false }
+        if let expirationDate, date > expirationDate { return false }
+        return true
     }
 
-    /// Center coordinate for map display and distance calculations.
-    nonisolated var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    var isActive: Bool { isActive(at: Date()) }
+
+    /// Vertex centroid of the boundary, for labels and coarse distance sorting.
+    var coordinate: CLLocationCoordinate2D {
+        PolygonGeometry.centroid(of: boundaries) ?? CLLocationCoordinate2D(latitude: 0, longitude: 0)
     }
 
-    nonisolated init(
+    /// "SFC-2400' MSL", "1000' AGL-FL180", or "See NOTAM" when altitudes are unpublished.
+    var altitudeDescription: String {
+        guard let floor, let ceiling else { return "See NOTAM" }
+        return "\(floor.displayString)-\(ceiling.displayString)"
+    }
+
+    /// Public FAA detail page for this NOTAM.
+    var detailURL: URL? {
+        URL(string: "https://tfr.faa.gov/tfr3/?page=detail_\(notamID.replacingOccurrences(of: "/", with: "_"))")
+    }
+
+    init(
         id: String,
+        notamID: String,
         type: TFRType,
-        description: String,
-        effectiveDate: Date,
-        expirationDate: Date,
-        latitude: Double,
-        longitude: Double,
-        radiusNM: Double? = nil,
-        boundaries: [[Double]] = [],
-        floorAltitude: Int = 0,
-        ceilingAltitude: Int = 18000
+        title: String,
+        state: String? = nil,
+        facility: String? = nil,
+        effectiveDate: Date? = nil,
+        expirationDate: Date? = nil,
+        boundaries: [[Double]],
+        floor: TFRAltitude? = nil,
+        ceiling: TFRAltitude? = nil,
+        lastModified: Date? = nil
     ) {
         self.id = id
+        self.notamID = notamID
         self.type = type
-        self.description = description
+        self.title = title
+        self.state = state
+        self.facility = facility
         self.effectiveDate = effectiveDate
         self.expirationDate = expirationDate
-        self.latitude = latitude
-        self.longitude = longitude
-        self.radiusNM = radiusNM
         self.boundaries = boundaries
-        self.floorAltitude = floorAltitude
-        self.ceilingAltitude = ceilingAltitude
+        self.floor = floor
+        self.ceiling = ceiling
+        self.lastModified = lastModified
+    }
+}
+
+/// A TFR vertical limit as published in the FAA XNOTAM detail.
+nonisolated struct TFRAltitude: Codable, Equatable, Sendable {
+    nonisolated enum Reference: String, Codable, Sendable {
+        case msl            // XNOTAM "ALT" with FT: feet MSL
+        case agl            // XNOTAM "HEI": feet AGL
+        case flightLevel    // XNOTAM uom "FL": value is the flight level (hundreds of feet, pressure altitude)
+    }
+
+    let value: Int          // feet (MSL or AGL), or flight level number for .flightLevel
+    let reference: Reference
+
+    /// Approximate feet for comparisons: flight levels converted at 100 ft per level.
+    var feet: Int { reference == .flightLevel ? value * 100 : value }
+
+    var displayString: String {
+        switch reference {
+        case .flightLevel: return "FL\(String(format: "%03d", value))"
+        case .agl: return value == 0 ? "SFC" : "\(value)' AGL"
+        case .msl: return value == 0 ? "SFC" : "\(value)' MSL"
+        }
+    }
+
+    init(value: Int, reference: Reference) {
+        self.value = value
+        self.reference = reference
     }
 }
 

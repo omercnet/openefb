@@ -25,6 +25,7 @@ struct ContentView: View {
 
         VStack(spacing: 0) {
             BetaBanner()
+            DatabaseUnavailableBanner()
 
             TabView(selection: $appState.selectedTab) {
                 Tab(AppTab.map.title, systemImage: AppTab.map.systemImage, value: .map) {

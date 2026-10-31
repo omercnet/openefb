@@ -2,224 +2,249 @@
 //  WeatherServiceTests.swift
 //  efb-212Tests
 //
-//  Tests for weather service logic: FlightCategory determination,
-//  WeatherCache staleness, age computation, and WindInfo properties.
-//
-//  The actual determineFlightCategory logic lives inside the WeatherService actor
-//  (private). We test the same logic indirectly via WeatherCache properties and
-//  FlightCategory enum behavior, plus test the observable behavior through
-//  the WeatherViewModel + MockWeatherService integration.
+//  WeatherService behaviour that WeatherParsingTests does not cover: flight-category
+//  thresholds when NOAA omits fltCat, HTTP/transport failure handling, the 15-minute cache,
+//  station batching and partial-batch failure, TAF extraction, and WeatherCache staleness.
 //
 
 import Testing
 import Foundation
 @testable import efb_212
 
+/// Thread-safe request log for stub handlers (the handler closure is @Sendable).
+nonisolated final class RequestLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var urls: [URL] = []
+
+    func record(_ url: URL?) {
+        guard let url else { return }
+        lock.withLock { urls.append(url) }
+    }
+    var count: Int { lock.withLock { urls.count } }
+    var all: [URL] { lock.withLock { urls } }
+}
+
 @Suite("Weather Service Tests")
 struct WeatherServiceTests {
 
-    // MARK: - Test Helpers
+    // MARK: - Helpers
 
-    /// Create a WeatherCache with specific ceiling and visibility for flight category testing.
-    static func makeWeather(
-        stationID: String = "KPAO",
-        ceiling: Int? = nil,
-        visibility: Double? = nil,
-        category: FlightCategory = .vfr,
-        fetchedAt: Date = Date()
-    ) -> WeatherCache {
-        let visStr: String? = visibility.map { String($0) }
-        return WeatherCache(
-            stationID: stationID,
-            visibility: visStr,
-            ceiling: ceiling,
-            flightCategory: category,
-            fetchedAt: fetchedAt
-        )
+    /// `ids` query parameter of a request, split on commas.
+    nonisolated static func requestedIDs(_ request: URLRequest) -> [String] {
+        guard let url = request.url,
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems,
+              let ids = items.first(where: { $0.name == "ids" })?.value else { return [] }
+        return ids.split(separator: ",").map(String.init)
     }
 
-    // MARK: - FlightCategory Determination Logic Tests
-
-    // These test the category determination rules documented in WeatherService:
-    // VFR:  ceiling > 3000 AND visibility > 5 SM
-    // MVFR: ceiling 1000-3000 OR visibility 3-5 SM
-    // IFR:  ceiling 500-999 OR visibility 1-3 SM
-    // LIFR: ceiling < 500 OR visibility < 1 SM
-
-    @Test func flightCategoryVFR() {
-        // VFR conditions: high ceiling, good visibility
-        let category = FlightCategory.vfr
-        #expect(category.colorName == "green")
-        #expect(category.rawValue == "vfr")
+    /// A METAR JSON array with one VFR entry per requested id.
+    nonisolated static func metarJSON(for ids: [String]) -> Data {
+        let entries = ids.map { #"{"icaoId":"\#($0)","fltCat":"VFR","visib":"10+"}"# }
+        return Data("[\(entries.joined(separator: ","))]".utf8)
     }
 
-    @Test func flightCategoryMVFR() {
-        // MVFR: marginal VFR
-        let category = FlightCategory.mvfr
-        #expect(category.colorName == "blue")
-        #expect(category.rawValue == "mvfr")
+    /// Parse one synthetic METAR without a NOAA flight category, so the service must compute it.
+    static func computedCategory(ceilingFeet: Int?, visibilitySM: String?) throws -> FlightCategory {
+        var fields = [#""icaoId":"KTST""#]
+        if let visibilitySM { fields.append(#""visib":"\#(visibilitySM)""#) }
+        if let ceilingFeet { fields.append(#""clouds":[{"cover":"BKN","base":\#(ceilingFeet)}]"#) }
+        let json = Data("[{\(fields.joined(separator: ","))}]".utf8)
+        return try #require(try WeatherService().parseMetarResponse(json).first).flightCategory
     }
 
-    @Test func flightCategoryIFR() {
-        // IFR: instrument conditions
-        let category = FlightCategory.ifr
-        #expect(category.colorName == "red")
-        #expect(category.rawValue == "ifr")
+    // MARK: - Flight category thresholds (FAA: ceiling and visibility, worst wins)
+
+    @Test(arguments: [
+        (3001, "VFR"), (3000, "MVFR"), (1000, "MVFR"), (999, "IFR"), (500, "IFR"), (499, "LIFR"),
+    ] as [(Int, String)])
+    func ceilingBoundaries(ceiling: Int, expected: String) throws {
+        let category = try Self.computedCategory(ceilingFeet: ceiling, visibilitySM: "10")
+        #expect(category.rawValue == expected.lowercased(), "ceiling \(ceiling) ft")
     }
 
-    @Test func flightCategoryLIFR() {
-        // LIFR: low instrument conditions
-        let category = FlightCategory.lifr
-        #expect(category.colorName == "magenta")
-        #expect(category.rawValue == "lifr")
+    @Test(arguments: [
+        ("6", "VFR"), ("5", "MVFR"), ("3", "MVFR"), ("2.9", "IFR"), ("1", "IFR"), ("0.5", "LIFR"),
+    ] as [(String, String)])
+    func visibilityBoundaries(visibility: String, expected: String) throws {
+        let category = try Self.computedCategory(ceilingFeet: nil, visibilitySM: visibility)
+        #expect(category.rawValue == expected.lowercased(), "visibility \(visibility) SM")
     }
 
-    @Test func vfrConditions() {
-        // Ceiling > 3000 AND visibility > 5
-        let weather = Self.makeWeather(ceiling: 5000, visibility: 10.0, category: .vfr)
-        #expect(weather.flightCategory == .vfr)
-        #expect(weather.ceiling! > 3000)
-        #expect(weather.visibility == "10.0")
+    @Test func worseOfCeilingAndVisibilityWins() throws {
+        // Ceiling alone would be VFR, visibility alone IFR.
+        #expect(try Self.computedCategory(ceilingFeet: 8000, visibilitySM: "2") == .ifr)
+        // Ceiling alone LIFR, visibility alone VFR.
+        #expect(try Self.computedCategory(ceilingFeet: 300, visibilitySM: "10") == .lifr)
     }
 
-    @Test func mvfrCeiling() {
-        // Ceiling 1000-3000 triggers MVFR
-        let weather = Self.makeWeather(ceiling: 2500, visibility: 10.0, category: .mvfr)
-        #expect(weather.flightCategory == .mvfr)
-        #expect(weather.ceiling! >= 1000 && weather.ceiling! <= 3000)
+    @Test func noCeilingAndNoVisibilityDefaultsToVFR() throws {
+        #expect(try Self.computedCategory(ceilingFeet: nil, visibilitySM: nil) == .vfr)
     }
 
-    @Test func mvfrVisibility() {
-        // Visibility 3-5 SM triggers MVFR
-        let weather = Self.makeWeather(ceiling: 5000, visibility: 4.0, category: .mvfr)
-        #expect(weather.flightCategory == .mvfr)
-        #expect(weather.visibility == "4.0")
+    @Test func noaaFlightCategoryOverridesComputedOne() throws {
+        // NOAA says LIFR even though the numbers alone would say VFR; the report is authoritative.
+        let json = Data(#"[{"icaoId":"KTST","fltCat":"LIFR","visib":"10"}]"#.utf8)
+        let wx = try #require(try WeatherService().parseMetarResponse(json).first)
+        #expect(wx.flightCategory == .lifr)
     }
 
-    @Test func ifrCeiling() {
-        // Ceiling 500-999 triggers IFR
-        let weather = Self.makeWeather(ceiling: 800, visibility: 10.0, category: .ifr)
-        #expect(weather.flightCategory == .ifr)
-        #expect(weather.ceiling! >= 500 && weather.ceiling! < 1000)
+    @Test func entriesWithoutStationIdAreDropped() throws {
+        let json = Data(#"[{"fltCat":"VFR"},{"icaoId":"KPAO","fltCat":"VFR"}]"#.utf8)
+        #expect(try WeatherService().parseMetarResponse(json).map(\.stationID) == ["KPAO"])
     }
 
-    @Test func ifrVisibility() {
-        // Visibility 1-3 SM triggers IFR
-        let weather = Self.makeWeather(ceiling: 5000, visibility: 2.0, category: .ifr)
-        #expect(weather.flightCategory == .ifr)
-        #expect(weather.visibility == "2.0")
+    @Test func nonArrayPayloadThrowsWeatherFetchFailed() {
+        let service = WeatherService()
+        #expect(throws: EFBError.self) {
+            try service.parseMetarResponse(Data(#"{"error":"nope"}"#.utf8))
+        }
     }
 
-    @Test func lifrCeiling() {
-        // Ceiling < 500 triggers LIFR
-        let weather = Self.makeWeather(ceiling: 200, visibility: 10.0, category: .lifr)
-        #expect(weather.flightCategory == .lifr)
-        #expect(weather.ceiling! < 500)
+    // MARK: - fetchMETAR failures
+
+    @Test func serverErrorThrowsAndLeavesCacheEmpty() async {
+        let service = WeatherService(session: StubURLProtocol.session { _ in (500, Data()) })
+
+        await #expect(throws: EFBError.self) { try await service.fetchMETAR(for: "KPAO") }
+        #expect(service.cachedWeather(for: "KPAO") == nil)
     }
 
-    @Test func lifrVisibility() {
-        // Visibility < 1 SM triggers LIFR
-        let weather = Self.makeWeather(ceiling: 5000, visibility: 0.5, category: .lifr)
-        #expect(weather.flightCategory == .lifr)
-        #expect(weather.visibility == "0.5")
+    @Test func emptyArrayForUnknownStationThrows() async {
+        let service = WeatherService(session: StubURLProtocol.session { _ in (200, Data("[]".utf8)) })
+
+        await #expect(throws: EFBError.self) { try await service.fetchMETAR(for: "KZZZ") }
     }
 
-    // MARK: - WeatherCache Staleness Tests
+    @Test func transportFailureSurfacesAsAnError() async {
+        let service = WeatherService(session: StubURLProtocol.session { _ in throw URLError(.notConnectedToInternet) })
 
-    @Test func freshWeatherIsNotStale() {
-        let weather = WeatherCache(stationID: "KPAO", fetchedAt: Date())
-        #expect(!weather.isStale)
+        await #expect(throws: (any Error).self) { try await service.fetchMETAR(for: "KPAO") }
     }
 
-    @Test func oldWeatherIsStale() {
-        // 2 hours ago = definitely stale (threshold is 60 minutes)
-        let weather = WeatherCache(stationID: "KPAO", fetchedAt: Date(timeIntervalSinceNow: -7200))
-        #expect(weather.isStale)
+    // MARK: - Cache
+
+    @Test func secondFetchWithinFifteenMinutesIsServedFromCache() async throws {
+        let log = RequestLog()
+        let service = WeatherService(session: StubURLProtocol.session { request in
+            log.record(request.url)
+            return (200, Self.metarJSON(for: Self.requestedIDs(request)))
+        })
+
+        let first = try await service.fetchMETAR(for: "KPAO")
+        let second = try await service.fetchMETAR(for: "KPAO")
+
+        #expect(log.count == 1)
+        #expect(second == first)
     }
 
-    @Test func weatherAgeBoundary() {
-        // Just under 60 minutes = fresh
-        let justFresh = WeatherCache(stationID: "KPAO", fetchedAt: Date(timeIntervalSinceNow: -3599))
+    @Test func clearingCacheForcesANetworkFetch() async throws {
+        let log = RequestLog()
+        let service = WeatherService(session: StubURLProtocol.session { request in
+            log.record(request.url)
+            return (200, Self.metarJSON(for: Self.requestedIDs(request)))
+        })
+
+        _ = try await service.fetchMETAR(for: "KPAO")
+        await service.clearCache(for: "KPAO")
+        _ = try await service.fetchMETAR(for: "KPAO")
+
+        #expect(log.count == 2)
+    }
+
+    // MARK: - Batch fetch
+
+    @Test func emptyStationListMakesNoRequest() async throws {
+        let log = RequestLog()
+        let service = WeatherService(session: StubURLProtocol.session { request in
+            log.record(request.url)
+            return (200, Data("[]".utf8))
+        })
+
+        #expect(try await service.fetchWeatherForStations([]).isEmpty)
+        #expect(log.count == 0)
+    }
+
+    @Test func largeStationListIsSplitIntoBatchesOfForty() async throws {
+        let log = RequestLog()
+        let service = WeatherService(session: StubURLProtocol.session { request in
+            log.record(request.url)
+            return (200, Self.metarJSON(for: Self.requestedIDs(request)))
+        })
+        let ids = (0..<45).map { String(format: "K%03d", $0) }
+
+        let results = try await service.fetchWeatherForStations(ids)
+
+        #expect(results.count == 45)
+        #expect(log.count == 2)
+        let sizes = log.all.map { url in
+            (URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?.first { $0.name == "ids" }?.value?.split(separator: ",").count) ?? 0
+        }
+        #expect(sizes == [40, 5])
+    }
+
+    @Test func batchFetchSkipsCachedStationsAndOnlyRequestsTheRest() async throws {
+        let log = RequestLog()
+        let service = WeatherService(session: StubURLProtocol.session { request in
+            log.record(request.url)
+            return (200, Self.metarJSON(for: Self.requestedIDs(request)))
+        })
+        _ = try await service.fetchMETAR(for: "KPAO")
+
+        let results = try await service.fetchWeatherForStations(["KPAO", "KSQL"])
+
+        #expect(Set(results.map(\.stationID)) == ["KPAO", "KSQL"])
+        #expect(log.count == 2)
+        #expect(Self.requestedIDs(URLRequest(url: log.all[1])) == ["KSQL"])
+    }
+
+    @Test func failedBatchDoesNotLoseTheOtherBatch() async throws {
+        let log = RequestLog()
+        let service = WeatherService(session: StubURLProtocol.session { request in
+            log.record(request.url)
+            // First batch fails, second succeeds.
+            return log.count == 1 ? (503, Data()) : (200, Self.metarJSON(for: Self.requestedIDs(request)))
+        })
+        let ids = (0..<45).map { String(format: "K%03d", $0) }
+
+        let results = try await service.fetchWeatherForStations(ids)
+
+        #expect(results.count == 5)
+        #expect(Set(results.map(\.stationID)) == Set(ids.suffix(5)))
+    }
+
+    // MARK: - TAF
+
+    @Test func fetchTAFReturnsRawText() async throws {
+        let body = Data(#"[{"icaoId":"KPAO","rawTAF":"TAF KPAO 301130Z 3012/3112 33008KT P6SM SKC"}]"#.utf8)
+        let service = WeatherService(session: StubURLProtocol.session { _ in (200, body) })
+
+        #expect(try await service.fetchTAF(for: "KPAO") == "TAF KPAO 301130Z 3012/3112 33008KT P6SM SKC")
+    }
+
+    @Test func fetchTAFWithoutRawTextThrows() async {
+        let service = WeatherService(session: StubURLProtocol.session { _ in (200, Data(#"[{"icaoId":"KPAO"}]"#.utf8)) })
+
+        await #expect(throws: EFBError.self) { try await service.fetchTAF(for: "KPAO") }
+    }
+
+    @Test func fetchTAFHTTPErrorThrows() async {
+        let service = WeatherService(session: StubURLProtocol.session { _ in (404, Data()) })
+
+        await #expect(throws: EFBError.self) { try await service.fetchTAF(for: "KPAO") }
+    }
+
+    // MARK: - WeatherCache staleness
+
+    @Test func stalenessThresholdIsSixtyMinutes() {
+        let justFresh = WeatherCache(stationID: "KPAO", fetchedAt: Date(timeIntervalSinceNow: -3590))
+        let justStale = WeatherCache(stationID: "KPAO", fetchedAt: Date(timeIntervalSinceNow: -3610))
         #expect(!justFresh.isStale)
-
-        // Just over 60 minutes = stale
-        let justStale = WeatherCache(stationID: "KPAO", fetchedAt: Date(timeIntervalSinceNow: -3601))
         #expect(justStale.isStale)
     }
 
-    @Test func weatherAge() {
-        let twoHoursAgo = Date(timeIntervalSinceNow: -7200)
-        let weather = WeatherCache(stationID: "KPAO", fetchedAt: twoHoursAgo)
-        // Age should be approximately 7200 seconds (allow 5 second tolerance for test execution)
-        #expect(weather.age > 7195)
-        #expect(weather.age < 7210)
-    }
-
-    // MARK: - WeatherCache Init Defaults
-
-    @Test func weatherCacheDefaults() {
-        let cache = WeatherCache(stationID: "KPAO")
-        #expect(cache.stationID == "KPAO")
-        #expect(cache.rawMETAR == nil)
-        #expect(cache.rawTAF == nil)
-        #expect(cache.flightCategory == .vfr)
-        #expect(cache.temperature == nil)
-        #expect(cache.dewpoint == nil)
-        #expect(cache.windDirection == nil)
-        #expect(cache.visibility == nil)
-        #expect(cache.ceiling == nil)
-        #expect(cache.observationTime == nil)
-        #expect(!cache.isStale) // just created
-    }
-
-    // MARK: - WindInfo Tests
-
-    @Test func windInfoCreation() {
-        let wind = WindInfo(direction: 270, speed: 15, gusts: 25, isVariable: false)
-        #expect(wind.direction == 270)     // degrees true
-        #expect(wind.speed == 15)          // knots
-        #expect(wind.gusts == 25)          // knots
-        #expect(wind.isVariable == false)
-    }
-
-    @Test func windInfoVariable() {
-        let wind = WindInfo(direction: 0, speed: 5, gusts: nil, isVariable: true)
-        #expect(wind.isVariable == true)
-        #expect(wind.direction == 0)
-        #expect(wind.gusts == nil)
-    }
-
-    @Test func windInfoEquality() {
-        let wind1 = WindInfo(direction: 180, speed: 10, gusts: nil, isVariable: false)
-        let wind2 = WindInfo(direction: 180, speed: 10, gusts: nil, isVariable: false)
-        let wind3 = WindInfo(direction: 270, speed: 10, gusts: nil, isVariable: false)
-        #expect(wind1 == wind2)
-        #expect(wind1 != wind3)
-    }
-
-    // MARK: - MockWeatherService Call Tracking Tests
-
-    @Test func mockTracksCallCount() async throws {
-        let mock = MockWeatherService()
-        mock.mockWeather["KPAO"] = WeatherCache(stationID: "KPAO")
-
-        #expect(mock.fetchMETARCallCount == 0)
-        let _ = try await mock.fetchMETAR(for: "KPAO")
-        #expect(mock.fetchMETARCallCount == 1)
-        let _ = try await mock.fetchMETAR(for: "KPAO")
-        #expect(mock.fetchMETARCallCount == 2)
-    }
-
-    @Test func mockThrowsOnError() async {
-        let mock = MockWeatherService()
-        mock.shouldFail = true
-
-        do {
-            let _ = try await mock.fetchMETAR(for: "KPAO")
-            #expect(Bool(false), "Should have thrown")
-        } catch {
-            // Expected
-            #expect(error is EFBError)
-        }
+    @Test func ageGrowsWithTimeSinceFetch() {
+        let weather = WeatherCache(stationID: "KPAO", fetchedAt: Date(timeIntervalSinceNow: -7200))
+        #expect(weather.age > 7195 && weather.age < 7210)   // seconds
     }
 }

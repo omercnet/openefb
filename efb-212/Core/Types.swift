@@ -54,6 +54,7 @@ enum MapLayer: String, CaseIterable, Sendable {
     case airports       // Airport dots/icons
     case airspace       // Airspace boundaries
     case tfrs           // TFRs
+    case advisories     // AIRMET / SIGMET / G-AIRMET areas
     case weatherDots    // Color-coded weather dots
     case navaids        // VOR/NDB icons
     case route          // Active flight plan route line
@@ -123,6 +124,7 @@ enum LightingType: String, Codable, CaseIterable, Sendable {
     case fullTime
 }
 
+/// Raw values match the `frequencies.type` column written by tools/nasr-importer.
 enum FrequencyType: String, Codable, CaseIterable, Sendable {
     case ctaf
     case tower
@@ -132,25 +134,54 @@ enum FrequencyType: String, Codable, CaseIterable, Sendable {
     case departure
     case atis
     case awos
+    case asos
     case unicom
     case multicom
+    case center         // ARTCC
+    case fss            // Flight Service Station / RCO
+    case other
 }
 
+/// Raw values match the `navaids.type` column written by tools/nasr-importer.
 enum NavaidType: String, Codable, CaseIterable, Sendable {
     case vor
     case vortac
-    case vorDme
+    case vorDme = "vor_dme"
+    case tacan
+    case dme
     case ndb
-    case ndbDme
+    case ndbDme = "ndb_dme"
 }
 
-enum TFRType: String, Codable, CaseIterable, Sendable {
-    case security       // National security (e.g., Washington DC SFRA)
-    case vip            // Presidential/VIP movement
-    case hazard         // Hazardous operations (e.g., firefighting, space launch)
-    case airshow        // Air show / aerial demo
-    case stadium        // Sporting event stadium TFR (3 NM, surface to 3000 AGL)
-    case other          // Catch-all
+/// Raw values are the FAA TFR `LEGAL` / list `type` strings from tfr.faa.gov.
+nonisolated enum TFRType: String, Codable, CaseIterable, Sendable {
+    case security = "SECURITY"                       // 14 CFR 99.7 national security
+    case vip = "VIP"                                 // 14 CFR 91.141 presidential/VIP movement
+    case hazard = "HAZARDS"                          // 14 CFR 91.137 firefighting, disaster, etc.
+    case airShowSports = "AIR SHOWS/SPORTS"          // 14 CFR 91.145 air shows, stadium events
+    case spaceOperations = "SPACE OPERATIONS"        // 14 CFR 91.143 space launch/recovery
+    case uasPublicGathering = "UAS PUBLIC GATHERING" // 49 USC 44812 drone restrictions
+    case special = "SPECIAL"                         // Special security instructions
+    case other = "OTHER"                             // Unrecognized FAA category
+
+    /// Map an FAA category string; unknown values become `.other`.
+    init(faaType: String) {
+        let normalized = faaType.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        self = TFRType(rawValue: normalized) ?? .other
+    }
+
+    var displayName: String {
+        switch self {
+        case .security: return "Security"
+        case .vip: return "VIP"
+        case .hazard: return "Hazards"
+        case .airShowSports: return "Air Show / Sports"
+        case .spaceOperations: return "Space Operations"
+        case .uasPublicGathering: return "UAS Public Gathering"
+        case .special: return "Special"
+        case .other: return "Other"
+        }
+    }
 }
 
 enum AirspaceClass: String, Codable, CaseIterable, Sendable {

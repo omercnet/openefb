@@ -61,16 +61,6 @@ protocol WeatherServiceProtocol: Sendable {
     func cachedWeather(for stationID: String) -> WeatherCache?
 }
 
-// MARK: - TFR Service Protocol
-
-protocol TFRServiceProtocol: Sendable {
-    /// Fetch TFRs near a coordinate within the given radius.
-    func fetchTFRs(near coordinate: CLLocationCoordinate2D, radiusNM: Double) async throws -> [TFR]
-
-    /// Fetch all currently active TFRs.
-    func activeTFRs() async throws -> [TFR]
-}
-
 // MARK: - Reachability Service Protocol
 
 protocol ReachabilityServiceProtocol: Sendable {
@@ -151,12 +141,6 @@ final class PlaceholderWeatherService: WeatherServiceProtocol, @unchecked Sendab
         throw EFBError.weatherFetchFailed(underlying: PlaceholderError.notImplemented)
     }
     func cachedWeather(for stationID: String) -> WeatherCache? { nil }
-}
-
-/// Placeholder TFR service -- returns empty results.
-final class PlaceholderTFRService: TFRServiceProtocol, @unchecked Sendable {
-    func fetchTFRs(near coordinate: CLLocationCoordinate2D, radiusNM: Double) async throws -> [TFR] { [] }
-    func activeTFRs() async throws -> [TFR] { [] }
 }
 
 /// Placeholder reachability service -- reports no connection.

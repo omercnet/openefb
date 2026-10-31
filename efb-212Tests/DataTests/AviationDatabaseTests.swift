@@ -1,706 +1,390 @@
-// DISABLED: AviationDatabase API has evolved significantly since these tests were written.
-// Insert/query methods changed, weather cache moved to different layer.
-// These tests will be re-enabled when the database integration tests are updated.
-#if false
 //
 //  AviationDatabaseTests.swift
 //  efb-212Tests
 //
-//  Tests for AviationDatabase spatial queries, FTS5 search, and weather cache.
-//  Uses an in-memory GRDB database (via temporary file) to validate
-//  R-tree spatial indexing and full-text search behavior.
+//  Query behaviour of AviationDatabase against a temporary GRDB database carrying the full
+//  bundled schema (airports, runways, frequencies, navaids, airspaces, R-trees, FTS5):
+//  row decoding with fallbacks, bounding-box edges, airspace containment geometry.
+//
+//  Nearest-airport ordering, FTS escaping and bundled-file refresh are covered by
+//  AviationDatabaseRobustnessTests.
 //
 
 import Testing
 import Foundation
 import CoreLocation
+import GRDB
 @testable import efb_212
 
-@Suite("AviationDatabase Tests", .serialized)
+@Suite("AviationDatabase Query Tests")
 struct AviationDatabaseTests {
 
-    // MARK: - Test Helpers
+    // MARK: - Fixture
 
-    /// Create a temporary on-disk database (GRDB DatabasePool requires a file path).
-    static func makeTempDB() throws -> AviationDatabase {
-        let tempDir = FileManager.default.temporaryDirectory
-        let dbPath = tempDir.appendingPathComponent("test-\(UUID().uuidString).sqlite").path
-        return try AviationDatabase(path: dbPath)
+    struct AirportRow {
+        var icao: String
+        var name: String
+        var lat: Double
+        var lon: Double
+        var type: String = "airport"
+        var ownership: String = "public"
+        var fuelTypes: String? = "[]"
+        var hasBeacon: Int = 0
     }
 
-    static func makeTestAirport(
-        icao: String = "KPAO",
-        faaID: String? = "PAO",
-        name: String = "Palo Alto",
-        latitude: Double = 37.4611,
-        longitude: Double = -122.1150,
-        elevation: Double = 4,
-        runways: [Runway] = [],
-        frequencies: [Frequency] = []
-    ) -> Airport {
-        Airport(
-            icao: icao,
-            faaID: faaID,
-            name: name,
-            latitude: latitude,
-            longitude: longitude,
-            elevation: elevation,
-            type: .airport,
-            ownership: .publicOwned,
-            ctafFrequency: 118.6,
-            unicomFrequency: nil,
-            artccID: nil,
-            fssID: nil,
-            magneticVariation: nil,
-            patternAltitude: 800,
-            fuelTypes: ["100LL"],
-            hasBeaconLight: true,
-            runways: runways,
-            frequencies: frequencies
-        )
+    struct RunwayRow {
+        var airport: String
+        var id: String
+        var length: Int
+        var surface: String = "asphalt"
+        var lighting: String = "fullTime"
     }
 
-    /// Bay Area test airports with known positions.
-    static let kpao = makeTestAirport(icao: "KPAO", name: "Palo Alto", latitude: 37.4611, longitude: -122.1150)
-    static let ksql = makeTestAirport(icao: "KSQL", faaID: "SQL", name: "San Carlos", latitude: 37.5119, longitude: -122.2494)
-    static let koak = makeTestAirport(icao: "KOAK", faaID: "OAK", name: "Oakland Intl", latitude: 37.7213, longitude: -122.2208)
-    static let ksfo = makeTestAirport(icao: "KSFO", faaID: "SFO", name: "San Francisco Intl", latitude: 37.6213, longitude: -122.3790)
-    static let ksjc = makeTestAirport(icao: "KSJC", faaID: "SJC", name: "San Jose Intl", latitude: 37.3626, longitude: -121.9291)
-
-    /// A far-away airport (New York) for distance filtering tests.
-    static let kjfk = makeTestAirport(icao: "KJFK", faaID: "JFK", name: "John F Kennedy Intl", latitude: 40.6413, longitude: -73.7781)
-
-    // MARK: - Insert & Count
-
-    @Test func insertAndCount() throws {
-        let db = try Self.makeTempDB()
-        #expect(try db.airportCount() == 0)
-
-        try db.insertAirport(Self.kpao)
-        #expect(try db.airportCount() == 1)
-
-        try db.insertAirport(Self.ksql)
-        #expect(try db.airportCount() == 2)
+    struct FrequencyRow {
+        var airport: String
+        var id: String
+        var type: String
+        var name: String
+        var frequency: Double
     }
 
-    @Test func bulkInsert() throws {
-        let db = try Self.makeTempDB()
-        let airports = [Self.kpao, Self.ksql, Self.koak, Self.ksfo, Self.ksjc]
-        try db.insertAirports(airports)
-        #expect(try db.airportCount() == 5)
+    struct NavaidRow {
+        var id: String
+        var name: String
+        var type: String
+        var lat: Double
+        var lon: Double
+        var elevation: Double? = nil
     }
 
-    @Test func insertOrReplaceOverwrites() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirport(Self.kpao)
-        #expect(try db.airportCount() == 1)
-
-        // Insert same ICAO with different name
-        let modified = Self.makeTestAirport(icao: "KPAO", name: "Palo Alto Modified")
-        try db.insertAirport(modified)
-        #expect(try db.airportCount() == 1)
-
-        let fetched = try db.airport(byICAO: "KPAO")
-        #expect(fetched?.name == "Palo Alto Modified")
+    struct AirspaceRow {
+        var id: String
+        var name: String
+        var classification: String
+        var floor: Int = 0
+        var ceiling: Int = 4000
+        var center: (lat: Double, lon: Double)? = nil
+        var radiusNM: Double? = nil
+        var coordinatesJSON: String? = nil
+        var box: (minLat: Double, maxLat: Double, minLon: Double, maxLon: Double)
     }
 
-    // MARK: - Lookup by ICAO
+    /// Build a temporary database with the bundled schema and the given rows.
+    static func makeDatabase(
+        airports: [AirportRow] = [],
+        runways: [RunwayRow] = [],
+        frequencies: [FrequencyRow] = [],
+        navaids: [NavaidRow] = [],
+        airspaces: [AirspaceRow] = []
+    ) throws -> AviationDatabase {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("efb-avdb-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let pool = try DatabasePool(path: dir.appendingPathComponent("aviation.sqlite").path)
 
-    @Test func lookupByICAO() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql])
+        try pool.write { db in
+            try db.execute(sql: """
+                CREATE TABLE airports (
+                    icao TEXT PRIMARY KEY, faa_id TEXT, name TEXT NOT NULL,
+                    latitude REAL NOT NULL, longitude REAL NOT NULL,
+                    elevation REAL NOT NULL DEFAULT 0,
+                    type TEXT NOT NULL DEFAULT 'airport', ownership TEXT NOT NULL DEFAULT 'public',
+                    ctaf_frequency REAL, unicom_frequency REAL, artcc_id TEXT, fss_id TEXT,
+                    magnetic_variation REAL, pattern_altitude INTEGER,
+                    fuel_types TEXT DEFAULT '[]', has_beacon_light INTEGER DEFAULT 0
+                );
+                CREATE TABLE runways (
+                    id TEXT NOT NULL, airport_icao TEXT NOT NULL,
+                    length INTEGER NOT NULL, width INTEGER NOT NULL,
+                    surface TEXT NOT NULL DEFAULT 'asphalt', lighting TEXT NOT NULL DEFAULT 'none',
+                    base_end_id TEXT NOT NULL, reciprocal_end_id TEXT NOT NULL,
+                    base_end_latitude REAL NOT NULL DEFAULT 0, base_end_longitude REAL NOT NULL DEFAULT 0,
+                    reciprocal_end_latitude REAL NOT NULL DEFAULT 0, reciprocal_end_longitude REAL NOT NULL DEFAULT 0
+                );
+                CREATE TABLE frequencies (
+                    id TEXT NOT NULL, airport_icao TEXT NOT NULL,
+                    type TEXT NOT NULL, name TEXT NOT NULL, frequency REAL NOT NULL
+                );
+                CREATE TABLE navaids (
+                    id TEXT PRIMARY KEY, type TEXT NOT NULL DEFAULT 'vor', name TEXT NOT NULL,
+                    latitude REAL NOT NULL, longitude REAL NOT NULL,
+                    frequency REAL NOT NULL DEFAULT 0, elevation REAL, magnetic_variation REAL
+                );
+                CREATE TABLE airspaces (
+                    id TEXT PRIMARY KEY, name TEXT NOT NULL, class TEXT NOT NULL,
+                    floor_altitude INTEGER NOT NULL DEFAULT 0, ceiling_altitude INTEGER NOT NULL DEFAULT 18000,
+                    center_latitude REAL, center_longitude REAL, radius_nm REAL, coordinates TEXT,
+                    min_lat REAL NOT NULL, max_lat REAL NOT NULL, min_lon REAL NOT NULL, max_lon REAL NOT NULL
+                );
+                CREATE VIRTUAL TABLE airports_rtree USING rtree(rowid, min_lat, max_lat, min_lon, max_lon);
+                CREATE VIRTUAL TABLE navaids_rtree USING rtree(rowid, min_lat, max_lat, min_lon, max_lon);
+                CREATE VIRTUAL TABLE airspaces_rtree USING rtree(rowid, min_lat, max_lat, min_lon, max_lon);
+                CREATE VIRTUAL TABLE airports_fts USING fts5(icao, name, faa_id, content=airports, content_rowid=rowid);
+                """)
 
-        let found = try db.airport(byICAO: "KPAO")
-        #expect(found != nil)
-        #expect(found?.icao == "KPAO")
-        #expect(found?.name == "Palo Alto")
-        #expect(found?.latitude == 37.4611)
-    }
-
-    @Test func lookupByICAONotFound() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirport(Self.kpao)
-
-        let notFound = try db.airport(byICAO: "KXYZ")
-        #expect(notFound == nil)
-    }
-
-    // MARK: - Nearest Airports (R-tree spatial query + distance sort)
-
-    @Test func nearestAirportsSortedByDistance() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak, Self.ksfo, Self.ksjc, Self.kjfk])
-
-        // Query from KPAO's location — nearest airports should be sorted by distance
-        let paoCoord = CLLocationCoordinate2D(latitude: 37.4611, longitude: -122.1150)
-        let nearest = try db.nearestAirports(to: paoCoord, count: 3)
-
-        #expect(nearest.count == 3)
-        // First result should be KPAO itself (distance 0)
-        #expect(nearest[0].icao == "KPAO")
-
-        // Verify all returned airports are closer than omitted ones
-        let paoLocation = CLLocation(latitude: 37.4611, longitude: -122.1150)
-        var prevDistance: Double = -1
-        for airport in nearest {
-            let dist = paoLocation.distance(from: CLLocation(latitude: airport.latitude, longitude: airport.longitude))
-            #expect(dist >= prevDistance, "Airports should be sorted by ascending distance")
-            prevDistance = dist
+            for a in airports {
+                try db.execute(
+                    sql: """
+                        INSERT INTO airports (icao, name, latitude, longitude, type, ownership, fuel_types, has_beacon_light)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                    arguments: [a.icao, a.name, a.lat, a.lon, a.type, a.ownership, a.fuelTypes, a.hasBeacon]
+                )
+                try db.execute(
+                    sql: "INSERT INTO airports_rtree VALUES (?, ?, ?, ?, ?)",
+                    arguments: [db.lastInsertedRowID, a.lat, a.lat, a.lon, a.lon]
+                )
+            }
+            for r in runways {
+                try db.execute(
+                    sql: """
+                        INSERT INTO runways (id, airport_icao, length, width, surface, lighting, base_end_id, reciprocal_end_id)
+                        VALUES (?, ?, ?, 75, ?, ?, '13', '31')
+                        """,
+                    arguments: [r.id, r.airport, r.length, r.surface, r.lighting]
+                )
+            }
+            for f in frequencies {
+                try db.execute(
+                    sql: "INSERT INTO frequencies (id, airport_icao, type, name, frequency) VALUES (?, ?, ?, ?, ?)",
+                    arguments: [f.id, f.airport, f.type, f.name, f.frequency]
+                )
+            }
+            for n in navaids {
+                try db.execute(
+                    sql: "INSERT INTO navaids (id, type, name, latitude, longitude, frequency, elevation) VALUES (?, ?, ?, ?, ?, 113.0, ?)",
+                    arguments: [n.id, n.type, n.name, n.lat, n.lon, n.elevation]
+                )
+                try db.execute(
+                    sql: "INSERT INTO navaids_rtree VALUES (?, ?, ?, ?, ?)",
+                    arguments: [db.lastInsertedRowID, n.lat, n.lat, n.lon, n.lon]
+                )
+            }
+            for s in airspaces {
+                try db.execute(
+                    sql: """
+                        INSERT INTO airspaces (id, name, class, floor_altitude, ceiling_altitude,
+                            center_latitude, center_longitude, radius_nm, coordinates,
+                            min_lat, max_lat, min_lon, max_lon)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                    arguments: [
+                        s.id, s.name, s.classification, s.floor, s.ceiling,
+                        s.center?.lat, s.center?.lon, s.radiusNM, s.coordinatesJSON,
+                        s.box.minLat, s.box.maxLat, s.box.minLon, s.box.maxLon,
+                    ]
+                )
+                try db.execute(
+                    sql: "INSERT INTO airspaces_rtree VALUES (?, ?, ?, ?, ?)",
+                    arguments: [db.lastInsertedRowID, s.box.minLat, s.box.maxLat, s.box.minLon, s.box.maxLon]
+                )
+            }
+            try db.execute(sql: "INSERT INTO airports_fts(airports_fts) VALUES ('rebuild')")
         }
+        return AviationDatabase(dbPool: pool)
     }
 
-    @Test func nearestAirportsLimitWorks() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak, Self.ksfo, Self.ksjc])
+    static let kpao = AirportRow(icao: "KPAO", name: "Palo Alto", lat: 37.4611, lon: -122.1150,
+                                 fuelTypes: "[\"100LL\",\"Jet-A\"]", hasBeacon: 1)
+    static let ksql = AirportRow(icao: "KSQL", name: "San Carlos", lat: 37.5119, lon: -122.2494)
+    static let paoCoord = CLLocationCoordinate2D(latitude: 37.4611, longitude: -122.1150)
 
-        let paoCoord = CLLocationCoordinate2D(latitude: 37.4611, longitude: -122.1150)
-        let nearest = try db.nearestAirports(to: paoCoord, count: 2)
-        #expect(nearest.count == 2)
-    }
+    // MARK: - Airport detail lookup
 
-    @Test func nearestAirportsExcludesFarAway() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.kjfk])
-
-        // Query from KPAO — JFK is ~2250 NM away, outside the 50 NM R-tree box
-        let paoCoord = CLLocationCoordinate2D(latitude: 37.4611, longitude: -122.1150)
-        let nearest = try db.nearestAirports(to: paoCoord, count: 10)
-
-        // JFK should not be in the result set because it is outside the 50 NM bounding box
-        let icaos = nearest.map(\.icao)
-        #expect(!icaos.contains("KJFK"))
-        #expect(icaos.contains("KPAO"))
-    }
-
-    // MARK: - Airports Within Radius (R-tree bounding box query)
-
-    @Test func airportsWithinRadius() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak, Self.ksfo, Self.ksjc, Self.kjfk])
-
-        // 20 NM radius from KPAO — should include nearby Bay Area airports
-        let paoCoord = CLLocationCoordinate2D(latitude: 37.4611, longitude: -122.1150)
-        let results = try db.airports(near: paoCoord, radiusNM: 20.0)
-
-        let icaos = Set(results.map(\.icao))
-        // KPAO, KSQL, KSFO, KOAK, KSJC are all within ~20 NM of each other
-        #expect(icaos.contains("KPAO"))
-        #expect(icaos.contains("KSQL"))
-        // JFK should not be included
-        #expect(!icaos.contains("KJFK"))
-    }
-
-    @Test func airportsWithinSmallRadius() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak, Self.kjfk])
-
-        // 5 NM radius from KPAO — should include KSQL but possibly not KOAK
-        let paoCoord = CLLocationCoordinate2D(latitude: 37.4611, longitude: -122.1150)
-        let results = try db.airports(near: paoCoord, radiusNM: 5.0)
-
-        let icaos = Set(results.map(\.icao))
-        #expect(icaos.contains("KPAO"))
-        // KSQL is ~5-7 NM from KPAO
-        // JFK should definitely not be included
-        #expect(!icaos.contains("KJFK"))
-    }
-
-    // MARK: - FTS5 Search
-
-    @Test func searchByICAO() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak])
-
-        let results = try db.searchAirports(query: "KPAO", limit: 10)
-        #expect(results.count == 1)
-        #expect(results.first?.icao == "KPAO")
-    }
-
-    @Test func searchByName() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak])
-
-        let results = try db.searchAirports(query: "San Carlos", limit: 10)
-        #expect(results.count == 1)
-        #expect(results.first?.icao == "KSQL")
-    }
-
-    @Test func searchByPartialName() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak, Self.ksfo])
-
-        // "San" should match "San Carlos" and "San Francisco Intl" and "San Jose Intl"
-        let results = try db.searchAirports(query: "San", limit: 10)
-        let icaos = Set(results.map(\.icao))
-        #expect(icaos.contains("KSQL"))   // San Carlos
-        #expect(icaos.contains("KSFO"))   // San Francisco Intl
-    }
-
-    @Test func searchByFAAID() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak])
-
-        let results = try db.searchAirports(query: "PAO", limit: 10)
-        // Should find KPAO (faaID = "PAO")
-        #expect(results.count >= 1)
-        let icaos = results.map(\.icao)
-        #expect(icaos.contains("KPAO"))
-    }
-
-    @Test func searchLimitWorks() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak, Self.ksfo, Self.ksjc])
-
-        // "K" matches all ICAO codes starting with K
-        let results = try db.searchAirports(query: "K", limit: 2)
-        #expect(results.count <= 2)
-    }
-
-    @Test func searchNoResults() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql])
-
-        let results = try db.searchAirports(query: "ZZZZ", limit: 10)
-        #expect(results.isEmpty)
-    }
-
-    // MARK: - Runway & Frequency Round-Trip
-
-    @Test func airportWithRunwaysRoundTrip() throws {
-        let db = try Self.makeTempDB()
-
-        let runway = Runway(
-            id: "13/31", length: 2443, width: 70,
-            surface: .asphalt, lighting: .fullTime,
-            baseEndID: "13", reciprocalEndID: "31",
-            baseEndLatitude: 37.4585, baseEndLongitude: -122.1120,
-            reciprocalEndLatitude: 37.4636, reciprocalEndLongitude: -122.1181,
-            baseEndElevation: 4, reciprocalEndElevation: 4
+    @Test func airportByICAOLoadsRunwaysFrequenciesAndDecodesJSONFields() throws {
+        let db = try Self.makeDatabase(
+            airports: [Self.kpao, Self.ksql],
+            runways: [
+                RunwayRow(airport: "KPAO", id: "13/31", length: 2443),
+                RunwayRow(airport: "KSQL", id: "12/30", length: 2600),
+            ],
+            frequencies: [
+                FrequencyRow(airport: "KPAO", id: UUID().uuidString, type: "tower", name: "Palo Alto Tower", frequency: 118.6),
+                FrequencyRow(airport: "KSQL", id: UUID().uuidString, type: "tower", name: "San Carlos Tower", frequency: 119.0),
+            ]
         )
-        let airport = Self.makeTestAirport(icao: "KPAO", runways: [runway])
-        try db.insertAirport(airport)
 
-        let fetched = try db.airport(byICAO: "KPAO")
-        #expect(fetched != nil)
-        #expect(fetched?.runways.count == 1)
-        #expect(fetched?.runways.first?.id == "13/31")
-        #expect(fetched?.runways.first?.length == 2443)
-        #expect(fetched?.runways.first?.surface == .asphalt)
+        let airport = try #require(try db.airport(byICAO: "KPAO"))
+        #expect(airport.fuelTypes == ["100LL", "Jet-A"])
+        #expect(airport.hasBeaconLight)
+        // Only KPAO's own rows, not KSQL's.
+        #expect(airport.runways.map(\.id) == ["13/31"])
+        #expect(airport.runways.first?.length == 2443)   // feet
+        #expect(airport.runways.first?.lighting == .fullTime)
+        #expect(airport.frequencies.map(\.frequency) == [118.6])   // MHz
+        #expect(airport.frequencies.first?.type == .tower)
     }
 
-    @Test func airportWithFrequenciesRoundTrip() throws {
-        let db = try Self.makeTempDB()
-
-        let freqID = UUID()
-        let frequency = Frequency(id: freqID, type: .ctaf, frequency: 118.6, name: "Palo Alto CTAF")
-        let airport = Self.makeTestAirport(icao: "KPAO", frequencies: [frequency])
-        try db.insertAirport(airport)
-
-        let fetched = try db.airport(byICAO: "KPAO")
-        #expect(fetched != nil)
-        #expect(fetched?.frequencies.count == 1)
-        #expect(fetched?.frequencies.first?.frequency == 118.6)
-        #expect(fetched?.frequencies.first?.type == .ctaf)
-        #expect(fetched?.frequencies.first?.name == "Palo Alto CTAF")
+    @Test func airportByICAOIsExactMatchAndNilWhenMissing() throws {
+        let db = try Self.makeDatabase(airports: [Self.kpao])
+        #expect(try db.airport(byICAO: "KPA") == nil)
+        #expect(try db.airport(byICAO: "KXYZ") == nil)
+        #expect(try db.airport(byICAO: "KPAO")?.icao == "KPAO")
     }
 
-    // MARK: - Weather Cache
-
-    @Test func weatherCacheRoundTrip() throws {
-        let db = try Self.makeTempDB()
-
-        let weather = WeatherCache(
-            stationID: "KPAO",
-            metar: "KPAO 121855Z 31008KT 10SM FEW040 20/10 A3012",
-            flightCategory: .vfr,
-            temperature: 20.0,
-            dewpoint: 10.0,
-            wind: WindInfo(direction: 310, speed: 8, gusts: nil, isVariable: false),
-            visibility: 10.0,
-            ceiling: nil,
-            fetchedAt: Date()
+    @Test func unknownEnumRawValuesDecodeToFallbacksInsteadOfFailing() throws {
+        var weird = Self.kpao
+        weird.type = "spaceport"
+        weird.ownership = "coop"
+        weird.fuelTypes = "not json"
+        let db = try Self.makeDatabase(
+            airports: [weird],
+            runways: [RunwayRow(airport: "KPAO", id: "13/31", length: 2443, surface: "lava", lighting: "disco")],
+            frequencies: [FrequencyRow(airport: "KPAO", id: "not-a-uuid", type: "telepathy", name: "X", frequency: 1)]
         )
-        try db.cacheWeather(weather)
 
-        let fetched = try db.cachedWeather(for: "KPAO")
-        #expect(fetched != nil)
-        #expect(fetched?.stationID == "KPAO")
-        #expect(fetched?.flightCategory == .vfr)
-        #expect(fetched?.temperature == 20.0)
-        #expect(fetched?.wind?.direction == 310)
-        #expect(fetched?.wind?.speed == 8)
+        let airport = try #require(try db.airport(byICAO: "KPAO"))
+        #expect(airport.type == .airport)
+        #expect(airport.ownership == .publicOwned)
+        #expect(airport.fuelTypes.isEmpty)
+        #expect(airport.runways.first?.surface == .other)
+        #expect(airport.runways.first?.lighting == LightingType.none)
+        #expect(airport.frequencies.first?.type == .other)
     }
 
-    @Test func weatherCacheClear() throws {
-        let db = try Self.makeTempDB()
+    // MARK: - Bounding-box queries
 
-        let weather = WeatherCache(stationID: "KPAO", fetchedAt: Date())
-        try db.cacheWeather(weather)
-        #expect(try db.cachedWeather(for: "KPAO") != nil)
+    /// 1 NM of latitude is 1/60 degree; the box edge is inclusive.
+    @Test func airportsNearIncludesBoxEdgeAndExcludesJustOutside() throws {
+        let onEdge = AirportRow(icao: "EDGE", name: "On Edge", lat: 37.0 + 10.0 / 60.0, lon: -122.0)
+        let outside = AirportRow(icao: "OUTS", name: "Outside", lat: 37.0 + 10.001 / 60.0, lon: -122.0)
+        let db = try Self.makeDatabase(airports: [onEdge, outside])
 
-        try db.clearWeatherCache()
-        #expect(try db.cachedWeather(for: "KPAO") == nil)
+        let found = try db.airports(near: CLLocationCoordinate2D(latitude: 37.0, longitude: -122.0), radiusNM: 10.0)
+        #expect(found.map(\.icao) == ["EDGE"])
     }
 
-    @Test func staleWeatherStations() throws {
-        let db = try Self.makeTempDB()
+    @Test func airportsNearWidensLongitudeBoxWithLatitude() throws {
+        // At 60N one degree of longitude is only 30 NM, so a 20 NM box spans 2/3 of a degree.
+        let center = CLLocationCoordinate2D(latitude: 60.0, longitude: -150.0)
+        let inside = AirportRow(icao: "INSD", name: "Inside", lat: 60.0, lon: -150.0 - 0.6)
+        let outside = AirportRow(icao: "OUTS", name: "Outside", lat: 60.0, lon: -150.0 - 0.7)
+        let db = try Self.makeDatabase(airports: [inside, outside])
 
-        // Insert fresh weather
-        let fresh = WeatherCache(stationID: "KPAO", fetchedAt: Date())
-        try db.cacheWeather(fresh)
-
-        // Insert stale weather (2 hours ago)
-        let stale = WeatherCache(stationID: "KSQL", fetchedAt: Date(timeIntervalSinceNow: -7200))
-        try db.cacheWeather(stale)
-
-        // Find stations older than 1 hour
-        let staleStations = try db.staleWeatherStations(olderThan: 3600)
-        #expect(staleStations.contains("KSQL"))
-        #expect(!staleStations.contains("KPAO"))
+        let found = try db.airports(near: center, radiusNM: 20.0)
+        #expect(found.map(\.icao) == ["INSD"])
     }
 
-    // MARK: - Navaid Insert & Lookup
-
-    static func makeTestNavaid(
-        id: String = "SJC",
-        name: String = "San Jose",
-        type: NavaidType = .vorDme,
-        latitude: Double = 37.3626,
-        longitude: Double = -121.9291,
-        frequency: Double = 114.1,
-        magneticVariation: Double? = 14.0,
-        elevation: Double? = 56
-    ) -> Navaid {
-        Navaid(
-            id: id, name: name, type: type,
-            latitude: latitude, longitude: longitude,
-            frequency: frequency,
-            magneticVariation: magneticVariation,
-            elevation: elevation
+    @Test func airportsNearReturnsNoRunwaysAndEmptyForEmptyRegion() throws {
+        let db = try Self.makeDatabase(
+            airports: [Self.kpao],
+            runways: [RunwayRow(airport: "KPAO", id: "13/31", length: 2443)]
         )
+        let nearby = try db.airports(near: Self.paoCoord, radiusNM: 5)
+        #expect(nearby.count == 1)
+        #expect(nearby.first?.runways.isEmpty == true)   // list query skips runway loading
+
+        let farAway = CLLocationCoordinate2D(latitude: 40.6413, longitude: -73.7781)
+        #expect(try db.airports(near: farAway, radiusNM: 50).isEmpty)
     }
 
-    static let sjcVOR = makeTestNavaid()
-    static let oakVOR = makeTestNavaid(id: "OAK", name: "Oakland", latitude: 37.7213, longitude: -122.2208, frequency: 116.8)
-    static let sqpVOR = makeTestNavaid(id: "SQP", name: "Saratoga", latitude: 37.27, longitude: -122.05, frequency: 117.0)
-
-    @Test func insertAndLookupNavaid() throws {
-        let db = try Self.makeTempDB()
-        try db.insertNavaid(Self.sjcVOR)
-
-        let found = try db.navaid(byID: "SJC")
-        #expect(found != nil)
-        #expect(found?.id == "SJC")
-        #expect(found?.name == "San Jose")
-        #expect(found?.type == .vorDme)
-        #expect(found?.frequency == 114.1)
-        #expect(found?.latitude == 37.3626)
-    }
-
-    @Test func navaidNotFound() throws {
-        let db = try Self.makeTempDB()
-        try db.insertNavaid(Self.sjcVOR)
-
-        let notFound = try db.navaid(byID: "ZZZZ")
-        #expect(notFound == nil)
-    }
-
-    @Test func bulkInsertNavaids() throws {
-        let db = try Self.makeTempDB()
-        try db.insertNavaids([Self.sjcVOR, Self.oakVOR, Self.sqpVOR])
-
-        // All three should be queryable
-        #expect(try db.navaid(byID: "SJC") != nil)
-        #expect(try db.navaid(byID: "OAK") != nil)
-        #expect(try db.navaid(byID: "SQP") != nil)
-    }
-
-    @Test func navaidInsertOrReplaceOverwrites() throws {
-        let db = try Self.makeTempDB()
-        try db.insertNavaid(Self.sjcVOR)
-
-        // Replace with updated name
-        let modified = Self.makeTestNavaid(id: "SJC", name: "San Jose Updated")
-        try db.insertNavaid(modified)
-
-        let fetched = try db.navaid(byID: "SJC")
-        #expect(fetched?.name == "San Jose Updated")
-    }
-
-    // MARK: - Navaids Near Coordinate (bounding box query)
-
-    @Test func navaidsNearCoordinate() throws {
-        let db = try Self.makeTempDB()
-        try db.insertNavaids([Self.sjcVOR, Self.oakVOR, Self.sqpVOR])
-
-        // Query near SJC with 20 NM radius — should include SJC and SQP
-        let sjcCoord = CLLocationCoordinate2D(latitude: 37.3626, longitude: -121.9291)
-        let results = try db.navaids(near: sjcCoord, radiusNM: 20.0)
-
-        let ids = Set(results.map(\.id))
-        #expect(ids.contains("SJC"))
-        #expect(ids.contains("SQP"))  // ~10 NM away
-    }
-
-    @Test func navaidsNearSmallRadius() throws {
-        let db = try Self.makeTempDB()
-        try db.insertNavaids([Self.sjcVOR, Self.oakVOR])
-
-        // Very small radius from SJC — Oakland is ~25 NM away, shouldn't appear
-        let sjcCoord = CLLocationCoordinate2D(latitude: 37.3626, longitude: -121.9291)
-        let results = try db.navaids(near: sjcCoord, radiusNM: 5.0)
-
-        let ids = Set(results.map(\.id))
-        #expect(ids.contains("SJC"))
-        #expect(!ids.contains("OAK"))
-    }
-
-    @Test func navaidsNearEmptyDB() throws {
-        let db = try Self.makeTempDB()
-
-        let coord = CLLocationCoordinate2D(latitude: 37.46, longitude: -122.12)
-        let results = try db.navaids(near: coord, radiusNM: 50.0)
-        #expect(results.isEmpty)
-    }
-
-    // MARK: - Weather Station Coordinate Resolution
-
-    @Test func airportCoordinateForStation() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirport(Self.kpao)
-
-        let coord = try db.airportCoordinate(forStation: "KPAO")
-        #expect(coord != nil)
-        #expect(coord?.latitude == 37.4611)
-        #expect(coord?.longitude == -122.1150)
-    }
-
-    @Test func airportCoordinateForUnknownStation() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirport(Self.kpao)
-
-        let coord = try db.airportCoordinate(forStation: "KXYZ")
-        #expect(coord == nil)
-    }
-
-    @Test func airportCoordinateMultipleStations() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirports([Self.kpao, Self.ksql, Self.koak])
-
-        let paoCoord = try db.airportCoordinate(forStation: "KPAO")
-        let sqlCoord = try db.airportCoordinate(forStation: "KSQL")
-        let oakCoord = try db.airportCoordinate(forStation: "KOAK")
-
-        #expect(paoCoord?.latitude == 37.4611)
-        #expect(sqlCoord?.latitude == 37.5119)
-        #expect(oakCoord?.latitude == 37.7213)
-    }
-
-    // MARK: - Navaid Optional Fields
-
-    @Test func navaidWithNilOptionalFields() throws {
-        let db = try Self.makeTempDB()
-        let navaid = Navaid(
-            id: "TST", name: "Test NDB", type: .ndb,
-            latitude: 37.0, longitude: -122.0, frequency: 350.0,
-            magneticVariation: nil, elevation: nil
-        )
-        try db.insertNavaid(navaid)
-
-        let fetched = try db.navaid(byID: "TST")
-        #expect(fetched != nil)
-        #expect(fetched?.type == .ndb)
-        #expect(fetched?.magneticVariation == nil)
-        #expect(fetched?.elevation == nil)
-    }
-
-    // MARK: - Airspace Insert & Lookup
-
-    static func makeTestAirspace(
-        id: UUID = UUID(),
-        classification: AirspaceClass = .charlie,
-        name: String = "Test Class C",
-        floor: Int = 0,
-        ceiling: Int = 4000,
-        geometry: AirspaceGeometry = .circle(center: [37.3626, -121.9291], radiusNM: 5.0)
-    ) -> Airspace {
-        Airspace(id: id, classification: classification, name: name,
-                 floor: floor, ceiling: ceiling, geometry: geometry)
-    }
-
-    static let sjcClassC = makeTestAirspace(
-        classification: .charlie, name: "SJC Class C",
-        floor: 0, ceiling: 4000,
-        geometry: .circle(center: [37.3626, -121.9291], radiusNM: 5.0)
-    )
-
-    static let sfoClassB = makeTestAirspace(
-        classification: .bravo, name: "SFO Class B Inner",
-        floor: 0, ceiling: 10000,
-        geometry: .polygon(coordinates: [
-            [37.55, -122.45], [37.55, -122.30],
-            [37.68, -122.30], [37.68, -122.45],
-            [37.55, -122.45]
+    @Test func navaidsNearFiltersByBoxAndDecodesOptionalElevation() throws {
+        let db = try Self.makeDatabase(navaids: [
+            NavaidRow(id: "SJC", name: "San Jose", type: "vor_dme", lat: 37.3626, lon: -121.9291, elevation: 56),
+            NavaidRow(id: "OAK", name: "Oakland", type: "vortac", lat: 37.7213, lon: -122.2208),
         ])
+        let sjc = CLLocationCoordinate2D(latitude: 37.3626, longitude: -121.9291)
+
+        let close = try db.navaids(near: sjc, radiusNM: 5)
+        #expect(close.map(\.id) == ["SJC"])
+        #expect(close.first?.type == .vorDme)
+        #expect(close.first?.elevation == 56)   // feet MSL
+
+        let wide = try db.navaids(near: sjc, radiusNM: 40)
+        #expect(Set(wide.map(\.id)) == ["SJC", "OAK"])
+        #expect(wide.first { $0.id == "OAK" }?.elevation == nil)
+    }
+
+    // MARK: - Airspace geometry
+
+    static let sjcClassC = AirspaceRow(
+        id: UUID().uuidString, name: "SJC Class C", classification: "charlie", ceiling: 4000,
+        center: (37.3626, -121.9291), radiusNM: 5.0,
+        box: (37.27, 37.45, -122.04, -121.82)
     )
 
-    static let paoClassD = makeTestAirspace(
-        classification: .delta, name: "PAO Class D",
-        floor: 0, ceiling: 2500,
-        geometry: .circle(center: [37.4611, -122.1150], radiusNM: 4.0)
+    /// Square roughly 8 NM on a side around SFO.
+    static let sfoClassB = AirspaceRow(
+        id: UUID().uuidString, name: "SFO Class B Inner", classification: "bravo", ceiling: 10000,
+        coordinatesJSON: "[[37.55,-122.45],[37.55,-122.30],[37.68,-122.30],[37.68,-122.45],[37.55,-122.45]]",
+        box: (37.55, 37.68, -122.45, -122.30)
     )
 
-    @Test func insertAndLookupAirspace() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirspace(Self.sjcClassC)
+    @Test func circleAirspaceContainsPointsInsideRadiusOnly() throws {
+        let db = try Self.makeDatabase(airspaces: [Self.sjcClassC])
+        let center = CLLocationCoordinate2D(latitude: 37.3626, longitude: -121.9291)
 
-        #expect(try db.airspaceCount() == 1)
+        #expect(try db.airspacesContaining(point: center).map(\.name) == ["SJC Class C"])
+
+        // 4.9 NM north: inside. 5.1 NM north: outside, even though the R-tree box still matches.
+        let inside = CLLocationCoordinate2D(latitude: 37.3626 + 4.9 / 60.0, longitude: -121.9291)
+        let outside = CLLocationCoordinate2D(latitude: 37.3626 + 5.1 / 60.0, longitude: -121.9291)
+        #expect(try db.airspacesContaining(point: inside).count == 1)
+        #expect(try db.airspacesContaining(point: outside).isEmpty)
     }
 
-    @Test func bulkInsertAirspaces() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirspaces([Self.sjcClassC, Self.sfoClassB, Self.paoClassD])
-
-        #expect(try db.airspaceCount() == 3)
-    }
-
-    @Test func airspacesContainingPointInsideCircle() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirspace(Self.sjcClassC)
-
-        // SJC center (37.3626, -121.9291) — query from inside the 5 NM circle
-        let sjcCoord = CLLocationCoordinate2D(latitude: 37.3626, longitude: -121.9291)
-        let results = try db.airspaces(containing: sjcCoord, altitude: 2000)
-
-        #expect(results.count == 1)
-        #expect(results.first?.name == "SJC Class C")
-    }
-
-    @Test func airspacesContainingPointInsidePolygon() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirspace(Self.sfoClassB)
-
-        // Point inside the polygon (SFO area)
-        let inside = CLLocationCoordinate2D(latitude: 37.62, longitude: -122.38)
-        let results = try db.airspaces(containing: inside, altitude: 5000)
-
-        #expect(results.count == 1)
-        #expect(results.first?.name == "SFO Class B Inner")
-    }
-
-    @Test func airspacesExcludesOutsidePoint() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirspaces([Self.sjcClassC, Self.sfoClassB])
-
-        // Point well outside both airspaces (JFK area)
-        let outside = CLLocationCoordinate2D(latitude: 40.64, longitude: -73.78)
-        let results = try db.airspaces(containing: outside, altitude: 2000)
-
-        #expect(results.isEmpty)
-    }
-
-    @Test func airspacesExcludesByAltitude() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirspace(Self.sjcClassC)  // ceiling 4000
-
-        // Inside the circle but above the ceiling
-        let sjcCoord = CLLocationCoordinate2D(latitude: 37.3626, longitude: -121.9291)
-        let results = try db.airspaces(containing: sjcCoord, altitude: 5000)
-
-        #expect(results.isEmpty)
-    }
-
-    @Test func airspacesNearCoordinate() throws {
-        let db = try Self.makeTempDB()
-        try db.insertAirspaces([Self.sjcClassC, Self.sfoClassB, Self.paoClassD])
-
-        // Query near KPAO — should find PAO Class D and possibly SJC Class C
-        let paoCoord = CLLocationCoordinate2D(latitude: 37.4611, longitude: -122.1150)
-        let results = try db.airspaces(near: paoCoord, radiusNM: 20.0)
-
-        let names = Set(results.map(\.name))
-        #expect(names.contains("PAO Class D"))
-    }
-
-    // MARK: - TFR Model Tests
-
-    @Test func tfrIsActiveWhenCurrentlyInEffect() {
-        let tfr = TFR(
-            id: "FDC 4/0001", type: .stadium, description: "Test TFR",
-            effectiveDate: Date(timeIntervalSinceNow: -3600),
-            expirationDate: Date(timeIntervalSinceNow: 3600),
-            latitude: 37.40, longitude: -121.97
+    @Test func polygonAirspaceUsesRayCastingNotBoundingBox() throws {
+        // Triangle: the bounding box covers the whole square, the polygon only its lower-left half.
+        let triangle = AirspaceRow(
+            id: UUID().uuidString, name: "Tri", classification: "delta",
+            coordinatesJSON: "[[37.0,-122.0],[37.0,-121.0],[38.0,-122.0],[37.0,-122.0]]",
+            box: (37.0, 38.0, -122.0, -121.0)
         )
-        #expect(tfr.isActive)
+        let db = try Self.makeDatabase(airspaces: [triangle])
+
+        let inTriangle = CLLocationCoordinate2D(latitude: 37.2, longitude: -121.8)
+        let inBoxOnly = CLLocationCoordinate2D(latitude: 37.8, longitude: -121.2)
+        #expect(try db.airspacesContaining(point: inTriangle).map(\.name) == ["Tri"])
+        #expect(try db.airspacesContaining(point: inBoxOnly).isEmpty)
     }
 
-    @Test func tfrIsNotActiveWhenExpired() {
-        let tfr = TFR(
-            id: "FDC 4/0002", type: .vip, description: "Expired TFR",
-            effectiveDate: Date(timeIntervalSinceNow: -7200),
-            expirationDate: Date(timeIntervalSinceNow: -3600),
-            latitude: 37.44, longitude: -122.14
+    @Test func overlappingAirspacesAreAllReported() throws {
+        let paoClassD = AirspaceRow(
+            id: UUID().uuidString, name: "PAO Class D", classification: "delta", ceiling: 2500,
+            center: (37.4611, -122.1150), radiusNM: 4.0,
+            box: (37.39, 37.53, -122.20, -122.03)
         )
-        #expect(!tfr.isActive)
-    }
-
-    @Test func tfrIsNotActiveWhenFuture() {
-        let tfr = TFR(
-            id: "FDC 4/0003", type: .airshow, description: "Future TFR",
-            effectiveDate: Date(timeIntervalSinceNow: 3600),
-            expirationDate: Date(timeIntervalSinceNow: 7200),
-            latitude: 37.41, longitude: -122.05
+        let overlappingC = AirspaceRow(
+            id: UUID().uuidString, name: "Big Class C", classification: "charlie",
+            center: (37.4611, -122.1150), radiusNM: 10.0,
+            box: (37.29, 37.63, -122.33, -121.90)
         )
-        #expect(!tfr.isActive)
+        let db = try Self.makeDatabase(airspaces: [paoClassD, overlappingC, Self.sfoClassB])
+
+        let names = Set(try db.airspacesContaining(point: Self.paoCoord).map(\.name))
+        #expect(names == ["PAO Class D", "Big Class C"])
     }
 
-    @Test func tfrCoordinateProperty() {
-        let tfr = TFR(
-            id: "FDC 4/0004", type: .hazard, description: "Test",
-            effectiveDate: Date(), expirationDate: Date(timeIntervalSinceNow: 3600),
-            latitude: 37.175, longitude: -122.227
+    @Test func airspaceRowsDecodeClassFloorCeilingAndPreferCircleOverPolygon() throws {
+        var both = Self.sjcClassC
+        both.coordinatesJSON = Self.sfoClassB.coordinatesJSON
+        both.floor = 1500
+        let db = try Self.makeDatabase(airspaces: [both])
+
+        let airspace = try #require(try db.airspaces(near: Self.paoCoord, radiusNM: 30).first)
+        #expect(airspace.classification == .charlie)
+        #expect(airspace.floor == 1500)     // feet MSL
+        #expect(airspace.ceiling == 4000)   // feet MSL
+        guard case .circle(_, let radius) = airspace.geometry else {
+            Issue.record("expected circle geometry when radius_nm > 0")
+            return
+        }
+        #expect(radius == 5.0)   // nautical miles
+    }
+
+    @Test func airspaceRowsWithoutUsableGeometryAreDropped() throws {
+        let noGeometry = AirspaceRow(
+            id: UUID().uuidString, name: "Broken", classification: "delta",
+            box: (37.0, 38.0, -123.0, -122.0)
         )
-        #expect(tfr.coordinate.latitude == 37.175)
-        #expect(tfr.coordinate.longitude == -122.227)
-    }
+        let zeroRadiusBadJSON = AirspaceRow(
+            id: UUID().uuidString, name: "Broken2", classification: "delta",
+            center: (37.5, -122.5), radiusNM: 0, coordinatesJSON: "[]",
+            box: (37.0, 38.0, -123.0, -122.0)
+        )
+        let db = try Self.makeDatabase(airspaces: [noGeometry, zeroRadiusBadJSON, Self.sfoClassB])
 
-    // MARK: - TFR Service Tests
-
-    @Test func tfrServiceFetchReturnsResults() async throws {
-        let service = TFRService()
-        let bayAreaCoord = CLLocationCoordinate2D(latitude: 37.46, longitude: -122.12)
-        let tfrs = try await service.fetchActiveTFRs(near: bayAreaCoord, radiusNM: 50.0)
-
-        #expect(!tfrs.isEmpty, "Stub TFR service should return sample TFRs near Bay Area")
-        #expect(tfrs.allSatisfy { $0.isActive }, "All returned TFRs should be active")
-    }
-
-    @Test func tfrServiceFiltersOutDistantTFRs() async throws {
-        let service = TFRService()
-        // Query from New York — Bay Area TFRs should not appear
-        let nyCoord = CLLocationCoordinate2D(latitude: 40.64, longitude: -73.78)
-        let tfrs = try await service.fetchActiveTFRs(near: nyCoord, radiusNM: 50.0)
-
-        #expect(tfrs.isEmpty, "No Bay Area TFRs should appear near New York")
-    }
-
-    // MARK: - AirspaceGeometry Codable
-
-    @Test func airspaceGeometryCircleRoundTrip() throws {
-        let geometry = AirspaceGeometry.circle(center: [37.46, -122.12], radiusNM: 5.0)
-        let data = try JSONEncoder().encode(geometry)
-        let decoded = try JSONDecoder().decode(AirspaceGeometry.self, from: data)
-        #expect(geometry == decoded)
-    }
-
-    @Test func airspaceGeometryPolygonRoundTrip() throws {
-        let geometry = AirspaceGeometry.polygon(coordinates: [
-            [37.55, -122.45], [37.55, -122.30],
-            [37.68, -122.30], [37.68, -122.45]
-        ])
-        let data = try JSONEncoder().encode(geometry)
-        let decoded = try JSONDecoder().decode(AirspaceGeometry.self, from: data)
-        #expect(geometry == decoded)
+        let found = try db.airspaces(near: CLLocationCoordinate2D(latitude: 37.6, longitude: -122.4), radiusNM: 30)
+        #expect(found.map(\.name) == ["SFO Class B Inner"])
     }
 }
-#endif

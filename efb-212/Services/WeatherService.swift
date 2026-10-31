@@ -14,7 +14,9 @@ actor WeatherService: WeatherServiceProtocol {
 
     // MARK: - Properties
 
-    private var cache: [String: WeatherCache] = [:]
+    /// Lock-protected so `cachedWeather(for:)` can be read synchronously (protocol contract)
+    /// without hopping onto the actor.
+    nonisolated private let cache = OSAllocatedUnfairLock<[String: WeatherCache]>(initialState: [:])
     private let session: URLSession
     nonisolated private static let metarURL = "https://aviationweather.gov/api/data/metar"
     nonisolated private static let tafURL = "https://aviationweather.gov/api/data/taf"
@@ -24,19 +26,24 @@ actor WeatherService: WeatherServiceProtocol {
 
     // MARK: - Init
 
-    init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 30
-        config.waitsForConnectivity = false
-        self.session = URLSession(configuration: config)
+    /// - Parameter session: Override for tests; defaults to a session with short timeouts.
+    init(session: URLSession? = nil) {
+        if let session {
+            self.session = session
+        } else {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = 15
+            config.timeoutIntervalForResource = 30
+            config.waitsForConnectivity = false
+            self.session = URLSession(configuration: config)
+        }
     }
 
     // MARK: - METAR
 
     func fetchMETAR(for stationID: String) async throws -> WeatherCache {
         // Check cache -- return if fresh (< 15 minutes old)
-        if let cached = cache[stationID], cached.age < Self.cacheExpiry {
+        if let cached = cachedWeather(for: stationID), cached.age < Self.cacheExpiry {
             return cached
         }
 
@@ -57,7 +64,7 @@ actor WeatherService: WeatherServiceProtocol {
             throw EFBError.weatherFetchFailed(underlying: URLError(.cannotParseResponse))
         }
 
-        cache[entry.stationID] = entry
+        store(entry)
         return entry
     }
 
@@ -96,7 +103,7 @@ actor WeatherService: WeatherServiceProtocol {
         var needsFetch: [String] = []
 
         for id in stationIDs {
-            if let cached = cache[id], cached.age < Self.cacheExpiry {
+            if let cached = cachedWeather(for: id), cached.age < Self.cacheExpiry {
                 results.append(cached)
             } else {
                 needsFetch.append(id)
@@ -122,7 +129,7 @@ actor WeatherService: WeatherServiceProtocol {
 
                 let entries = try parseMetarResponse(data)
                 for entry in entries {
-                    cache[entry.stationID] = entry
+                    store(entry)
                     results.append(entry)
                 }
             } catch {
@@ -134,43 +141,41 @@ actor WeatherService: WeatherServiceProtocol {
         return results
     }
 
-    // MARK: - Cached Weather (synchronous)
+    // MARK: - Cache Access
 
-    /// Return cached weather if available. Uses nonisolated access
-    /// which requires caller to await when crossing isolation boundaries.
+    /// Return the last fetched weather for a station, including entries older than the
+    /// fresh-cache window, so callers can show stale data (with an age badge) when offline.
     nonisolated func cachedWeather(for stationID: String) -> WeatherCache? {
-        // For actor isolation, this returns nil for synchronous access.
-        // Callers should use fetchMETAR which checks cache first.
-        // This satisfies the protocol contract; real cache access goes through fetchMETAR.
-        nil
+        cache.withLock { $0[stationID] }
     }
 
-    /// Actor-isolated cache access for internal use.
-    func getCachedWeather(for stationID: String) -> WeatherCache? {
-        cache[stationID]
+    nonisolated private func store(_ entry: WeatherCache) {
+        cache.withLock { $0[entry.stationID] = entry }
     }
 
     /// Force-clear cache for a station (used by manual refresh).
     func clearCache(for stationID: String) {
-        cache.removeValue(forKey: stationID)
+        cache.withLock { _ = $0.removeValue(forKey: stationID) }
     }
 
     /// Clear all cached weather data.
     func clearAllCache() {
-        cache.removeAll()
+        cache.withLock { $0.removeAll() }
     }
 
     // MARK: - NOAA JSON Parsing
 
     /// Parse NOAA METAR JSON response into WeatherCache array.
     /// NOAA API returns: [{icaoId, rawOb, temp, dewp, wdir, wspd, wgst, visib, clouds, obsTime, fltCat}, ...]
-    private func parseMetarResponse(_ data: Data) throws -> [WeatherCache] {
+    nonisolated func parseMetarResponse(_ data: Data) throws -> [WeatherCache] {
         guard let jsonArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
             throw EFBError.weatherFetchFailed(underlying: URLError(.cannotParseResponse))
         }
 
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime]
+        // NOAA `obsTime` is epoch seconds (number); `reportTime` is an ISO-8601 string with
+        // fractional seconds. Use obsTime, fall back to reportTime.
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
         return jsonArray.compactMap { entry -> WeatherCache? in
             guard let icaoId = entry["icaoId"] as? String else { return nil }
@@ -205,8 +210,10 @@ actor WeatherService: WeatherServiceProtocol {
 
             // Observation time
             let obsTime: Date?
-            if let obsTimeStr = entry["obsTime"] as? String {
-                obsTime = dateFormatter.date(from: obsTimeStr)
+            if let epoch = parseDouble(entry["obsTime"]) {
+                obsTime = Date(timeIntervalSince1970: epoch)  // seconds since 1970 UTC
+            } else if let reportTime = entry["reportTime"] as? String {
+                obsTime = isoFormatter.date(from: reportTime)
             } else {
                 obsTime = nil
             }
@@ -235,7 +242,7 @@ actor WeatherService: WeatherServiceProtocol {
     /// MVFR: ceiling 1000-3000 OR vis 3-5
     /// IFR: ceiling 500-999 OR vis 1-3 (exclusive)
     /// LIFR: ceiling <500 OR vis <1
-    private func computeFlightCategory(ceiling: Int?, visibility: String?) -> FlightCategory {
+    nonisolated private func computeFlightCategory(ceiling: Int?, visibility: String?) -> FlightCategory {
         let vis = parseVisibilityFloat(visibility)
 
         let ceilingCat: FlightCategory
@@ -268,14 +275,14 @@ actor WeatherService: WeatherServiceProtocol {
 
     // MARK: - Parsing Helpers
 
-    private func parseDouble(_ value: Any?) -> Double? {
+    nonisolated private func parseDouble(_ value: Any?) -> Double? {
         if let d = value as? Double { return d }
         if let i = value as? Int { return Double(i) }
         if let s = value as? String { return Double(s) }
         return nil
     }
 
-    private func parseInt(_ value: Any?) -> Int? {
+    nonisolated private func parseInt(_ value: Any?) -> Int? {
         if let i = value as? Int { return i }
         if let d = value as? Double { return Int(d) }
         if let s = value as? String { return Int(s) }
@@ -285,7 +292,7 @@ actor WeatherService: WeatherServiceProtocol {
     /// Parse ceiling from NOAA clouds array.
     /// Clouds format: [{cover: "BKN", base: 2500}, {cover: "OVC", base: 5000}]
     /// Returns lowest base with BKN or OVC cover.
-    private func parseCeiling(from clouds: Any?) -> Int? {
+    nonisolated private func parseCeiling(from clouds: Any?) -> Int? {
         guard let cloudArray = clouds as? [[String: Any]] else { return nil }
 
         var lowestCeiling: Int?
@@ -302,7 +309,7 @@ actor WeatherService: WeatherServiceProtocol {
     }
 
     /// Parse visibility string to float (e.g., "10+" -> 10.0, "3" -> 3.0)
-    private func parseVisibilityFloat(_ visibility: String?) -> Double? {
+    nonisolated private func parseVisibilityFloat(_ visibility: String?) -> Double? {
         guard let vis = visibility else { return nil }
         let cleaned = vis.replacingOccurrences(of: "+", with: "")
         return Double(cleaned)

@@ -7,11 +7,17 @@
 //  Only isFinal transcript segments are stored to GRDB.
 //  Volatile results are displayed in UI via callback.
 //
+//  Segment times (audioStartTime / audioEndTime) are seconds from the start of the
+//  audio file. AudioRecorder stamps every buffer with its file position, so the
+//  analyzer timeline and the replay timeline agree even though transcription starts
+//  slightly after audio capture.
+//
 //  Design source: SFR CockpitTranscriptionEngine (680 lines), adapted for iOS 26.
 //
 
 import Foundation
 import AVFoundation
+import CoreMedia
 import Speech
 import os
 
@@ -31,9 +37,24 @@ enum TranscriptionEngine: Sendable {
     case sfSpeechRecognizer  // Fallback
 }
 
+// MARK: - Segment Timing / Confidence
+
+/// Confidence and audio time range extracted from a transcription result.
+nonisolated struct TranscriptSegmentMetrics: Sendable, Equatable {
+    /// 0.0-1.0, or `TranscriptionService.unknownConfidence` when the engine gave none.
+    let confidence: Double
+    let audioStartTime: TimeInterval  // seconds from start of audio file
+    let audioEndTime: TimeInterval    // seconds from start of audio file
+}
+
 // MARK: - Transcription Service
 
 actor TranscriptionService: TranscriptionServiceProtocol {
+
+    /// Sentinel stored in `TranscriptSegmentRecord.confidence` when the engine did not
+    /// report a confidence. The column is non-null, so "unknown" cannot be nil; -1 sorts
+    /// below every real value so unverified segments are never preferred.
+    nonisolated static let unknownConfidence: Double = -1
 
     private let recordingDB: RecordingDatabase
     private let vocabularyProcessor = AviationVocabularyProcessor()
@@ -49,6 +70,9 @@ actor TranscriptionService: TranscriptionServiceProtocol {
     private var sfRecognizer: SFSpeechRecognizer?
     private var sfRecognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var sfRecognitionTask: SFSpeechRecognitionTask?
+    /// File position (seconds) of the first buffer fed to SFSpeechRecognizer. Its segment
+    /// timestamps are relative to the audio it has seen, so this offset re-anchors them.
+    private var sfTimelineOffsetSeconds: TimeInterval?
 
     /// Callback for UI updates (volatile + final segments).
     var onTranscriptUpdate: (@Sendable (TranscriptDisplayItem) -> Void)?
@@ -94,6 +118,7 @@ actor TranscriptionService: TranscriptionServiceProtocol {
     /// Checks SpeechAnalyzer availability first, falls back to SFSpeechRecognizer.
     func startTranscription(flightID: UUID) async throws {
         self.flightID = flightID
+        sfTimelineOffsetSeconds = nil
 
         // Try SpeechAnalyzer first (iOS 26+)
         let locale = Locale(identifier: "en-US")
@@ -124,6 +149,7 @@ actor TranscriptionService: TranscriptionServiceProtocol {
         sfRecognitionRequest?.endAudio()
         sfRecognitionRequest = nil
         sfRecognizer = nil
+        sfTimelineOffsetSeconds = nil
 
         _isTranscribing = false
         flightID = nil
@@ -134,7 +160,8 @@ actor TranscriptionService: TranscriptionServiceProtocol {
     // MARK: - Buffer Feed
 
     /// Feed audio buffer from AudioRecorder for real-time transcription.
-    /// Routes to the active transcription engine.
+    /// Routes to the active transcription engine. `time` is the buffer's position in
+    /// the audio file (sampleTime at the file's sample rate), as stamped by AudioRecorder.
     func feedBuffer(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
         guard _isTranscribing else { return }
 
@@ -144,12 +171,91 @@ actor TranscriptionService: TranscriptionServiceProtocol {
             bufferContinuation?.yield(AudioBufferInput(buffer: buffer, time: time))
 
         case .sfSpeechRecognizer:
+            if sfTimelineOffsetSeconds == nil, time.isSampleTimeValid, time.sampleRate > 0 {
+                sfTimelineOffsetSeconds = Double(time.sampleTime) / time.sampleRate
+            }
             // Append to SFSpeechAudioBufferRecognitionRequest
             sfRecognitionRequest?.append(buffer)
 
         case .none:
             break
         }
+    }
+
+    // MARK: - Final Segment Storage
+
+    /// Store a final transcript segment tagged with the current flight phase and notify the UI.
+    /// Both engines funnel through here so phase tagging has one code path.
+    func recordFinalSegment(text: String, metrics: TranscriptSegmentMetrics) async {
+        guard let flightID else { return }
+
+        let phase = await currentPhaseProvider?() ?? .preflight
+
+        let segment = TranscriptSegmentRecord(
+            flightID: flightID,
+            text: text,
+            confidence: metrics.confidence,
+            audioStartTime: metrics.audioStartTime,
+            audioEndTime: metrics.audioEndTime,
+            flightPhase: phase.rawValue
+        )
+
+        do {
+            try recordingDB.insertTranscript(segment)
+        } catch {
+            logger.error("Failed to store transcript: \(error.localizedDescription)")
+        }
+
+        onTranscriptUpdate?(TranscriptDisplayItem(
+            id: UUID(),
+            text: text,
+            timestamp: Date(),
+            isVolatile: false
+        ))
+    }
+
+    // MARK: - Metrics Extraction
+
+    /// Extract confidence and audio time range from an attributed transcription result.
+    /// Confidence is the character-length-weighted mean of the runs that carry one, or
+    /// `unknownConfidence` if none do. Time range prefers the runs' audioTimeRange
+    /// attributes and falls back to `resultRange` (the result's overall range).
+    nonisolated static func metrics(
+        from text: AttributedString,
+        resultRange: CMTimeRange
+    ) -> TranscriptSegmentMetrics {
+        var weightedConfidence = 0.0
+        var confidenceWeight = 0.0
+        var rangeStart: TimeInterval?
+        var rangeEnd: TimeInterval?
+
+        if #available(iOS 26.0, *) {
+            for run in text.runs {
+                let length = Double(text[run.range].characters.count)
+                if let confidence = run.transcriptionConfidence, length > 0 {
+                    weightedConfidence += confidence * length
+                    confidenceWeight += length
+                }
+                if let timeRange = run.audioTimeRange, timeRange.isValid {
+                    let start = timeRange.start.seconds
+                    let end = CMTimeRangeGetEnd(timeRange).seconds
+                    rangeStart = min(rangeStart ?? start, start)
+                    rangeEnd = max(rangeEnd ?? end, end)
+                }
+            }
+        }
+
+        if rangeStart == nil || rangeEnd == nil, resultRange.isValid, !resultRange.start.isIndefinite {
+            rangeStart = resultRange.start.seconds
+            rangeEnd = CMTimeRangeGetEnd(resultRange).seconds
+        }
+
+        let confidence = confidenceWeight > 0 ? weightedConfidence / confidenceWeight : unknownConfidence
+        return TranscriptSegmentMetrics(
+            confidence: confidence,
+            audioStartTime: rangeStart ?? 0,
+            audioEndTime: rangeEnd ?? 0
+        )
     }
 
     // MARK: - SpeechAnalyzer (iOS 26)
@@ -165,40 +271,39 @@ actor TranscriptionService: TranscriptionServiceProtocol {
     }
 
     /// Start transcription using SpeechAnalyzer (iOS 26+).
-    /// Uses SpeechAnalyzer.process(input:) with an AsyncStream of AnalyzerInput buffers.
+    /// Uses SpeechAnalyzer.analyzeSequence(_:) with an AsyncStream of AnalyzerInput buffers.
     @available(iOS 26.0, *)
     private func startSpeechAnalyzerTranscription(locale: Locale) async throws {
         let transcriber = SpeechTranscriber(
             locale: locale,
             transcriptionOptions: [],
             reportingOptions: [.volatileResults],
-            attributeOptions: [.audioTimeRange]
+            attributeOptions: [.audioTimeRange, .transcriptionConfidence]
         )
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
-        let analyzerFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
-            compatibleWith: [transcriber]
-        )
 
         // Create buffer stream for feeding audio from AudioRecorder
         let (bufferStream, bufferContinuation) = AsyncStream<AudioBufferInput>.makeStream()
         self.bufferContinuation = bufferContinuation
 
-        // Map AudioBufferInput stream to AnalyzerInput stream
+        // Map AudioBufferInput stream to AnalyzerInput stream, anchored on the file timeline
         let inputStream = bufferStream.map { bufferInput -> AnalyzerInput in
-            AnalyzerInput(buffer: bufferInput.buffer)
+            let time = bufferInput.time
+            guard time.isSampleTimeValid, time.sampleRate > 0 else {
+                return AnalyzerInput(buffer: bufferInput.buffer)
+            }
+            let start = CMTime(value: CMTimeValue(time.sampleTime), timescale: CMTimeScale(time.sampleRate))
+            return AnalyzerInput(buffer: bufferInput.buffer, bufferStartTime: start)
         }
 
-        let recordingDB = self.recordingDB
         let vocabularyProcessor = self.vocabularyProcessor
         let onTranscriptUpdate = self.onTranscriptUpdate
-        let currentPhaseProvider = self.currentPhaseProvider
-        let flightID = self.flightID!
         let logger = self.logger
 
-        transcriptionTask = Task {
+        transcriptionTask = Task { [weak self] in
             // Process transcription results in a child task
-            let resultsTask = Task {
+            let resultsTask = Task { [weak self] in
                 do {
                     for try await result in transcriber.results {
                         guard !Task.isCancelled else { break }
@@ -206,42 +311,16 @@ actor TranscriptionService: TranscriptionServiceProtocol {
                         let processed = vocabularyProcessor.process(text)
 
                         if result.isFinal {
-                            // Get current flight phase
-                            let phase = await currentPhaseProvider?() ?? .cruise
-
-                            // Create and store segment to GRDB
-                            let segment = TranscriptSegmentRecord(
-                                flightID: flightID,
-                                text: processed,
-                                confidence: 0.9,
-                                audioStartTime: 0,
-                                audioEndTime: 0,
-                                flightPhase: phase.rawValue
-                            )
-
-                            do {
-                                try recordingDB.insertTranscript(segment)
-                            } catch {
-                                logger.error("Failed to store transcript: \(error.localizedDescription)")
-                            }
-
-                            // Notify UI with final segment
-                            let displayItem = TranscriptDisplayItem(
-                                id: UUID(),
-                                text: processed,
-                                timestamp: Date(),
-                                isVolatile: false
-                            )
-                            onTranscriptUpdate?(displayItem)
+                            let metrics = Self.metrics(from: result.text, resultRange: result.range)
+                            await self?.recordFinalSegment(text: processed, metrics: metrics)
                         } else {
                             // Volatile result -- UI only, not stored
-                            let displayItem = TranscriptDisplayItem(
+                            onTranscriptUpdate?(TranscriptDisplayItem(
                                 id: UUID(),
                                 text: processed,
                                 timestamp: Date(),
                                 isVolatile: true
-                            )
-                            onTranscriptUpdate?(displayItem)
+                            ))
                         }
                     }
                 } catch {
@@ -253,7 +332,7 @@ actor TranscriptionService: TranscriptionServiceProtocol {
 
             // Feed audio to analyzer using analyzeSequence(_:)
             do {
-                try await analyzer.analyzeSequence(inputStream)
+                _ = try await analyzer.analyzeSequence(inputStream)
             } catch {
                 if !Task.isCancelled {
                     logger.error("SpeechAnalyzer analyze error: \(error.localizedDescription)")
@@ -282,14 +361,11 @@ actor TranscriptionService: TranscriptionServiceProtocol {
         self.sfRecognizer = recognizer
         self.sfRecognitionRequest = request
 
-        let recordingDB = self.recordingDB
         let vocabularyProcessor = self.vocabularyProcessor
         let onTranscriptUpdate = self.onTranscriptUpdate
-        let currentPhaseProvider = self.currentPhaseProvider
-        let flightID = self.flightID!
         let logger = self.logger
 
-        sfRecognitionTask = recognizer.recognitionTask(with: request) { result, error in
+        sfRecognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
             if let error = error {
                 if (error as NSError).code != 1 {  // Code 1 = cancelled, expected on stop
                     logger.error("SFSpeechRecognizer error: \(error.localizedDescription)")
@@ -303,43 +379,34 @@ actor TranscriptionService: TranscriptionServiceProtocol {
             let processed = vocabularyProcessor.process(text)
 
             if result.isFinal {
-                // Get confidence from best transcription segments
-                let confidence = result.bestTranscription.segments.last?.confidence ?? 0.0
+                let segments = result.bestTranscription.segments
+                // Mean word confidence; SFSpeechRecognizer reports 0 for words it didn't score.
+                let confidence: Double = segments.isEmpty
+                    ? TranscriptionService.unknownConfidence
+                    : segments.map { Double($0.confidence) }.reduce(0, +) / Double(segments.count)
+                let start = segments.first?.timestamp ?? 0
+                let end = segments.last.map { $0.timestamp + $0.duration } ?? 0
 
-                let segment = TranscriptSegmentRecord(
-                    flightID: flightID,
-                    text: processed,
-                    confidence: Double(confidence),
-                    audioStartTime: result.bestTranscription.segments.first?.timestamp ?? 0,
-                    audioEndTime: result.bestTranscription.segments.last.map {
-                        $0.timestamp + $0.duration
-                    } ?? 0,
-                    flightPhase: "cruise"  // Will be updated by phase provider
-                )
-
-                do {
-                    try recordingDB.insertTranscript(segment)
-                } catch {
-                    logger.error("Failed to store transcript: \(error.localizedDescription)")
+                Task { [weak self] in
+                    guard let self else { return }
+                    let offset = await self.sfTimelineOffsetSeconds ?? 0
+                    await self.recordFinalSegment(
+                        text: processed,
+                        metrics: TranscriptSegmentMetrics(
+                            confidence: confidence,
+                            audioStartTime: start + offset,
+                            audioEndTime: end + offset
+                        )
+                    )
                 }
-
-                // Notify UI with final segment
-                let displayItem = TranscriptDisplayItem(
-                    id: UUID(),
-                    text: processed,
-                    timestamp: Date(),
-                    isVolatile: false
-                )
-                onTranscriptUpdate?(displayItem)
             } else {
                 // Volatile result -- UI only
-                let displayItem = TranscriptDisplayItem(
+                onTranscriptUpdate?(TranscriptDisplayItem(
                     id: UUID(),
                     text: processed,
                     timestamp: Date(),
                     isVolatile: true
-                )
-                onTranscriptUpdate?(displayItem)
+                ))
             }
         }
     }

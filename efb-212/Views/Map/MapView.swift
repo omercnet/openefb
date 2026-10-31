@@ -6,6 +6,9 @@
 //  Creates the map, sets initial CONUS center, wires delegate through Coordinator,
 //  and adds tap gesture for GeoJSON feature detection (airport tapping).
 //
+//  Ownship is always our own chevron: showsUserLocation stays off and userTrackingMode
+//  is never set, so the system blue puck can never appear (design finding F4).
+//
 
 import SwiftUI
 import MapLibre
@@ -31,10 +34,10 @@ struct MapView: UIViewRepresentable {
             animated: false
         )
 
-        // We render our own ownship -- disable default user location display
+        // We render our own ownship -- never show the system puck
         mapView.showsUserLocation = false
 
-        // Hide default compass -- we provide our own controls
+        // Hide default compass -- we provide our own north indicator
         mapView.compassView.compassVisibility = .hidden
 
         // Set delegate through coordinator
@@ -54,20 +57,16 @@ struct MapView: UIViewRepresentable {
         }
         mapView.addGestureRecognizer(tapGesture)
 
+        // Age the GPS fix once a second for the status chip and stale chevron
+        mapViewModel.startGPSClock()
+
         return mapView
     }
 
     func updateUIView(_ mapView: MLNMapView, context: Context) {
-        // Sync ownship position
+        // New GPS fix: chevron, first-fix jump, follow camera (de-duplicated by timestamp)
         if let position = mapViewModel.appState.ownshipPosition {
-            let heading = mapViewModel.appState.track
-            mapService.updateOwnship(location: position, heading: heading)
-
-            // Handle first location animation (fire once only via Coordinator flag)
-            if mapViewModel.appState.firstLocationReceived && !context.coordinator.hasCalledFirstLocation {
-                context.coordinator.hasCalledFirstLocation = true
-                mapViewModel.onFirstLocationReceived(location: position)
-            }
+            mapViewModel.onOwnshipUpdated(position)
         }
 
         // Sync layer visibility
@@ -76,8 +75,14 @@ struct MapView: UIViewRepresentable {
             mapService.setLayerVisibility(layer, visible: visible)
         }
 
-        // Sync sectional opacity
-        mapService.setSectionalOpacity(mapViewModel.appState.sectionalOpacity)
+        // Sync base map style and sectional opacity (opacity only when it changed: this
+        // update runs once a second for the GPS clock and a raster-opacity write re-renders)
+        mapService.setMapStyle(mapViewModel.appState.mapStyle)
+        let opacity = mapViewModel.appState.sectionalOpacity
+        if context.coordinator.appliedSectionalOpacity != opacity {
+            context.coordinator.appliedSectionalOpacity = opacity
+            mapService.setSectionalOpacity(opacity)
+        }
     }
 
     // MARK: - Coordinator
@@ -86,14 +91,19 @@ struct MapView: UIViewRepresentable {
         let mapViewModel: MapViewModel
         let mapService: MapService
 
-        /// Tracks whether onFirstLocationReceived has been called this map lifecycle.
-        /// Prevents wasteful repeated calls on every SwiftUI update cycle.
-        var hasCalledFirstLocation: Bool = false
+        /// Last sectional opacity pushed to the map (nil until the first update).
+        @MainActor var appliedSectionalOpacity: Double?
 
         init(mapViewModel: MapViewModel, mapService: MapService) {
             self.mapViewModel = mapViewModel
             self.mapService = mapService
             super.init()
+        }
+
+        /// Pan and rotate gestures hand the camera to the user and suspend follow.
+        /// Pinch/zoom gestures keep following (the next fix re-centres).
+        nonisolated private static func isUserMove(_ reason: MLNCameraChangeReason) -> Bool {
+            reason.contains(.gesturePan) || reason.contains(.gestureRotate)
         }
 
         // Style finished loading -- initialize all layers
@@ -102,12 +112,31 @@ struct MapView: UIViewRepresentable {
             mapViewModel.onMapStyleLoaded(style: style)
         }
 
-        // Region changed -- trigger debounced data reload
+        // Camera moving (gesture or animation): suspend follow on user drag right away so the
+        // Recenter button appears while the finger is still down; keep the north indicator live.
         @MainActor
-        func mapViewRegionDidChangeAnimated(_ mapView: MLNMapView) {
+        func mapView(_ mapView: MLNMapView, regionIsChangingWith reason: MLNCameraChangeReason) {
+            if Self.isUserMove(reason) {
+                mapViewModel.onUserMovedMap()
+            }
+            mapViewModel.onMapDirectionChanged(mapView.direction)
+        }
+
+        // Region changed -- trigger debounced data reload sized from the visible bounds.
+        // Implementing the reason-bearing variant means MapLibre no longer calls
+        // regionDidChangeAnimated, so this is the only region-change entry point.
+        @MainActor
+        func mapView(_ mapView: MLNMapView, regionDidChangeWith reason: MLNCameraChangeReason, animated: Bool) {
+            if Self.isUserMove(reason) {
+                mapViewModel.onUserMovedMap()
+            }
+            let bounds = mapView.visibleCoordinateBounds
             mapViewModel.onRegionChanged(
                 center: mapView.centerCoordinate,
-                zoom: mapView.zoomLevel
+                zoom: mapView.zoomLevel,
+                northEast: bounds.ne,
+                southWest: bounds.sw,
+                direction: mapView.direction
             )
         }
 

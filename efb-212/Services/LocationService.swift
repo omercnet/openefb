@@ -6,6 +6,9 @@
 //  Updates AppState ownship properties on MainActor with aviation unit conversions.
 //  CLBackgroundActivitySession enables background GPS per NAV-07.
 //
+//  Position quality (GPS status chip, stale greying) is derived elsewhere from the
+//  CLLocation stored in AppState (timestamp, accuracies) plus the stationary flag set here.
+//
 
 import CoreLocation
 
@@ -45,8 +48,25 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
             do {
                 for try await update in updates {
                     guard !Task.isCancelled else { break }
-                    guard let location = update.location else { continue }
                     guard let self else { break }
+
+                    // CoreLocation pauses updates while the device is stationary and tells us
+                    // so once. The last fix stays valid; the status chip must not age it out.
+                    let isStationary = update.stationary
+
+                    guard let location = update.location else {
+                        // No position in this update: stationary notice keeps the last fix;
+                        // anything else (denied, unavailable) means the stream is not usable.
+                        await MainActor.run { [weak self] in
+                            guard let appState = self?.appState else { return }
+                            if isStationary {
+                                appState.gpsStationary = true
+                            } else if update.authorizationDenied || update.locationUnavailable {
+                                appState.gpsAvailable = false
+                            }
+                        }
+                        continue
+                    }
 
                     // Convert to aviation units
                     let speedKnots = max(0, location.speed * 1.94384)  // m/s to knots
@@ -76,6 +96,7 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
                         appState.verticalSpeed = computedVSI          // fpm
                         appState.track = trackDegrees                 // degrees true
                         appState.gpsAvailable = true
+                        appState.gpsStationary = isStationary
 
                         if !appState.firstLocationReceived {
                             appState.firstLocationReceived = true

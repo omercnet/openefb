@@ -4,7 +4,8 @@
 //
 //  GRDB-backed aviation database with R-tree spatial indexes and FTS5 full-text search.
 //  Wraps a DatabasePool for thread-safe concurrent reads with WAL mode.
-//  Copy-on-first-launch: bundled SQLite copied to Application Support on first run.
+//  The bundled SQLite is copied to Application Support on first run and re-copied whenever
+//  the bundled data fingerprint (data version + file size) changes, so app updates refresh it.
 //
 //  All query methods are nonisolated -- GRDB DatabasePool handles thread safety internally.
 //  Marked @unchecked Sendable because DatabasePool is inherently thread-safe.
@@ -18,27 +19,97 @@ final class AviationDatabase: @unchecked Sendable {
 
     private let dbPool: DatabasePool
 
-    // MARK: - Initialization (copy-on-first-launch)
+    // MARK: - Bundled Data Version
 
-    nonisolated init() throws {
+    /// Version of the bundled aviation.sqlite. Bump this whenever tools/nasr-importer regenerates
+    /// the file. The install fingerprint also includes the bundled file size, so a regenerated
+    /// file with a forgotten bump is still re-copied in most cases.
+    nonisolated static let bundledDataVersion = "2026-10-30"
+
+    /// Name of the installed database file and its version marker (both in the install directory).
+    nonisolated static let installedFileName = "aviation.sqlite"
+    nonisolated static let versionMarkerFileName = "aviation.sqlite.version"
+
+    // MARK: - Initialization
+
+    /// Open the production database: the bundled aviation.sqlite installed into
+    /// Application Support/efb-212, refreshed when the bundled data fingerprint changes.
+    /// Throws EFBError.databaseCorrupted if the bundled database is missing.
+    nonisolated convenience init() throws {
         let fileManager = FileManager.default
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dbDir = appSupport.appendingPathComponent("efb-212", isDirectory: true)
-        let dbPath = dbDir.appendingPathComponent("aviation.sqlite")
-
-        if !fileManager.fileExists(atPath: dbPath.path) {
-            guard let bundledPath = Bundle.main.url(forResource: "aviation", withExtension: "sqlite") else {
-                throw EFBError.databaseCorrupted
-            }
-            try fileManager.createDirectory(at: dbDir, withIntermediateDirectories: true)
-            try fileManager.copyItem(at: bundledPath, to: dbPath)
+        guard let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw EFBError.databaseCorrupted
         }
+        guard let bundledURL = Bundle.main.url(forResource: "aviation", withExtension: "sqlite") else {
+            throw EFBError.databaseCorrupted
+        }
+        let installDirectory = appSupport.appendingPathComponent("efb-212", isDirectory: true)
+        try self.init(bundledURL: bundledURL, installDirectory: installDirectory, dataVersion: Self.bundledDataVersion)
+    }
+
+    /// Open the database at `bundledURL` after installing it into `installDirectory`.
+    /// Exposed for tests; production uses `init()`.
+    nonisolated init(bundledURL: URL, installDirectory: URL, dataVersion: String) throws {
+        let installedURL = try Self.installBundledDatabase(
+            from: bundledURL,
+            into: installDirectory,
+            dataVersion: dataVersion
+        )
 
         var config = Configuration()
         config.prepareDatabase { db in
             try db.execute(sql: "PRAGMA journal_mode = WAL")
         }
-        dbPool = try DatabasePool(path: dbPath.path, configuration: config)
+        do {
+            dbPool = try DatabasePool(path: installedURL.path, configuration: config)
+        } catch {
+            throw EFBError.databaseMigrationFailed(underlying: error)
+        }
+    }
+
+    /// Copy the bundled database into `directory` when it is missing or its fingerprint differs
+    /// from the installed marker. Removes the old file and its -wal/-shm sidecars before copying
+    /// so a stale write-ahead log can never be applied to the fresh file.
+    /// Returns the URL of the installed database.
+    /// Throws EFBError.databaseCorrupted if the bundled file does not exist.
+    @discardableResult
+    nonisolated static func installBundledDatabase(
+        from bundledURL: URL,
+        into directory: URL,
+        dataVersion: String
+    ) throws -> URL {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: bundledURL.path) else {
+            throw EFBError.databaseCorrupted
+        }
+
+        let installedURL = directory.appendingPathComponent(installedFileName)
+        let markerURL = directory.appendingPathComponent(versionMarkerFileName)
+        let fingerprint = try installFingerprint(bundledURL: bundledURL, dataVersion: dataVersion)
+
+        let installedMarker = try? String(contentsOf: markerURL, encoding: .utf8)
+        let upToDate = fileManager.fileExists(atPath: installedURL.path) && installedMarker == fingerprint
+        if upToDate {
+            return installedURL
+        }
+
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        for suffix in ["", "-wal", "-shm"] {
+            let stale = directory.appendingPathComponent(installedFileName + suffix)
+            if fileManager.fileExists(atPath: stale.path) {
+                try fileManager.removeItem(at: stale)
+            }
+        }
+        try fileManager.copyItem(at: bundledURL, to: installedURL)
+        try fingerprint.write(to: markerURL, atomically: true, encoding: .utf8)
+        return installedURL
+    }
+
+    /// Fingerprint written to the version marker: "<dataVersion>|<bundled file size in bytes>".
+    nonisolated static func installFingerprint(bundledURL: URL, dataVersion: String) throws -> String {
+        let attributes = try FileManager.default.attributesOfItem(atPath: bundledURL.path)
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        return "\(dataVersion)|\(size)"
     }
 
     /// Internal init for testing with an explicit database pool.
@@ -86,27 +157,39 @@ final class AviationDatabase: @unchecked Sendable {
         }
     }
 
+    /// Initial search radius for nearestAirports, doubled until enough airports are found.
+    nonisolated static let nearestInitialRadiusNM: Double = 25.0   // nautical miles
+    /// Largest circle nearestAirports will search before returning fewer than requested.
+    nonisolated static let nearestMaxRadiusNM: Double = 400.0      // nautical miles
+
     /// Fetch the N nearest airports to a coordinate, sorted by great-circle distance.
     /// Includes runways for emergency HUD display.
+    ///
+    /// Searches a circle, not a box: the R-tree box that covers the circle is queried, each
+    /// candidate's true great-circle distance is computed, and only airports inside the circle
+    /// are accepted. The radius doubles until `count` airports are inside it, so an airport at
+    /// the corner of the box can never outrank a closer one just outside the box.
     nonisolated func nearestAirports(to center: CLLocationCoordinate2D, count: Int) throws -> [Airport] {
-        // Start with 25 NM radius, expand until we have enough results (max 200 NM)
-        var radiusNM: Double = 25.0
-        var candidates: [Airport] = []
+        guard count > 0 else { return [] }
 
-        while candidates.count < count && radiusNM <= 200.0 {
-            candidates = try airports(near: center, radiusNM: radiusNM)
-            radiusNM *= 2.0
+        var radiusNM = Self.nearestInitialRadiusNM
+        var withinCircle: [(airport: Airport, distanceNM: Double)] = []
+
+        while true {
+            let candidates = try airports(near: center, radiusNM: radiusNM)
+            withinCircle = candidates
+                .map { (airport: $0, distanceNM: Self.haversineDistanceNM(from: center, to: $0.coordinate)) }
+                .filter { $0.distanceNM <= radiusNM }
+            if withinCircle.count >= count || radiusNM >= Self.nearestMaxRadiusNM {
+                break
+            }
+            radiusNM = min(radiusNM * 2.0, Self.nearestMaxRadiusNM)
         }
 
-        // Sort by Haversine distance and take top N
-        let centerLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
-        let sorted = candidates.sorted { a, b in
-            let distA = centerLocation.distance(from: CLLocation(latitude: a.latitude, longitude: a.longitude))
-            let distB = centerLocation.distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
-            return distA < distB
-        }
-
-        let topN = Array(sorted.prefix(count))
+        let topN = withinCircle
+            .sorted { $0.distanceNM < $1.distanceNM }
+            .prefix(count)
+            .map(\.airport)
 
         // Load runways for the nearest airports (needed for emergency HUD)
         return try dbPool.read { db in
@@ -137,13 +220,22 @@ final class AviationDatabase: @unchecked Sendable {
         }
     }
 
-    /// Search airports by ICAO identifier, name, or FAA ID using FTS5 full-text search.
-    nonisolated func searchAirports(query: String, limit: Int = 20) throws -> [Airport] {
-        let sanitized = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !sanitized.isEmpty else { return [] }
+    /// Build a safe FTS5 MATCH expression from raw user text.
+    /// Splits on non-alphanumerics, quotes each token and adds prefix matching, so quotes,
+    /// dashes and other FTS5 syntax in the input can never cause a parse error.
+    /// `KPAO-1` -> `"KPAO"* "1"*`. Returns nil when the input has no alphanumeric token.
+    nonisolated static func ftsMatchExpression(from query: String) -> String? {
+        let tokens = query
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+        guard !tokens.isEmpty else { return nil }
+        return tokens.map { "\"\($0)\"*" }.joined(separator: " ")
+    }
 
-        // Append * for prefix matching (e.g., "KPA" matches "KPAO")
-        let ftsQuery = sanitized + "*"
+    /// Search airports by ICAO identifier, name, or FAA ID using FTS5 full-text search.
+    /// Empty input (or input with no alphanumeric characters) returns no results.
+    nonisolated func searchAirports(query: String, limit: Int = 20) throws -> [Airport] {
+        guard let ftsQuery = Self.ftsMatchExpression(from: query) else { return [] }
 
         return try dbPool.read { db in
             let rows = try Row.fetchAll(db, sql: """
@@ -289,7 +381,7 @@ final class AviationDatabase: @unchecked Sendable {
             let idString: String = row["id"] ?? UUID().uuidString
             return Frequency(
                 id: UUID(uuidString: idString) ?? UUID(),
-                type: FrequencyType(rawValue: row["type"] ?? "ctaf") ?? .ctaf,
+                type: FrequencyType(rawValue: row["type"] ?? "other") ?? .other,
                 frequency: row["frequency"],
                 name: row["name"]
             )

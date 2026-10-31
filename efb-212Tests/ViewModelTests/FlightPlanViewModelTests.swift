@@ -1,347 +1,381 @@
-// DISABLED: FlightPlanViewModel does not exist yet (planned for Phase 2 Plan 03).
-// These tests will be re-enabled when FlightPlanViewModel is implemented.
-#if false
 //
 //  FlightPlanViewModelTests.swift
 //  efb-212Tests
 //
-//  Tests for FlightPlanViewModel: plan creation, distance calculation,
-//  clearing, and error handling when airports are not found.
+//  FlightPlanViewModel behaviour: search thresholds and failure handling, route math with and
+//  without an active aircraft profile, AppState summary propagation, SwiftData persistence,
+//  and plan lifecycle (save / load / clear / delete). No MapService is attached (it needs a
+//  live MLNMapView); map drawing is optional in the view model and is not covered here.
 //
 
 import Testing
 import Foundation
 import CoreLocation
+import SwiftData
 @testable import efb_212
 
 @Suite("FlightPlanViewModel Tests")
+@MainActor
 struct FlightPlanViewModelTests {
 
-    // MARK: - Test Helpers
+    // MARK: - Fixtures
 
-    static let kpao = Airport(
-        icao: "KPAO", faaID: "PAO", name: "Palo Alto",
-        latitude: 37.4611, longitude: -122.1150, elevation: 4,
-        type: .airport, ownership: .publicOwned,
-        ctafFrequency: 118.6, unicomFrequency: nil,
-        artccID: nil, fssID: nil, magneticVariation: nil,
-        patternAltitude: 800, fuelTypes: ["100LL"],
-        hasBeaconLight: true, runways: [], frequencies: []
-    )
+    static func airport(_ icao: String, _ name: String, _ lat: Double, _ lon: Double) -> Airport {
+        Airport(
+            icao: icao, faaID: nil, name: name,
+            latitude: lat, longitude: lon, elevation: 5,
+            type: .airport, ownership: .publicOwned,
+            ctafFrequency: nil, unicomFrequency: nil,
+            artccID: nil, fssID: nil, magneticVariation: nil,
+            patternAltitude: nil, fuelTypes: [],
+            hasBeaconLight: false, runways: [], frequencies: []
+        )
+    }
 
-    static let ksql = Airport(
-        icao: "KSQL", faaID: "SQL", name: "San Carlos",
-        latitude: 37.5119, longitude: -122.2494, elevation: 5,
-        type: .airport, ownership: .publicOwned,
-        ctafFrequency: 119.0, unicomFrequency: nil,
-        artccID: nil, fssID: nil, magneticVariation: nil,
-        patternAltitude: 800, fuelTypes: ["100LL"],
-        hasBeaconLight: true, runways: [], frequencies: []
-    )
+    static let kpao = airport("KPAO", "Palo Alto", 37.4611, -122.1150)
+    static let ksql = airport("KSQL", "San Carlos", 37.5119, -122.2494)
+    static let koak = airport("KOAK", "Oakland Intl", 37.7213, -122.2208)
 
-    /// Create a mock database manager pre-loaded with test airports.
-    static func makeMockDB() -> MockDatabaseManager {
+    struct Harness {
+        let vm: FlightPlanViewModel
+        let appState: AppState
+        let context: ModelContext
+        let db: MockDatabaseManager
+        let container: ModelContainer
+    }
+
+    static func makeHarness(configure: Bool = true) throws -> Harness {
+        let container = try ModelContainer(
+            for: SchemaV1.FlightPlanRecord.self, SchemaV1.AircraftProfile.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
         let db = MockDatabaseManager()
-        db.airports = [kpao, ksql]
-        return db
+        db.airports = [kpao, ksql, koak]
+        let appState = AppState()
+        let vm = FlightPlanViewModel(databaseService: db, appState: appState)
+        if configure {
+            vm.configure(mapService: nil, modelContext: container.mainContext)
+        }
+        return Harness(vm: vm, appState: appState, context: container.mainContext, db: db, container: container)
     }
 
-    // MARK: - Flight Plan Creation
-
-    @Test func createFlightPlanSuccess() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-
-        await vm.createFlightPlan()
-
-        #expect(vm.activePlan != nil)
-        #expect(vm.error == nil)
-        #expect(vm.activePlan?.departure == "KPAO")
-        #expect(vm.activePlan?.destination == "KSQL")
+    /// Great-circle distance reference computed independently of the view model's helper.
+    static func haversineNM(_ a: Airport, _ b: Airport) -> Double {
+        let r = 3440.065  // Earth radius, nautical miles
+        let dLat = (b.latitude - a.latitude) * .pi / 180
+        let dLon = (b.longitude - a.longitude) * .pi / 180
+        let h = sin(dLat / 2) * sin(dLat / 2)
+            + cos(a.latitude * .pi / 180) * cos(b.latitude * .pi / 180) * sin(dLon / 2) * sin(dLon / 2)
+        return 2 * r * asin(sqrt(h))
     }
 
-    @Test func createFlightPlanDistance() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
+    @discardableResult
+    static func addActiveAircraft(_ context: ModelContext, speed: Double?, burn: Double?, active: Bool = true) -> SchemaV1.AircraftProfile {
+        let aircraft = SchemaV1.AircraftProfile(nNumber: "N4543A")
+        aircraft.cruiseSpeedKts = speed
+        aircraft.fuelBurnGPH = burn
+        aircraft.isActive = active
+        context.insert(aircraft)
+        return aircraft
+    }
 
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
+    // MARK: - Search
 
-        await vm.createFlightPlan()
+    @Test func searchRequiresAtLeastTwoCharacters() throws {
+        let h = try Self.makeHarness()
 
-        guard let plan = vm.activePlan else {
-            #expect(Bool(false), "Flight plan should have been created")
-            return
+        h.vm.departureQuery = "K"
+        h.vm.searchDeparture()
+        #expect(h.vm.departureResults.isEmpty)
+
+        h.vm.departureQuery = "KP"
+        h.vm.searchDeparture()
+        #expect(h.vm.departureResults.map(\.icao) == ["KPAO"])
+
+        // Shrinking the query again clears stale results instead of leaving them on screen.
+        h.vm.departureQuery = "K"
+        h.vm.searchDeparture()
+        #expect(h.vm.departureResults.isEmpty)
+    }
+
+    @Test func destinationSearchIsIndependentOfDeparture() throws {
+        let h = try Self.makeHarness()
+        h.vm.departureQuery = "KPAO"
+        h.vm.searchDeparture()
+
+        h.vm.destinationQuery = "Oakland"
+        h.vm.searchDestination()
+
+        #expect(h.vm.destinationResults.map(\.icao) == ["KOAK"])
+        #expect(h.vm.departureResults.map(\.icao) == ["KPAO"])
+    }
+
+    @Test func searchFailureYieldsEmptyResultsNotStaleOnes() throws {
+        let appState = AppState()
+        let vm = FlightPlanViewModel(databaseService: UnavailableDatabaseService(), appState: appState)
+        vm.departureResults = [Self.kpao]
+        vm.departureQuery = "KPAO"
+
+        vm.searchDeparture()
+
+        #expect(vm.departureResults.isEmpty)
+    }
+
+    // MARK: - Selection
+
+    @Test func selectingAirportFillsQueryAndClearsResults() throws {
+        let h = try Self.makeHarness()
+        h.vm.departureResults = [Self.kpao, Self.ksql]
+
+        h.vm.selectDeparture(Self.kpao)
+
+        #expect(h.vm.selectedDeparture?.icao == "KPAO")
+        #expect(h.vm.departureQuery == "KPAO")
+        #expect(h.vm.departureResults.isEmpty)
+        // Only one end chosen: nothing is calculated or published yet.
+        #expect(h.vm.distanceNM == 0)
+        #expect(h.appState.activeFlightPlan == false)
+    }
+
+    // MARK: - Route math
+
+    @Test func selectingBothEndsComputesDistanceAndPublishesSummaryToAppState() throws {
+        let h = try Self.makeHarness()
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.ksql)
+
+        let expected = Self.haversineNM(Self.kpao, Self.ksql)
+        #expect(abs(h.vm.distanceNM - expected) < 0.1)   // nautical miles
+        #expect(h.vm.distanceNM > 5 && h.vm.distanceNM < 9)
+
+        #expect(h.appState.activeFlightPlan)
+        #expect(h.appState.activePlanDeparture == "KPAO")
+        #expect(h.appState.activePlanDestination == "KSQL")
+        #expect(h.appState.distanceToNext == h.vm.distanceNM)
+        #expect(h.appState.estimatedTimeEnroute == h.vm.estimatedTimeSeconds)
+    }
+
+    @Test func withoutAircraftProfileUsesDefault100KnotsAndNoFuel() throws {
+        let h = try Self.makeHarness()
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.koak)
+
+        let expectedETE = Self.haversineNM(Self.kpao, Self.koak) / 100.0 * 3600  // seconds at 100 kt
+        #expect(abs(h.vm.estimatedTimeSeconds - expectedETE) < 10)
+        #expect(h.vm.estimatedFuelGallons == nil)
+        #expect(h.appState.activePlanFuelGallons == nil)
+    }
+
+    @Test func activeAircraftSuppliesSpeedAndFuelBurn() throws {
+        let h = try Self.makeHarness()
+        Self.addActiveAircraft(h.context, speed: 120, burn: 9)
+
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.koak)
+
+        let distance = Self.haversineNM(Self.kpao, Self.koak)
+        #expect(abs(h.vm.estimatedTimeSeconds - distance / 120 * 3600) < 10)
+        let fuel = try #require(h.vm.estimatedFuelGallons)
+        #expect(abs(fuel - distance / 120 * 9) < 0.05)   // gallons
+        #expect(h.appState.activePlanFuelGallons == fuel)
+    }
+
+    @Test func inactiveAircraftIsIgnored() throws {
+        let h = try Self.makeHarness()
+        Self.addActiveAircraft(h.context, speed: 200, burn: 20, active: false)
+
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.koak)
+
+        let distance = Self.haversineNM(Self.kpao, Self.koak)
+        #expect(abs(h.vm.estimatedTimeSeconds - distance / 100 * 3600) < 10)
+        #expect(h.vm.estimatedFuelGallons == nil)
+    }
+
+    @Test func zeroOrMissingCruiseSpeedFallsBackToDefault() throws {
+        let h = try Self.makeHarness()
+        Self.addActiveAircraft(h.context, speed: 0, burn: 8)
+
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.koak)
+
+        // A zero cruise speed must not divide by zero or produce an infinite ETE.
+        #expect(h.vm.estimatedTimeSeconds.isFinite)
+        let distance = Self.haversineNM(Self.kpao, Self.koak)
+        #expect(abs(h.vm.estimatedTimeSeconds - distance / 100 * 3600) < 10)
+    }
+
+    @Test func zeroBurnRateYieldsNoFuelEstimate() throws {
+        let h = try Self.makeHarness()
+        Self.addActiveAircraft(h.context, speed: 110, burn: 0)
+
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.koak)
+
+        #expect(h.vm.estimatedFuelGallons == nil)
+    }
+
+    @Test func sameAirportBothEndsGivesZeroDistanceWithoutCrashing() throws {
+        let h = try Self.makeHarness()
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.kpao)
+
+        #expect(h.vm.distanceNM == 0)
+        #expect(h.vm.estimatedTimeSeconds == 0)
+        #expect(h.vm.formattedETE == "0:00")
+    }
+
+    // MARK: - ETE formatting
+
+    @Test func formattedETETruncatesToWholeMinutes() throws {
+        let h = try Self.makeHarness(configure: false)
+        let cases: [(TimeInterval, String)] = [
+            (0, "0:00"), (59, "0:00"), (60, "0:01"), (3599, "0:59"), (3600, "1:00"), (7500, "2:05"),
+        ]
+        for (seconds, text) in cases {
+            h.vm.estimatedTimeSeconds = seconds
+            #expect(h.vm.formattedETE == text, "\(seconds) s")
+        }
+    }
+
+    // MARK: - Persistence
+
+    @Test func savePlanPersistsRouteAndMarksItActive() throws {
+        let h = try Self.makeHarness()
+        Self.addActiveAircraft(h.context, speed: 120, burn: 9)
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.ksql)
+
+        h.vm.savePlan()
+
+        let record = try #require(h.vm.savedPlans.first)
+        #expect(h.vm.savedPlans.count == 1)
+        #expect(record.departureICAO == "KPAO")
+        #expect(record.destinationICAO == "KSQL")
+        #expect(record.destinationLatitude == Self.ksql.latitude)
+        #expect(abs(record.cruiseSpeedKts - 120) < 0.01)   // knots, recovered from distance / ETE
+        #expect(record.totalDistanceNM == h.vm.distanceNM)
+        #expect(h.vm.activePlanID == record.id)
+    }
+
+    @Test func savePlanWithoutBothAirportsDoesNothing() throws {
+        let h = try Self.makeHarness()
+        h.vm.selectDeparture(Self.kpao)
+
+        h.vm.savePlan()
+
+        #expect(h.vm.savedPlans.isEmpty)
+        #expect(h.vm.activePlanID == nil)
+    }
+
+    @Test func savedPlansAreOrderedMostRecentlyUsedFirst() throws {
+        let h = try Self.makeHarness()
+        for (index, destination) in [Self.ksql, Self.koak].enumerated() {
+            let record = SchemaV1.FlightPlanRecord()
+            record.departureICAO = "KPAO"
+            record.destinationICAO = destination.icao
+            record.lastUsedAt = Date(timeIntervalSince1970: 1_700_000_000 + Double(index) * 100)
+            h.context.insert(record)
         }
 
-        // KPAO to KSQL is approximately 5-7 NM
-        let distance = plan.totalDistance
-        #expect(distance > 3.0, "Distance should be at least 3 NM")
-        #expect(distance < 10.0, "Distance should be less than 10 NM")
+        h.vm.loadSavedPlans()
+
+        #expect(h.vm.savedPlans.map(\.destinationICAO) == ["KOAK", "KSQL"])
     }
 
-    @Test func createFlightPlanETE() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
+    @Test func configureRestoresMostRecentPlanFromDatabaseAirports() throws {
+        let h = try Self.makeHarness(configure: false)
+        let old = SchemaV1.FlightPlanRecord()
+        old.departureICAO = "KPAO"; old.destinationICAO = "KSQL"
+        old.lastUsedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let recent = SchemaV1.FlightPlanRecord()
+        recent.departureICAO = "KSQL"; recent.destinationICAO = "KOAK"
+        recent.lastUsedAt = Date(timeIntervalSince1970: 1_700_100_000)
+        h.context.insert(old)
+        h.context.insert(recent)
 
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
+        h.vm.configure(mapService: nil, modelContext: h.context)
 
-        await vm.createFlightPlan()
-
-        guard let plan = vm.activePlan else {
-            #expect(Bool(false), "Flight plan should have been created")
-            return
-        }
-
-        // ETE = distance / speed * 3600
-        // ~5 NM at 100 kts = ~3 minutes = ~180 seconds
-        #expect(plan.estimatedTime > 60, "ETE should be at least 1 minute")
-        #expect(plan.estimatedTime < 600, "ETE should be less than 10 minutes for this short flight")
+        #expect(h.vm.selectedDeparture?.icao == "KSQL")
+        #expect(h.vm.selectedDestination?.icao == "KOAK")
+        #expect(h.vm.activePlanID == recent.id)
+        #expect(h.appState.activePlanDestination == "KOAK")
     }
 
-    @Test func createFlightPlanHasWaypoints() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
+    @Test func loadingPlanWhoseAirportIsGoneDoesNotPublishARoute() throws {
+        let h = try Self.makeHarness()
+        let record = SchemaV1.FlightPlanRecord()
+        record.departureICAO = "KPAO"
+        record.destinationICAO = "KGONE"   // removed from a newer aviation database
+        h.context.insert(record)
 
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
+        h.vm.loadPlan(record)
 
-        await vm.createFlightPlan()
-
-        guard let plan = vm.activePlan else {
-            #expect(Bool(false), "Flight plan should have been created")
-            return
-        }
-
-        // Should have 2 waypoints (departure + destination)
-        #expect(plan.waypoints.count == 2)
-        #expect(plan.waypoints.first?.identifier == "KPAO")
-        #expect(plan.waypoints.last?.identifier == "KSQL")
+        #expect(h.vm.selectedDeparture?.icao == "KPAO")
+        #expect(h.vm.selectedDestination == nil)
+        #expect(h.appState.activeFlightPlan == false)
     }
 
-    // MARK: - Clear Flight Plan
+    @Test func loadingPlanTouchesLastUsedAt() throws {
+        let h = try Self.makeHarness()
+        let record = SchemaV1.FlightPlanRecord()
+        record.departureICAO = "KPAO"; record.destinationICAO = "KSQL"
+        record.lastUsedAt = Date(timeIntervalSince1970: 1_000_000_000)
+        h.context.insert(record)
 
-    @Test func clearFlightPlan() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
+        h.vm.loadPlan(record)
 
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-        await vm.createFlightPlan()
-        #expect(vm.activePlan != nil)
-
-        vm.clearFlightPlan()
-
-        #expect(vm.activePlan == nil)
-        #expect(vm.departureICAO == "")
-        #expect(vm.destinationICAO == "")
-        #expect(vm.error == nil)
+        #expect(record.lastUsedAt > Date(timeIntervalSinceNow: -60))
     }
 
-    // MARK: - Error Cases
+    // MARK: - Clear / delete
 
-    @Test func errorWhenDepartureNotFound() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
+    @Test func clearPlanResetsViewModelAndAppState() throws {
+        let h = try Self.makeHarness()
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.ksql)
+        h.vm.savePlan()
+        #expect(h.appState.activeFlightPlan)
 
-        vm.departureICAO = "KXYZ"  // Does not exist in mock DB
-        vm.destinationICAO = "KSQL"
+        h.vm.clearPlan()
 
-        await vm.createFlightPlan()
-
-        #expect(vm.activePlan == nil)
-        #expect(vm.error != nil)
+        #expect(h.vm.selectedDeparture == nil && h.vm.selectedDestination == nil)
+        #expect(h.vm.departureQuery.isEmpty && h.vm.destinationQuery.isEmpty)
+        #expect(h.vm.distanceNM == 0 && h.vm.estimatedTimeSeconds == 0)
+        #expect(h.vm.estimatedFuelGallons == nil)
+        #expect(h.vm.activePlanID == nil)
+        #expect(h.appState.activeFlightPlan == false)
+        #expect(h.appState.distanceToNext == nil)
+        #expect(h.appState.estimatedTimeEnroute == nil)
+        #expect(h.appState.activePlanDeparture == nil)
+        #expect(h.appState.activePlanDestination == nil)
+        #expect(h.appState.activePlanFuelGallons == nil)
+        // Clearing the active plan does not delete it from storage.
+        #expect(h.vm.savedPlans.count == 1)
     }
 
-    @Test func errorWhenDestinationNotFound() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
+    @Test func deletingActivePlanAlsoClearsItWhileDeletingOtherPlanKeepsActive() throws {
+        let h = try Self.makeHarness()
+        h.vm.selectDeparture(Self.kpao)
+        h.vm.selectDestination(Self.ksql)
+        h.vm.savePlan()
+        let active = try #require(h.vm.savedPlans.first)
 
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KXYZ"  // Does not exist in mock DB
+        let other = SchemaV1.FlightPlanRecord()
+        other.departureICAO = "KPAO"; other.destinationICAO = "KOAK"
+        other.lastUsedAt = Date(timeIntervalSince1970: 1)
+        h.context.insert(other)
+        h.vm.loadSavedPlans()
+        #expect(h.vm.savedPlans.count == 2)
 
-        await vm.createFlightPlan()
+        h.vm.deletePlan(other)
+        #expect(h.vm.savedPlans.map(\.id) == [active.id])
+        #expect(h.vm.activePlanID == active.id)
+        #expect(h.appState.activeFlightPlan)
 
-        #expect(vm.activePlan == nil)
-        #expect(vm.error != nil)
-    }
-
-    @Test func errorWhenBothFieldsEmpty() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = ""
-        vm.destinationICAO = ""
-
-        await vm.createFlightPlan()
-
-        #expect(vm.activePlan == nil)
-        #expect(vm.error != nil)
-    }
-
-    // MARK: - Formatted Helpers
-
-    @Test func formattedDistanceNil() {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        // No active plan = nil formatted values
-        #expect(vm.formattedDistance == nil)
-        #expect(vm.formattedETE == nil)
-    }
-
-    @Test func formattedDistanceAfterPlan() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-        await vm.createFlightPlan()
-
-        #expect(vm.formattedDistance != nil)
-        #expect(vm.formattedDistance?.contains("NM") == true)
-    }
-
-    @Test func formattedETEAfterPlan() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-        await vm.createFlightPlan()
-
-        // ETE should be formatted as minutes (short flight)
-        #expect(vm.formattedETE != nil)
-        #expect(vm.formattedETE?.contains("m") == true)
-    }
-
-    // MARK: - Fuel Calculation
-
-    @Test func fuelIsNilWhenNoBurnRate() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-        await vm.createFlightPlan()
-
-        // Default fuel burn rate is nil, so estimated fuel should be nil
-        #expect(vm.activePlan?.estimatedFuel == nil)
-        #expect(vm.formattedFuel == nil)
-    }
-
-    // MARK: - Speed and Altitude Formatting
-
-    @Test func formattedSpeedAndAltitude() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-        await vm.createFlightPlan()
-
-        #expect(vm.formattedSpeed != nil)
-        #expect(vm.formattedSpeed?.contains("kts") == true)
-        #expect(vm.formattedSpeed?.contains("TAS") == true)
-
-        #expect(vm.formattedAltitude != nil)
-        #expect(vm.formattedAltitude?.contains("ft MSL") == true)
-    }
-
-    @Test func formattedValuesNilBeforePlan() {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        #expect(vm.formattedDistance == nil)
-        #expect(vm.formattedETE == nil)
-        #expect(vm.formattedFuel == nil)
-        #expect(vm.formattedAltitude == nil)
-        #expect(vm.formattedSpeed == nil)
-    }
-
-    // MARK: - Airport Resolution
-
-    @Test func departureAirportResolvedAfterPlan() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-        await vm.createFlightPlan()
-
-        #expect(vm.departureAirport != nil)
-        #expect(vm.departureAirport?.icao == "KPAO")
-        #expect(vm.destinationAirport != nil)
-        #expect(vm.destinationAirport?.icao == "KSQL")
-    }
-
-    @Test func airportsNilAfterClear() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-        await vm.createFlightPlan()
-        #expect(vm.departureAirport != nil)
-
-        vm.clearFlightPlan()
-
-        #expect(vm.departureAirport == nil)
-        #expect(vm.destinationAirport == nil)
-    }
-
-    // MARK: - Input Handling
-
-    @Test func icaoInputIsUppercased() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "kpao"  // lowercase
-        vm.destinationICAO = "ksql"
-
-        await vm.createFlightPlan()
-
-        // Flight plan departure should be uppercased
-        #expect(vm.activePlan?.departure == "KPAO")
-        #expect(vm.activePlan?.destination == "KSQL")
-    }
-
-    @Test func icaoInputIsTrimmed() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "  KPAO  "  // whitespace
-        vm.destinationICAO = "  KSQL  "
-
-        await vm.createFlightPlan()
-
-        #expect(vm.activePlan?.departure == "KPAO")
-        #expect(vm.activePlan?.destination == "KSQL")
-    }
-
-    // MARK: - Default Values
-
-    @Test func defaultCruiseValues() async {
-        let db = Self.makeMockDB()
-        let vm = FlightPlanViewModel(databaseManager: db)
-
-        vm.departureICAO = "KPAO"
-        vm.destinationICAO = "KSQL"
-        await vm.createFlightPlan()
-
-        guard let plan = vm.activePlan else {
-            #expect(Bool(false), "Plan should exist")
-            return
-        }
-
-        // Default cruise speed is 100 knots
-        #expect(plan.cruiseSpeed == 100.0)
-        // Default cruise altitude is 3000 feet MSL
-        #expect(plan.cruiseAltitude == 3000)
+        h.vm.deletePlan(active)
+        #expect(h.vm.savedPlans.isEmpty)
+        #expect(h.vm.activePlanID == nil)
+        #expect(h.appState.activeFlightPlan == false)
     }
 }
-#endif

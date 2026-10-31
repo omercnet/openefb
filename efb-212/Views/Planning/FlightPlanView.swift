@@ -229,26 +229,13 @@ struct FlightPlanView: View {
 
     // MARK: - ViewModel Initialization
 
-    /// Initialize the FlightPlanViewModel with database service.
-    /// Uses AppState.sharedDatabaseService if available (Map tab loaded first),
-    /// otherwise creates a concrete AviationDatabase as fallback.
+    /// Initialize the FlightPlanViewModel with the app-wide database service.
+    /// AppState owns the single DatabaseManager; it is created here if the Map tab
+    /// has not loaded yet, and a failure surfaces through AppState.databaseError.
     private func initializeViewModel() {
         guard viewModel == nil else { return }
 
-        let dbService: any DatabaseServiceProtocol
-        if let shared = appState.sharedDatabaseService {
-            dbService = shared
-        } else {
-            // Initialize AviationDatabase directly when Map tab hasn't loaded yet.
-            // AviationDatabase opens the bundled SQLite read-only -- safe to have multiple instances.
-            if let aviationDB = try? DatabaseManager() {
-                dbService = aviationDB
-                // Also set as shared so other tabs can use it
-                appState.sharedDatabaseService = aviationDB
-            } else {
-                dbService = PlaceholderDatabaseService()
-            }
-        }
+        let dbService = appState.getOrCreateDatabaseService()
 
         let vm = FlightPlanViewModel(databaseService: dbService, appState: appState)
         vm.configure(mapService: appState.sharedMapService, modelContext: modelContext)

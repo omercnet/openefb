@@ -158,13 +158,19 @@ final class RecordingViewModel {
                 try? await Task.sleep(for: .milliseconds(500))
                 guard let self else { break }
 
-                let state = await self.coordinator.state
+                let state = self.coordinator.state
                 self.recordingStatus = state.recordingStatus
                 self.elapsedTime = state.elapsedTime
                 self.currentPhase = state.currentPhase
                 self.recentTranscripts = state.recentTranscripts
                 self.audioLevel = state.audioLevel
                 self.countdownRemaining = state.countdownRemaining
+
+                // Surface mid-recording failures (e.g. audio write error) once
+                if let error = state.lastError {
+                    self.lastError = error
+                    state.lastError = nil
+                }
 
                 // Sync key state to AppState for cross-tab visibility
                 if let appState = self.appState {

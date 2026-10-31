@@ -5,7 +5,7 @@
 //  Complete map tab composing all navigation components:
 //  map, right-edge controls, layer panel, chart expiration badge,
 //  search bar with results, instrument strip, nearest airport HUD,
-//  airport info sheet, nearest airport list, TFR disclaimer banner,
+//  airport info sheet, nearest airport list,
 //  offline indicator, and all service wiring.
 //
 //  Per UI-SPEC: map fills screen, controls on right edge, ZStack composition.
@@ -68,6 +68,11 @@ struct MapContainerView: View {
     // Plan 04 Services
     @State private var weatherService = WeatherService()
     @State private var tfrService = TFRService()
+    @State private var airSigmetService = AirSigmetService()
+    @State private var chartService = TerminalProcedureService()
+    @State private var notamService = NotamService()
+    @State private var pirepService = PirepService()
+    @State private var windsAloftService = WindsAloftService()
     @State private var proximityAlertService: ProximityAlertService?
     @State private var reachabilityService = ReachabilityService()
 
@@ -167,32 +172,21 @@ struct MapContainerView: View {
                 // MARK: Bottom stack
 
                 VStack(spacing: 8) {
-                    // TFR disclaimer banner (non-dismissable red banner when TFR layer visible)
-                    if appState.visibleLayers.contains(.tfrs) {
-                        Text("TFR DATA IS SAMPLE ONLY \u{2014} NOT FOR NAVIGATION")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 6)
-                            .background(Color.red)
-                    }
-
-                    // Nearest airport HUD (positioned above instrument strip)
-                    if let nearestVM = nearestAirportVM {
-                        HStack {
-                            Spacer()
-                            NearestAirportHUD(
-                                nearestAirport: nearestVM.nearestAirport,
-                                distance: nearestVM.nearestDistance,
-                                bearing: nearestVM.nearestBearing
-                            )
+                    // Recenter (only while follow is suspended) and the fixed NRST button,
+                    // bottom-right above the instrument strip (F2, F3)
+                    HStack(alignment: .bottom, spacing: 12) {
+                        Spacer()
+                        if let viewModel = mapViewModel, !viewModel.isFollowing {
+                            RecenterButton { viewModel.recenter() }
                         }
-                        .padding(.horizontal, 16)
+                        if let nearestVM = nearestAirportVM {
+                            NearestAirportHUD(entry: nearestVM.nearestEntry)
+                        }
                     }
+                    .padding(.horizontal, 16)
 
-                    // Instrument strip (bottom bar)
-                    InstrumentStripView()
+                    // Instrument strip (bottom bar) with the GPS status chip
+                    InstrumentStripView(gpsStatus: mapViewModel?.gpsStatus ?? .lost(ageSeconds: nil))
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
                 }
@@ -209,7 +203,9 @@ struct MapContainerView: View {
             if appState.isPresentingLayerControls, let viewModel = mapViewModel {
                 VStack {
                     LayerControlsView(mapViewModel: viewModel)
-                        .padding(.trailing, 16)
+                        // Sit left of the map controls column (16 edge + 60 button + 12 gap)
+                        // so the layers button stays tappable to close the panel.
+                        .padding(.trailing, 88)
                         .padding(.top, 140)
                     Spacer()
                 }
@@ -264,7 +260,11 @@ struct MapContainerView: View {
         .sheet(isPresented: $appState.isPresentingAirportInfo) {
             AirportInfoSheet(
                 databaseService: mapViewModel?.databaseService ?? PlaceholderDatabaseService(),
-                weatherService: weatherService
+                weatherService: weatherService,
+                chartService: chartService,
+                notamService: notamService,
+                pirepService: pirepService,
+                windsAloftService: windsAloftService
             )
         }
 
@@ -317,17 +317,13 @@ struct MapContainerView: View {
     // MARK: - Service Initialization
 
     /// Create all services and view models once on first appear.
-    /// Uses DatabaseManager (real DB) or PlaceholderDatabaseService as fallback.
+    /// The aviation database is owned by AppState; on failure its queries throw and
+    /// AppState.databaseError drives the "Airport database unavailable" banner.
     private func initializeServices() {
         guard mapViewModel == nil else { return }  // already initialized
 
-        // Database service
-        let databaseService: any DatabaseServiceProtocol
-        if let dbManager = try? DatabaseManager() {
-            databaseService = dbManager
-        } else {
-            databaseService = PlaceholderDatabaseService()
-        }
+        // Database service (single shared instance, created once by AppState)
+        let databaseService = appState.getOrCreateDatabaseService()
 
         // MapViewModel
         let vm = MapViewModel(
@@ -340,13 +336,14 @@ struct MapContainerView: View {
         let proxService = ProximityAlertService(databaseService: databaseService)
         vm.weatherService = weatherService
         vm.tfrService = tfrService
+        vm.airSigmetService = airSigmetService
         vm.proximityAlertService = proxService
+        mapService.airportDiagramOverlay.configure(chartService: chartService, databaseService: databaseService)
 
         mapViewModel = vm
         proximityAlertService = proxService
 
-        // Share services via AppState for other tabs (Flight Plans, etc.)
-        appState.sharedDatabaseService = databaseService
+        // Share the map service via AppState for other tabs (Flight Plans, etc.)
         appState.sharedMapService = mapService
 
         // LocationService -- starts GPS tracking
@@ -374,7 +371,9 @@ struct MapContainerView: View {
     /// Initialize recording pipeline: RecordingDatabase -> AudioRecorder -> TranscriptionService -> RecordingCoordinator -> RecordingViewModel.
     private func initializeRecordingServices() {
         do {
-            let recordingDB = try RecordingDatabase()
+            guard let recordingDB = appState.getOrCreateRecordingDatabase() else {
+                throw appState.recordingDatabaseError ?? EFBError.databaseCorrupted
+            }
             let audioRecorder = AudioRecorder()
             let transcriptionService = TranscriptionService(recordingDB: recordingDB)
 

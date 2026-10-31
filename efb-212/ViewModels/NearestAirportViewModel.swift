@@ -2,10 +2,11 @@
 //  NearestAirportViewModel.swift
 //  efb-212
 //
-//  Nearest airport computation using R-tree spatial queries from AviationDatabase.
-//  Updates nearest airport when ownship position changes by >0.5 NM to avoid
-//  excessive DB queries. Maintains sorted list of nearest 10 airports for the
-//  expanded nearest-airport view.
+//  Nearest landable airport computation using R-tree spatial queries from
+//  AviationDatabase. Asks for a generous candidate set, drops anything a fixed-wing
+//  aircraft cannot land at (heliports, seaplane bases, short or soft runways; see
+//  LandableAirportFilter), then keeps the closest 10. Re-queries when ownship moves
+//  more than 0.5 NM.
 //
 
 import Foundation
@@ -21,6 +22,18 @@ struct NearestAirportEntry: Identifiable, Sendable {
     let bearing: Double    // degrees true
 
     var id: String { airport.icao }
+
+    /// Longest usable runway, for the HUD and list rows.
+    var longestRunway: Runway? { LandableAirportFilter.longestRunway(airport) }
+
+    /// Private-use field: landing needs prior permission.
+    var isPrivateUse: Bool { LandableAirportFilter.isPrivateUse(airport) }
+
+    /// Compact runway summary, e.g. "2441' ASPH". Nil when the airport has no runway data.
+    var runwaySummary: String? {
+        guard let runway = longestRunway else { return nil }
+        return "\(runway.length)' \(runway.surface.abbreviation)"   // feet
+    }
 }
 
 // MARK: - NearestAirportViewModel
@@ -29,6 +42,20 @@ struct NearestAirportEntry: Identifiable, Sendable {
 @MainActor
 final class NearestAirportViewModel {
 
+    // MARK: - Constants
+
+    /// Entries kept for the list.
+    static let listCount = 10
+    /// Candidates requested from the database before landability filtering. Roughly a third
+    /// of US facilities are heliports, and short private strips are common, so ask for
+    /// several times what the list shows.
+    static let candidateCount = 40
+    /// Minimum runway for the active aircraft. The aircraft profile has no runway field yet,
+    /// so this is the shared default.
+    static let minimumRunwayLengthFeet = LandableAirportFilter.defaultMinimumRunwayLengthFeet  // feet
+    /// Ownship must move this far before the database is queried again.
+    static let requeryDistanceNM = 0.5   // nautical miles
+
     // MARK: - Dependencies
 
     let databaseService: any DatabaseServiceProtocol
@@ -36,7 +63,7 @@ final class NearestAirportViewModel {
 
     // MARK: - Published State
 
-    /// The single closest airport to ownship.
+    /// The single closest landable airport to ownship.
     var nearestAirport: Airport?
 
     /// Distance to nearest airport in nautical miles.
@@ -45,7 +72,10 @@ final class NearestAirportViewModel {
     /// Bearing to nearest airport in degrees true.
     var nearestBearing: Double?
 
-    /// Full sorted list of nearest airports (up to 10).
+    /// Closest entry, for the NRST button.
+    var nearestEntry: NearestAirportEntry? { nearestAirports.first }
+
+    /// Full sorted list of nearest landable airports (up to `listCount`).
     var nearestAirports: [NearestAirportEntry] = []
 
     /// Loading indicator for async queries.
@@ -53,8 +83,7 @@ final class NearestAirportViewModel {
 
     // MARK: - Private
 
-    /// Last position used for nearest airport query. Prevents re-querying
-    /// when ownship moves less than 0.5 NM.
+    /// Last position used for nearest airport query.
     private var lastQueryPosition: CLLocation?
 
     // MARK: - Init
@@ -66,64 +95,59 @@ final class NearestAirportViewModel {
 
     // MARK: - Update Nearest
 
-    /// Recompute nearest airports from the given ownship position.
-    /// Skips query if position moved less than 0.5 NM from last query.
+    /// Recompute nearest landable airports from the given ownship position.
+    /// Skips the query if the position moved less than `requeryDistanceNM` since the last one.
     func updateNearest(from position: CLLocation) {
-        // Skip if position moved less than 0.5 NM from last query
-        if let lastPosition = lastQueryPosition {
-            let distanceMoved = position.distanceInNM(to: lastPosition)
-            if distanceMoved < 0.5 {
-                return
-            }
+        if let lastPosition = lastQueryPosition,
+           position.distanceInNM(to: lastPosition) < Self.requeryDistanceNM {
+            return
         }
 
         isLoading = true
         defer { isLoading = false }
 
         do {
-            let airports = try databaseService.nearestAirports(
+            let candidates = try databaseService.nearestAirports(
                 to: position.coordinate,
-                count: 10
+                count: Self.candidateCount
+            )
+            let entries = Self.rankLandable(
+                candidates,
+                from: position,
+                minimumRunwayLengthFeet: Self.minimumRunwayLengthFeet,
+                limit: Self.listCount
             )
 
-            // Compute distance and bearing for each airport
-            var entries: [NearestAirportEntry] = []
-            for airport in airports {
-                let airportLocation = CLLocation(
-                    latitude: airport.latitude,
-                    longitude: airport.longitude
-                )
-                let distance = position.distanceInNM(to: airportLocation)  // nautical miles
-                let bearing = position.bearing(to: airportLocation)        // degrees true
-
-                entries.append(NearestAirportEntry(
-                    airport: airport,
-                    distance: distance,
-                    bearing: bearing
-                ))
-            }
-
-            // Sort by distance (ascending)
-            entries.sort { $0.distance < $1.distance }
-
-            // Update state
             nearestAirports = entries
-
-            if let closest = entries.first {
-                nearestAirport = closest.airport
-                nearestDistance = closest.distance
-                nearestBearing = closest.bearing
-            } else {
-                nearestAirport = nil
-                nearestDistance = nil
-                nearestBearing = nil
-            }
-
+            nearestAirport = entries.first?.airport
+            nearestDistance = entries.first?.distance
+            nearestBearing = entries.first?.bearing
             lastQueryPosition = position
         } catch {
             // Non-critical -- nearest airport is informational.
             // Keep stale data rather than clearing it.
         }
+    }
+
+    /// Filter candidates to landable fields and sort by distance from `position`.
+    static func rankLandable(
+        _ candidates: [Airport],
+        from position: CLLocation,
+        minimumRunwayLengthFeet: Int,
+        limit: Int
+    ) -> [NearestAirportEntry] {
+        LandableAirportFilter.landable(candidates, minimumRunwayLengthFeet: minimumRunwayLengthFeet)
+            .map { airport in
+                let airportLocation = CLLocation(latitude: airport.latitude, longitude: airport.longitude)
+                return NearestAirportEntry(
+                    airport: airport,
+                    distance: position.distanceInNM(to: airportLocation),   // nautical miles
+                    bearing: position.bearing(to: airportLocation)          // degrees true
+                )
+            }
+            .sorted { $0.distance < $1.distance }
+            .prefix(limit)
+            .map { $0 }
     }
 
     // MARK: - Direct-To

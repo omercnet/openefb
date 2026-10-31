@@ -1,0 +1,27 @@
+{
+  "worktree": {
+    "setup": [
+      "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -resolvePackageDependencies -project efb-212.xcodeproj -scheme efb-212 </dev/null",
+      "tools/sim-test.sh id"
+    ],
+    "teardown": "tools/sim-test.sh teardown || true"
+  },
+  "scripts": {
+    "simulator": {
+      "type": "service",
+      "command": "tools/sim-preview.sh"
+    },
+    "fly": {
+      "command": "tools/fly.sh"
+    },
+    "test": {
+      "command": "RESULT=/tmp/efb-tests-$(basename \"$PWD\").xcresult tools/sim-test.sh test -only-testing:efb-212Tests"
+    },
+    "build": {
+      "command": "tools/sim-test.sh build -quiet"
+    },
+    "ready": {
+      "command": "bd ready"
+    }
+  }
+}

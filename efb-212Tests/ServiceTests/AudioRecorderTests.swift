@@ -79,4 +79,22 @@ struct AudioRecorderTests {
         #expect(expected.lastPathComponent == "recordings")
         #expect(expected.deletingLastPathComponent().lastPathComponent == "efb-212")
     }
+
+    // MARK: - Write Failure Path
+
+    @Test func writeFailureWhenIdleIsNoOp() async {
+        let recorder = AudioRecorder()
+        let fired = FlagBox()
+        await recorder.setOnRecordingError { _ in fired.value = true }
+
+        await recorder.handleWriteFailure(CocoaError(.fileWriteOutOfSpace))
+
+        #expect(fired.value == false)
+        #expect(await recorder.isRecording == false)
+        #expect(await recorder.stopRecording() == nil)
+    }
+}
+
+private final class FlagBox: @unchecked Sendable {
+    var value = false
 }

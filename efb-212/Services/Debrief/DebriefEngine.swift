@@ -146,24 +146,23 @@ final class DebriefEngine {
         defer { isGenerating = false }
 
         do {
-            // Stream partial results for progressive UI rendering
+            // Stream partial results for progressive UI rendering. The last snapshot holds the
+            // complete generated content, so no second generation call is needed.
             let stream = session.streamResponse(
                 to: prompt,
                 generating: FlightDebrief.self
             )
 
-            for try await partial in stream {
-                self.partialDebrief = partial.content
+            var finalContent: GeneratedContent?
+            for try await snapshot in stream {
+                self.partialDebrief = snapshot.content
+                finalContent = snapshot.rawContent
             }
 
-            // After streaming completes, use respond() for the final typed object.
-            // This makes a second generation call but ensures we get a fully typed
-            // FlightDebrief for persistence. The session transcript helps context.
-            let response = try await session.respond(
-                to: prompt,
-                generating: FlightDebrief.self
-            )
-            let debrief = response.content
+            guard let finalContent else {
+                throw DebriefError.emptyResponse
+            }
+            let debrief = try FlightDebrief(finalContent)
 
             completedDebrief = debrief
 
@@ -227,12 +226,15 @@ final class DebriefEngine {
 
 enum DebriefError: LocalizedError, Sendable {
     case sessionUnavailable
+    case emptyResponse
     case generationFailed(underlying: Error)
 
     var errorDescription: String? {
         switch self {
         case .sessionUnavailable:
             return "AI debrief session is not available. Please check Apple Intelligence settings."
+        case .emptyResponse:
+            return "The AI debrief returned no content. Please try again."
         case .generationFailed(let error):
             return "Debrief generation failed: \(error.localizedDescription)"
         }

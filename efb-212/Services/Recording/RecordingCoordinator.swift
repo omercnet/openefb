@@ -42,6 +42,8 @@ actor RecordingCoordinator {
         var recentTranscripts: [TranscriptDisplayItem] = []
         var audioLevel: Float = -160  // dBFS
         var countdownRemaining: Int = 0
+        /// Mid-recording failure (e.g. audio write error). Consumed by RecordingViewModel.
+        var lastError: EFBError?
 
         nonisolated init() {}
     }
@@ -67,25 +69,12 @@ actor RecordingCoordinator {
 
     init(
         recordingDB: RecordingDatabase,
-        audioRecorder: any AudioRecorderProtocol = PlaceholderAudioRecorder(),
-        transcriptionService: any TranscriptionServiceProtocol = PlaceholderTranscriptionService()
+        audioRecorder: any AudioRecorderProtocol,
+        transcriptionService: any TranscriptionServiceProtocol
     ) {
         self.recordingDB = recordingDB
         self.audioRecorder = audioRecorder
         self.transcriptionService = transcriptionService
-    }
-
-    /// Factory: create a production RecordingCoordinator with real AudioRecorder.
-    /// Uses real RecordingDatabase, real AudioRecorder, and placeholder TranscriptionService
-    /// (TranscriptionService wired in Plan 03).
-    static func makeDefault() throws -> RecordingCoordinator {
-        let db = try RecordingDatabase()
-        let audio = AudioRecorder()
-        return RecordingCoordinator(
-            recordingDB: db,
-            audioRecorder: audio,
-            transcriptionService: PlaceholderTranscriptionService()
-        )
     }
 
     // MARK: - Core Lifecycle
@@ -93,9 +82,15 @@ actor RecordingCoordinator {
     /// Start a new flight recording session.
     /// Returns the flight ID for the new recording.
     func startRecording(profile: AudioQualityProfile = .standard) async throws -> UUID {
-        // Guard: don't start if already recording
+        // Guard: don't start if already recording. Allowed from idle or from the
+        // tail of an auto-start countdown (whatever the remaining count is).
         let currentStatus = await state.recordingStatus
-        guard currentStatus == .idle || currentStatus == .countdown(remaining: 0) else {
+        let canStart: Bool
+        switch currentStatus {
+        case .idle, .countdown: canStart = true
+        default: canStart = false
+        }
+        guard canStart else {
             logger.warning("Attempted to start recording while status is not idle")
             if case .recording = currentStatus {
                 throw EFBError.recordingFailed(underlying: RecordingError.alreadyRecording)
@@ -114,6 +109,7 @@ actor RecordingCoordinator {
             state.currentPhase = .preflight
             state.recentTranscripts = []
             state.audioLevel = -160
+            state.lastError = nil
         }
 
         // Start track recorder
@@ -121,32 +117,43 @@ actor RecordingCoordinator {
         trackRecorder = tracker
         await tracker.startTracking()
 
-        // Start audio recorder -- wire callbacks if using real AudioRecorder
+        // Audio file for this flight
         let audioURL = Self.audioFileURL(for: flightID)
         audioOutputURL = audioURL
 
-        // Wire buffer streaming and interruption gap callbacks on real AudioRecorder
+        // Wire interruption gap and error callbacks on the real AudioRecorder.
+        // (The PCM buffer forwarder to TranscriptionService is installed once at app
+        // init by MapContainerView and must not be overwritten here.)
         if let realRecorder = audioRecorder as? AudioRecorder {
-            // Buffer streaming: forward PCM buffers to transcription service (Plan 03 wiring point)
-            await realRecorder.setOnBufferAvailable { [weak self] buffer, time in
-                // Transcription service will consume these buffers when wired in Plan 03
-                _ = self  // Retain reference for future wiring
-            }
-
-            // Interruption gap: insert gap marker into recording database
             let capturedDB = recordingDB
             let capturedFlightID = flightID
             await realRecorder.setOnInterruptionGap { reason in
-                // Insert interruption gap as a transcript segment marker
-                let gapSegment = TranscriptSegmentRecord(
-                    flightID: capturedFlightID,
-                    text: "[INTERRUPTION: \(reason)]",
-                    confidence: 1.0,
-                    audioStartTime: 0,
-                    audioEndTime: 0,
-                    flightPhase: FlightPhaseType.preflight.rawValue
-                )
-                try? capturedDB.insertTranscript(gapSegment)
+                Task {
+                    let phase = await tracker.currentPhase
+                    let gapSegment = TranscriptSegmentRecord(
+                        flightID: capturedFlightID,
+                        text: "[INTERRUPTION: \(reason)]",
+                        confidence: 1.0,
+                        audioStartTime: 0,
+                        audioEndTime: 0,
+                        flightPhase: phase.rawValue
+                    )
+                    try? capturedDB.insertTranscript(gapSegment)
+                }
+            }
+
+            await realRecorder.setOnRecordingError { [weak self] error in
+                Task { [weak self] in
+                    await self?.handleAudioFailure(error)
+                }
+            }
+        }
+
+        // Transcript segments are tagged with the live phase from the track recorder.
+        // Must be wired before startTranscription: both engines read the provider at start.
+        if let realTranscription = transcriptionService as? TranscriptionService {
+            await realTranscription.setCurrentPhaseProvider {
+                await tracker.currentPhase
             }
         }
 
@@ -165,7 +172,7 @@ actor RecordingCoordinator {
             // Continue without transcription
         }
 
-        // Start elapsed time timer
+        // Start 1 Hz elapsed time + phase/level sync loop
         startTimer()
 
         logger.info("Recording started: \(flightID.uuidString)")
@@ -183,7 +190,7 @@ actor RecordingCoordinator {
             state.recordingStatus = .stopping
         }
 
-        // Stop timer
+        // Stop timer / sync loop
         timerTask?.cancel()
         timerTask = nil
 
@@ -278,7 +285,7 @@ actor RecordingCoordinator {
                         speedAboveThresholdSince = Date()
                     }
 
-                    let elapsed = Date().timeIntervalSince(speedAboveThresholdSince!)
+                    let elapsed = Date().timeIntervalSince(speedAboveThresholdSince ?? Date())
                     if elapsed >= 1.0 && !countdownStarted {
                         // Begin 3-second countdown
                         countdownStarted = true
@@ -312,19 +319,30 @@ actor RecordingCoordinator {
 
     // MARK: - State Sync
 
-    /// Update state from sub-services. Call periodically from view layer.
+    /// Copy the live flight phase and audio level from the sub-services into State.
+    /// Called at 1 Hz by the coordinator's own timer loop while recording.
     func syncPhaseAndLevel() async {
-        if let tracker = trackRecorder {
-            let phase = await tracker.currentPhase
-            let level = await audioRecorder.audioLevel
-            await MainActor.run { [state] in
-                state.currentPhase = phase
-                state.audioLevel = level
-            }
+        guard let tracker = trackRecorder else { return }
+        let phase = await tracker.currentPhase
+        let level = await audioRecorder.audioLevel
+        await MainActor.run { [state] in
+            state.currentPhase = phase
+            state.audioLevel = level
         }
     }
 
     // MARK: - Private Helpers
+
+    /// Audio stopped itself mid-recording (e.g. disk full). Keep the GPS track going,
+    /// stop transcription (no more buffers will arrive), and surface the error.
+    private func handleAudioFailure(_ error: EFBError) async {
+        logger.error("Audio recording failed mid-flight: \(error.localizedDescription)")
+        await transcriptionService.stopTranscription()
+        await MainActor.run { [state] in
+            state.lastError = error
+            state.audioLevel = -160
+        }
+    }
 
     private func startCountdown() async {
         for remaining in stride(from: 3, through: 1, by: -1) {
@@ -351,6 +369,7 @@ actor RecordingCoordinator {
         }
     }
 
+    /// 1 Hz loop: elapsed time plus phase/audio-level sync. Cancelled by stopRecording().
     private func startTimer() {
         timerTask?.cancel()
         timerTask = Task { [weak self] in
@@ -359,9 +378,10 @@ actor RecordingCoordinator {
                 guard let self else { break }
                 guard let startDate = await self.recordingStartDate else { break }
                 let elapsed = Date().timeIntervalSince(startDate)
-                await MainActor.run { [state = await self.state] in
+                await MainActor.run { [state = self.state] in
                     state.elapsedTime = elapsed
                 }
+                await self.syncPhaseAndLevel()
             }
         }
     }
@@ -369,7 +389,8 @@ actor RecordingCoordinator {
     /// Generate audio file URL for a flight recording.
     private nonisolated static func audioFileURL(for flightID: UUID) -> URL {
         let fileManager = FileManager.default
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fileManager.temporaryDirectory
         let recordingDir = appSupport.appendingPathComponent("efb-212/recordings", isDirectory: true)
 
         try? fileManager.createDirectory(at: recordingDir, withIntermediateDirectories: true)

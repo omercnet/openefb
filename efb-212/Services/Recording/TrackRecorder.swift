@@ -4,7 +4,7 @@
 //
 //  GPS track capture actor. Consumes CLLocationUpdate.liveUpdates(.airborne)
 //  and writes TrackPointRecord to RecordingDatabase at 1Hz.
-//  Owns a FlightPhaseDetector and publishes phase changes.
+//  Owns a FlightPhaseDetector and a VerticalSpeedEstimator and publishes phase changes.
 //
 //  Uses CLBackgroundActivitySession for background GPS (stored as strong property).
 //
@@ -25,6 +25,7 @@ actor TrackRecorder {
 
     private let recordingDB: RecordingDatabase
     private var phaseDetector: FlightPhaseDetector
+    private var verticalSpeedEstimator = VerticalSpeedEstimator()
     private var trackingTask: Task<Void, Never>?
     private var backgroundSession: CLBackgroundActivitySession?
     private let flightID: UUID
@@ -32,7 +33,7 @@ actor TrackRecorder {
     private var _currentPhase: FlightPhaseType = .preflight
 
     /// Phase change callback -- called on each phase transition.
-    var onPhaseChange: ((FlightPhaseType, PhaseMarkerRecord) -> Void)?
+    var onPhaseChange: (@Sendable (FlightPhaseType, PhaseMarkerRecord) -> Void)?
 
     // MARK: - Init
 
@@ -52,6 +53,11 @@ actor TrackRecorder {
         _trackPointCount
     }
 
+    /// Last smoothed vertical speed in feet per minute.
+    var verticalSpeedFPM: Double {
+        verticalSpeedEstimator.verticalSpeedFPM
+    }
+
     /// Start GPS tracking via CLLocationUpdate.liveUpdates(.airborne).
     /// Creates CLBackgroundActivitySession for background operation.
     func startTracking() async {
@@ -66,42 +72,7 @@ actor TrackRecorder {
                     guard !Task.isCancelled else { break }
                     guard let location = update.location else { continue }
                     guard let self else { break }
-
-                    // Convert CLLocation to aviation units (same conversions as LocationService)
-                    let speedKnots = max(0, location.speed * 1.94384)  // m/s to knots
-                    let altitudeFeet = location.altitude / 0.3048       // meters to feet MSL
-                    let trackDegrees = location.course >= 0 ? location.course : 0  // degrees true
-
-                    // Compute VSI from successive points (simplified -- uses location vertical accuracy)
-                    let vsi = location.speedAccuracy >= 0 ? 0.0 : 0.0  // placeholder for first point
-                    // VSI is computed from successive altitude readings in the phase detector's smoothing
-
-                    let point = TrackPointRecord(
-                        flightID: await self.flightID,
-                        timestamp: location.timestamp,
-                        latitude: location.coordinate.latitude,
-                        longitude: location.coordinate.longitude,
-                        altitudeFeet: altitudeFeet,
-                        groundSpeedKnots: speedKnots,
-                        verticalSpeedFPM: vsi,
-                        courseDegrees: trackDegrees
-                    )
-
-                    // Write to GRDB (append-only, no memory accumulation)
-                    try? await self.recordingDB.insertTrackPoint(point)
-                    await self.incrementCount()
-
-                    // Run through phase detector
-                    let previousPhase = await self._currentPhase
-                    let newPhase = await self.processPhase(point)
-
-                    if newPhase != previousPhase {
-                        // Phase changed -- notify
-                        if let lastMarker = await self.phaseDetector.phaseMarkers.last {
-                            try? await self.recordingDB.insertPhaseMarker(lastMarker)
-                            await self.onPhaseChange?(newPhase, lastMarker)
-                        }
-                    }
+                    await self.ingest(location)
                 }
             } catch {
                 // CLLocationUpdate can throw on cancellation or auth denial
@@ -123,15 +94,45 @@ actor TrackRecorder {
         )
     }
 
-    // MARK: - Private Helpers
+    /// Process one GPS fix: convert to aviation units, estimate vertical speed,
+    /// persist the track point, and advance the phase detector.
+    /// Internal (not private) so tests can drive it with synthetic CLLocations.
+    func ingest(_ location: CLLocation) {
+        // Convert CLLocation to aviation units (same conversions as LocationService)
+        let speedKnots = max(0, location.speed * 1.94384)  // m/s to knots
+        let altitudeFeet = location.altitude / 0.3048       // meters to feet MSL
+        let trackDegrees = location.course >= 0 ? location.course : 0  // degrees true
 
-    private func incrementCount() {
+        // Vertical speed from successive fixes, keyed on the fix timestamp (feet per minute)
+        let vsi = verticalSpeedEstimator.update(
+            altitudeFeet: altitudeFeet,
+            timestamp: location.timestamp,
+            verticalAccuracyMeters: location.verticalAccuracy
+        )
+
+        let point = TrackPointRecord(
+            flightID: flightID,
+            timestamp: location.timestamp,
+            latitude: location.coordinate.latitude,
+            longitude: location.coordinate.longitude,
+            altitudeFeet: altitudeFeet,
+            groundSpeedKnots: speedKnots,
+            verticalSpeedFPM: vsi,
+            courseDegrees: trackDegrees
+        )
+
+        // Write to GRDB (append-only, no memory accumulation)
+        try? recordingDB.insertTrackPoint(point)
         _trackPointCount += 1
-    }
 
-    private func processPhase(_ point: TrackPointRecord) -> FlightPhaseType {
-        let phase = phaseDetector.process(point)
-        _currentPhase = phase
-        return phase
+        // Run through phase detector
+        let previousPhase = _currentPhase
+        let newPhase = phaseDetector.process(point)
+        _currentPhase = newPhase
+
+        if newPhase != previousPhase, let lastMarker = phaseDetector.phaseMarkers.last {
+            try? recordingDB.insertPhaseMarker(lastMarker)
+            onPhaseChange?(newPhase, lastMarker)
+        }
     }
 }

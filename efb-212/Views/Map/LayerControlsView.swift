@@ -3,7 +3,8 @@
 //  efb-212
 //
 //  Layer toggle panel with .regularMaterial background per UI-SPEC.
-//  Controls visibility of airports, airspace, TFRs, weather dots, navaids.
+//  Controls visibility of airports, airspace, TFRs, AIRMET/SIGMETs, weather dots, navaids.
+//  Live-data layers (TFRs, AIRMET/SIGMET) show their data age while visible.
 //  Includes sectional opacity slider and chart expiration badge (INFRA-03).
 //  Map style picker for VFR Sectional, Street, Satellite, Terrain.
 //
@@ -13,22 +14,42 @@ import SwiftUI
 struct LayerControlsView: View {
     let mapViewModel: MapViewModel
     @Environment(AppState.self) private var appState
+    @State private var offlineMaps = OfflineMapService.shared
 
     var body: some View {
         @Bindable var appState = appState
 
         VStack(alignment: .leading, spacing: 12) {
-            // Title
-            Text("Map Layers")
-                .font(.title3)
-                .fontWeight(.semibold)
+            // Title + close
+            HStack {
+                Text("Map Layers")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                Spacer()
+                Button {
+                    appState.isPresentingLayerControls = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityLabel("Close map layers")
+            }
+            .padding(.horizontal, 16)
 
             Divider()
 
             // Layer toggles
             layerToggle(layer: .airports, label: "Airports", tint: .cyan)
             layerToggle(layer: .airspace, label: "Airspace", tint: .orange)
-            tfrToggle()
+            dataLayerToggle(
+                layer: .tfrs, label: "TFRs", tint: .red,
+                fetchedAt: mapViewModel.tfrFetchedAt, failed: mapViewModel.tfrLoadFailed
+            )
+            dataLayerToggle(
+                layer: .advisories, label: "AIRMET/SIGMET", tint: .purple,
+                fetchedAt: mapViewModel.advisoriesFetchedAt, failed: mapViewModel.advisoriesLoadFailed
+            )
             layerToggle(layer: .weatherDots, label: "Weather", tint: .green)
 
             // Weather data age badge (per user decision: staleness on every weather surface)
@@ -44,6 +65,7 @@ struct LayerControlsView: View {
             }
 
             layerToggle(layer: .navaids, label: "Navaids", tint: .purple)
+            airportDiagramToggle
 
             Divider()
 
@@ -52,6 +74,7 @@ struct LayerControlsView: View {
 
             // Chart expiration status below opacity slider (INFRA-03)
             ChartExpirationBadge(daysRemaining: mapViewModel.chartDaysRemaining)
+            offlineStatusRow
 
             Divider()
 
@@ -77,6 +100,50 @@ struct LayerControlsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 
+    // MARK: - Offline Status (F6)
+
+    /// "Offline: ready / partial / not downloaded / expired" for the visible map at the active
+    /// base style, plus the sectional cycle. Amber when a downloaded sectional is expired.
+    private var offlineStatusRow: some View {
+        let status = appState.mapVisibleBounds.map {
+            offlineMaps.status(visible: $0, style: appState.mapStyle)
+        } ?? .notDownloaded
+        let cycle = SectionalCycle.current()
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(status.label)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(status == .expired ? Color.orange : (status == .ready ? Color.primary : Color.secondary))
+                .accessibilityIdentifier("offline-status-line")
+            Text("Sectional cycle: valid to \(OfflineMapsView.dateString(cycle.expires))")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("sectional-cycle-line")
+        }
+        .padding(.horizontal, 16)
+    }
+
+    // MARK: - Airport Diagram Toggle (T11)
+
+    /// Georeferenced FAA airport diagrams at zoom 14 and closer. Advisory only.
+    private var airportDiagramToggle: some View {
+        @Bindable var overlay = mapViewModel.mapService.airportDiagramOverlay
+        return VStack(alignment: .leading, spacing: 2) {
+            Toggle(isOn: $overlay.isEnabled) {
+                Text("Airport diagrams")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .tint(.gray)
+            .accessibilityIdentifier("Airport diagrams")
+            Text("Advisory, verify against the charted diagram")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 36)
+        }
+        .padding(.horizontal, 16)
+    }
+
     // MARK: - Layer Toggle Row
 
     private func layerToggle(layer: MapLayer, label: String, tint: Color) -> some View {
@@ -92,24 +159,46 @@ struct LayerControlsView: View {
         .padding(.horizontal, 16)
     }
 
-    // MARK: - TFR Toggle with "Sample data only" caption
+    // MARK: - Fetched Data Layer Toggle (TFRs, AIRMET/SIGMET)
 
-    private func tfrToggle() -> some View {
+    /// Toggle plus a status line while visible: data age since fetch, loading, or unavailable.
+    private func dataLayerToggle(
+        layer: MapLayer,
+        label: String,
+        tint: Color,
+        fetchedAt: Date?,
+        failed: Bool
+    ) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Toggle(isOn: Binding(
-                get: { appState.visibleLayers.contains(.tfrs) },
-                set: { _ in mapViewModel.toggleLayer(.tfrs) }
+                get: { appState.visibleLayers.contains(layer) },
+                set: { _ in mapViewModel.toggleLayer(layer) }
             )) {
-                Text("TFRs")
+                Text(label)
                     .font(.subheadline)
                     .fontWeight(.medium)
             }
-            .tint(.red)
+            .tint(tint)
 
-            Text("Sample data only")
-                .font(.caption2)
-                .foregroundColor(.red)
-                .padding(.leading, 4)
+            if appState.visibleLayers.contains(layer) {
+                HStack(spacing: 4) {
+                    if let fetchedAt {
+                        Text("Data age:")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        WeatherBadge(observationTime: fetchedAt)
+                    } else if failed {
+                        Text("Unavailable \u{2014} check connection")
+                            .font(.caption2)
+                            .foregroundStyle(.red)
+                    } else {
+                        Text("Loading\u{2026}")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.leading, 36)  // Indent under toggle label
+            }
         }
         .padding(.horizontal, 16)
     }

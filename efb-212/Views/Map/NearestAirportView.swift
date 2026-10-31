@@ -2,28 +2,53 @@
 //  NearestAirportView.swift
 //  efb-212
 //
-//  Full sorted list of nearest airports presented when the HUD is tapped.
-//  Shows distance, bearing, runway info, and direct-to button for each airport.
-//  Per user decision: "tap to expand full sorted list with runways and direct-to option."
+//  Sorted list of the nearest landable airports, opened from the NRST button.
+//  Each row: ident, name, longest runway (length and surface), private-use flag,
+//  distance and bearing, and a large "Direct" action that starts Direct-To and
+//  closes the list (design findings F1, F2). Tapping the row text opens airport info.
 //
 
 import SwiftUI
 
 struct NearestAirportView: View {
+    @Environment(\.dismiss) private var dismiss
+
     let entries: [NearestAirportEntry]
     let onDirectTo: (Airport) -> Void
     let onAirportTap: (String) -> Void
 
     var body: some View {
         NavigationStack {
-            List(entries) { entry in
-                NearestAirportRow(
-                    entry: entry,
-                    onDirectTo: onDirectTo,
-                    onAirportTap: onAirportTap
-                )
+            Group {
+                if entries.isEmpty {
+                    ContentUnavailableView(
+                        "No landable airport in range",
+                        systemImage: "airplane.circle",
+                        description: Text("Heliports, seaplane bases and runways under \(LandableAirportFilter.defaultMinimumRunwayLengthFeet) ft are not listed.")
+                    )
+                } else {
+                    List(entries) { entry in
+                        NearestAirportRow(
+                            entry: entry,
+                            onDirectTo: { airport in
+                                onDirectTo(airport)
+                                dismiss()
+                            },
+                            onAirportTap: onAirportTap
+                        )
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 12))
+                    }
+                    .listStyle(.plain)
+                }
             }
             .navigationTitle("Nearest Airports")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .accessibilityIdentifier("Close nearest airports")
+                }
+            }
         }
     }
 }
@@ -36,44 +61,65 @@ struct NearestAirportRow: View {
     let onAirportTap: (String) -> Void
 
     var body: some View {
-        HStack {
+        HStack(spacing: 12) {
+            // Airport identity and runway (tap for airport info)
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(entry.airport.icao)
-                        .font(.system(.subheadline, design: .monospaced))
-                        .fontWeight(.semibold)
+                        .font(.system(size: 22, weight: .bold, design: .monospaced))
                     Text(entry.airport.name)
-                        .font(.subheadline)
+                        .font(.system(size: 15))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
-                // Runways summary -- show longest runway
-                if let runway = entry.airport.runways.first {
-                    Text("\(runway.id) \(runway.length)'\u{00D7}\(runway.width)' \(runway.surface.rawValue)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    if let runway = entry.longestRunway {
+                        Text("\(runway.id)  \(runway.length)' \(runway.surface.abbreviation)")   // feet
+                            .font(.system(size: 15, weight: .medium, design: .monospaced))
+                    } else {
+                        Text("no runway data")
+                            .font(.system(size: 15, weight: .medium, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                    if entry.isPrivateUse {
+                        PrivateUseTag()
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .contentShape(Rectangle())
             .onTapGesture { onAirportTap(entry.airport.icao) }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityHint("Shows airport information")
 
-            Spacer()
-
+            // Distance and bearing
             VStack(alignment: .trailing, spacing: 2) {
                 Text(String(format: "%.1f NM", entry.distance))
-                    .font(.system(.subheadline, design: .monospaced))
+                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
                 Text(String(format: "%03.0f\u{00B0}", entry.bearing))
-                    .font(.system(.caption2, design: .monospaced))
+                    .font(.system(size: 17, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
+            .accessibilityElement(children: .combine)
 
+            // Direct-To: one tap, large target
             Button(action: { onDirectTo(entry.airport) }) {
-                Image(systemName: "arrow.right.circle.fill")
-                    .font(.title3)
-                    .foregroundStyle(.blue)
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 18, weight: .bold))
+                    Text("Direct")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                }
+                .padding(.horizontal, 14)
+                .frame(height: MapControlMetrics.size)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
+            .accessibilityIdentifier("Direct \(entry.airport.icao)")
             .accessibilityLabel("Direct to \(entry.airport.icao)")
         }
+        .frame(minHeight: MapControlMetrics.size + 8)
     }
 }
 
@@ -90,7 +136,7 @@ struct NearestAirportRow: View {
                 ownership: .publicOwned,
                 runways: [
                     Runway(
-                        id: "13/31", length: 2443, width: 70,
+                        id: "13/31", length: 2441, width: 70,
                         surface: .asphalt, lighting: .fullTime,
                         baseEndID: "13", reciprocalEndID: "31",
                         baseEndLatitude: 37.458, baseEndLongitude: -122.118,
@@ -103,13 +149,22 @@ struct NearestAirportRow: View {
         ),
         NearestAirportEntry(
             airport: Airport(
-                icao: "KNUQ",
-                name: "Moffett Federal",
+                icao: "1CA9",
+                name: "Private Ranch",
                 latitude: 37.416,
                 longitude: -122.049,
                 elevation: 32,
                 type: .airport,
-                ownership: .publicOwned
+                ownership: .privateOwned,
+                runways: [
+                    Runway(
+                        id: "18/36", length: 2200, width: 50,
+                        surface: .turf, lighting: .none,
+                        baseEndID: "18", reciprocalEndID: "36",
+                        baseEndLatitude: 37.41, baseEndLongitude: -122.05,
+                        reciprocalEndLatitude: 37.42, reciprocalEndLongitude: -122.05
+                    )
+                ]
             ),
             distance: 5.8,
             bearing: 135

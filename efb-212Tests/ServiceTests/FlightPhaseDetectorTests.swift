@@ -217,4 +217,49 @@ struct FlightPhaseDetectorTests {
         #expect(detector.phaseMarkers.count == 1)
         #expect(detector.phaseMarkers.first?.phase == FlightPhaseType.taxi.rawValue)
     }
+
+    // MARK: - Realistic Track (VSI from altitude, not hand-set)
+
+    @Test func realisticTrackReachesTakeoffAndDeparture() {
+        var detector = FlightPhaseDetector()
+        var estimator = VerticalSpeedEstimator()
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        var second = 0
+        var altitude = 100.0  // feet MSL, field elevation
+
+        func feed(speed: Double) -> FlightPhaseType {
+            let vsi = estimator.update(altitudeFeet: altitude,
+                                       timestamp: t0.addingTimeInterval(Double(second)),
+                                       verticalAccuracyMeters: 3)
+            let point = TrackPointRecord(
+                flightID: Self.testFlightID,
+                timestamp: t0.addingTimeInterval(Double(second)),
+                latitude: 37.46, longitude: -122.12,
+                altitudeFeet: altitude, groundSpeedKnots: speed,
+                verticalSpeedFPM: vsi, courseDegrees: 270
+            )
+            second += 1
+            return detector.process(point)
+        }
+
+        // Taxi 40 s at 10 kt, level
+        var phase: FlightPhaseType = .preflight
+        for _ in 0..<40 { phase = feed(speed: 10) }
+        #expect(phase == .taxi)
+
+        // Accelerate to 70 kt on the ground over 15 s
+        for i in 0..<15 { phase = feed(speed: 10 + Double(i + 1) * 4) }
+        #expect(phase == .taxi)  // not climbing yet
+
+        // Climb at 600 fpm (10 ft/s) at 70 kt
+        var reachedTakeoff = false
+        for _ in 0..<90 {
+            altitude += 10
+            phase = feed(speed: 70)
+            if phase == .takeoff { reachedTakeoff = true }
+        }
+        #expect(reachedTakeoff)
+        #expect(phase == .departure)
+        #expect(abs(estimator.verticalSpeedFPM - 600) < 20)
+    }
 }

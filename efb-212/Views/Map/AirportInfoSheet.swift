@@ -2,8 +2,8 @@
 //  AirportInfoSheet.swift
 //  efb-212
 //
-//  Bottom sheet with airport details, runways, frequencies, weather,
-//  and manual refresh button. Half-height default per user decision.
+//  Bottom sheet with airport details, runways, frequencies, weather, FAA charts,
+//  NOTAMs, PIREPs, and winds aloft. Half-height default per user decision; drag up for full height.
 //  Per UI-SPEC: .presentationBackground(.regularMaterial), 24pt horizontal padding.
 //
 
@@ -15,6 +15,10 @@ struct AirportInfoSheet: View {
 
     let databaseService: any DatabaseServiceProtocol
     let weatherService: any WeatherServiceProtocol
+    let chartService: any TerminalProcedureServiceProtocol
+    let notamService: any NotamServiceProtocol
+    let pirepService: any PirepServiceProtocol
+    let windsAloftService: any WindsAloftServiceProtocol
 
     @State private var airport: Airport?
     @State private var weatherViewModel: WeatherViewModel?
@@ -28,7 +32,19 @@ struct AirportInfoSheet: View {
                         headerSection(airport)
                         infoChipsRow(airport)
                         twoColumnBody(airport)
+                        Divider()
+                        AirportChartsSection(airport: airport, service: chartService)
+                        Divider()
+                        NotamSection(airport: airport, service: notamService)
+                        Divider()
+                        HStack(alignment: .top, spacing: 24) {
+                            PirepSection(airport: airport, service: pirepService)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            WindsAloftSection(airport: airport, service: windsAloftService)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
+                    .padding(.bottom, 24)
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
                 } else {
@@ -49,7 +65,7 @@ struct AirportInfoSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.medium, .large])
         .presentationBackground(.regularMaterial)
         .onAppear {
             loadAirport()
@@ -382,7 +398,11 @@ struct AirportInfoSheet: View {
 #Preview {
     AirportInfoSheet(
         databaseService: PlaceholderDatabaseService(),
-        weatherService: PlaceholderWeatherService()
+        weatherService: PlaceholderWeatherService(),
+        chartService: TerminalProcedureService(),
+        notamService: NotamService(),
+        pirepService: PirepService(),
+        windsAloftService: WindsAloftService()
     )
     .environment(AppState())
 }

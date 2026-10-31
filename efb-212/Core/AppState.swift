@@ -35,6 +35,8 @@ final class AppState {
 
     var mapCenter: CLLocationCoordinate2D = .init(latitude: 39.0, longitude: -98.0)  // CONUS center
     var mapZoom: Double = 5.0  // CONUS zoom level
+    /// Visible map box, set (debounced) with the camera. Drives the layer panel's offline status.
+    var mapVisibleBounds: OfflineRegionBounds?
     var mapMode: MapMode = .northUp
     var mapStyle: MapStyle = .vfrSectional
     var visibleLayers: Set<MapLayer> = [.sectional, .airports, .ownship]
@@ -48,6 +50,7 @@ final class AppState {
     var verticalSpeed: Double = 0      // feet per minute
     var track: Double = 0              // degrees true
     var gpsAvailable: Bool = false
+    var gpsStationary: Bool = false    // CoreLocation paused updates (device still); last fix stays valid
     var firstLocationReceived: Bool = false  // prevents re-animation after initial GPS fix
 
     // MARK: - Flight Plan State (for instrument strip DTG/ETE)
@@ -76,22 +79,81 @@ final class AppState {
     var autoStartSpeedThresholdKts: Double = 15.0  // knots, user configurable
     var activeFlightRecordID: UUID?
 
-    // MARK: - Shared Services (set by MapContainerView, used by other tabs)
+    // MARK: - Shared Services
 
-    var sharedDatabaseService: (any DatabaseServiceProtocol)?
+    /// The single aviation database service for the whole app. Set by
+    /// `getOrCreateDatabaseService()`; nil until the first caller asks for it.
+    /// When the database failed to open this holds an `UnavailableDatabaseService`
+    /// (every query throws) and `databaseError` explains why.
+    private(set) var sharedDatabaseService: (any DatabaseServiceProtocol)?
+
+    /// Why the aviation database could not be opened. Drives the non-dismissable
+    /// "Airport database unavailable" banner. nil when the database is healthy.
+    private(set) var databaseError: EFBError?
+
     var sharedMapService: MapService?
+
+    /// Open the aviation database once and share it. Never falls back to an empty
+    /// placeholder: on failure it records `databaseError` and returns a service whose
+    /// queries throw, so no view can mistake a broken database for "no airports".
+    ///
+    /// Launch with `-simulateDatabaseFailure YES` (debug builds only) to exercise the
+    /// failure path in UI tests.
+    @discardableResult
+    func getOrCreateDatabaseService(
+        make: () throws -> any DatabaseServiceProtocol = { try DatabaseManager() }
+    ) -> any DatabaseServiceProtocol {
+        if let existing = sharedDatabaseService {
+            return existing
+        }
+        do {
+            #if DEBUG
+            if UserDefaults.standard.bool(forKey: "simulateDatabaseFailure") {
+                throw EFBError.databaseCorrupted
+            }
+            #endif
+            let service = try make()
+            sharedDatabaseService = service
+            databaseError = nil
+            return service
+        } catch let error as EFBError {
+            return recordDatabaseFailure(error)
+        } catch {
+            return recordDatabaseFailure(.databaseMigrationFailed(underlying: error))
+        }
+    }
+
+    private func recordDatabaseFailure(_ error: EFBError) -> any DatabaseServiceProtocol {
+        let unavailable = UnavailableDatabaseService()
+        sharedDatabaseService = unavailable
+        databaseError = error
+        return unavailable
+    }
 
     // MARK: - Shared Recording Database
 
-    /// Shared RecordingDatabase instance -- avoids creating new instances per view.
-    /// Initialized lazily on first access (e.g., when FlightDetailView appears).
+    /// The single RecordingDatabase for the whole app (recording, replay, debrief).
+    /// Initialized lazily on first access; creation is attempted once per launch.
     private(set) var sharedRecordingDatabase: RecordingDatabase?
 
+    /// Why the recording database could not be opened, if `getOrCreateRecordingDatabase()` returned nil.
+    private(set) var recordingDatabaseError: EFBError?
+
     func getOrCreateRecordingDatabase() -> RecordingDatabase? {
-        if sharedRecordingDatabase == nil {
-            sharedRecordingDatabase = try? RecordingDatabase()
+        if let existing = sharedRecordingDatabase {
+            return existing
         }
-        return sharedRecordingDatabase
+        guard recordingDatabaseError == nil else { return nil }  // already failed this launch
+        do {
+            let db = try RecordingDatabase()
+            sharedRecordingDatabase = db
+            return db
+        } catch let error as EFBError {
+            recordingDatabaseError = error
+        } catch {
+            recordingDatabaseError = .databaseMigrationFailed(underlying: error)
+        }
+        return nil
     }
 
     // MARK: - Currency Warning State

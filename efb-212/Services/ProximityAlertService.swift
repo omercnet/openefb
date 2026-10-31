@@ -137,31 +137,31 @@ final class ProximityAlertService {
     }
 
     /// Check TFR proximity separately (called when TFR data is available).
-    func checkTFRProximity(position: CLLocation, tfrs: [TFR]) {
-        var tfrAlerts: [ProximityAlert] = []
-
-        for tfr in tfrs {
-            let tfrCenter = CLLocation(latitude: tfr.latitude, longitude: tfr.longitude)
-            let distanceNM = position.distance(from: tfrCenter) / 1852.0  // meters to NM
-
-            let tfrRadius = tfr.radiusNM ?? 0
-            let effectiveDistance = max(0, distanceNM - tfrRadius)
-
-            if effectiveDistance <= Self.tfrAlertThresholdNM {
-                let alert = ProximityAlert(
-                    id: "tfr-\(tfr.id)",
-                    type: .tfr,
-                    name: tfr.description,
-                    distance: effectiveDistance,
-                    altitude: formatAltitude(floor: tfr.floorAltitude, ceiling: tfr.ceilingAltitude)
-                )
-                tfrAlerts.append(alert)
-            }
-        }
+    func checkTFRProximity(position: CLLocation, tfrs: [TFR], now: Date = Date()) {
+        let tfrAlerts = Self.tfrAlerts(for: position.coordinate, tfrs: tfrs, now: now)
 
         // Merge TFR alerts with existing airspace alerts
         let airspaceAlerts = activeAlerts.filter { $0.type == .airspace }
         activeAlerts = airspaceAlerts + tfrAlerts
+    }
+
+    /// Alerts for TFRs in effect at `now` whose boundary is within `tfrAlertThresholdNM`
+    /// (distance 0 when inside the polygon), nearest first. Altitudes are not compared:
+    /// many TFR limits are AGL, so lateral proximity alone triggers the alert.
+    static func tfrAlerts(for coordinate: CLLocationCoordinate2D, tfrs: [TFR], now: Date) -> [ProximityAlert] {
+        tfrs.compactMap { tfr -> ProximityAlert? in
+            guard tfr.isActive(at: now),
+                  let distanceNM = PolygonGeometry.distanceNM(from: coordinate, ring: tfr.boundaries),
+                  distanceNM <= tfrAlertThresholdNM else { return nil }
+            return ProximityAlert(
+                id: "tfr-\(tfr.id)",
+                type: .tfr,
+                name: "TFR \(tfr.notamID) \u{2014} \(tfr.title)",
+                distance: distanceNM,  // nautical miles to boundary, 0 inside
+                altitude: tfr.altitudeDescription
+            )
+        }
+        .sorted { $0.distance < $1.distance }
     }
 
     // MARK: - Helpers

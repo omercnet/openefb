@@ -37,6 +37,14 @@ actor AudioRecorder: AudioRecorderProtocol {
     /// Callback for gap markers on interruptions.
     var onInterruptionGap: (@Sendable (InterruptionGapReason) -> Void)?
 
+    /// Callback for unrecoverable failures mid-recording (e.g. disk full while writing).
+    /// The recorder has already stopped itself when this fires.
+    var onRecordingError: (@Sendable (EFBError) -> Void)?
+
+    /// URL of a partially written file kept after a mid-recording failure,
+    /// returned once by the next stopRecording() call.
+    private var partialFileURL: URL?
+
     // Notification observers
     private var interruptionObserver: (any NSObjectProtocol)?
     private var routeChangeObserver: (any NSObjectProtocol)?
@@ -55,6 +63,11 @@ actor AudioRecorder: AudioRecorderProtocol {
     /// Set the interruption gap callback (called from RecordingCoordinator wiring).
     func setOnInterruptionGap(_ callback: (@Sendable (InterruptionGapReason) -> Void)?) {
         onInterruptionGap = callback
+    }
+
+    /// Set the recording error callback (called from RecordingCoordinator wiring).
+    func setOnRecordingError(_ callback: (@Sendable (EFBError) -> Void)?) {
+        onRecordingError = callback
     }
 
     // MARK: - AudioRecorderProtocol
@@ -97,16 +110,40 @@ actor AudioRecorder: AudioRecorderProtocol {
 
         // Install tap: write to file AND stream to transcription callback
         let bufferCallback = onBufferAvailable
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { [weak self] buffer, time in
-            // Write to AAC file
+        let logger = self.logger
+        // File timeline: frames written so far. Buffers are handed to the transcription
+        // service stamped with this position so transcript times line up with the file
+        // (and therefore with replay), not with the hardware clock.
+        let framesWritten = OSAllocatedUnfairLock<AVAudioFramePosition>(initialState: 0)
+        let writeFailed = OSAllocatedUnfairLock(initialState: false)
+        let sampleRate = recordingFormat.sampleRate
+        inputNode.installTap(onBus: 0, bufferSize: 4096, format: recordingFormat) { [weak self] buffer, _ in
+            // Write to AAC file. A failure here (disk full, file vanished) is not
+            // recoverable for this recording: report once and stop so audio isn't lost silently.
             do {
                 try file.write(from: buffer)
             } catch {
-                // Log but don't crash -- audio file write errors are recoverable
+                let firstFailure = writeFailed.withLock { failed -> Bool in
+                    defer { failed = true }
+                    return !failed
+                }
+                if firstFailure {
+                    logger.error("Audio file write failed: \(error.localizedDescription)")
+                    Task { [weak self] in
+                        await self?.handleWriteFailure(error)
+                    }
+                }
+                return
             }
 
+            let bufferStartFrame = framesWritten.withLock { frames -> AVAudioFramePosition in
+                defer { frames += AVAudioFramePosition(buffer.frameLength) }
+                return frames
+            }
+            let fileTime = AVAudioTime(sampleTime: bufferStartFrame, atRate: sampleRate)
+
             // Stream PCM buffer to transcription service
-            bufferCallback?(buffer, time)
+            bufferCallback?(buffer, fileTime)
 
             // Compute RMS for audio level meter
             guard let channelData = buffer.floatChannelData else { return }
@@ -145,7 +182,12 @@ actor AudioRecorder: AudioRecorderProtocol {
     // MARK: - Stop Recording
 
     func stopRecording() async -> URL? {
-        guard _isRecording else { return nil }
+        guard _isRecording else {
+            // A mid-recording failure already tore down the engine; hand back what was written.
+            let partial = partialFileURL
+            partialFileURL = nil
+            return partial
+        }
 
         // Remove tap and stop engine
         audioEngine?.inputNode.removeTap(onBus: 0)
@@ -167,6 +209,31 @@ actor AudioRecorder: AudioRecorderProtocol {
 
         logger.info("Audio recording stopped")
         return fileURL
+    }
+
+    // MARK: - Write Failure
+
+    /// Stop the recorder after an unrecoverable file write error and report it.
+    /// Keeps the partial file on disk. Internal so tests can exercise the path
+    /// without real audio hardware.
+    func handleWriteFailure(_ error: Error) async {
+        guard _isRecording else { return }
+
+        audioEngine?.inputNode.removeTap(onBus: 0)
+        audioEngine?.stop()
+        audioEngine = nil
+
+        _isRecording = false
+        isPausedByInterruption = false
+        removeNotificationObservers()
+
+        partialFileURL = outputFile?.url
+        outputFile = nil
+
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+
+        logger.error("Audio recording stopped after write failure")
+        onRecordingError?(.recordingFailed(underlying: error))
     }
 
     // MARK: - Pause / Resume

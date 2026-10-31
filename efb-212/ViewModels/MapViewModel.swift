@@ -2,9 +2,10 @@
 //  MapViewModel.swift
 //  efb-212
 //
-//  Map coordination -- airport loading, region change handling, layer state,
-//  chart expiration state (INFRA-03). Debounces region changes by 500ms
-//  and skips queries when center moves less than 5 NM.
+//  Map coordination -- airport loading sized from the visible bounds, follow-ownship
+//  camera with track-up, GPS status clock, layer state, chart expiration state
+//  (INFRA-03). Debounces region changes by 500ms and skips queries when the visible
+//  region barely changed (see MapQueryRegion).
 //
 
 import Foundation
@@ -27,7 +28,9 @@ final class MapViewModel {
     /// Optional weather service -- set by MapContainerView after creation.
     var weatherService: (any WeatherServiceProtocol)?
     /// Optional TFR service -- set by MapContainerView after creation.
-    var tfrService: TFRServiceProtocol?
+    var tfrService: (any TFRServiceProtocol)?
+    /// Optional AIRMET/SIGMET service -- set by MapContainerView after creation.
+    var airSigmetService: (any AirSigmetServiceProtocol)?
     /// Optional proximity alert service -- set by MapContainerView after creation.
     var proximityAlertService: ProximityAlertService?
 
@@ -39,16 +42,45 @@ final class MapViewModel {
     var isLoadingAirports: Bool = false
     var lastError: EFBError?
 
+    // MARK: - Follow / Orientation (F3, F4, F7)
+
+    /// Follow-ownship state. Following by default; a user pan suspends it.
+    private(set) var followState = FollowModeState()
+
+    /// True while the camera re-centres on every GPS fix.
+    var isFollowing: Bool { followState.isFollowing }
+
+    /// Current map rotation in degrees clockwise from north (0 = north-up). Drives the
+    /// north indicator while rotated.
+    private(set) var mapDirection: Double = 0   // degrees
+
+    /// Zoom used when the first fix arrives and the map jumps from CONUS to the aircraft.
+    static let firstFixZoom: Double = 10
+
+    // MARK: - GPS Status (F5)
+
+    /// Wall clock advanced once a second so the status chip ages the last fix.
+    private(set) var now: Date = Date()
+    private var clockTask: Task<Void, Never>?
+    private var lastAppliedStale: Bool?
+
+    /// Position quality derived from the stored fix and the clock.
+    var gpsStatus: GPSStatus {
+        GPSStatus.evaluate(
+            fix: appState.ownshipPosition.map { GPSFix(location: $0, isStationary: appState.gpsStationary) },
+            gpsAvailable: appState.gpsAvailable,
+            now: now
+        )
+    }
+
     // MARK: - Chart Expiration (INFRA-03)
 
-    /// Chart expiration date from MapService's MBTiles metadata read.
-    var chartExpirationDate: Date? { mapService.chartExpirationDate }
+    /// Expiry of the FAA sectional cycle in force. The online sectional is always the current
+    /// edition; downloaded regions are checked against this cycle separately (OfflineStatus).
+    var chartExpirationDate: Date? { SectionalCycle.current(at: now).expires }
 
-    /// Days remaining until chart expiration. Nil if no chart loaded. Negative if expired.
-    var chartDaysRemaining: Int? {
-        guard let expirationDate = mapService.chartExpirationDate else { return nil }
-        return Calendar.current.dateComponents([.day], from: Date(), to: expirationDate).day
-    }
+    /// Whole days until the current sectional cycle ends (drives the expiry warning badge).
+    var chartDaysRemaining: Int? { SectionalCycle.daysRemaining(at: now) }
 
     // MARK: - Weather Data Age
 
@@ -62,8 +94,10 @@ final class MapViewModel {
     // MARK: - Private
 
     private var lastQueryCenter: CLLocationCoordinate2D?
+    private var lastQueryRadiusNM: Double?
     private var regionChangeDebounceTask: Task<Void, Never>?
-    private var hasAnimatedToFirstLocation: Bool = false
+    private var hasCenteredOnFirstFix: Bool = false
+    private var lastOwnshipTimestamp: Date?
 
     // MARK: - Init
 
@@ -79,21 +113,32 @@ final class MapViewModel {
     func onMapStyleLoaded(style: MLNStyle) {
         mapService.onStyleLoaded(style: style)
 
-        // Load initial data for CONUS view
+        // Load initial data for the CONUS view (max radius; thinned to the cap)
         let conusCenter = CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0)
-        loadDataForRegion(center: conusCenter, zoom: 5.0)
+        loadDataForRegion(center: conusCenter, radiusNM: MapQueryRegion.maxRadiusNM)
 
-        // Sync current layer visibility
+        // Sync current layer visibility, base map style, and sectional opacity
         for layer in MapLayer.allCases {
             let visible = appState.visibleLayers.contains(layer)
             mapService.setLayerVisibility(layer, visible: visible)
         }
+        mapService.setMapStyle(appState.mapStyle)
+        mapService.setSectionalOpacity(appState.sectionalOpacity)
+        mapService.setOwnshipStale(gpsStatus.isStale)
     }
 
     // MARK: - Region Changed
 
-    /// Debounce 500ms. Skip if center moved less than 5 NM from last query center.
-    func onRegionChanged(center: CLLocationCoordinate2D, zoom: Double) {
+    /// Debounce 500ms. Query radius comes from the visible bounds; the database is hit again
+    /// only when the centre moved > 5 NM or the radius changed > 20% (zoom in place).
+    func onRegionChanged(
+        center: CLLocationCoordinate2D,
+        zoom: Double,
+        northEast: CLLocationCoordinate2D,
+        southWest: CLLocationCoordinate2D,
+        direction: Double
+    ) {
+        mapDirection = direction
         regionChangeDebounceTask?.cancel()
         regionChangeDebounceTask = Task { [weak self] in
             do {
@@ -104,34 +149,138 @@ final class MapViewModel {
 
             guard let self else { return }
 
-            // Skip if center moved less than 5 NM
-            if let lastCenter = lastQueryCenter {
-                let lastLocation = CLLocation(latitude: lastCenter.latitude, longitude: lastCenter.longitude)
-                let currentLocation = CLLocation(latitude: center.latitude, longitude: center.longitude)
-                let distanceNM = lastLocation.distance(from: currentLocation) / 1852.0  // meters to NM
-                if distanceNM < 5.0 {
-                    // Still update map state for zoom changes
-                    appState.mapCenter = center
-                    appState.mapZoom = zoom
-                    return
-                }
-            }
-
             appState.mapCenter = center
             appState.mapZoom = zoom
+            appState.mapVisibleBounds = OfflineRegionBounds(
+                south: southWest.latitude, west: southWest.longitude,
+                north: northEast.latitude, east: northEast.longitude
+            )
 
-            loadDataForRegion(center: center, zoom: zoom)
+            let radiusNM = MapQueryRegion.radiusNM(center: center, northEast: northEast, southWest: southWest)
+            guard MapQueryRegion.shouldRequery(
+                lastCenter: lastQueryCenter,
+                lastRadiusNM: lastQueryRadiusNM,
+                center: center,
+                radiusNM: radiusNM
+            ) else { return }
+
+            loadDataForRegion(center: center, radiusNM: radiusNM)
             lastQueryCenter = center
+            lastQueryRadiusNM = radiusNM
         }
     }
 
-    // MARK: - First Location
+    /// Live camera rotation while a gesture or animation is in progress (north indicator).
+    func onMapDirectionChanged(_ direction: Double) {
+        if abs(direction - mapDirection) > 0.1 {
+            mapDirection = direction
+        }
+    }
 
-    /// Called once when first GPS fix is received. Animates map to user position.
+    // MARK: - Follow Ownship
+
+    /// The user dragged or rotated the map: stop following until Recenter.
+    func onUserMovedMap() {
+        guard followState.isFollowing else { return }
+        followState.userMovedMap()
+    }
+
+    /// Recenter button: re-engage follow and put the aircraft back in the centre at the
+    /// current zoom, oriented for the current map mode.
+    func recenter() {
+        followState.recenter()
+        guard let position = appState.ownshipPosition else { return }
+        mapService.setCamera(
+            center: position.coordinate,
+            zoom: nil,
+            direction: cameraDirection,
+            animated: true
+        )
+    }
+
+    /// Called for every new GPS fix. Draws the chevron, handles the first-fix jump from the
+    /// CONUS view, and keeps the camera on the aircraft while following. Duplicate calls for
+    /// the same fix are ignored.
+    func onOwnshipUpdated(_ location: CLLocation) {
+        guard location.timestamp != lastOwnshipTimestamp else { return }
+        lastOwnshipTimestamp = location.timestamp
+
+        mapService.updateOwnship(location: location, heading: appState.track)
+
+        if !hasCenteredOnFirstFix {
+            hasCenteredOnFirstFix = true
+            // No animation: follow takes over on the next fix and would cut it short anyway.
+            mapService.setCamera(
+                center: location.coordinate,
+                zoom: Self.firstFixZoom,
+                direction: cameraDirection,
+                animated: false
+            )
+            return
+        }
+
+        guard followState.isFollowing else { return }
+        mapService.setCamera(
+            center: location.coordinate,
+            zoom: nil,
+            direction: cameraDirection,
+            animated: false
+        )
+    }
+
+    /// Camera heading for the current map mode: GPS track for track-up, north otherwise.
+    private var cameraDirection: Double {
+        appState.mapMode == .trackUp ? appState.track : 0   // degrees
+    }
+
+    // MARK: - Map Mode (F4, F7)
+
+    /// Switch orientation. Track-up rotates the camera to the GPS track ourselves and keeps
+    /// our chevron; MapLibre's user-tracking mode is never used (it draws the system puck).
+    func setMapMode(_ mode: MapMode) {
+        appState.mapMode = mode
+        mapService.setCamera(
+            center: followState.isFollowing ? appState.ownshipPosition?.coordinate : nil,
+            zoom: nil,
+            direction: cameraDirection,
+            animated: true
+        )
+    }
+
+    // MARK: - GPS Clock (F5)
+
+    /// Start the 1 Hz clock that ages the last fix and greys the chevron when stale.
+    func startGPSClock() {
+        guard clockTask == nil else { return }
+        clockTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                tickGPSClock(now: Date())
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    func stopGPSClock() {
+        clockTask?.cancel()
+        clockTask = nil
+    }
+
+    /// Advance the clock and push staleness to the map. Exposed for tests.
+    func tickGPSClock(now: Date) {
+        self.now = now
+        let stale = gpsStatus.isStale
+        if stale != lastAppliedStale {
+            lastAppliedStale = stale
+            mapService.setOwnshipStale(stale)
+        }
+    }
+
+    // MARK: - First Location (legacy entry point)
+
+    /// Kept for callers that only know the first fix arrived; follow handles the camera.
     func onFirstLocationReceived(location: CLLocation) {
-        guard !hasAnimatedToFirstLocation else { return }
-        hasAnimatedToFirstLocation = true
-        mapService.animateToLocation(location.coordinate, zoom: 10.0)
+        onOwnshipUpdated(location)
     }
 
     // MARK: - Airport Tapping
@@ -152,69 +301,40 @@ final class MapViewModel {
             appState.visibleLayers.insert(layer)
             mapService.setLayerVisibility(layer, visible: true)
 
-            // If a data layer is toggled on, trigger data load for current region
+            // If a data layer is toggled on, load just that layer for the current region
+            let center = appState.mapCenter
+            let radiusNM = lastQueryRadiusNM ?? MapQueryRegion.maxRadiusNM
             switch layer {
-            case .airports, .navaids, .airspace:
-                loadDataForRegion(center: appState.mapCenter, zoom: appState.mapZoom)
+            case .airports:
+                isLoadingAirports = true
+                loadAirports(center: center, radiusNM: radiusNM)
+                isLoadingAirports = false
+            case .navaids:
+                loadNavaids(center: center, radiusNM: radiusNM)
+            case .airspace:
+                loadAirspaces(center: center, radiusNM: radiusNM)
             case .weatherDots:
                 Task { await loadWeatherDots() }
             case .tfrs:
                 Task { await loadTFRs() }
+            case .advisories:
+                Task { await loadAdvisories() }
             default:
                 break
             }
         }
     }
 
-    // MARK: - Map Mode
-
-    /// Update map mode. TrackUp enables heading tracking; NorthUp resets to north.
-    func setMapMode(_ mode: MapMode) {
-        appState.mapMode = mode
-        if mode == .trackUp {
-            mapService.mapView?.userTrackingMode = .followWithHeading
-        } else {
-            mapService.mapView?.setDirection(0, animated: true)
-        }
-    }
-
     // MARK: - Data Loading
 
-    private func loadDataForRegion(center: CLLocationCoordinate2D, zoom: Double) {
-        // Compute radius from zoom level: wider radius at lower zoom
-        let radiusNM = 200.0 / pow(2.0, zoom - 5.0)
-
+    private func loadDataForRegion(center: CLLocationCoordinate2D, radiusNM: Double) {
         isLoadingAirports = true
-
-        // Load airports
-        do {
-            let airports = try databaseService.airports(near: center, radiusNM: min(radiusNM, 500))
-            visibleAirports = airports
-            mapService.updateAirports(airports)
-        } catch {
-            lastError = EFBError.databaseCorrupted
-        }
-
-        // Load navaids if layer is visible
+        loadAirports(center: center, radiusNM: radiusNM)
         if appState.visibleLayers.contains(.navaids) {
-            do {
-                let navaids = try databaseService.navaids(near: center, radiusNM: min(radiusNM, 500))
-                visibleNavaids = navaids
-                mapService.updateNavaids(navaids)
-            } catch {
-                // Non-critical -- continue without navaids
-            }
+            loadNavaids(center: center, radiusNM: radiusNM)
         }
-
-        // Load airspaces if layer is visible
         if appState.visibleLayers.contains(.airspace) {
-            do {
-                let airspaces = try databaseService.airspaces(near: center, radiusNM: min(radiusNM, 300))
-                visibleAirspaces = airspaces
-                mapService.updateAirspaces(airspaces)
-            } catch {
-                // Non-critical -- continue without airspaces
-            }
+            loadAirspaces(center: center, radiusNM: radiusNM)
         }
 
         isLoadingAirports = false
@@ -227,6 +347,43 @@ final class MapViewModel {
         // Load TFRs if layer visible (Plan 04)
         if appState.visibleLayers.contains(.tfrs) {
             Task { await loadTFRs() }
+        }
+
+        // Load AIRMET/SIGMETs if layer visible
+        if appState.visibleLayers.contains(.advisories) {
+            Task { await loadAdvisories() }
+        }
+    }
+
+    /// Airports for the region; thinned at low zoom so MapLibre never gets thousands of points.
+    private func loadAirports(center: CLLocationCoordinate2D, radiusNM: Double) {
+        do {
+            let airports = try databaseService.airports(near: center, radiusNM: radiusNM)
+            let shown = MapQueryRegion.thin(airports, around: center)
+            visibleAirports = shown
+            mapService.updateAirports(shown)
+        } catch {
+            lastError = EFBError.databaseCorrupted
+        }
+    }
+
+    private func loadNavaids(center: CLLocationCoordinate2D, radiusNM: Double) {
+        do {
+            let navaids = try databaseService.navaids(near: center, radiusNM: radiusNM)
+            visibleNavaids = navaids
+            mapService.updateNavaids(navaids)
+        } catch {
+            // Non-critical -- continue without navaids
+        }
+    }
+
+    private func loadAirspaces(center: CLLocationCoordinate2D, radiusNM: Double) {
+        do {
+            let airspaces = try databaseService.airspaces(near: center, radiusNM: min(radiusNM, 300))
+            visibleAirspaces = airspaces
+            mapService.updateAirspaces(airspaces)
+        } catch {
+            // Non-critical -- continue without airspaces
         }
     }
 
@@ -255,17 +412,49 @@ final class MapViewModel {
         }
     }
 
-    // MARK: - TFR Loading (Plan 04)
+    // MARK: - TFR Loading
 
-    /// Fetch TFRs near current map center and update map TFR layer.
+    /// Last loaded TFRs (all published, active or upcoming), used for proximity alerts.
+    private(set) var loadedTFRs: [TFR] = []
+    /// When the displayed TFR data was fetched from the FAA; nil until the first fetch.
+    private(set) var tfrFetchedAt: Date?
+    /// True when the last load failed with no cached data to fall back on.
+    private(set) var tfrLoadFailed: Bool = false
+
+    /// Load TFRs (service caches for 10 minutes) and redraw the TFR layer.
     func loadTFRs() async {
         guard let tfrService else { return }
 
         do {
-            let tfrs = try await tfrService.activeTFRs()
-            mapService.updateTFRs(tfrs)
+            let snapshot = try await tfrService.currentTFRs()
+            loadedTFRs = snapshot.tfrs
+            tfrFetchedAt = snapshot.fetchedAt
+            tfrLoadFailed = false
+            mapService.updateTFRs(snapshot.tfrs)
         } catch {
-            // TFR fetch failure is non-critical
+            // Service already falls back to its cache; reaching here means nothing was ever fetched
+            tfrLoadFailed = true
+        }
+    }
+
+    // MARK: - AIRMET / SIGMET Loading
+
+    /// When the displayed advisory data was fetched; nil until the first fetch.
+    private(set) var advisoriesFetchedAt: Date?
+    /// True when the last load failed with no cached data to fall back on.
+    private(set) var advisoriesLoadFailed: Bool = false
+
+    /// Load advisories (service caches for 10 minutes) and draw only those valid now.
+    func loadAdvisories() async {
+        guard let airSigmetService else { return }
+
+        do {
+            let snapshot = try await airSigmetService.currentAdvisories()
+            advisoriesFetchedAt = snapshot.fetchedAt
+            advisoriesLoadFailed = false
+            mapService.updateAdvisories(snapshot.valid(at: Date()))
+        } catch {
+            advisoriesLoadFailed = true
         }
     }
 
@@ -276,5 +465,8 @@ final class MapViewModel {
     func checkProximityAlerts() {
         guard let position = appState.ownshipPosition else { return }
         proximityAlertService?.checkProximity(position: position, altitude: appState.altitude)
+        if appState.visibleLayers.contains(.tfrs) {
+            proximityAlertService?.checkTFRProximity(position: position, tfrs: loadedTFRs)
+        }
     }
 }

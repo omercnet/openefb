@@ -20,19 +20,26 @@
 
 ## Build & Run
 
+Paseo scripts (`paseo.json`; run from the Paseo app or `paseo script start <name>`):
+
+| Script | What it does |
+|---|---|
+| `simulator` (service) | Builds the app, runs it on this worktree's simulator at KPAO, and streams the simulator to the service URL (serve-sim). If the tree doesn't compile mid-edit, shows the last good build. |
+| `fly` | Feeds a simulated VFR route (KPAO → KSQL → KOAK → KSFO) to the simulator. `tools/fly.sh stop` stops it. |
+| `test` | Full unit suite on the worktree simulator. |
+| `build` | Compile app + tests (no simulator). |
+| `ready` | `bd ready`: unblocked work. |
+
+Worktree setup resolves SwiftPM packages and creates the worktree's simulator; teardown deletes it.
+
+From a shell, all simulator work goes through `tools/sim-test.sh` (test, build, demo, id, delete, teardown). Agents set
+`SIM_TAG=<ticket>` to get their own simulator. See docs/handoff/COMMON.md.
+
 ```bash
-# Open in Xcode
-open efb-212.xcodeproj
-
-# Build and run (Xcode)
-# Select iPad simulator or connected device → Cmd+R
-
-# Run tests
-# Cmd+U in Xcode, or:
-xcodebuild test -scheme efb-212 -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M4)'
-
-# Clean build
-xcodebuild clean build -scheme efb-212
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
+tools/sim-test.sh test -only-testing:efb-212Tests          # unit tests on the worktree sim
+SIM_TAG=T07 tools/sim-test.sh test -only-testing:efb-212Tests/MapQueryRegionTests   # an agent's own sim
+open efb-212.xcodeproj                                     # Xcode (Cmd+R / Cmd+U)
 ```
 
 ## File Organization
@@ -166,6 +173,15 @@ efb-212/
 **Last Active:** February 2026
 **Built:** 61 Swift files, 215+ tests, 3,700 airports seeded. Moving map with VFR sectional overlay, airport database with R-tree spatial queries, METAR/TAF weather service, nearest airport emergency HUD, flight planning, instrument strip, airspace boundaries, TFR service.
 **Next:** Phase 2 — blocked on SFR package extraction (flight recording) and Apple Foundation Models (AI debrief)
+
+## Issue Tracking (beads)
+
+This project uses bd (beads) for issue tracking. The database lives in the main checkout at `/Users/omer/dev/openefb/.beads` and is shared by all worktrees.
+
+- Run `bd prime` for workflow context and command guidance.
+- Use `bd ready`, `bd show <id>`, `bd update <id> --claim`, and `bd close <id>`.
+- Use `bd remember "insight"` for durable project facts; keep per-operator preferences in your harness's own memory.
+- Do not use markdown TODO lists for task tracking.
 
 ## Known Issues
 

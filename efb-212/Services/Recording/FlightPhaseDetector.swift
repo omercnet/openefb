@@ -14,7 +14,7 @@
 
 import Foundation
 
-struct FlightPhaseDetector: Sendable {
+nonisolated struct FlightPhaseDetector: Sendable {
 
     // MARK: - State
 

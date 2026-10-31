@@ -11,7 +11,7 @@
 
 import Foundation
 
-struct AviationVocabularyProcessor: Sendable {
+nonisolated struct AviationVocabularyProcessor: Sendable {
 
     // MARK: - Phonetic Digit Map
 
