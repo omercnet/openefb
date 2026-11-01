@@ -15,6 +15,7 @@ import Foundation
 @testable import efb_212
 
 @Suite("AudioRecorder Tests")
+@MainActor
 struct AudioRecorderTests {
 
     // MARK: - Protocol Conformance

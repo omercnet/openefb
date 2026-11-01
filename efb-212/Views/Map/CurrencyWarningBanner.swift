@@ -34,18 +34,20 @@ struct CurrencyWarningBanner: View {
         if shouldShow {
             HStack(spacing: 10) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(overallStatus == .expired ? .red : .yellow)
+                    .foregroundStyle(overallStatus == .expired ? Palette.warning : Palette.caution)
                     .font(.title3)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(fetchFailed ? "Currency unknown" : "Currency Warning")
+                    Text(fetchFailed ? "Currency unknown" : (overallStatus == .expired ? "Currency Expired" : "Currency Warning"))
                         .font(.caption.bold())
                     ForEach(Array(warningMessages.enumerated()), id: \.offset) { _, message in
                         Text(message)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                 }
+                .accessibilityElement(children: .combine)
 
                 Spacer()
 
@@ -56,14 +58,18 @@ struct CurrencyWarningBanner: View {
                     }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
+                        .frame(minWidth: MapControlMetrics.size, minHeight: MapControlMetrics.size)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
+                .accessibilityLabel("Dismiss currency warning")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: 10))
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
     }
 

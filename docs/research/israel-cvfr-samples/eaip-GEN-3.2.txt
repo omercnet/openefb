@@ -1,0 +1,127 @@
+ 
+ AIP for ISRAEL(section GEN-3.2)valid from 06 AUG 2026 GEN 3.2 AERONAUTICAL CHARTS 1. Responsible services The Civil Aviation Authority of the state of Israel (CAAI), provides a wide range of aeronautical charts for use by all types of civil aviation. Charts, suitable for preflight planning and briefing, are available for reference at the CAAI eAIP: Israel eAIP 
+ https://e-aip.azurefd.net 
+and also at aerodrome AIM units, (AIM addresses can be found in GEN 3.1). The charts are produced in accordance with the provisions contained in Annex 4 — Aeronautical Charts. Differences to these provisions are detailed in subsection GEN 1.7. 2. Maintenance of charts 2.1 The aeronautical charts included in the AIP are kept up to date by amendments to the AIP. Information concerning the planning for or issuance of new maps and charts is notified, when applicable, by Aeronautical Information Circular. 2.2 If incorrect information detected on published charts is of operational significance, it is corrected by NOTAM. 3. Purchase arrangements The charts as listed under 5. of this subsection may be obtained either from: Israel Online eAIP at, (Free of charge): https://e-aip.azurefd.net Or from (only ENR 6.1 chart): Gideon Dan Cartography Design Studio 
+Shevet Binyamin 17/1
+Givat Zeev 9091417
+Israel Tel:972 2 6520464 URL: https://www.studio-dan.biz/en/shop/ 4. Aeronautical chart series available 4.1 The following series of aeronautical charts are produced or will be produced in the future: Aerodrome/Heliport Chart — ICAO; Aerodrome Ground Movement Chart — ICAO; Aircraft Parking/Docking Chart — ICAO; Aerodrome Obstacle Chart — ICAO — Type A (for each runway); En-route Chart — ICAO; Area Chart — ICAO; Standard Departure Chart — Instrument (SID) — ICAO Standard Arrival Chart — Instrument (STAR) — ICAO Instrument Approach Chart — ICAO (for each runway and procedure type); Visual Approach Chart — ICAO. The charts currently available are listed under 5. of this subsection. 4.2 General description of each series: Aerodrome/Heliport Chart — ICAO . 
+This chart contains detailed aerodrome/heliport data to provide flight crews with information that will facilitate the ground movement of aircraft: from the aircraft stand to the runway; and from the runway to the aircraft stand; and helicopter movement: from the helicopter stand to the touchdown and lift-off area and to the final approach and takeoff area; from the final approach and take-off area to the touchdown and lift-off area and to the helicopter stand; along helicopter ground and air taxiways; and along air transit routes. It also provides essential operational information at the aerodrome/heliport. Aerodrome Ground Movement Chart- ICAO . 
+This chart is produced for those aerodromes where, due to congestion of information, details necessary for the ground movement of aircraft along the taxiways to and from the aircraft stands and for the parking/docking of aircraft cannot be shown with sufficient clarity on the Aerodrome/Heliport Chart — ICAO. Aircraft Parking/Docking Chart — ICAO .
+This chart is produced for those aerodromes where, due to the complexity of the terminal facilities, the information to facilitate the ground movement of aircraft between the taxiways and the aircraft stands and the parking/docking of aircraft cannot be shown with sufficient clarity on the Aerodrome/Heliport Chart — ICAO or on the Aerodrome Ground Movement Chart — lCAO. Aerodrome Obstacle Chart — ICAO — Type A (operating limitations) . 
+This chart contains detailed information on obstacles in the take-off flight path areas of aerodromes.
+It is shown in plan and profile view. 
+This obstacle information, in combination with an Obstacle Chart — ICAO — Type C, provides the data necessary to enable an operator to comply with the operating limitations of Annex 6, Parts I and II, Chapter 5. Precision Approach Terrain Chart — ICAO . 
+This chart provides detailed terrain profile information within a defined portion of the final approach so as to enable aircraft operating agencies to assess the effect of the terrain on decision height determination by the use of radio altimeters.
+This chart is produced for all precision approach Cat II and III runways. En-route Chart — ICAO . 
+This chart is produced for the entire Israel FIR, The aeronautical data include all aerodromes, prohibited, restricted and danger areas and the air traffic services system in detail. The chart provides the flight crew with information that will facilitate navigation along ATS routes in compliance with air traffic services procedures. Area Chart — ICAO . 
+This chart is produced when the air traffic services routes or position reporting requirements are complex and cannot be shown on an En-route Chart — ICAO. 
+It shows, in more detail, those aerodromes that affect terminal routings, prohibited, restricted and danger areas and the air traffic services system.
+This chart provides the flight crew with information that will facilitate the following phases of instrument flight: the transition between the en-route phase and the approach to an aerodrome; the transition between the take-0ff/missed approach and the en-route phase of flight; and flights through areas of complex ATS routes or airspace structure. ATC Surveillance Minimum Altitude Chart — ICAO . 
+This chart is supplementary to the Area Chart and provides information which will enable flight crews to monitor and cross-check altitudes assigned while under radar control. Standard Departure Chart -- Instrument (SID} — ICAO .
+This chart is produced whenever a standard departure route — instrument has been established and cannot be shown with sufficient clarity on the Area Chart — ICAO. 
+The aeronautical data shown include the aerodrome of departure, aerodrome(s) which affect the designated standard departure route — instrument, prohibited, restricted and danger areas and the air traffic services system.
+This chart provides the flight crew with information that will enable them to comply with the designated standard departure route — instrument from the take-off phase to the en-route phase. Standard Departure Route -- Visual .
+This chart is produced whenever a standard departure route — Visual has been established. A standard departure route is aimed for controlled VFR flights which terminate at a significant point. The aeronautical data shown include the aerodrome of departure, aerodrome(s) which affect the designated standard departure, prohibited, restricted and danger areas and the air traffic services system.
+This chart provides the flight crew with information that will enable them to comply with the designated route, from the take-off phase to the en-route phase. Standard Arrival Chart — Instrument (STAR) — ICAO .
+This chart is produced whenever a standard arrival route —instrument has been established and cannot be shown with sufficient clarity on the Area Chart — ICAO. 
+The aeronautical data shown include the aerodrome of landing, aerodrome(s) which affect the designated standard arrival route — instrument, prohibited, restricted and danger areas and the air traffic services system.
+This chart provides the flight crew with information that will enable them to comply with the designated standard arrival route — instrument from the en-route phase to the approach phase. Instrument Approach Chart — ICAO .
+This chart is produced for all aerodromes used by civil aviation where instrument approach procedures have been established. A separate Instrument Approach Chart — ICAO has been provided for each approach procedure. 
+The aeronautical data shown include information on aerodromes, prohibited, restricted and danger areas, radio communication facilities and navigation aids, minimum sector altitude, procedure track portrayed in plan and profile view, aerodrome operating minima, etc. 
+This chart provides the flight crew with information that will enable them to perform an approved instrument approach procedure to the runway of intended landing including the missed approach procedure and where applicable, associated holding patterns. Visual Approach Chart — ICAO .
+This chart is produced for aerodromes used by civil aviation where: only limited navigation facilities are available; or radio communication facilities are not available; or no adequate aeronautical charts of the aerodrome and its surroundings at 1:500,000 or greater scale are available; or visual approach procedures have been established. The aeronautical data shown include information on aerodromes, obstacles, designated airspace, visual approach information, radio navigation aids and communication facilities, as appropriate. 5. List of aeronautical charts available Those chart series marked by an asterisk (*) form part of the AIP Those chart series marked by (**) the scale is approximated Title of series | Scale | Name and/or number | Price (NIS) | Date | 
+ En-route Chart — ICAO* | 1:400,000** | ENR 6-1 | 17.00 | Ref. GEN 0.4 | 
+ Title of series | Scale | Name and/or number | Price (NIS) | Date | 
+ Standard Departure Chart — Instrument (SID) — ICAO* 
+or Standard Departure Route – Visual* | 1:100,000** | Ben-Gurion (LLBG) | 
+ LLBG RWY 12,26,30 PIDET 2C,1E,1F, RIPUD 1E,1F | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLBG RWY 12,26,30 ORLEV 1C,1E,1F | Ref. GEN 0.4 | 
+ LLBG RWY 08 SALAM 4B, TOMAL 4B, SUVAS 1B, DAFNA 1B, MERVA 2B | Ref. GEN 0.4 | 
+ LLBG RWY 08 SIGGA 1B, TALMI 1B, IVONA 1B, RAPIV 1B | Ref. GEN 0.4 | 
+ LLBG RWY 12 SALAM 5C, TOMAL 5C, SUVAS 2C, DAFNA 2C, MERVA 3C | Ref. GEN 0.4 | 
+ LLBG RWY 26 SALAM 4E, TOMAL 4E, SUVAS 1E, DAFNA 1E, MERVA 2E | Ref. GEN 0.4 | 
+ LLBG RWY 30 SALAM 4F, TOMAL 4F, SUVAS 1F, DAFNA 1F, MERVA 2F | Ref. GEN 0.4 | 
+ LLBG RWY 03, 08, 12, 21 NAT 1A, 1B, 1D, SUVAS 1G | Ref. GEN 0.4 | 
+ Eilat/Ilan & Asaf Ramon (LLER) | 
+ LLER RWY 01 NURIT 1F | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLER RWY 01 NURIT 2H | Ref. GEN 0.4 | 
+ LLER RWY 19 NURIT 1K | Ref. GEN 0.4 | 
+ LLER RWY 19 NURIT 1M | Ref. GEN 0.4 | 
+ LLER RWY 19 NURIT 1J | Ref. GEN 0.4 | 
+ LLER RWY 19 NURIT 1N | Ref. GEN 0.4 | 
+ Title of series | Scale | Name and/or number | Price (NIS) | Date | 
+ Standard Arrival Chart —Instrument (STAR) — ICAO* | 1:150,000** | Haifa (LLHA) | 
+ LLHA RWY 15.33 GALIM 1A 1B | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ Ben-Gurion (LLBG) | 
+ LLBG RWY 08 PURLA 1 | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLBG RWY 12 AMMIT1B, SALAM 2B | Ref. GEN 0.4 | 
+ LLBG RWY 30 VETEK 1A, AMMIT 2E, SALAM 1E | Ref. GEN 0.4 | 
+ LLBG RWY 21, 26 AMMOS 1A, AMMOS 1B, AMMIT 2A, SALAM 3A | Ref. GEN 0.4 | 
+ LLBG RWY 12, 30 NINET 1, GODED 2 | Ref. GEN 0.4 | 
+ LLBG RWY 21, 26 RNAV TRANSITION | Ref. GEN 0.4 | 
+ Eilat/Ilan & Asaf Ramon (LLER) | 
+ LLER RWY 01 NURIT 1B | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLER RWY 01 NURIT 1D | Ref. GEN 0.4 | 
+ Title of series | Scale | Name and/or number | Price (NIS) | Date | 
+ Instrument Approach Chart — (IAC) - ICAO* | 1:250,000** | Ben-Gurion (LLBG) | 
+ LLBG ILS RWY 08 | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLBG ILS RWY 12 | Ref. GEN 0.4 | 
+ LLBG ILS RWY 21 | Ref. GEN 0.4 | 
+ LLBG ILS RWY 26 | Ref. GEN 0.4 | 
+ LLBG ILS RWY 30 | Ref. GEN 0.4 | 
+ LLBG LOC RWY 12 | Ref. GEN 0.4 | 
+ LLBG LOC RWY 21 | Ref. GEN 0.4 | 
+ LLBG RNP RWY 08 | Ref. GEN 0.4 | 
+ LLBG RNP RWY 12 | Ref. GEN 0.4 | 
+ LLBG RNP Y RWY 21 | Ref. GEN 0.4 | 
+ LLBG RNP RWY 26 | Ref. GEN 0.4 | 
+ LLBG RNP X RWY 30 | Ref. GEN 0.4 | 
+ LLBG RNP Z RWY 30 | Ref. GEN 0.4 | 
+ Eilat/Ilan & Asaf Ramon (LLER) | 
+ LLER RNP RWY 01 | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLER RNP RWY 19 | Ref. GEN 0.4 | 
+ LLER ILS RWY 01 | Ref. GEN 0.4 | 
+ LLER ILS RWY 19 | Ref. GEN 0.4 | 
+ LLER (RNAV VIS) RWY 01 | Ref. GEN 0.4 | 
+ LLER (RNAV VIS) NURIT APCH RWY 19 | Ref. GEN 0.4 | 
+ Title of series | Scale | Name and/or number | Price (NIS) | Date | 
+ Visual Approach Chart — ICAO* (VAC) | 1:250,000** | Haifa (LLHA) | 
+ LLHA VISUAL CIRCUIT CHART | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ Ben-Gurion (LLBG) | 
+ LLBG NAMIM APCH RWY 21 | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLBG GAVRI APCH RWY 30 | Ref. GEN 0.4 | 
+ LLBG ROMIE APCH RWY 30 | Ref. GEN 0.4 | 
+ LLBG VISUAL APCH CHART | Ref. GEN 0.4 | 
+ Title of series | Scale | Name and/or number | Price (NIS) | Date | 
+ Aerodrome/Heliport Chart — ICAO* (AC) | 1:10,000** | Haifa (LLHA) | 
+ LLHA AERODROME CHART | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ Ben-Gurion (LLBG) | 
+ LLBG AERODROME CHART | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ Eilat/Ilan & Asaf Ramon (LLER) | 
+ LLER AERODROME CHART | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ Title of series | Scale | Name and/or number | Price (NIS) | Date | 
+ Aircraft Parking/Docking Chart — ICAO* (APDC) | 1:5,000** | Haifa (LLHA) | 
+ LLHA Aircraft Parking Chart | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLHA Aircraft Parking Chart Apron G | Ref. GEN 0.4 | 
+ LLHA Aircraft Parking Chart Apron N | Ref. GEN 0.4 | 
+ LLHA Aircraft Parking Chart Apron Z | Ref. GEN 0.4 | 
+ Ben-Gurion (LLBG) | 
+ LLBG Aircraft parking/docking chart Terminal 1 | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLBG Aircraft parking/docking chart Apron V | Ref. GEN 0.4 | 
+ LLBG Aircraft parking chart - Terminal 3 | Ref. GEN 0.4 | 
+ LLBG Aircraft parking chart - Terminal 3 – Apron H, X | Ref. GEN 0.4 | 
+ LLBG Aircraft parking/docking chart - Apron N | Ref. GEN 0.4 | 
+ Eilat/Ilan & Asaf Ramon (LLER) | 
+ LLER Aircraft Parking Chart Apron U | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLER Aircraft Parking Chart Apron R, S, T | Ref. GEN 0.4 | 
+ LLER Aircraft Parking Chart Apron V | Ref. GEN 0.4 | 
+ Title of series | Scale | Name and/or number | Price (NIS) | Date | 
+ Aerodrome Obstacle Chart — Type A — ICAO* (for each runway); | 1:10,000** | Haifa (LLHA) | 
+ LLHA AERODROME OBSTACLE CHART – TYPE A RWY 15/33 | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ Ben-Gurion (LLBG) | 
+ LLBG AERODROME OBSTACLE CHART – TYPE A RWY 03/21 | Part of the IAip and NOT sold separately | Ref. GEN 0.4 | 
+ LLBG AERODROME OBSTACLE CHART – TYPE A RWY 08/26 | Ref. GEN 0.4 | 
+ LLBG AERODROME OBSTACLE CHART – TYPE A RWY 12/30 | Ref. GEN 0.4 | 
+ 6. Index to the World Aeronautical Chart (WAC) - ICAO 1:1 000 000 The state of Israel is currently NOT publishing WAC chart and chart index. Please refer to GEN 1.7 - Difference from ICAO Standards, Recommended Practices and Procedures. 7. Topographical charts To supplement the aeronautical charts, a wide range of topographical charts is available from: Survey of Israel 
+Lincoln 1 St, Po. Box 14171 
+Tel Aviv 6522000. Tel:+972-3-6231969 Fax:+972-3-6231958 Email: aviayet@mapi.gov.il 

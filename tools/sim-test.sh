@@ -10,6 +10,8 @@
 #   tools/sim-test.sh build                                               # build for the sim
 #   tools/sim-test.sh demo  [lat,lon]                                     # install + launch the built app
 #   tools/sim-test.sh id                                                  # print the sim UDID
+#   tools/sim-test.sh claim <ticket>                                      # reuse a free agent simulator (prints its tag)
+#   tools/sim-test.sh release                                             # give SIM_TAG's simulator back to the pool
 #   tools/sim-test.sh delete                                              # delete this SIM_TAG's simulator
 #   tools/sim-test.sh teardown                                            # delete every simulator of this worktree
 # Extra args are passed to xcodebuild. Set DD=<path> for a private derived-data dir
@@ -26,6 +28,14 @@ SIM_NAME="OpenEFB · $NAME$SUFFIX"
 DD=${DD:-/tmp/efb-dd-$NAME${SIM_TAG:+-$SIM_TAG}}
 LOCK=/tmp/efb-sim-lock-$NAME${SIM_TAG:+-$SIM_TAG}
 RUNTIME=$(xcrun simctl list runtimes | grep -oE 'com\.apple\.CoreSimulator\.SimRuntime\.iOS-[0-9]+-[0-9]+' | sort -Vu | tail -1)
+
+CLAIMS=/tmp/efb-sim-claims-$NAME
+CLAIM_TTL_MIN=${CLAIM_TTL_MIN:-480}   # a claim older than this is treated as abandoned
+
+# Tags of existing agent simulators in this worktree ("OpenEFB · <worktree> · <tag>").
+pool_tags() {
+  xcrun simctl list devices | grep -F "OpenEFB · $NAME · " | sed -E "s/.*OpenEFB · $NAME · ([^ ]+) \(.*/\1/" | sort -u
+}
 
 sim_id() {
   local id
@@ -77,6 +87,22 @@ case "$cmd" in
     xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
     xcrun simctl launch "$SIM" "$BUNDLE"
     open -g /Applications/Xcode.app/Contents/Applications/DeviceHub.app 2>/dev/null || true ;;
+  claim)
+    # Reuse an existing agent simulator nobody holds; create one only when all are busy.
+    owner=${1:-agent}; mkdir -p "$CLAIMS"
+    exec 9>"$CLAIMS/.lock"; while ! mkdir "$CLAIMS/.mutex" 2>/dev/null; do sleep 1; done
+    trap 'rmdir "$CLAIMS/.mutex" 2>/dev/null || true' EXIT
+    tag=""
+    for t in $(pool_tags); do
+      f="$CLAIMS/$t"
+      if [ ! -f "$f" ] || [ -n "$(find "$f" -mmin +"$CLAIM_TTL_MIN" 2>/dev/null)" ]; then tag=$t; break; fi
+    done
+    if [ -z "$tag" ]; then n=1; while pool_tags | grep -qx "pool$n"; do n=$((n + 1)); done; tag="pool$n"; fi
+    echo "$owner $(date -u +%FT%TZ)" > "$CLAIMS/$tag"
+    SIM_NAME="OpenEFB · $NAME · $tag"; sim_id >/dev/null
+    echo "$tag" ;;
+  release)
+    [ -n "${SIM_TAG:-}" ] && rm -f "$CLAIMS/$SIM_TAG" ;;
   delete)
     [ -n "${SIM_TAG:-}" ] || { echo "delete needs SIM_TAG (refusing to delete the shared worktree sim)" >&2; exit 2; }
     id=$(xcrun simctl list devices | grep -F "$SIM_NAME (" | grep -oE '[0-9A-F-]{36}' | head -1 || true)
@@ -88,5 +114,5 @@ case "$cmd" in
       xcrun simctl delete "$id" && echo "deleted $id"
     done
     rm -rf "/tmp/efb-dd-$NAME" /tmp/efb-dd-"$NAME"-* /tmp/efb-sim-lock-"$NAME"* ;;
-  *) echo "usage: $0 test|build|demo|id|delete|teardown [xcodebuild args]" >&2; exit 2 ;;
+  *) echo "usage: $0 test|build|demo|id|claim|release|delete|teardown [xcodebuild args]" >&2; exit 2 ;;
 esac

@@ -42,6 +42,18 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
         backgroundSession = CLBackgroundActivitySession()
         isTracking = true
 
+        // Cold start with no fix and no explicit failure: say so after the grace period.
+        Task { [weak self] in
+            try? await Task.sleep(for: .seconds(GPSFailureReason.noFixGraceSeconds))
+            await MainActor.run { [weak self] in
+                guard let appState = self?.appState,
+                      self?.isTracking == true,
+                      !appState.firstLocationReceived,
+                      appState.gpsFailure == nil else { return }
+                appState.gpsFailure = .noFixYet
+            }
+        }
+
         trackingTask = Task { [weak self] in
             let updates = CLLocationUpdate.liveUpdates(.otherNavigation)
 
@@ -61,8 +73,13 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
                             guard let appState = self?.appState else { return }
                             if isStationary {
                                 appState.gpsStationary = true
-                            } else if update.authorizationDenied || update.locationUnavailable {
+                            } else if let reason = GPSFailureReason.from(
+                                authorizationDenied: update.authorizationDenied || update.authorizationDeniedGlobally,
+                                authorizationRestricted: update.authorizationRestricted,
+                                locationUnavailable: update.locationUnavailable
+                            ) {
                                 appState.gpsAvailable = false
+                                appState.gpsFailure = reason
                             }
                         }
                         continue
@@ -96,6 +113,7 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
                         appState.verticalSpeed = computedVSI          // fpm
                         appState.track = trackDegrees                 // degrees true
                         appState.gpsAvailable = true
+                        appState.gpsFailure = nil
                         appState.gpsStationary = isStationary
 
                         if !appState.firstLocationReceived {
@@ -107,6 +125,7 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
                 // CLLocationUpdate.liveUpdates() can throw if cancelled or authorization denied
                 await MainActor.run { [weak self] in
                     self?.appState?.gpsAvailable = false
+                    self?.appState?.gpsFailure = .streamFailed
                 }
             }
         }

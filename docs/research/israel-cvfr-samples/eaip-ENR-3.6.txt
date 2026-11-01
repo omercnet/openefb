@@ -1,0 +1,74 @@
+ 
+ AIP for ISRAEL(section ENR-3.6)valid from 06 AUG 2026 ENR 3.6 EN-ROUTE HOLDING HLDG ID / FIX / WPT
+Coordinates | INBD TR (°MAG) | Direction of PTN | MAXIAS (KT) | NMN-MAX
+HLDG LVL
+FL/FT (MSL) | TIME (MIN)
+or DIST 
+OUBD | Controlling unit and Frequency | 
+ 1 | 2 | 3 | 4 | 5 | 6 | 7 | 
+ The en-route holdings may be used only when indicated as CLEARANCE LIMIT or after permission from ATC. | 
+ ADLOD
+Natania
+NAT VOR/DME 
+320034N 
+0351509E | 319 | Left | 230 | 6 000 FT - 10 000 FT | 1 | Ben-Gurion TMA
+119.50 MHz | 
+ BEN GURION
+Ben-Gurion 
+BGN VOR/DME
+320047N
+0345231E | 270 | Left | 230 | 4 000FT - 8000 FT | 1 | Ben-Gurion APP
+120.50 MHz | 
+ KONFO 
+Ben-Gurion 
+BGN VOR/DME
+322542N 
+0340656E | 128 | Right | 5 000 FT – FL 200 | 1 | Tel-Aviv ACC 
+121.40 MHz | 
+ ZOFAR
+Zofar 
+ZFR VOR/DME 
+303332N 
+0350943E | 199 | Right | 230 | 6 000 FT - 14 000 FT | 1 | South Control ACC 
+120.90 MHz | 
+ 199 | Right | 240 | 15 000 FT - 20 000 FT | 1:30 | 
+ 199 | Right | 265 | 21 000 FT - 34 000 FT | 1:30 | 
+ NURIT
+Zofar
+ZFR VOR/DME
+300410N
+0350357E | 185 | Right | 215 | 5 000 FT – 15 000 FT | 1 | South Control ACC 
+120.90 MHz | 
+ SHANI
+Zofar
+ZFR VOR/DME
+301335N
+0350554E | 185 | Right | 230 | 5 000 FT – 10 000 FT | 1 | South Control ACC 
+120.90 MHz | 
+ SHAYO
+Zofar
+ZFR VOR/DME
+301943N
+0350703E | 185 | Right | 230 | 10 000 FT – 14 000 FT | 1 | South Control ACC 
+120.90 MHz | 
+ 240 | 15 000 FT – 20 000 FT | 1:30 | 
+ 265 | 21 000 FT – 24 000 FT | 1:30 | 
+ 265 | 25 000 FT – 34 000 FT | 1:30 | 
+ 0.83 mach | 35 000 FT – 37 000 FT | 1:30 | 
+ METZADA
+Metzada
+MZD VOR/DME
+311954N
+0352330E | 001 | Left | 230 | 10 000 FT – 14 000 FT | 1 | South Control ACC
+120.90 MHz | 
+ 240 | 15 000 FT – 20 000 FT | 1:30 | 
+ 265 | 21 000 FT – 24 000 FT | 1:30 | 
+ 265 | 25 000 FT – 34 000 FT | 1:30 | 
+ 0.83mach | 35 000 FT – 37 000 FT | 1:30 | 
+ NATANIA
+Natania
+NAT VOR/DME
+322002N
+0345808E | 213 | Right | 230 | 4 000 FT – 6 000 FT | 1 | Military Control ACC 
+118.40 MHz | 
+ 

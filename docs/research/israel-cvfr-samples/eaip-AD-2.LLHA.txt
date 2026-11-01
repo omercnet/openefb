@@ -1,0 +1,131 @@
+ 
+ AIP for ISRAEL(section AD-2.LLHA)valid from 06 AUG 2026 AD 2 AERODROMES LLHA — HAIFA/U. Michaeli airport Note: The following sections in this chapter are intentionally left blank: AD-2.7, AD-2.25 LLHA AD 2.1 Aerodrome Location Indicator And Name LLHA — HAIFA/U. Michaeli airport LLHA AD 2.2 Aerodrome Geographical And Administrative Data 1 | ARP coordinates and site at AD | 324835N 0350238E
+163°/678 M from THR 15 | 
+ 2 | Direction and distance from (city) | 090°, 12 km from Haifa city center | 
+ 3 | Elevation/Reference temperature | 28FT./31.5°C (August) | 
+ 4 | Geoid undulation at AD ELEV PSN | 20.5 M | 
+ 5 | MAG VAR/Annual Change | 5° E (2019)/0.08° increasing | 
+ 6 | AD Administration, address, telephone, telefax, e-mail address, AFS | Post: Israel Airports Authority (IAA)
+Haifa Airport
+99 Julius Simon Rd. Haifa Tel:972-4-8476100/1 
+ after 16:00: Security Unit - 972-4-8476100 972-4-8476106 , 972-50-9753105/6 Fax:972-4-8728657 Email: AD Administration/Operation and Security Center: mail_haifaairport@iaa.gov.il Email: ATC Tower: migdalha@iaa.gov.il AFS:LLHAZPZX | 
+ 7 | In the event of communication failure, the pilot should call Air traffic control tower | Tel:Control tower: 972-4-8476120
+in case of comm. failure: 972-4-8729361 | 
+ 8 | Types of traffic permitted (IFR/VFR) | CVFR only | 
+ 9 | Remarks | 
+ LLHA AD 2.3 Operational Hours 1 | AD Administration | Operation and Security Center operates during ATS operational hours, except on the eves of Rosh Hashana, Yom Kippur and Passover, when the service is not provided . SUN-THU: 0800-1600 LT | 
+ 2 | Customs and immigration | Prior coordination with Operation and Security Center required | 
+ 3 | Health and sanitation | NIL | 
+ 4 | AIS Briefing Office | By Ben-Gurion AIS office (See LLBG AD 2.2) | 
+ 5 | ATS Reporting Office (ARO) | NIL | 
+ 6 | MET Briefing Office | Israel Meteorological Service meteorological watch office, Bet Dagan (LLBD). | 
+ 7 | ATS | SUN, THU: 0800-2200 LT
+MON, TUE, WED: 0800-2000 LT. Additionally, between 2000-2200 LT, only commercial air transport operations (passenger flights), international or domestic operated by aircraft with capacity of 30 passengers seats or more, will be permitted.
+FRI & HOL eve: 0700-1900 LT
+SAT & HOL: 0800-2000 LT. Additionally, between 2000-2200 LT, only commercial air transport operations (passenger flights), international or domestic operated by aircraft with capacity of 30 passengers seats or more, will be permitted.
+Jewish New Year’s Eve and Passover Eve (the first) - (See GEN 2.1) - Airport closed for ARR/DEP at 18:00 L.M.T.
+Yom Kippur - Day of Atonement (See Gen 2.1) - Airport closed for ARR/DEP at 14:00 L.M.T until holiday’s following day. | 
+ 8 | Fueling | Fueling services are provided during ATS operational hours. 
+SAT& HOL: outside the operational hours, prior condition required (24h in advance) trough ‘PAZ Aviation Services’, Tel. +972-53-7211039. 
+ SUN-THU: 0700-1500 LT or until the end of the last scheduled flight.
+FRI & HOL eve: 0700-1500 LT or until the end of the last scheduled flight.
+SAT & HOL: PR 24H through ‘PAZ Aviation Services’ Tel. 053-7211039 | 
+ 9 | Handling | To receive Handling services, please contact QAS : one of the IAA Handling Companies:
+ QAS - Phone: +972-3-9751333.
+ L aufer-GHI - Phone: +972-76-8880000;
+AEROHANDLING - Phone: -972-3-9754012. | 
+ 10 | Security | As AD administration | 
+ 11 | De-icing | NIL | 
+ 12 | Remarks | Fixed-wing aircraft operations are prohibited outside published airport operating hours.Authorization for special operations, outside airport operating hours shall be subject to prior coordination with the Operations and Security Center, not less than 24 hours in advance.Helicopter medical evacuation operations or police helicopter operations are exempted from these restrictions and may operate outside airport operating hours, subject to prior authorization by airport management.at apron G, stand G3 coordination with ‘Paz Aviation Services’. Landing and takeoff of Helicopters in medical evacuation or Israeli Police in operational emergency is allowed beyond operational hours for refuelling purposes only, and requires prior coordination with AD Administration/Operation and Security Center. | 
+ LLHA AD 2.4 Handling Services And Facilities 1 | Cargo-handling facilities | NIL | 
+ 2 | Fuel/oil types | Jet A-1 by prior coordination with ‘PAZ Aviation Services’ Tel. 053-7211039 | 
+ 3 | Fueling facilities/capacity | Self-service 100LL & JET n ear stand J10, for local operators. A-1, for local operators.
+ Others: contact ‘PAZ Aviation Services’, Tel +972-53-7211039, prior coordination required (24h in advance). PR 24H in advance.
+ Oil – NIL
+Boarding passengers at the refuelling stand is forbidden. | 
+ 4 | De-icing facilities | NIL | 
+ 5 | Hangar space for visiting aircraft | NIL | 
+ 6 | Repair facilities for visiting aircraft | Contact AEROTECH GNS: +972-3-5477891 NIL | 
+ 7 | Remarks | NIL | 
+ LLHA AD 2.5 Passenger Facilities 1 | Hotels | In the city of Haifa | 
+ 2 | Restaurants | Inside the terminal and in the city | 
+ 3 | Transportation | Taxies and bus station outside the terminal building | 
+ 4 | Medical facilities | First-aid at AD
+Hospitals in the city of Haifa | 
+ 5 | Bank and Post Office | Nil | 
+ 6 | Tourist Office | In the city of Haifa | 
+ 7 | Remarks | Nil | 
+ LLHA AD 2.6 Rescue And Fire Fighting Services 1 | AD category for fire fighting | CAT 5 | 
+ 2 | Rescue equipment | Fire fighting vehicles & Ambulance | 
+ 3 | Capability for removal of disabled aircraft | No local equipment available. For further information contact Haifa airport management: +972-4-8476100 /1 . | 
+ 4 | Remarks | It is the duty of the owner or operator of a disabled aircraft to have it removed from the runway as soon as possible. If the owner or operator does not remove a disabled aircraft from the runway as quickly as possible, the aircraft will be removed by the aerodrome authority through an external crane company at the owner’s or operator’s expense and responsibility. | 
+ LLHA AD 2.7 Seasonal Availability - Clearing NIL LLHA AD 2.8 Aprons, Taxiways And Check Locations/Positions Data 1 | Designation, surface and strength of aprons (PCR) | A: Surface: ASPH, Strength: 250 / F / C / X / T
+Z: Surface: ASPH, Strength: 80 / F / C / X / T
+N: Surface: ASPH, Strength: 115 / F / C / X / T
+J: Surface: ASPH, Strength: 3 150 kg / 1.25 Mpa
+L: Surface: ASPH, Strength: 1 200 kg / 0.5 Mpa
+G: Surface: ASPH, Strength: 5 300 kg / 1.25 Mpa
+U: Surface: ASPH, Strength: 5 700 kg / 1.25 Mpa | 
+ 2 | Designation, width, surface and strength of taxiways | Surface: ASPH TWY A, G: 30 M TWY N: 31.14 M N1, N2: 14.95 M TWY J: 13.56 M TWY L: 11.63 M | 
+ 3 | Location and elevation to the nearest metre or foot of altimeter checkpoints | Location: At Apron
+Elevation: 28 FT. | 
+ 4 | Location of VOR checkpoints | Nil | 
+ 5 | Position of INS checkpoints in degrees, minutes, seconds and hundredths of seconds | Nil | 
+ 6 | Remarks | Aprons details and instructions, see aircraft parking chart: Parking for international flights shall be approved in advance by the Operation and Security Center. Apron A : In front of the terminal for commercial aircraft’s. Stands A1 and A3 can accommodate to W.S of 27.05 meters only. Stands A2 and A4 can accommodate up to W.S of 27.43 meters only. Aprons A , J , L , Z : For general aviation fixed-wing aircraft’s. Apron G : For authorized helicopters only. Apron N : For domestic aircraft (as detailed in Domestic AIP). Apron Z : For authorized aircraft only.
+Taxi in: via taxiway Y-3, or follow tower instructions. Give way to traffic taxiing out of Apron Z.
+Taxi out: via Z-2, or follow tower instructions. A/C parking stand shall be selected according to A/C W.S, as detailed in aircraft parking charts. Parking small aircraft with small W.S in stands designed for larger W.S requires prior approval from the large parking spot must be approved by the Operation and Security Center. | 
+ LLHA AD 2.9 Surface Movement Guidance And Control System And Markings 1 | Use of aircraft stand ID signs, TWY guide lines and visual docking/parking guidance system of aircraft stands | Taxiing guidance information signs at all intersections with TWY and RWY and at all holding positions.
+ Guide Leading lines at apron.
+Nose-out guidance at aircraft stands - only in apron A stands A1-A4 and apron N . | 
+ 2 | RWY and TWY markings and LGT | RWY: Designation, THR center line, edge runway end as appropriate, marked and lighted, aiming point marked.
+TWY: Center line, marked, unlighted. | 
+ 3 | Stop bars | Nil | 
+ 4 | Remarks | Nil | 
+ LLHA AD 2.10 Aerodrome Obstacles In Area 2a, Area 2b and Area 2c | 
+ Obstacle data for Area 2a, 2b and 2c is available by contacting the Civil Aviation Authority of Israel: Post: Ministry of Transportation
+Civil Aviation Authority
+Infrastructure Div. Mrs. Nitzan Vainstain
+P.O.B 1101
+Golan House, Golan st., Airport City 7019900, Israel. Tel:+972-3-9774568 Email: aip@mot.gov.il Obstacle Data effective: 04 FEB 2023 | 
+ In Area 3 | 
+ Obstacle data for Area 3 is maintained by the Israeli Airports Authority (IAA), which is the aerodrome operator of LLHA airport.However, this information is not available for publication or purchase. | 
+ In Area 4 | 
+ Obstacle data for Area 4 is not applicable, since there are no ILS CAT II/III operations in LLHA airport. | 
+ LLHA AD 2.11 Meteorological Information Provided 1 | Associated MET office | Israel Meteorological Service, Bet Dagan (LLBD) | 
+ 2 | Hours of service
+MET office outside hours | Observations commence one hour before AD resuming operation and continue until closure. Briefing available from LLBD 24H each day. | 
+ 3 | Office responsible for TAF preparation
+Periods of validity | Israel Meteorological Service
+24 HR (Long TAF). | 
+ 4 | Type of landing forecast
+Interval of issuance | Nil | 
+ 5 | Briefing/consultation provided | Telephone briefing with the Meteorological Watch Office at Israel Meteorological Service, Bet Dagan, can be established in the aerodrome meteorological station. | 
+ 6 | Flight documentation
+Language(s) used | By request from the local MET station, a folder may be provided containing: Charts, OPMET information, SIGMET, Aerodrome Warnings and low level forecasts for TEL-AVIV FIR available in ICAO abbreviated text or in 
+English | 
+ 7 | Charts and other information available for briefing or consulting | Low level and upper wind and temperature chart for standard isobaric surface. Significant weather chart (low level, medium and high level) | 
+ 8 | Supplementary equipment available for providing information | Meteorological information terminal available at meteorological station in the AD containing: weather radar, weather satellite image display and animation, Upper Air temperature & wind profiles derived from Israeli radiosonds and AMDAR reports, SIGWX and T+W charts and updated OPMET information | 
+ 9 | ATS units provided with information | Haifa Tower. | 
+ 10 | Additional information (limitation of service, etc.) | Local MET station Tel: 972-4-8476132 | 
+ LLHA AD 2.12 Runway Physical Characteristics Designations
+RWY NR | TRUE BRG | Dimensions of RWY (m) | Strength (PCR) and surface of RWY and SWY | THR coordinates
+RWY end coordinates
+THR geoid undulation | THR elevation and highest elevation of TDZ of precision APP RWY | Slope of
+RWY-SWY | 
+ 1 | 2 | 3 | 4 | 5 | 6 | 7 | 
+ 15 | 159.80° | 1 318 X 30 | 320/F/C/X/T
+Asphalt | THR 324855.55N 0350229.26E;
+RWY END 324817.81N 0350245.71E;
+GUND 20.5 M | THR 26 FT | -0.86%/+Negligible
+(502 M) (785 M) | 
+ 33 | 339.80° | 1 318 X 30 | 320/F/C/X/T
+Asphalt | THR 324821.41N 0350244.14E;
+RWY END 324857.04N 0350228.58E;
+GUND 20.5 M | THR 16 FT | Negligible/+0.86%
+(785 M) (502 M) | 
+ SWY dimensions (m) | CWY dimensions (m) | Strip dimensions (m) | Dimensions of RESA (m) | Location And Description Of Arresting System | OFZ | Remarks | 
+ 8 | 9 | 10 | 11 | 12 | 13 | 14 | 
+ * Use of CWY for RWY 15 - coordination with ATC is required before line-up | 
+ Nil | 90 X 80 | 
+
+[... truncated sample ...]

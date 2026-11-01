@@ -20,16 +20,15 @@ struct FlightPlanView: View {
     @State private var viewModel: FlightPlanViewModel?
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let viewModel {
-                    flightPlanContent(viewModel: viewModel)
-                } else {
-                    ProgressView("Loading...")
-                }
+        // Plans section of the Flights tab; the tab's NavigationStack owns the bar (T22).
+        Group {
+            if let viewModel {
+                flightPlanContent(viewModel: viewModel)
+            } else {
+                ProgressView("Loading...")
             }
-            .navigationTitle("Flight Plans")
         }
+        .navigationTitle("Flight Plans")
         .onAppear {
             initializeViewModel()
         }
@@ -69,6 +68,7 @@ struct FlightPlanView: View {
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.characters)
+                .accessibilityLabel("Departure airport")
                 .onChange(of: viewModel.departureQuery) { _, _ in
                     viewModel.searchDeparture()
                 }
@@ -95,6 +95,7 @@ struct FlightPlanView: View {
                 .textFieldStyle(.roundedBorder)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.characters)
+                .accessibilityLabel("Destination airport")
                 .onChange(of: viewModel.destinationQuery) { _, _ in
                     viewModel.searchDestination()
                 }
@@ -124,8 +125,10 @@ struct FlightPlanView: View {
                         viewModel.savePlan()
                     } label: {
                         Label("Save Plan", systemImage: "square.and.arrow.down")
+                            .foregroundStyle(Palette.onAccent)
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(Palette.accent)
 
                     Button(role: .destructive) {
                         viewModel.clearPlan()
@@ -145,9 +148,9 @@ struct FlightPlanView: View {
     private func savedPlansSection(viewModel: FlightPlanViewModel) -> some View {
         if viewModel.savedPlans.isEmpty {
             ContentUnavailableView(
-                "No Saved Plans",
+                "No saved plans",
                 systemImage: "airplane.circle",
-                description: Text("Create a flight plan above to get started.")
+                description: Text("Pick a departure and destination above, then Save Plan.")
             )
         } else {
             List {
@@ -163,6 +166,7 @@ struct FlightPlanView: View {
                                     Image(systemName: "arrow.right")
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
+                                        .accessibilityLabel("to")
                                     Text(record.destinationICAO)
                                         .font(.headline)
                                 }
@@ -172,8 +176,8 @@ struct FlightPlanView: View {
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                     Text(record.lastUsedAt, style: .relative)
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
+                                        .font(.caption)
+                                        .foregroundStyle(Palette.secondaryText)
                                 }
                             }
 
@@ -182,10 +186,13 @@ struct FlightPlanView: View {
                             if record.id == viewModel.activePlanID {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
+                                    .accessibilityLabel("Active plan")
                             }
                         }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityAddTraits(record.id == viewModel.activePlanID ? .isSelected : [])
                 }
                 .onDelete { indexSet in
                     for index in indexSet {
@@ -215,9 +222,11 @@ struct FlightPlanView: View {
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityElement(children: .combine)
                 if airport.id != results.last?.id {
                     Divider()
                 }

@@ -6,7 +6,11 @@
 //  Checks pilot position against nearby airspaces and TFRs,
 //  firing alerts at configurable distance thresholds per airspace class.
 //
-//  Alert thresholds:
+//  An airspace alert is INSIDE only when the aircraft is laterally within the boundary AND
+//  the GPS altitude (feet MSL) is between the floor and ceiling. Laterally inside but below
+//  a shelf, above the ceiling, or with no usable altitude (GPS Degraded) is NEAR.
+//
+//  Alert thresholds (lateral, outside the boundary):
 //  - Class B: 5 NM
 //  - Class C: 3 NM
 //  - Class D: 2 NM
@@ -19,17 +23,36 @@ import os
 
 // MARK: - ProximityAlert
 
-struct ProximityAlert: Identifiable, Sendable {
+struct ProximityAlert: Identifiable, Sendable, Equatable {
     let id: String
     let type: AlertType
     let name: String
-    let distance: Double      // nautical miles
-    let altitude: String      // floor/ceiling info (e.g., "SFC-10000")
+    let distance: Double      // nautical miles to the lateral boundary, 0 when laterally inside
+    let altitude: String      // floor/ceiling info (e.g., "SFC-10000'")
+    /// Where the aircraft sits relative to the floor/ceiling. `.unknown` for TFRs (AGL limits
+    /// are not compared) and when GPS altitude is unavailable.
+    let vertical: VerticalRelation
 
     enum AlertType: Sendable {
         case airspace
         case tfr
     }
+
+    /// Aircraft altitude relative to an airspace's vertical limits.
+    enum VerticalRelation: Sendable, Equatable {
+        case within
+        case below
+        case above
+        case unknown
+    }
+
+    /// True when laterally inside and, for airspace, vertically within known limits. Never true
+    /// for airspace without altitude: "near", not "inside", is what the pilot sees when GPS
+    /// altitude is missing. TFR altitudes are not compared, so lateral inside suffices.
+    var isInside: Bool { distance <= 0 && (type == .tfr || vertical == .within) }
+
+    /// Display word for the alert: "INSIDE" or "NEAR".
+    var relationLabel: String { isInside ? "INSIDE" : "NEAR" }
 }
 
 // MARK: - ProximityAlertService
@@ -73,67 +96,75 @@ final class ProximityAlertService {
 
     // MARK: - Proximity Check
 
-    /// Check airspace and TFR proximity for the given position.
+    /// Check airspace proximity for the given position.
     /// Throttled to once per 10 seconds to avoid excessive DB queries.
-    func checkProximity(position: CLLocation, altitude: Double) {
+    /// - `altitude`: GPS altitude in feet MSL, or nil when unknown (GPS Degraded, no vertical
+    ///   fix). Unknown altitude never produces an INSIDE alert.
+    func checkProximity(position: CLLocation, altitude: Double?, now: Date = Date()) {
         // Throttle checks
         if let lastCheck = lastCheckTime,
-           Date().timeIntervalSince(lastCheck) < checkIntervalSeconds {
+           now.timeIntervalSince(lastCheck) < checkIntervalSeconds {
             return
         }
-        lastCheckTime = Date()
+        lastCheckTime = now
 
-        var newAlerts: [ProximityAlert] = []
-        var foundInAirspace = false
-        var closestDistance: Double?
-
-        // 1. Check airspaces containing current position
         do {
-            let containingAirspaces = try databaseService.airspaces(near: position.coordinate, radiusNM: 5.0)
-
-            for airspace in containingAirspaces {
-                let distance = distanceToAirspace(from: position.coordinate, airspace: airspace)
-
-                // Check if we're inside this airspace
-                if distance <= 0.0 {
-                    foundInAirspace = true
-                    let alert = ProximityAlert(
-                        id: "airspace-\(airspace.id)",
-                        type: .airspace,
-                        name: airspace.name,
-                        distance: 0,
-                        altitude: formatAltitude(floor: airspace.floor, ceiling: airspace.ceiling)
-                    )
-                    newAlerts.append(alert)
-                    continue
-                }
-
-                // Check against threshold for this airspace class
-                let threshold = Self.alertThresholds[airspace.classification]
-                if let threshold, distance <= threshold {
-                    let alert = ProximityAlert(
-                        id: "airspace-\(airspace.id)",
-                        type: .airspace,
-                        name: airspace.name,
-                        distance: distance,
-                        altitude: formatAltitude(floor: airspace.floor, ceiling: airspace.ceiling)
-                    )
-                    newAlerts.append(alert)
-                }
-
-                // Track closest distance
-                if closestDistance == nil || distance < closestDistance! {
-                    closestDistance = distance
-                }
-            }
+            let nearby = try databaseService.airspaces(near: position.coordinate, radiusNM: 5.0)
+            let result = Self.airspaceAlerts(for: position.coordinate, altitude: altitude, airspaces: nearby)
+            activeAlerts = result.alerts
+            isInAirspace = result.alerts.contains { $0.isInside }
+            nearestAirspaceDistance = result.nearestDistance
         } catch {
             logger.warning("Airspace proximity check failed: \(error.localizedDescription)")
+            activeAlerts = []
+            isInAirspace = false
+            nearestAirspaceDistance = nil
         }
+    }
 
-        // 2. Update state
-        activeAlerts = newAlerts
-        isInAirspace = foundInAirspace
-        nearestAirspaceDistance = closestDistance
+    /// Vertical relation of `altitude` (feet MSL) to an airspace's limits. SFC is 0. The
+    /// airspace model has no AGL flag (the NASR import stores B/C/D limits as MSL), so no
+    /// field-elevation adjustment is applied.
+    static func verticalRelation(altitude: Double?, floor: Int, ceiling: Int) -> ProximityAlert.VerticalRelation {
+        guard let altitude else { return .unknown }
+        if altitude < Double(floor) { return .below }
+        if altitude > Double(ceiling) { return .above }
+        return .within
+    }
+
+    /// Pure alert evaluation. Laterally inside airspaces always alert (INSIDE when the altitude
+    /// is within limits, NEAR when below/above/unknown). Laterally outside alerts within the
+    /// class threshold. `nearestDistance` is the closest lateral distance (0 when laterally
+    /// inside any listed airspace).
+    static func airspaceAlerts(
+        for coordinate: CLLocationCoordinate2D,
+        altitude: Double?,
+        airspaces: [Airspace]
+    ) -> (alerts: [ProximityAlert], nearestDistance: Double?) {
+        var alerts: [ProximityAlert] = []
+        var closest: Double?
+
+        for airspace in airspaces {
+            let distance = lateralDistanceNM(from: coordinate, airspace: airspace)
+            let vertical = verticalRelation(altitude: altitude, floor: airspace.floor, ceiling: airspace.ceiling)
+            let limits = formatAltitude(floor: airspace.floor, ceiling: airspace.ceiling)
+
+            if distance <= 0.0 {
+                alerts.append(ProximityAlert(
+                    id: "airspace-\(airspace.id)", type: .airspace, name: airspace.name,
+                    distance: 0, altitude: limits, vertical: vertical))
+                closest = 0
+                continue
+            }
+
+            if let threshold = alertThresholds[airspace.classification], distance <= threshold {
+                alerts.append(ProximityAlert(
+                    id: "airspace-\(airspace.id)", type: .airspace, name: airspace.name,
+                    distance: distance, altitude: limits, vertical: vertical))
+            }
+            if closest == nil || distance < closest! { closest = distance }
+        }
+        return (alerts, closest)
     }
 
     /// Check TFR proximity separately (called when TFR data is available).
@@ -158,7 +189,8 @@ final class ProximityAlertService {
                 type: .tfr,
                 name: "TFR \(tfr.notamID) \u{2014} \(tfr.title)",
                 distance: distanceNM,  // nautical miles to boundary, 0 inside
-                altitude: tfr.altitudeDescription
+                altitude: tfr.altitudeDescription,
+                vertical: .unknown
             )
         }
         .sorted { $0.distance < $1.distance }
@@ -166,9 +198,9 @@ final class ProximityAlertService {
 
     // MARK: - Helpers
 
-    /// Approximate distance from position to airspace boundary in nautical miles.
+    /// Lateral distance from position to the airspace boundary in nautical miles.
     /// Returns 0 if inside, positive distance if outside.
-    private func distanceToAirspace(from coordinate: CLLocationCoordinate2D, airspace: Airspace) -> Double {
+    private static func lateralDistanceNM(from coordinate: CLLocationCoordinate2D, airspace: Airspace) -> Double {
         switch airspace.geometry {
         case .circle(let center, let radiusNM):
             guard center.count >= 2 else { return .greatestFiniteMagnitude }
@@ -177,27 +209,21 @@ final class ProximityAlertService {
             return max(0, distanceNM - radiusNM)
 
         case .polygon(let coordinates):
-            // Approximate: compute distance to nearest polygon vertex
-            var minDistance: Double = .greatestFiniteMagnitude
-            for coord in coordinates {
-                guard coord.count >= 2 else { continue }
-                let vertex = CLLocationCoordinate2D(latitude: coord[0], longitude: coord[1])
-                let dist = haversineDistanceNM(from: coordinate, to: vertex)
-                minDistance = min(minDistance, dist)
-            }
-            return max(0, minDistance)
+            // 0 inside the ring, else distance to the nearest edge (edges matter: a Class B ring has
+            // long sides with no vertex near the aircraft).
+            return PolygonGeometry.distanceNM(from: coordinate, ring: coordinates) ?? .greatestFiniteMagnitude
         }
     }
 
     /// Format altitude range string for display (e.g., "SFC-10000'" or "1200'-10000'").
-    private func formatAltitude(floor: Int, ceiling: Int) -> String {
+    private static func formatAltitude(floor: Int, ceiling: Int) -> String {
         let floorStr = floor == 0 ? "SFC" : "\(floor)'"
         let ceilingStr = ceiling >= 99999 ? "UNL" : "\(ceiling)'"
         return "\(floorStr)-\(ceilingStr)"
     }
 
     /// Haversine great-circle distance in nautical miles.
-    private func haversineDistanceNM(
+    private static func haversineDistanceNM(
         from: CLLocationCoordinate2D,
         to: CLLocationCoordinate2D
     ) -> Double {

@@ -193,7 +193,12 @@ final class FlightPlanViewModel {
                     longitude: max(dep.longitude, dest.longitude) + 0.5
                 )
             )
-            mapView.setVisibleCoordinateBounds(bounds, edgePadding: UIEdgeInsets(top: 80, left: 80, bottom: 80, right: 80), animated: true)
+            mapView.setVisibleCoordinateBounds(
+                bounds,
+                edgePadding: UIEdgeInsets(top: 80, left: 80, bottom: 80, right: 80),
+                animated: true,
+                completionHandler: nil
+            )
         }
     }
 

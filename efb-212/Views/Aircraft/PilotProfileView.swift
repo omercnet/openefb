@@ -113,6 +113,7 @@ struct PilotProfileView: View {
                                             .font(.subheadline)
                                             .foregroundStyle(.secondary)
                                     }
+                                    .accessibilityElement(children: .combine)
                                 }
                             }
                         } header: {
@@ -143,6 +144,7 @@ struct PilotProfileView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("Add pilot profile")
                 }
             }
         }
@@ -212,13 +214,15 @@ private struct PilotRow: View {
 
                 if isActive {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Palette.accentText)
                         .font(.title3)
+                        .accessibilityLabel("Selected")
                 }
             }
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 }
 

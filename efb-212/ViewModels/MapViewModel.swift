@@ -79,9 +79,6 @@ final class MapViewModel {
     /// edition; downloaded regions are checked against this cycle separately (OfflineStatus).
     var chartExpirationDate: Date? { SectionalCycle.current(at: now).expires }
 
-    /// Whole days until the current sectional cycle ends (drives the expiry warning badge).
-    var chartDaysRemaining: Int? { SectionalCycle.daysRemaining(at: now) }
-
     // MARK: - Weather Data Age
 
     /// Oldest observation time from the last weather fetch, for staleness indicator.
@@ -96,15 +93,24 @@ final class MapViewModel {
     private var lastQueryCenter: CLLocationCoordinate2D?
     private var lastQueryRadiusNM: Double?
     private var regionChangeDebounceTask: Task<Void, Never>?
+    private let regionChangeDebounce: Duration
+    private var lastQueryWasLowZoom: Bool?
     private var hasCenteredOnFirstFix: Bool = false
     private var lastOwnshipTimestamp: Date?
 
     // MARK: - Init
 
-    init(appState: AppState, mapService: MapService, databaseService: any DatabaseServiceProtocol) {
+    /// `regionChangeDebounce` is injectable so tests don't race real time (production: 500 ms).
+    init(
+        appState: AppState,
+        mapService: MapService,
+        databaseService: any DatabaseServiceProtocol,
+        regionChangeDebounce: Duration = .milliseconds(500)
+    ) {
         self.appState = appState
         self.mapService = mapService
         self.databaseService = databaseService
+        self.regionChangeDebounce = regionChangeDebounce
     }
 
     // MARK: - Style Loaded
@@ -113,16 +119,20 @@ final class MapViewModel {
     func onMapStyleLoaded(style: MLNStyle) {
         mapService.onStyleLoaded(style: style)
 
-        // Load initial data for the CONUS view (max radius; thinned to the cap)
+        // Load initial data for the CONUS view (default zoom is low: towered airports only)
         let conusCenter = CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0)
-        loadDataForRegion(center: conusCenter, radiusNM: MapQueryRegion.maxRadiusNM)
+        loadDataForRegion(
+            center: conusCenter,
+            radiusNM: MapQueryRegion.maxRadiusNM,
+            towerRadiusNM: MapQueryRegion.isLowZoom(appState.mapZoom) ? MapQueryRegion.maxLowZoomRadiusNM : nil
+        )
 
         // Sync current layer visibility, base map style, and sectional opacity
         for layer in MapLayer.allCases {
             let visible = appState.visibleLayers.contains(layer)
             mapService.setLayerVisibility(layer, visible: visible)
         }
-        mapService.setMapStyle(appState.mapStyle)
+        mapService.setMapStyle(appState.mapStyle, sectional: appState.visibleLayers.contains(.sectional))
         mapService.setSectionalOpacity(appState.sectionalOpacity)
         mapService.setOwnshipStale(gpsStatus.isStale)
     }
@@ -140,9 +150,10 @@ final class MapViewModel {
     ) {
         mapDirection = direction
         regionChangeDebounceTask?.cancel()
+        let debounce = regionChangeDebounce
         regionChangeDebounceTask = Task { [weak self] in
             do {
-                try await Task.sleep(for: .milliseconds(500))
+                try await Task.sleep(for: debounce)
             } catch {
                 return  // Cancelled
             }
@@ -156,18 +167,34 @@ final class MapViewModel {
                 north: northEast.latitude, east: northEast.longitude
             )
 
-            let radiusNM = MapQueryRegion.radiusNM(center: center, northEast: northEast, southWest: southWest)
-            guard MapQueryRegion.shouldRequery(
+            let cappedRadiusNM = MapQueryRegion.radiusNM(center: center, northEast: northEast, southWest: southWest)
+            let isLowZoom = MapQueryRegion.isLowZoom(zoom)
+            // Low zoom queries the whole visible region (uncapped); otherwise the capped radius.
+            let queryRadiusNM = isLowZoom
+                ? MapQueryRegion.lowZoomRadiusNM(center: center, northEast: northEast, southWest: southWest)
+                : cappedRadiusNM
+            // Crossing the low-zoom threshold changes what is queried, whatever the geometry says.
+            guard isLowZoom != lastQueryWasLowZoom || MapQueryRegion.shouldRequery(
                 lastCenter: lastQueryCenter,
                 lastRadiusNM: lastQueryRadiusNM,
                 center: center,
-                radiusNM: radiusNM
+                radiusNM: queryRadiusNM
             ) else { return }
 
-            loadDataForRegion(center: center, radiusNM: radiusNM)
+            loadDataForRegion(
+                center: center, radiusNM: cappedRadiusNM,
+                towerRadiusNM: isLowZoom ? queryRadiusNM : nil
+            )
             lastQueryCenter = center
-            lastQueryRadiusNM = radiusNM
+            lastQueryRadiusNM = queryRadiusNM
+            lastQueryWasLowZoom = isLowZoom
         }
+    }
+
+    /// Completes when the pending debounced region change has been applied. Tests use this
+    /// instead of sleeping past the debounce.
+    func settleRegionChange() async {
+        await regionChangeDebounceTask?.value
     }
 
     /// Live camera rotation while a gesture or animation is in progress (north indicator).
@@ -303,11 +330,15 @@ final class MapViewModel {
 
             // If a data layer is toggled on, load just that layer for the current region
             let center = appState.mapCenter
-            let radiusNM = lastQueryRadiusNM ?? MapQueryRegion.maxRadiusNM
+            let queryRadiusNM = lastQueryRadiusNM ?? MapQueryRegion.maxRadiusNM
+            let radiusNM = min(queryRadiusNM, MapQueryRegion.maxRadiusNM)
             switch layer {
             case .airports:
                 isLoadingAirports = true
-                loadAirports(center: center, radiusNM: radiusNM)
+                loadAirports(
+                    center: center, radiusNM: radiusNM,
+                    towerRadiusNM: MapQueryRegion.isLowZoom(appState.mapZoom) ? queryRadiusNM : nil
+                )
                 isLoadingAirports = false
             case .navaids:
                 loadNavaids(center: center, radiusNM: radiusNM)
@@ -327,9 +358,11 @@ final class MapViewModel {
 
     // MARK: - Data Loading
 
-    private func loadDataForRegion(center: CLLocationCoordinate2D, radiusNM: Double) {
+    /// `towerRadiusNM` non-nil = low zoom: airports are the towered public fields over that
+    /// (uncapped) region radius; navaids/airspaces still use the capped `radiusNM`.
+    private func loadDataForRegion(center: CLLocationCoordinate2D, radiusNM: Double, towerRadiusNM: Double?) {
         isLoadingAirports = true
-        loadAirports(center: center, radiusNM: radiusNM)
+        loadAirports(center: center, radiusNM: radiusNM, towerRadiusNM: towerRadiusNM)
         if appState.visibleLayers.contains(.navaids) {
             loadNavaids(center: center, radiusNM: radiusNM)
         }
@@ -355,11 +388,23 @@ final class MapViewModel {
         }
     }
 
-    /// Airports for the region; thinned at low zoom so MapLibre never gets thousands of points.
-    private func loadAirports(center: CLLocationCoordinate2D, radiusNM: Double) {
+    /// Airports for the region. Zoomed in: every airport in the (capped) radius, thinned so MapLibre
+    /// never gets thousands of points. Zoomed out (`towerRadiusNM` set): towered public airports
+    /// for the whole visible region, so the layer has no hard-edged disc.
+    private func loadAirports(center: CLLocationCoordinate2D, radiusNM: Double, towerRadiusNM: Double?) {
         do {
-            let airports = try databaseService.airports(near: center, radiusNM: radiusNM)
-            let shown = MapQueryRegion.thin(airports, around: center)
+            let shown: [Airport]
+            if let towerRadiusNM {
+                let towered = try databaseService.toweredAirports(near: center, radiusNM: towerRadiusNM)
+                if let b = appState.mapVisibleBounds {
+                    shown = MapQueryRegion.thinSpatially(towered, south: b.south, west: b.west, north: b.north, east: b.east)
+                } else {
+                    shown = towered
+                }
+            } else {
+                let airports = try databaseService.airports(near: center, radiusNM: radiusNM)
+                shown = MapQueryRegion.thin(airports, around: center)
+            }
             visibleAirports = shown
             mapService.updateAirports(shown)
         } catch {
@@ -464,9 +509,17 @@ final class MapViewModel {
     /// Called from MapContainerView on GPS updates, throttled internally to 10s.
     func checkProximityAlerts() {
         guard let position = appState.ownshipPosition else { return }
-        proximityAlertService?.checkProximity(position: position, altitude: appState.altitude)
+        let before = Set(proximityAlertService?.activeAlerts.map(\.id) ?? [])
+        // No vertical fix (verticalAccuracy < 0, GPS Degraded): altitude is unknown, never "inside".
+        let altitude: Double? = position.verticalAccuracy >= 0 ? appState.altitude : nil  // feet MSL
+        proximityAlertService?.checkProximity(position: position, altitude: altitude)
         if appState.visibleLayers.contains(.tfrs) {
             proximityAlertService?.checkTFRProximity(position: position, tfrs: loadedTFRs)
+        }
+        // One warning haptic per newly raised alert; an alert that stays active never repeats.
+        let after = Set(proximityAlertService?.activeAlerts.map(\.id) ?? [])
+        if !after.subtracting(before).isEmpty {
+            Haptics.warning()
         }
     }
 }

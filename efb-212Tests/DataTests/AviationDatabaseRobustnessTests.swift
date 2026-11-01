@@ -261,7 +261,7 @@ struct AviationDatabaseRobustnessTests {
         do {
             // Build a real bundled database file; the pool closes when it leaves scope.
             let pool = try Self.makeDatabasePool(at: bundled, airports: Self.bayArea)
-            try pool.writeWithoutTransaction { db in try db.checkpoint(.truncate) }
+            _ = try pool.writeWithoutTransaction { db in try db.checkpoint(.truncate) }
         }
 
         let install = dir.appendingPathComponent("install", isDirectory: true)

@@ -25,6 +25,8 @@ final class AppState {
     // MARK: - Navigation State
 
     var selectedTab: AppTab = .map
+    /// One-shot: the map's Plan button sets this so the Flights tab opens on Plans (F10).
+    var openFlightsOnPlans: Bool = false
     var isPresentingAirportInfo: Bool = false
     var selectedAirportID: String?
     var isPresentingLayerControls: Bool = false
@@ -39,8 +41,16 @@ final class AppState {
     var mapVisibleBounds: OfflineRegionBounds?
     var mapMode: MapMode = .northUp
     var mapStyle: MapStyle = .vfrSectional
-    var visibleLayers: Set<MapLayer> = [.sectional, .airports, .ownship]
+    /// TFRs are on by default: the proximity alert only runs while the layer is visible, and a
+    /// TFR is the one hazard the sectional cannot show.
+    var visibleLayers: Set<MapLayer> = [.sectional, .airports, .ownship, .tfrs]
     var sectionalOpacity: Double = 0.70  // 70% default per user decision
+    /// Day / night / auto display mode (F16). Persisted; `auto` follows the sun at ownship, else the system.
+    var displayMode: DisplayMode = DisplayMode(
+        rawValue: UserDefaults.standard.string(forKey: DisplayMode.defaultsKey) ?? ""
+    ) ?? .auto {
+        didSet { UserDefaults.standard.set(displayMode.rawValue, forKey: DisplayMode.defaultsKey) }
+    }
 
     // MARK: - Location / Ownship State
 
@@ -50,6 +60,7 @@ final class AppState {
     var verticalSpeed: Double = 0      // feet per minute
     var track: Double = 0              // degrees true
     var gpsAvailable: Bool = false
+    var gpsFailure: GPSFailureReason?  // why no position is coming; nil once a fix arrives
     var gpsStationary: Bool = false    // CoreLocation paused updates (device still); last fix stays valid
     var firstLocationReceived: Bool = false  // prevents re-animation after initial GPS fix
 

@@ -4,7 +4,7 @@
 //
 //  Airport-sheet section listing currently effective FAA NOTAMs.
 //  Aerodrome / runway closures sort first and are highlighted; tap a NOTAM to expand its text.
-//  Shows data age (fetch time) via WeatherBadge.
+//  Shows data age (fetch time) via DataAgeBadge.
 //
 
 import SwiftUI
@@ -24,6 +24,7 @@ struct NotamSection: View {
 
     @State private var state: LoadState = .loading
     @State private var expandedIDs: Set<String> = []
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     init(airport: Airport, service: any NotamServiceProtocol) {
         self.airport = airport
@@ -33,13 +34,10 @@ struct NotamSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("NOTAMS")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                SectionHeader("NOTAMS")
                 Spacer()
                 if case .loaded(let report) = state {
-                    WeatherBadge(observationTime: report.fetchedAt)
+                    DataAgeBadge(.notam, observed: report.fetchedAt)
                 }
             }
 
@@ -60,32 +58,34 @@ struct NotamSection: View {
                 .controlSize(.small)
 
         case .notConfigured:
-            Label("Add a free FAA NOTAM API key in Settings to see NOTAMs", systemImage: "key")
+            Label("NOTAMs need a free FAA API key. Add it in Settings › NOTAM API.", systemImage: "key")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
 
         case .credentialsRejected:
             Label(NotamError.credentialsRejected.errorDescription ?? "NOTAM API key rejected",
                   systemImage: "exclamationmark.triangle")
                 .font(.subheadline)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.caution)
 
         case .failed(let message):
             VStack(alignment: .leading, spacing: 4) {
-                Text("NOTAMs unavailable: \(message)")
+                Text("NOTAMs not loaded: \(message)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
                 Button("Retry") {
                     Task { await load() }
                 }
                 .font(.subheadline)
+                .buttonStyle(.bordered)
+                .controlSize(.large)
             }
 
         case .loaded(let report):
             if report.notams.isEmpty {
                 Text("No active NOTAMs for \(report.location)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(report.notams) { notam in
@@ -114,12 +114,12 @@ struct NotamSection: View {
                 HStack(spacing: 6) {
                     if let closure {
                         Text(closure.label)
-                            .font(.caption2)
+                            .font(.caption)
                             .fontWeight(.bold)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.red.opacity(0.2))
-                            .foregroundStyle(.red)
+                            .background(Palette.warning)
+                            .foregroundStyle(Palette.onWarning)
                             .clipShape(Capsule())
                     }
                     Text(notam.number)
@@ -127,33 +127,34 @@ struct NotamSection: View {
                         .fontWeight(.semibold)
                     Spacer()
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                        .accessibilityHidden(true)
                 }
 
                 // Effective window, UTC
                 Text(notam.effectiveWindowDescription)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
 
                 Text(notam.text)
                     .font(.subheadline)
-                    .lineLimit(isExpanded ? nil : 2)
+                    .lineLimit(isExpanded ? nil : (typeSize.isAccessibilitySize ? 6 : 2))
                     .multilineTextAlignment(.leading)
 
                 if isExpanded, let fullText = notam.fullText, fullText != notam.text {
                     Text(fullText)
                         .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                         .textSelection(.enabled)
                 }
             }
             .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(closure != nil ? Color.red.opacity(0.12) : Color.secondary.opacity(0.08))
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(closure != nil ? Palette.warning.opacity(0.12) : Color.secondary.opacity(0.08))
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .accessibilityHint(isExpanded ? "Collapse NOTAM" : "Expand NOTAM")
     }
 

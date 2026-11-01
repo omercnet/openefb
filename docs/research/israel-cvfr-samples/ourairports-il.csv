@@ -1,0 +1,59 @@
+"id","ident","type","name","latitude_deg","longitude_deg","elevation_ft","continent","iso_country","iso_region","municipality","scheduled_service","icao_code","iata_code","gps_code","local_code","home_link","wikipedia_link","keywords"
+45011,"IL-0001","small_airport","Kefar Gallim Highway Strip",32.7617093312,34.9535393715,,"AS","IL","IL-HA",,"no",,,,,,,
+45012,"IL-0002","small_airport","Mishmar Ayalon Highway Strip H",31.883434,34.948411,,"AS","IL","IL-M","Kfar Shmu'el","no",,,,,,,
+340306,"IL-0003","small_airport","Gvulot Airstrip",31.2277,34.4604,,"AS","IL","IL-D","Gvulot","no",,,,,,,
+340307,"IL-0004","small_airport","Talmei Yosef Airstrip",31.1252,34.3777,,"AS","IL","IL-D","Talmei Yosef","no",,,,,,,
+340308,"IL-0005","small_airport","Palmahim South Airstrip",31.8692,34.6907,,"AS","IL","IL-M","Palmahim","no",,,,,,,
+340309,"IL-0006","small_airport","Naan Airstrip",31.8851,34.8862,,"AS","IL","IL-M","Azaria","no",,,,,,,
+340310,"IL-0007","small_airport","Rishon Lezion Airfield",31.9672,34.7536,60,"AS","IL","IL-M","Rishon Lezion","no","LLRS",,"LLRS",,,"https://he.wikipedia.org/wiki/%D7%9E%D7%A0%D7%97%D7%AA_%D7%A8%D7%90%D7%A9%D7%95%D7%9F_%D7%9C%D7%A6%D7%99%D7%95%D7%9F",
+340311,"IL-0008","small_airport","Ein Vered Airfield",32.2636,34.9511,,"AS","IL","IL-M","Lev haSharon","no",,,,,,,
+340585,"IL-0009","heliport","Meir Medical Center Helipad",32.183686,34.894935,,"AS","IL","IL-M","Kefar Sava","no",,,,,,,
+340584,"IL-0010","heliport","Hadassah Heliport",31.799975,35.24041,2661,"AS","IL","IL-JM","West Jerusalem","no",,,,,,,
+351599,"IL-0011","small_airport","Kedma Airport",31.69692,34.76821,322,"AS","IL","IL-D","Kedma","no",,,,,,,
+352055,"IL-0012","small_airport","Dimona Airport",31.06104,35.01049,1798,"AS","IL","IL-D","Dimona","no",,,,,,,
+355229,"IL-0013","heliport","Assuta Helipad",31.778345,34.65511,30,"AS","IL","IL-M","Ashdod","no",,,,,,,
+520713,"IL-0014","closed","RAF Petah Tikva",32.087673,34.914894,,"AS","IL","IL-M",,"no",,,,,,,
+522521,"IL-0015","small_airport","Dalton Airfield",33.021598,35.464788,,"AS","IL","IL-Z","Jish","no",,,,,,,
+526624,"IL-0016","heliport","Mount Hermon Helipad",33.304008,35.795109,,"AS","IL","IL-Z","Mount Hermon (disputed territory)","no",,,,,,,
+530243,"IL-0017","closed","Plugot Airfield",31.640741,34.745581,344,"AS","IL","IL-D","Revaha","no",,,,,,,
+538906,"IL-0018","heliport","Jerusalem Airport Helipad",31.86512,35.21785,2461,"AS","IL","IL-JM","Jerusalem","no",,,,,,,
+538907,"IL-0019","small_airport","Negba-Gold Agricultural Airfield",31.679159,34.702879,196,"AS","IL","IL-D","Merkaz Shapira","no",,,,,,,
+570424,"IL-0020","small_airport","Cyclone damper",32.906065,35.18946,,"AS","IL","IL-U-A",,"no",,,,,,,
+4415,"IL-0021","closed","Eilat Airport",29.559945,34.959612,42,"AS","IL","IL-D","Eilat","no",,,,,,"https://en.wikipedia.org/wiki/Eilat_Airport","J. Hozman, LLET, ETH"
+4426,"IL-0022","closed","Sde Dov Airport",32.1147,34.7822,43,"AS","IL","IL-TA","Tel Aviv","no",,,,,,"https://en.wikipedia.org/wiki/Sde_Dov_Airport","LLSD, LLSD, SDV"
+5217,"IL-0023","closed","Jerusalem International Airport",31.866547,35.217223,2485,"AS","IL","IL-JM","Jerusalem","no",,,,,,"https://en.wikipedia.org/wiki/Atarot_Airport","Palestine, West Bank, Atarot Airport, LLJR, OJJR, JRS"
+3277,"LL1A","small_airport","Hatzerim Northwest Airport",31.260700225830078,34.64039993286133,660,"AS","IL","IL-D","Beersheba","no",,,,"LL1A",,,
+3278,"LL1B","small_airport","Arad Airport",31.229169845581055,35.18903732299805,1952,"AS","IL","IL-D","Arad","no",,,"LL1B","LL1B",,,
+3279,"LL59","small_airport","Palmahim Air Base",31.8979,34.6908,32,"AS","IL","IL-M","Palmahim","no",,,,"LL59",,"https://en.wikipedia.org/wiki/Palmachim_Airbase","Palmachim"
+3280,"LL60","small_airport","Kzeiot Airport",30.8594,34.4431,900,"AS","IL","IL-D","Nitzana","no",,,"LLKZ","LL60",,,"Nitzana West"
+4411,"LLBG","large_airport","Ben Gurion International Airport",32.011398,34.8867,135,"AS","IL","IL-M","Tel Aviv","yes","LLBG","TLV","LLBG",,"http://www.iaa.gov.il/Rashat/en-US/Airports/BenGurion/","https://en.wikipedia.org/wiki/Ben_Gurion_International_Airport",
+316577,"LLBL","heliport","Rabin Medical Center (Beilinson)",32.0869444,34.865,114,"AS","IL","IL-M","Petah Tikva","no",,,"LLBL",,,,"belinson"
+316589,"LLBO","small_airport","Habonim Airfield",32.649854,34.933126,17,"AS","IL","IL-HA","Habonim","no","LLBO",,"LLBO",,,"https://he.wikipedia.org/wiki/%D7%9E%D7%A0%D7%97%D7%AA_%D7%94%D7%91%D7%95%D7%A0%D7%99%D7%9D",
+4412,"LLBS","small_airport","Beersheba (Teyman) Airport",31.287000656128,34.722999572754,656,"AS","IL","IL-D","Beersheba","no","LLBS","BEV","LLBS",,,"https://en.wikipedia.org/wiki/Be'er_Sheva_(Teyman)_Airport",
+4413,"LLEK","medium_airport","Tel Nof Air Base",31.8395,34.8218,193,"AS","IL","IL-M","Rehovot","no","LLEK",,"LLEK",,,"https://en.wikipedia.org/wiki/Tel_Nof_Airbase","RAF Aqir"
+330388,"LLER","large_airport","Ramon International Airport",29.727009,35.014116,288,"AS","IL","IL-D","Eilat","yes","LLER","ETM","LLER",,,"https://en.wikipedia.org/wiki/Ramon_Airport#Airlines_and_destinations",
+4414,"LLES","small_airport","Ein Shemer Airfield",32.4408,35.007702,95,"AS","IL","IL-Z","Ein Shemer","no","LLES",,"LLES",,,"https://en.wikipedia.org/wiki/Ein_Shemer_Airfield","RAF Ein Shemer, military, Eyn Shemer Airfield"
+4416,"LLEY","small_airport","Ein Yahav Airfield",30.621700286865234,35.20330047607422,-164,"AS","IL","IL-D","Sapir","no","LLEY","EIY","LLEY",,,"https://en.wikipedia.org/wiki/Ein_Yahav_Airfield","Sapir Airfield"
+34928,"LLFK","small_airport","Fiq Airfield",32.786389,35.717499,1218,"AS","IL","IL-Z","Katzrin","no","LLFK",,"LLFK",,,"https://en.wikipedia.org/wiki/Fiq_Airfield","Piq, Golan Heights"
+4417,"LLHA","medium_airport","Uri Michaeli Haifa International Airport",32.810219,35.043719,28,"AS","IL","IL-HA","Haifa","yes","LLHA","HFA","LLHA",,"http://www.iaa.gov.il/Rashat/en-US/Airports/Haifa/","https://en.wikipedia.org/wiki/Haifa_Airport","RAF Haifa"
+31830,"LLHB","small_airport","Hatzerim Air Base",31.2334,34.662601,725,"AS","IL","IL-D","Beersheba","no","LLHB",,"LLHB",,,"https://en.wikipedia.org/wiki/Hatzerim_Airbase","IAF Flight Academy, Israeli Air Force Museum"
+316578,"LLHD","heliport","Hadassah Ein Kerem Heliport",31.7644444,35.1472222,2088,"AS","IL","IL-JM","Jerusalem","no",,,"LLHD",,,,
+4418,"LLHS","small_airport","Hatzor Air Base",31.762501,34.7272,148,"AS","IL","IL-M","Hatzor","no","LLHS",,"LLHS",,,"https://en.wikipedia.org/wiki/Hatzor_Airbase","RAF Qastina"
+316579,"LLHY","heliport","Hillel Yaffe",32.4530556,34.895,45,"AS","IL","IL-HA","Hadera","no",,,"LLHY",,,,
+29947,"LLHZ","small_airport","Herzliya Airport",32.180599,34.834702,121,"AS","IL","IL-TA","Herzliya","no","LLHZ",,"LLHZ",,,"https://en.wikipedia.org/wiki/Herzliya_airport","Herzlia"
+4419,"LLIB","medium_airport","Rosh Pina Airport",32.980999,35.571899,884,"AS","IL","IL-Z","Rosh Pina","no","LLIB","RPN","LLIB",,,"https://en.wikipedia.org/wiki/Rosh_Pina_Airport","Mahanayim Ben Yaakov Airport"
+316576,"LLIC","heliport","Sourasky (Ichilov) Medical Center",32.08,34.7897222,285,"AS","IL","IL-TA","Tel Aviv","no",,,"LLIC",,,,"echilov,איכילוב"
+30028,"LLKS","small_airport","Kiryat Shmona Airport",33.216275,35.59622,386,"AS","IL","IL-Z","Kiryat Shmona","no","LLKS","KSW","LLKS",,,"https://en.wikipedia.org/wiki/Kiryat_Shmona_Airport",
+4420,"LLMG","small_airport","Megiddo Airport",32.597301,35.228802,200,"AS","IL","IL-Z","Afula","no","LLMG",,"LLMG",,"https://www.megido-air.co.il/about-6","https://en.wikipedia.org/wiki/Megiddo_Airport",
+30144,"LLMR","small_airport","Mitzpe Ramon Airfield",30.6506,34.8069,2556,"AS","IL","IL-D","Mitzpe Ramon","no","LLMR","MIP","LLMR",,,"https://en.wikipedia.org/wiki/Mitzpe_Ramon_Airfield",
+4421,"LLMZ","medium_airport","Bar Yehuda Airfield",31.328199,35.388599,-1266,"AS","IL","IL-D","Masada","no","LLMZ","MTZ","LLMZ",,,"https://en.wikipedia.org/wiki/Bar_Yehuda_Airfield","Masada Airfield"
+4422,"LLNV","medium_airport","Nevatim Air Base",31.208299636799996,35.012298584,1330,"AS","IL","IL-D","Beersheba","no","LLNV","VTM","LLNV",,,"https://en.wikipedia.org/wiki/Nevatim_Airbase","Malhata, Be'er Sheva"
+4423,"LLOV","small_airport","Ovda Airport",29.9403,34.935799,1492,"AS","IL","IL-D","Eilat","no","LLOV","VDA","LLOV",,,"https://en.wikipedia.org/wiki/Ovda_Airport","Ovda Air Force Base"
+316581,"LLPO","heliport","Poriya Medical Center",32.7541667,35.5425,731,"AS","IL","IL-Z",,"no",,,"LLPO",,,,"Tiberias"
+316582,"LLRB","heliport","Rambam Heliport",32.8352778,34.9858333,10,"AS","IL","IL-HA","Haifa","no",,,"LLRB",,,,
+4424,"LLRD","medium_airport","Ramat David Air Base",32.6651,35.179501,185,"AS","IL","IL-Z","Haifa","no","LLRD",,"LLRD",,,"https://en.wikipedia.org/wiki/Ramat_David_Airbase","RAF Ramat David"
+4425,"LLRM","medium_airport","Ramon Air Base",30.7761,34.666698,2126,"AS","IL","IL-D","Beersheba","no","LLRM",,"LLRM",,,"https://en.wikipedia.org/wiki/Ramon_Airbase","Kanaf 25, Matred"
+316584,"LLSM","heliport","Sheba (Tel HaShomer) Medical Center",32.0433333,34.8419444,148,"AS","IL","IL-TA","Ramat Gan","no",,,"LLSM",,,,
+316580,"LLSR","heliport","Soroka Medical Center Heliport",31.259628,34.800278,951,"AS","IL","IL-D","Beersheba","no",,,"LLSR",,,,
+316592,"LLTN","small_airport","Tnuvot Ultralight Airfield",32.308611,34.978333,99,"AS","IL","IL-M","Tnuvot","no","LLTN",,"LLTN",,,"https://he.wikipedia.org/wiki/%D7%9E%D7%A0%D7%97%D7%AA_%D7%AA%D7%A0%D7%95%D7%91%D7%95%D7%AA",
+316586,"LLYT","closed","Yotvata Airfield",29.901111,35.0675,249,"AS","IL","IL-D","Yotvata","no",,,,,,"https://en.wikipedia.org/wiki/Yotvata_Airfield","LLYT, YOT"

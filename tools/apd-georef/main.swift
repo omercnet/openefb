@@ -31,14 +31,12 @@ struct Options {
     var verbose = false
     var inspect = false
     var tolerances = AirportDiagramGeoreferencer.Tolerances.standard
-    var runwayEndsPath: String?
-    var exportRunwayEndsPath: String?
 }
 
 func usage() -> Never {
     print("""
     usage: apd-georef [--cycle YYNN] [--db aviation.sqlite] [--cache DIR] [--report FILE.md] [--json FILE.json]
-                      [--render DIR] [--only KPAO,KBOS,...] [--limit N] [--jobs N] [--verbose] [--inspect] [--runway-tolerance FEET] [--runway-ends NASR_runway_ends.json]
+                      [--render DIR] [--only KPAO,KBOS,...] [--limit N] [--jobs N] [--verbose] [--inspect] [--runway-tolerance FEET]
     """)
     exit(2)
 }
@@ -63,8 +61,6 @@ while !arguments.isEmpty {
     case "--jobs": options.jobs = Int(value()) ?? options.jobs
     case "--verbose": options.verbose = true
     case "--inspect": options.inspect = true
-    case "--runway-ends": options.runwayEndsPath = value()
-    case "--export-runway-ends": options.exportRunwayEndsPath = value()
     case "--runway-tolerance": options.tolerances.runwayFeet = Double(value()) ?? options.tolerances.runwayFeet
     default: usage()
     }
@@ -216,28 +212,6 @@ final class AviationDB {
 
 let database = try AviationDB(path: options.databasePath)
 
-/// Optional precise runway ends (FAA NASR APT_RWY_END): FAA ident -> runway id -> end id -> [lat, lon].
-typealias RunwayEnds = [String: [String: [String: [Double]]]]
-let nasrEnds: RunwayEnds? = options.runwayEndsPath.flatMap { path in
-    (try? Data(contentsOf: URL(fileURLWithPath: path))).flatMap { try? JSONDecoder().decode(RunwayEnds.self, from: $0) }
-}
-if options.runwayEndsPath != nil { print("NASR runway ends: \(nasrEnds?.count ?? 0) airports") }
-
-/// Replaces database end coordinates with NASR ends when both ends of the runway are present.
-func withNASREnds(_ runways: [AirportDiagramRunway], faaIdent: String) -> [AirportDiagramRunway] {
-    guard let airport = nasrEnds?[faaIdent] else { return runways }
-    return runways.map { runway in
-        let ids = runway.identifier.split(separator: "/").map(String.init)
-        guard ids.count == 2,
-              let entry = airport[runway.identifier] ?? airport["\(ids[1])/\(ids[0])"],
-              let base = entry[ids[0]], let reciprocal = entry[ids[1]], base.count == 2, reciprocal.count == 2 else { return runway }
-        return AirportDiagramRunway(
-            identifier: runway.identifier, lengthFeet: runway.lengthFeet, widthFeet: runway.widthFeet,
-            baseLatitude: base[0], baseLongitude: base[1], reciprocalLatitude: reciprocal[0], reciprocalLongitude: reciprocal[1]
-        )
-    }
-}
-
 // MARK: - Work items
 
 struct Job {
@@ -271,38 +245,13 @@ for record in records {
     }
     jobs.append(Job(
         record: record, icao: airport.icao, reference: airport.reference,
-        runways: withNASREnds(database.runways(icao: airport.icao), faaIdent: record.faaIdent),
+        runways: database.runways(icao: airport.icao),
         pdfURL: cacheDirectory.appendingPathComponent((record.pdfName as NSString).lastPathComponent)
     ))
 }
 if let limit = options.limit { jobs = Array(jobs.prefix(limit)) }
 
-// Bundled resource for the app: precise NASR runway ends for every APD airport, keyed by the
-// aviation.sqlite ICAO ident (efb-212/Resources/apd-runway-ends.json).
-if let exportPath = options.exportRunwayEndsPath, let nasrEnds {
-    var export: [String: [String: [String: [Double]]]] = [:]
-    for job in jobs {
-        if let entry = nasrEnds[job.record.faaIdent] { export[job.icao] = entry }
-    }
-    let encoder = JSONEncoder()
-    encoder.outputFormatting = [.sortedKeys]
-    try encoder.encode(["cycle": AnyCodable(cycle), "airports": AnyCodable(export)]).write(to: URL(fileURLWithPath: exportPath))
-    print("exported runway ends for \(export.count) airports to \(exportPath)")
-}
 print("jobs: \(jobs.count) (no airport in DB: \(noAirport.count))")
-
-struct AnyCodable: Encodable {
-    let value: Any
-    init(_ value: Any) { self.value = value }
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch value {
-        case let v as String: try container.encode(v)
-        case let v as [String: [String: [String: [Double]]]]: try container.encode(v)
-        default: try container.encodeNil()
-        }
-    }
-}
 
 // MARK: - Download PDFs
 

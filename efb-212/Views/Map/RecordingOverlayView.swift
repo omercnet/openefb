@@ -2,42 +2,36 @@
 //  RecordingOverlayView.swift
 //  efb-212
 //
-//  Recording UI overlay on the map view:
-//  - Record button (top-left, prominent, one-tap start/stop)
-//  - Recording status bar (red dot + elapsed time + phase label)
+//  Recording UI overlay on the map view (F9):
+//  - Record button (top-left, 60pt): neutral at rest, filled stop square while recording
+//  - REC pill: "REC 00:12:34", flight phase and an audio level meter
+//  - Microphone-denied notice with an "Open Settings" action (GPS track still records)
 //  - Live transcript panel (collapsible, last 5 segments)
 //  - Auto-start countdown display (3-2-1 with cancel)
-//  - Stop confirmation dialog
+//  - Stop confirmation dialog "End recording?"
 //
-//  Per CONTEXT.md decisions:
-//  - Record button: prominent floating, top-left, red when recording
-//  - Status bar: red pulsing dot + elapsed time + flight phase
-//  - Transcript panel: scrolling, collapsible, last 3-5 segments
-//  - Manual stop: confirmation dialog "End flight recording?"
+//  EFB lens: red is reserved for warnings, so recording uses the accent colour; no pulsing
+//  or other decorative animation in flight.
 //
 
 import SwiftUI
+import UIKit
 
 struct RecordingOverlayView: View {
     let viewModel: RecordingViewModel
 
-    // Pulse animation state
-    @State private var isPulsing = false
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
         @Bindable var vm = viewModel
 
-        VStack {
-            // MARK: - Top Area: Record Button + Status Bar
-
+        VStack(alignment: .leading, spacing: Space.s) {
             HStack(alignment: .top) {
-                // Record button (top-left)
                 recordButton
-                    .padding(.leading, 16)
+                    .padding(.leading, Space.l)
 
                 Spacer()
 
-                // Status bar (top-center, visible when recording)
                 if viewModel.isRecording {
                     recordingStatusBar
                 }
@@ -45,30 +39,37 @@ struct RecordingOverlayView: View {
                 Spacer()
             }
 
-            Spacer()
-
-            // MARK: - Bottom Area: Transcript Panel (above instrument strip)
-
-            if viewModel.isRecording || !viewModel.recentTranscripts.isEmpty {
-                transcriptPanel
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 4)
+            if viewModel.microphoneDenied {
+                microphoneDeniedNotice
+                    .padding(.horizontal, Space.l)
             }
+
+            if let error = viewModel.lastError {
+                recordingErrorNotice(error)
+                    .padding(.horizontal, Space.l)
+            }
+
+            if viewModel.showDiscardedNotice {
+                discardedNotice
+                    .padding(.horizontal, Space.l)
+            }
+
+            Spacer()
         }
-
-        // MARK: - Stop Confirmation Dialog
-
         .confirmationDialog(
-            "End flight recording?",
+            "End recording?",
             isPresented: $vm.showStopConfirmation,
             titleVisibility: .visible
         ) {
             Button("End Recording", role: .destructive) {
-                Task { await viewModel.confirmStop() }
+                Task {
+                    await viewModel.confirmStop()
+                    Haptics.success()
+                }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will stop recording GPS track, audio, and transcription.")
+            Text("Stops the GPS track, cockpit audio and transcript. The flight is saved to Flights.")
         }
     }
 
@@ -81,6 +82,11 @@ struct RecordingOverlayView: View {
                 switch viewModel.recordingStatus {
                 case .idle:
                     await viewModel.startRecording()
+                    if viewModel.microphoneDenied || viewModel.lastError != nil {
+                        Haptics.warning()
+                    } else {
+                        Haptics.success()
+                    }
                 case .recording:
                     viewModel.requestStop()
                 case .countdown:
@@ -92,46 +98,37 @@ struct RecordingOverlayView: View {
         } label: {
             ZStack {
                 if viewModel.isCountingDown {
-                    // Countdown state: number with cancel option
+                    // Countdown: number, tap to cancel
                     Circle()
-                        .fill(.orange)
-                        .frame(width: 52, height: 52)
+                        .fill(Color.orange)  // amber fill under black text; `Palette.caution` is a darker text tone by day
+                        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
                     Text("\(viewModel.countdownRemaining)")
                         .font(.title2.bold())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.black)
                 } else if viewModel.isRecording {
-                    // Recording state: red circle with stop icon
+                    // Recording: filled accent circle with a stop square
                     Circle()
-                        .fill(.red)
-                        .frame(width: 52, height: 52)
-                        .overlay(
-                            Circle()
-                                .stroke(.red.opacity(0.5), lineWidth: 3)
-                                .scaleEffect(isPulsing ? 1.4 : 1.0)
-                                .opacity(isPulsing ? 0 : 1)
-                                .animation(
-                                    .easeOut(duration: 1.5).repeatForever(autoreverses: false),
-                                    value: isPulsing
-                                )
-                        )
+                        .fill(Palette.accent)
+                        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(.white)
+                        .fill(Palette.onAccent)
                         .frame(width: 18, height: 18)
                 } else {
-                    // Idle state: white circle with mic icon
+                    // Idle: neutral circle with a mic glyph (not warning red)
                     Circle()
-                        .fill(.white)
-                        .frame(width: 52, height: 52)
+                        .fill(Color(.systemBackground))  // white by day, dark at night (no glare)
+                        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
                         .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                     Image(systemName: "mic.fill")
                         .font(.title3)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Palette.primaryText)
                 }
             }
+            .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableButtonStyle())
         .accessibilityLabel(recordButtonLabel)
-        .onAppear { isPulsing = true }
+        .accessibilityIdentifier("record-button")
     }
 
     private var recordButtonLabel: String {
@@ -144,112 +141,142 @@ struct RecordingOverlayView: View {
         }
     }
 
-    // MARK: - Recording Status Bar
+    // MARK: - REC pill
 
     @ViewBuilder
     private var recordingStatusBar: some View {
-        HStack(spacing: 8) {
-            // Red pulsing dot
-            Circle()
-                .fill(.red)
-                .frame(width: 10, height: 10)
-                .scaleEffect(isPulsing ? 1.2 : 0.8)
-                .animation(
-                    .easeInOut(duration: 0.8).repeatForever(autoreverses: true),
-                    value: isPulsing
-                )
+        HStack(spacing: Space.s) {
+            Text("REC")
+                .font(.subheadline.weight(.heavy))
+                .foregroundStyle(Palette.accentText)
 
-            // Elapsed time
             Text(viewModel.formattedElapsedTime)
                 .font(.subheadline.monospacedDigit().bold())
-                .foregroundStyle(.primary)
+                .foregroundStyle(Palette.primaryText)
+                .accessibilityIdentifier("rec-elapsed")
 
-            // Flight phase label
             Text(viewModel.currentPhase.rawValue.capitalized)
                 .font(.caption)
-                .foregroundStyle(.secondary)
-                .transition(.opacity)
+                .foregroundStyle(Palette.secondaryText)
+
+            if !viewModel.microphoneDenied {
+                AudioLevelMeter(dBFS: viewModel.audioLevel)
+            }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, Space.m)
+        .padding(.vertical, Space.s)
         .background(.ultraThinMaterial)
         .clipShape(Capsule())
-        .padding(.trailing, 16)
+        .padding(.trailing, Space.l)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("rec-pill")
     }
 
-    // MARK: - Live Transcript Panel
+    // MARK: - Microphone denied
 
-    @ViewBuilder
-    private var transcriptPanel: some View {
-        VStack(spacing: 0) {
-            // Toggle button (chevron to expand/collapse)
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    viewModel.toggleTranscriptPanel()
-                }
-            } label: {
-                HStack {
-                    Image(systemName: "text.bubble")
-                        .font(.caption)
-                    Text("Transcription")
-                        .font(.caption.bold())
-                    Spacer()
-                    Image(systemName: viewModel.isTranscriptPanelExpanded ? "chevron.down" : "chevron.up")
-                        .font(.caption2)
-                }
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.plain)
-
-            // Expanded content: last 5 transcript segments
-            if viewModel.isTranscriptPanelExpanded {
-                Divider()
-
-                if viewModel.recentTranscripts.isEmpty {
-                    Text("Listening...")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .padding(.vertical, 12)
-                } else {
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 4) {
-                            ForEach(viewModel.recentTranscripts.suffix(5)) { item in
-                                TranscriptItemRow(item: item)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                    }
-                    .frame(maxHeight: 120)
+    private var microphoneDeniedNotice: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Label("Microphone is off", systemImage: "mic.slash.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Palette.caution)
+            Text("The GPS track still records. For cockpit audio, turn the microphone on in Settings \u{203A} OpenEFB \u{203A} Microphone.")
+                .font(TypeRole.caption)
+                .foregroundStyle(Palette.secondaryText)
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    openURL(url)
                 }
             }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .frame(minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
         }
+        .padding(Space.m)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .frame(maxWidth: 420, alignment: .leading)
+        .accessibilityIdentifier("mic-denied-notice")
+    }
+
+    // MARK: - Recording error
+
+    /// A failed start or a mid-flight failure (e.g. audio write error). Amber, dismissible.
+    private func recordingErrorNotice(_ error: EFBError) -> some View {
+        HStack(alignment: .top, spacing: Space.s) {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Label("Recording problem", systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.caution)
+                Text(error.localizedDescription)
+                    .font(TypeRole.caption)
+                    .foregroundStyle(Palette.secondaryText)
+            }
+            Spacer(minLength: Space.s)
+            Button("Dismiss") { viewModel.lastError = nil }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
+                .accessibilityLabel("Dismiss recording problem")
+        }
+        .padding(Space.m)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .frame(maxWidth: 420, alignment: .leading)
+        .accessibilityIdentifier("recording-error-notice")
+    }
+
+    // MARK: - Discarded recording
+
+    /// The recording ended with no GPS track points, so nothing was saved. Amber, dismissible.
+    private var discardedNotice: some View {
+        HStack(alignment: .top, spacing: Space.s) {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                Label("Recording not saved", systemImage: "trash.slash.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.caution)
+                Text("No GPS position was recorded, so there is no flight to keep. Check that Location is on and the aircraft had a fix before starting.")
+                    .font(TypeRole.caption)
+                    .foregroundStyle(Palette.secondaryText)
+            }
+            Spacer(minLength: Space.s)
+            Button("Dismiss") { viewModel.showDiscardedNotice = false }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
+                .accessibilityLabel("Dismiss recording not saved notice")
+        }
+        .padding(Space.m)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .frame(maxWidth: 420, alignment: .leading)
+        .accessibilityIdentifier("recording-discarded-notice")
     }
 }
 
-// MARK: - Transcript Item Row
+// MARK: - Audio level meter
 
-private struct TranscriptItemRow: View {
-    let item: TranscriptDisplayItem
+/// Five-segment input level meter. Maps -60...-10 dBFS onto the segments; no animation.
+struct AudioLevelMeter: View {
+    let dBFS: Float  // dBFS, -160 = silence / no signal
+
+    private static let segments = 5
+
+    private var lit: Int {
+        let clamped = min(max(dBFS, -60), -10)
+        return Int(((clamped + 60) / 50 * Float(Self.segments)).rounded(.up))
+    }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
-            // Timestamp
-            Text(item.timestamp, format: .dateTime.hour().minute().second())
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.tertiary)
-                .frame(width: 55, alignment: .leading)
-
-            // Transcript text -- volatile items shown lighter
-            Text(item.text)
-                .font(.caption)
-                .foregroundStyle(item.isVolatile ? .secondary : .primary)
-                .italic(item.isVolatile)
+        HStack(spacing: 2) {
+            ForEach(0..<Self.segments, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 1)
+                    .fill(index < lit ? Palette.primaryText : Palette.fill)
+                    .frame(width: 4, height: 8 + CGFloat(index) * 2)
+            }
         }
+        .frame(height: 16, alignment: .bottom)
+        .accessibilityLabel("Audio level")
+        .accessibilityValue("\(lit) of \(Self.segments)")
     }
 }
 

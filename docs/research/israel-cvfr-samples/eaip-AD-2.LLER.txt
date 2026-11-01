@@ -1,0 +1,178 @@
+ 
+ AIP for ISRAEL(section AD-2.LLER)valid from 06 AUG 2026 LLER — EILAT/Ilan & Asaf Ramon International Airport Note: The following sections in this chapter are intentionally left blank: AD-2.7, AD-2.25 LLER AD 2.1 Aerodrome Location Indicator And Name LLER — EILAT/Ilan & Asaf Ramon International Airport LLER AD 2.2 Aerodrome Geographical And Administrative Data 1 | ARP coordinates and site at AD | 294338N 0350051E
+14°/1 800 M from THR 01 | 
+ 2 | Direction and distance from (city) | 019°, 20 km from Eilat city center | 
+ 3 | Elevation/Reference temperature | 288 ft./40.2°C (August) | 
+ 4 | Geoid undulation at AD ELEV PSN | 20 meters | 
+ 5 | MAG VAR/Annual Change | 5°E (2019)/0.08° increasing | 
+ 6 | AD Administration, address, telephone, telefax, telex, e-mail address, AFS, website address | Israel Airports Authority (IAA) Eilat/Ilan & Asaf Ramon International Airport
+P.O. Box 42 
+Eilat 8810001 Tel:+972-8-9553881, 
++972-8-9553799 Tel:+972-8- 9553600 ( AIS AD OPS )
++972-8- 9553601 ( AIS AD OPS ) AFS:LLERZPZX Email: computerte@iaa.gov.il Email: teum_eilat@iaa.gov.il SITA:ETMELXH URL: http://www.iaa.gov.il | 
+ 7 | Types of traffic permitted (IFR/VFR) | IFR/CVFR | 
+ 8 | Remarks | Nil | 
+ LLER AD 2.3 Operational Hours 1 | AD Administration | SUN-THU 0530-2330 LT
+FRI & holiday eve 0600-1800 LT
+SAT & holidays 0700-2330 LT
+Beyond operating hours by special permission from the Airport Management
+Aerodrome available as alternate - H24 | 
+ 2 | Customs and immigration | As AD administration | 
+ 3 | Health and sanitation | As AD administration | 
+ 4 | AIS Briefing Office | As AD administration | 
+ 4 | ATS Reporting Office (ARO) | As AD administration NIL | 
+ 5 | MET Briefing Office | Israel Meteorological Service meteorological watch office, Bet Dagan (LLBD). | 
+ 6 | ATS | H24 | 
+ 7 | Fueling | Hours: SUN-FRI and holiday eve as AD administration
+SAT and holidays between 14:00-22:30 (LT) 
+Beyond operating hours: 24 hours' notice required. 
+Tel: (via Airport OPS) +972-8- 9553600 | 
+ 8 | Handling | AeroHandling, & Laufer GHI , QAS 
+Hours: As AD administration 
+Tel: (via Airport OPS) +972-8- 9553600 | 
+ 9 | Security | As AD administration | 
+ 10 | De-icing | Nil | 
+ 11 | Remarks | Nil | 
+ LLER AD 2.4 Handling Services And Facilities 1 | Handling & Cargo-handling facilities | Laufer GHI, AeroHandling, QAS Laufer GHI, AeroHandeling | 
+ 2 | Fuel/oil types | FUEL: A1 AVGAS-LL OIL: NIL | 
+ 3 | Fuelling facilities/capacity | All stands through bowsers. | 
+ 4 | De-icing facilities | NIL | 
+ 5 | Hangar space for visiting aircraft | NIL | 
+ 6 | Repair facilities for visiting aircraft | NIL | 
+ 7 | Remarks | Non-commercial and own-use charter flights are required to be represented at the airport by a handling agency. Operators which have no agency will be required to accept one of the authorized agencies.
+Nevertheless, non-commercial domestic flights are exempted from this requirement provided they carry less than four persons on board (crew excluded). | 
+ LLER AD 2.5 Passenger Facilities 1 | Hotels | In the city of Eilat. | 
+ 2 | Restaurants | At AD and in the city. | 
+ 3 | Transportation | Taxis and buses outside terminal. | 
+ 4 | Medical facilities | First aid & ambulance at AD.
+"Yoseftal" hospital in the city of Eilat. | 
+ 5 | Bank and Post Office | At AD and in the city. At AD and in the city. | 
+ 6 | Tourist Office | At AD and in the city. | 
+ 7 | Remarks | NIL | 
+ LLER AD 2.6 Rescue And Fire Fighting Services 1 | AD category for fire fighting | A9 Beyond operating hours by special permission from the Airport Management. | 
+ 2 | Rescue equipment | Rescue equipment: Ambulances and fire fighting vehicles. | 
+ 3 | Capability for removal of disabled aircraft | Limited recovery available for aircraft up to 400,000 kg MTOW
+(if tow bar available and aircraft can be rolled).
+Contact: (via Airport OPS) +972-8- 9553600. | 
+ 4 | Remarks | NIL | 
+ LLER AD 2.7 Seasonal Availability - Clearing NIL LLER AD 2.8 Aprons, Taxiways And Check Locations/Positions Data 1 | Designation, surface and strength of aprons | R Surface: CONC Strength: 2 000 kg / 0.50 Mpa, Code C A/C RS
+Surface: ASPH
+Strength: 485 / F / B / X / U S Surface: CONC Strength: 615 / R / B / W / U, Code C A/C TS
+Surface: ASPH
+Strength: 227 / F / B / Y / U
+T Surface: CONC Strength: 281 / R / B / W / U, Code C A/C
+TU
+Surface: ASPH
+Strength: 227 / F / B / Y / U U Surface: CONC+ASPH Strength: 858 / R / B / W / U, Code E A/C Strength: 660/F/B/X/U
+V Surface: ASPH PAVED Strength: 320 / F / B / X / U, Code E A/C | 
+ 2 | Designation, width, surface and strength of taxiways | A Width: 23 M Surface: ASPH Strength: 660 / F / B / X / U, Code E A/C A1 Width: 30.9 M Surface: ASPH Strength: 660 / F / B / X / U, Code E A/C Remark: Holding point A1S Width: 33.6 M Surface: ASPH Strength: 660 / F / B / X / U, Code E A/C Remark: Holding point A2 Width: 38.8 M Surface: ASPH Strength: 660 / F / B / X / U Code E A/C A3 Width: 38.8 M Surface: ASPH Strength: 660 / F / B / X / U, Code E A/C A4 Width: 25 M Surface: ASPH Strength: 660 / F / B / X / U Code E A/C Remark: Rapid Exit A5 Width: 30.9 M Surface: ASPH Strength: 660 / F / B / X / U Code E A/C Remarks: Taxiway “A5” Holding point: 72.0 M width. B Width: 44 M Surface: ASPH Strength: 660 / F / B / X / U, Code E A/C
+Connecting between the Aprons and Taxiways C, D, E, F C Width: 18 M Surface: ASPH Strength: 553 / F / B / X / U, Code C A/C D Width: 39.8 M Surface: ASPH Strength: 660 / F / B / X / U, Code E A/C E Width: 40 M Surface: ASPH Strength: 660 / F / B / X / U, Code E A/C F Width: 39 M Surface: ASPH Strength: 660 / F / B / X / U, Code D A/C | 
+ 3 | Location and elevation to the nearest metre or foot of altimeter checkpoints | APRON “R”, Elevation: 283 FT.
+APRON “S-west”, Elevation: 285 FT.
+APRON “S-east”, Elevation: 282 FT.
+APRON “T-west”, Elevation: 286 FT.
+APRON “T-east”, Elevation: 283 FT.
+APRON “U-west”, Elevation: 292 FT.
+APRON “U-east”, Elevation: 288 FT.
+APRON “V-west”, Elevation: 294FT.
+APRON “V-east”, Elevation: 291FT. | 
+ 4 | Location of VOR checkpoints | NIL | 
+ 5 | Position of INS checkpoints in degrees, minutes, seconds and hundredths of seconds | See aircraft parking chart | 
+ 6 | Remarks | Aprons: R Pushback is not permitted without specific GND approval. S Pushback is not permitted without specific GND approval. T Pushback is not permitted without specific GND approval. U Pushback is not permitted without specific GND approval. | 
+ LLER AD 2.9 Surface Movement Guidance And Control System And Markings 1 | Use of aircraft stand ID signs, TWY guide lines and visual docking/parking guidance system of aircraft stands | Taxiing guidance signs at all intersections with TWY and RWY and all holding positions.
+Guide lines at apron. 
+Nose-in guidance at aircraft stand. | 
+ 2 | RWY and TWY markings and LGT | RWY: Designation, THR, edge, runway end as appropriate, marked and lighted, Center line marked and lighted, AIM point, TDZ marked.
+TWY: Designation, holding position, as appropriate, marked and lighted.
+Center line marked. | 
+ 3 | Stop bars | Stop Bar 01: on TWY A1.
+Stop Bar 01: on TWY A1 South.
+Stop Bar 01-19: On TWY A2.
+Stop Bar 01-19: On TWY A3.
+Stop Bar 01-19: On TWY A4.
+Stop Bar 19: on TWY A5. | 
+ 4 | Remarks | Nil | 
+ LLER AD 2.10 Aerodrome Obstacles In Area 2a, Area 2b, Area 2c and Area 2d | 
+ Obstacle data for Areas 2a, 2b,2c and 2d is available by contacting the Civil Aviation Authority of Israel: Post: Ministry of Transportation
+Civil Aviation Authority
+Infrastructure Div Mrs. Nitzan Vainstain
+P.O.B 1101
+Golan House, Golan st., Airport City 7019900, Israel. Tel:+972-3-9774568 Email: aip@mot.gov.il Notes: "Type A" chart is not published for LLER, since there are no relevant obstacles. LLER aerodrome is located near the international boundary with The Hashemite Kingdom of Jordan. However, there is no available data regarding Area 2 obstacles beyond the international border 
+ Obstacle Data effective: 20 FEB 2024 | 
+ In Area 3 | 
+ Obstacle data for Area 3 is maintained by the Israeli Airports Authority (IAA), which is the aerodrome operator of LLER airport. However, this information is not available for publication or purchase. | 
+ In Area 4 | 
+ Obstacle data for Area 4 is not applicable, since there are no ILS CAT II/III operations in LLER airport | 
+ LLER AD 2.11 Meteorological Information Provided 1 | Associated MET office | Israel Meteorological Service, Bet Dagan (LLBD) | 
+ 2 | Hours of service
+MET office outside hours | Observations available at AD administration working hours, 
+ Briefing available from LLBD 24H each day.
+Alternate Aerodrome for LLBG -24H. | 
+ 3 | Office responsible for TAF preparation
+Periods of validity | Israel Meteorological Service, Bet Dagan (LLBD)
+24 HR (Long TAF) | 
+ 4 | Type of landing forecast
+Interval of issuance | TBD | 
+ 5 | Briefing/consultation provided | Telephone briefing with the Meteorological Watch Office at Israel Meteorological Service, Bet Dagan +972-3-5600600 
+ Website - www.ims.gov.il , can be established in the aerodrome meteorological station. | 
+ 6 | Flight documentation
+Language(s) used | Charts, OPMET information, SIGMET, Aerodrome Warnings and low level forecasts for TEL-AVIV FIR available in ICAO abbreviated language or in English | 
+ 7 | Charts and other information available for briefing or consulting | Low level and upper wind and temperature chart for standard isobaric surface. Significant weather chart (low level, medium and high level) | 
+ 8 | Supplementary equipment available for providing information | Meteorological information terminal available at Meteorological Watch Office at Israel Meteorological Service, Bet Dagan www.ims.gov.il meteorological station in the AD containing: weather radar, weather satellite image display and animation, Upper Air temperature & wind profiles derived from Israeli radiosondes and AMDAR reports, SIGWX and T+W charts and updated OPMET information | 
+ 9 | ATS units provided with information | Eilat TWR | 
+ 10 | Additional information (limitation of service, etc.) | Nil | 
+ LLER AD 2.12 Runway Physical Characteristics Designations
+RWY NR | TRUE BRG | Dimensions of RWY (m) | Strength (PCR) and surface of RWY and SWY | THR coordinates
+RWY end coordinates
+THR geoid undulation | THR elevation and highest elevation of TDZ of precision APP RWY | Slope of
+RWY-SWY | 
+ 1 | 2 | 3 | 4 | 5 | 6 | 7 | 
+ 01 | 013.72° | 3 600 X 45 | 660/F/B/X/U
+Asphalt | THR 294241.03 N 0350034.77 E;
+RWY END 294434.61 N 0350106.55E;
+GUND 19.72 m | THR 252.30 ft;
+TDZ 270.57 ft | 2 566m
++0.4%
+1 044m
+-0.4% | 
+ 19 | 193.72° | 3 600 X 45 | 660/F/B/X/U
+Asphalt | THR: 294434.61 N 0350106.55E;
+RWY END: 294241.03 N 0350034.77 E;
+GUND 19.69 m | THR 272.31 ft;
+TDZ 281.40 ft | 1 044m
++0.4%
+2 566m
+-0.4% | 
+ SWY dimensions (m) | CWY dimensions (m) | Strip dimensions (m) | Dimensions of RESA (m) | Location And Description Of Arresting System | OFZ | Remarks | 
+ 8 | 9 | 10 | 11 | 12 | 13 | 14 | 
+ Nil | 85 X 150 | 3 720 X 280 | RESA RWY 01 – 240x90 | Nil | Available | Nil | 
+ Nil | 85 X 150 | 3 720 X 280 | RESA RWY 19 – 240x90 | Nil | Available | Nil | 
+ LLER AD 2.13 Declared Distances RWY Designator | TORA
+(M) | TODA
+(M) | ASDA
+(M) | LDA
+(M) | Remarks | 
+ 1 | 2 | 3 | 4 | 5 | 6 | 
+ 01 | 3 600 | 3 685 | 3 600 | 3 600 | RESA 240 M | 
+ 19 | 3 600 | 3 685 | 3 600 | 3 600 | RESA 240 M | 
+ 01-A3 | 2 190 | 2 275 | 2 190 | Nil | Take-off from intersection with A3 | 
+ 01-A2 | 2 400 | 2 485 | 2 400 | Nil | Take-off from intersection with A2 | 
+ 19-A4 | 2 300 | 2 385 | 2 300 | Nil | Take-off from intersection with A4 | 
+ 19-A3 | 1 410 | 1 495 | 1 410 | Nil | Take-off from intersection with A3 | 
+ 19-A2 | 1 200 | 1 285 | 1 200 | Nil | Take-off from intersection with A2 | 
+ LLER AD 2.14 Approach And Runway Lighting RWY Designator | APCH LGT
+type
+LEN
+INTST | THR LGT colour, WBAR | PAPI
+(MEHT) | TDZ, LGT LEN | RWY
+Centre
+Line LGT Length, spacing, colour, INTST | RWY edge LGT
+LEN, spacing
+colour 
+INTST | RWY 
+End LGT
+colour | SWY LGT 
+LEN (M) colour | Remarks | 
+ 1 | 2 | 3 
+
+[... truncated sample ...]

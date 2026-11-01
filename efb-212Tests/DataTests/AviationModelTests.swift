@@ -268,8 +268,6 @@ struct AviationModelTests {
     @Test func appTabTitles() {
         #expect(AppTab.map.title == "Map")
         #expect(AppTab.flights.title == "Flights")
-        #expect(AppTab.logbook.title == "Logbook")
-        #expect(AppTab.aircraft.title == "Aircraft")
         #expect(AppTab.settings.title == "Settings")
     }
 
@@ -280,7 +278,7 @@ struct AviationModelTests {
     }
 
     @Test func appTabAllCases() {
-        #expect(AppTab.allCases.count == 5)
+        #expect(AppTab.allCases == [.map, .flights, .settings])
     }
 
     // MARK: - MapMode Tests

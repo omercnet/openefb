@@ -54,6 +54,41 @@ struct MapQueryRegionTests {
         #expect(radius == MapQueryRegion.maxRadiusNM)
     }
 
+    @Test func spatialThinningKeepsOnePerCellAndEverySparseField() {
+        // 28 cells over 28 deg => 1 deg cells. Three Bay Area fields share a cell; Denver is alone.
+        let bay = [Self.airport("KSFO", lat: 37.62, lon: -122.38),
+                   Self.airport("KOAK", lat: 37.72, lon: -122.22),
+                   Self.airport("KSQL", lat: 37.51, lon: -122.25)]
+        let denver = Self.airport("KDEN", lat: 39.86, lon: -104.67)
+        let result = MapQueryRegion.thinSpatially(bay + [denver], south: 25, west: -125, north: 50, east: -97)
+        #expect(result.map(\.icao) == ["KDEN", "KOAK"])   // lowest id wins the shared cell
+    }
+
+    // MARK: - Low zoom (towered airports over the whole region)
+
+    @Test func lowZoomBelowSevenOnly() {
+        #expect(MapQueryRegion.isLowZoom(5.0))
+        #expect(MapQueryRegion.isLowZoom(6.99))
+        #expect(MapQueryRegion.isLowZoom(MapQueryRegion.lowZoomThreshold) == false)
+        #expect(MapQueryRegion.isLowZoom(11) == false)
+    }
+
+    @Test func lowZoomRadiusCoversConusPastTheDiscCap() {
+        let conus = CLLocationCoordinate2D(latitude: 39, longitude: -98)
+        let b = Self.bounds(around: conus, halfLatDeg: 15, halfLonDeg: 30)
+        let capped = MapQueryRegion.radiusNM(center: conus, northEast: b.ne, southWest: b.sw)
+        let low = MapQueryRegion.lowZoomRadiusNM(center: conus, northEast: b.ne, southWest: b.sw)
+        #expect(capped == MapQueryRegion.maxRadiusNM)
+        #expect(low > capped)   // whole visible region, not a 500 NM disc
+        #expect(low <= MapQueryRegion.maxLowZoomRadiusNM)
+    }
+
+    @Test func lowZoomRadiusAgreesWithCappedRadiusBelowTheCap() {
+        let b = Self.bounds(around: Self.kpao, halfLatDeg: 0.5, halfLonDeg: 0.5)
+        #expect(MapQueryRegion.lowZoomRadiusNM(center: Self.kpao, northEast: b.ne, southWest: b.sw)
+                == MapQueryRegion.radiusNM(center: Self.kpao, northEast: b.ne, southWest: b.sw))
+    }
+
     @Test func wideScreenUsesTheWideAxis() {
         // Landscape iPad: half-width larger than half-height. Radius must exceed the half-height.
         let b = Self.bounds(around: Self.kpao, halfLatDeg: 0.2, halfLonDeg: 0.6)

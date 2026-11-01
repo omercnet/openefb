@@ -13,6 +13,7 @@
 //
 
 import SwiftUI
+import SwiftData
 import CoreLocation
 
 // MARK: - SearchResultsList (private helper)
@@ -40,7 +41,7 @@ private struct SearchResultsList: View {
                     .padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 if airport.id != results.last?.id {
                     Divider()
                 }
@@ -56,6 +57,8 @@ private struct SearchResultsList: View {
 
 struct MapContainerView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
 
     // MARK: - Services (created once in onAppear)
 
@@ -79,6 +82,7 @@ struct MapContainerView: View {
     // Recording Services (Plan 03)
     @State private var recordingViewModel: RecordingViewModel?
     @State private var recordingCoordinator: RecordingCoordinator?
+    @State private var recordingUnavailable = false
 
     // MARK: - Local UI State
 
@@ -93,6 +97,13 @@ struct MapContainerView: View {
             if let viewModel = mapViewModel {
                 MapView(mapService: mapService, mapViewModel: viewModel)
                     .ignoresSafeArea(edges: .top)
+
+                // Night dimming for vector base layers (raster layers are dimmed in MapService)
+                Color.black
+                    .opacity(colorScheme == .dark ? NightPalette.mapDimOpacity * 0.6 : 0)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
 
             // MARK: Layer 2 -- Floating UI overlays
@@ -115,11 +126,26 @@ struct MapContainerView: View {
                             } label: {
                                 Image(systemName: "magnifyingglass")
                                     .font(.title3)
-                                    .frame(width: 44, height: 44)
+                                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
                             }
                             .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
                             .accessibilityLabel("Search airports")
+                        }
+
+                        // Flight planning entry point (F10): opens the Flights tab on Plans
+                        if !showingSearch {
+                            Button {
+                                appState.openFlightsOnPlans = true
+                                appState.selectedTab = .flights
+                            } label: {
+                                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
+                                    .font(.title3)
+                                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+                            }
+                            .background(.ultraThinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+                            .accessibilityLabel("Plan a flight")
                         }
 
                         // Search bar (shown when activated)
@@ -145,12 +171,27 @@ struct MapContainerView: View {
                                         searchVM.clear()
                                     }
                                 )
+                            } else if searchVM.isSearching {
+                                ProgressView("Searching\u{2026}")
+                                    .font(TypeRole.caption)
+                                    .padding(Space.m)
+                                    .background(.regularMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            } else if searchVM.query.trimmingCharacters(in: .whitespaces).count >= 2 {
+                                Text("No airports match \u{201C}\(searchVM.query)\u{201D}")
+                                    .font(TypeRole.caption)
+                                    .foregroundStyle(Palette.secondaryText)
+                                    .padding(Space.m)
+                                    .background(.regularMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .accessibilityIdentifier("search-no-results")
                             }
                         }
 
                         // Chart expiration badge (INFRA-03)
                         if let viewModel = mapViewModel {
-                            ChartExpirationBadge(daysRemaining: viewModel.chartDaysRemaining)
+                            DataAgeBadge(.chartCycle, validUntil: viewModel.chartExpirationDate)
+                                .hiddenWhenFresh()
                         }
                     }
                     .padding(.leading, 16)
@@ -185,17 +226,49 @@ struct MapContainerView: View {
                     }
                     .padding(.horizontal, 16)
 
+                    // Why there is no position, with Open Settings when the pilot can fix it.
+                    if let failure = appState.gpsFailure,
+                       (mapViewModel?.gpsStatus ?? .lost(ageSeconds: nil)).isStale {
+                        GPSFailureNotice(reason: failure)
+                            .padding(.horizontal, 16)
+                    }
+
+                    // Active Direct-To / route with a Clear button (wrong field picked).
+                    if let navTitle = ActiveNavigationBar.title(for: appState) {
+                        ActiveNavigationBar(title: navTitle) {
+                            let hadRoute = appState.activePlanDestination != nil
+                            appState.clearActiveNavigation()
+                            if hadRoute { mapService.clearRoute() }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+
                     // Instrument strip (bottom bar) with the GPS status chip
                     InstrumentStripView(gpsStatus: mapViewModel?.gpsStatus ?? .lost(ageSeconds: nil))
                         .padding(.horizontal, 16)
                         .padding(.bottom, 8)
                 }
             }
+            // Map chrome keeps its 60pt geometry: cap text so controls never cover the map (sheets scale fully)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
 
             // MARK: Layer 3 -- Recording overlay
 
             if let recVM = recordingViewModel {
                 RecordingOverlayView(viewModel: recVM)
+            } else if recordingUnavailable {
+                VStack {
+                    Label("Recording unavailable", systemImage: "mic.slash.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Palette.caution)
+                        .padding(Space.m)
+                        .background(.regularMaterial)
+                        .clipShape(Capsule())
+                        .padding(.leading, Space.l)
+                        .accessibilityIdentifier("recording-unavailable")
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             // MARK: Layer controls popover
@@ -220,13 +293,14 @@ struct MapContainerView: View {
                     Spacer()
                     HStack {
                         Image(systemName: "wifi.slash")
+                            .accessibilityHidden(true)
                         Text("Offline \u{2014} using cached data")
                             .font(.caption)
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.black)  // black on amber: 9:1 (white on amber is 2.2:1)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(.orange.opacity(0.9))
+                    .background(Color.orange)
                     .clipShape(Capsule())
                     .padding(.bottom, 60)  // above instrument strip
                 }
@@ -386,8 +460,9 @@ struct MapContainerView: View {
             // Wire AudioRecorder's onBufferAvailable to TranscriptionService's feedBuffer
             Task {
                 await audioRecorder.setOnBufferAvailable { @Sendable buffer, time in
+                    let input = AudioBufferInput(buffer: buffer, time: time)
                     Task {
-                        await transcriptionService.feedBuffer(buffer, time: time)
+                        await transcriptionService.feedBuffer(input)
                     }
                 }
             }
@@ -409,13 +484,19 @@ struct MapContainerView: View {
             }
 
             recordingCoordinator = coordinator
-            recordingViewModel = RecordingViewModel(coordinator: coordinator, appState: appState)
+            let recVM = RecordingViewModel(coordinator: coordinator, appState: appState)
+            recVM.modelContext = modelContext
+            recVM.persistence = FlightPersistenceService(
+                recordingDB: recordingDB,
+                databaseService: appState.sharedDatabaseService
+            )
+            recordingViewModel = recVM
 
             // Start auto-start monitoring
             Task { await coordinator.startAutoStartMonitoring(appState: appState) }
         } catch {
-            // Recording database failed -- recording won't be available but app still works
-            // This is not a fatal error
+            // Recording database failed: the rest of the app works, but say so (no silent missing button).
+            recordingUnavailable = true
         }
     }
     // MARK: - Helpers

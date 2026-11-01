@@ -154,11 +154,13 @@ final class LogbookViewModel {
         return String(format: "%.1f", hours)
     }
 
-    /// Format duration in seconds as hours and minutes.
-    /// Example: 5400 -> "1h 30m", 0 -> "0h 0m"
+    /// Format duration in seconds as hours and minutes; under one minute, as seconds.
+    /// Example: 5400 -> "1h 30m", 48 -> "48s", 0 -> "0s"
     /// Pure function -- nonisolated for use from any context.
     nonisolated static func formatDurationHM(_ seconds: Double) -> String {
-        let totalMinutes = Int(seconds) / 60
+        let wholeSeconds = Int(seconds)
+        if wholeSeconds < 60 { return "\(max(0, wholeSeconds))s" }
+        let totalMinutes = wholeSeconds / 60
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
         return "\(hours)h \(minutes)m"

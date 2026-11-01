@@ -23,10 +23,7 @@ struct AirportChartsSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("FAA CHARTS")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+            SectionHeader("FAA CHARTS")
 
             switch state {
             case .loading:
@@ -34,21 +31,23 @@ struct AirportChartsSection: View {
                     ProgressView().controlSize(.small)
                     Text("Loading charts...")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             case .failed(let message):
                 VStack(alignment: .leading, spacing: 6) {
                     Text(message)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                     Button("Retry") { Task { await load() } }
                         .font(.subheadline)
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
                 }
             case .loaded(let charts, let cycle):
                 if charts.isEmpty {
                     Text("No FAA charts for this airport.")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 } else {
                     cycleStatus(cycle)
                     ForEach(Self.grouped(charts), id: \.category) { group in
@@ -71,11 +70,11 @@ struct AirportChartsSection: View {
             Label("Charts expired \(Self.shortDate(cycle.expirationDate)). Do not use for navigation.",
                   systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
-                .foregroundStyle(.red)
+                .foregroundStyle(Palette.warning)
         } else {
             Text("Cycle \(cycle.code) · Valid to \(Self.shortDate(cycle.expirationDate))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(TypeRole.caption)
+                .foregroundStyle(Palette.secondaryText)
         }
     }
 
@@ -83,8 +82,8 @@ struct AirportChartsSection: View {
     private func groupView(_ category: TerminalChartCategory, charts: [TerminalChart]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(category.title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                .font(TypeRole.label)
+                .foregroundStyle(Palette.secondaryText)
             ForEach(charts) { chart in
                 Button {
                     selectedChart = chart
@@ -96,11 +95,13 @@ struct AirportChartsSection: View {
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Palette.secondaryText)
+                            .accessibilityHidden(true)
                     }
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
                 .padding(.vertical, 4)
             }
         }

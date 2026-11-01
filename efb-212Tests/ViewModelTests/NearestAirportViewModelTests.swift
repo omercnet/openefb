@@ -15,6 +15,7 @@ import CoreLocation
 @testable import efb_212
 
 @Suite("NearestAirportViewModel Tests")
+@MainActor
 struct NearestAirportViewModelTests {
 
     // MARK: - Test Helpers

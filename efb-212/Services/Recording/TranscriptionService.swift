@@ -24,7 +24,9 @@ import os
 // MARK: - Audio Buffer Input
 
 /// Audio buffer wrapper for streaming from AudioRecorder to TranscriptionService.
-struct AudioBufferInput: Sendable {
+/// `@unchecked Sendable`: `AVAudioPCMBuffer` is not Sendable, but the audio tap hands each buffer
+/// off once and never touches it again, so exactly one consumer owns it at a time.
+nonisolated struct AudioBufferInput: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
     let time: AVAudioTime
 }
@@ -162,13 +164,15 @@ actor TranscriptionService: TranscriptionServiceProtocol {
     /// Feed audio buffer from AudioRecorder for real-time transcription.
     /// Routes to the active transcription engine. `time` is the buffer's position in
     /// the audio file (sampleTime at the file's sample rate), as stamped by AudioRecorder.
-    func feedBuffer(_ buffer: AVAudioPCMBuffer, time: AVAudioTime) {
+    func feedBuffer(_ input: AudioBufferInput) {
+        let buffer = input.buffer
+        let time = input.time
         guard _isTranscribing else { return }
 
         switch activeEngine {
         case .speechAnalyzer:
             // Stream to SpeechAnalyzer via AsyncStream
-            bufferContinuation?.yield(AudioBufferInput(buffer: buffer, time: time))
+            bufferContinuation?.yield(input)
 
         case .sfSpeechRecognizer:
             if sfTimelineOffsetSeconds == nil, time.isSampleTimeValid, time.sampleRate > 0 {

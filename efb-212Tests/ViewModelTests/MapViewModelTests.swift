@@ -15,6 +15,7 @@ import CoreLocation
 @testable import efb_212
 
 @Suite("MapViewModel Tests")
+@MainActor
 struct MapViewModelTests {
 
     // MARK: - Test Helpers
@@ -69,7 +70,7 @@ struct MapViewModelTests {
 
     @Test func mockDatabaseReturnsAirports() async throws {
         let db = Self.makeMockDB()
-        let airports = try await db.airports(near: CLLocationCoordinate2D(latitude: 37.46, longitude: -122.12), radiusNM: 20.0)
+        let airports = try db.airports(near: CLLocationCoordinate2D(latitude: 37.46, longitude: -122.12), radiusNM: 20.0)
         #expect(airports.count == 3)
     }
 

@@ -20,34 +20,35 @@ struct TimelineScrubBar: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            // Slider with phase marker overlay
-            ZStack(alignment: .leading) {
-                // Phase marker overlay (behind the slider visually)
-                phaseMarkerOverlay
-
-                // Scrub slider
-                Slider(
-                    value: $currentPosition,
-                    in: 0...max(totalDuration, 0.001),
-                    onEditingChanged: { editing in
-                        if !editing {
-                            onSeek(currentPosition)
-                        }
+            // Scrub slider. Phase markers are an overlay so they take the slider's size: a
+            // GeometryReader as a ZStack sibling expands to all offered height and turned the
+            // scrub bar into a full-screen blurred panel over the replay map.
+            Slider(
+                value: $currentPosition,
+                in: 0...max(totalDuration, 0.001),
+                onEditingChanged: { editing in
+                    if !editing {
+                        onSeek(currentPosition)
                     }
-                )
-                .tint(.orange)
+                }
+            )
+            .tint(.orange)
+            .accessibilityLabel("Replay position")
+            .accessibilityValue("\(spokenTime(currentPosition)) elapsed of \(spokenTime(totalDuration))")
+            .overlay(alignment: .leading) {
+                phaseMarkerOverlay
             }
 
             // Time labels: elapsed (left) and remaining (right)
             HStack {
                 Text(formatTime(currentPosition))
-                    .font(.caption2.monospacedDigit())
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
                 Text("-\(formatTime(max(0, totalDuration - currentPosition)))")
-                    .font(.caption2.monospacedDigit())
+                    .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
         }
@@ -76,10 +77,12 @@ struct TimelineScrubBar: View {
 
                     // Phase abbreviation label
                     Text(phaseAbbreviation(marker.phase))
-                        .font(.system(size: 8))
-                        .foregroundStyle(.tertiary)
+                        .font(.caption)
+                        .dynamicTypeSize(...DynamicTypeSize.large)
+                        .foregroundStyle(Palette.secondaryText)
                 }
                 .position(x: xPosition, y: sliderHeight / 2)
+                .accessibilityHidden(true)  // Decorative; position is exposed via the slider value
             }
         }
         .allowsHitTesting(false)  // Phase markers don't intercept touches
@@ -115,5 +118,14 @@ struct TimelineScrubBar: View {
             return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         }
         return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    /// Spoken elapsed time for VoiceOver, e.g. "12 minutes, 5 seconds".
+    private func spokenTime(_ interval: TimeInterval) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .full
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.zeroFormattingBehavior = .dropLeading
+        return formatter.string(from: max(0, interval)) ?? formatTime(interval)
     }
 }

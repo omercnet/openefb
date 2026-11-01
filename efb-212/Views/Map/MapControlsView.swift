@@ -20,19 +20,23 @@ enum MapControlMetrics {
 struct MapControlsView: View {
     let mapViewModel: MapViewModel
     @Environment(AppState.self) private var appState
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack(spacing: 8) {
+        // 12pt between groups: the translucent 60pt controls read as one blob at 8pt over a busy map.
+        VStack(spacing: 12) {
             // Orientation toggle: text shows the CURRENT mode (F7)
             Button {
                 let newMode: MapMode = appState.mapMode == .northUp ? .trackUp : .northUp
+                Haptics.light()
                 mapViewModel.setMapMode(newMode)
             } label: {
                 Text(appState.mapMode == .northUp ? "N\u{2191}" : "TRK\u{2191}")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.headline.weight(.bold))
                     .minimumScaleFactor(0.8)
                     .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
             }
+            .buttonStyle(PressableButtonStyle())
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
             .accessibilityIdentifier("Map orientation")
@@ -49,12 +53,14 @@ struct MapControlsView: View {
                 } label: {
                     Image(systemName: "plus")
                         .font(.title2)
-                        .frame(width: MapControlMetrics.size, height: 52)
+                        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+                        .contentShape(Rectangle())  // whole 60pt cell is the target, not just the glyph
                 }
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Zoom in")
 
                 Divider()
-                    .frame(width: 40)
+                    .frame(width: 44)
 
                 // Zoom out
                 Button {
@@ -63,8 +69,10 @@ struct MapControlsView: View {
                 } label: {
                     Image(systemName: "minus")
                         .font(.title2)
-                        .frame(width: MapControlMetrics.size, height: 52)
+                        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Zoom out")
             }
             .background(.ultraThinMaterial)
@@ -72,15 +80,35 @@ struct MapControlsView: View {
 
             // Layer toggle button
             Button {
+                Haptics.light()
                 appState.isPresentingLayerControls.toggle()
             } label: {
                 Image(systemName: "square.3.layers.3d")
                     .font(.title2)
                     .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
             }
+            .buttonStyle(PressableButtonStyle())
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
             .accessibilityLabel("Toggle map layers")
+            .accessibilityValue(appState.isPresentingLayerControls ? "Open" : "Closed")
+
+            // Night mode quick toggle: day <-> night (Settings can return to Auto)
+            Button {
+                Haptics.light()
+                appState.displayMode = colorScheme == .dark ? .day : .night
+            } label: {
+                Image(systemName: colorScheme == .dark ? "sun.max.fill" : "moon.fill")
+                    .font(.title2)
+                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+            }
+            .buttonStyle(PressableButtonStyle())
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+            .accessibilityIdentifier("Toggle night mode")
+            .accessibilityLabel("Night mode")
+            .accessibilityValue(colorScheme == .dark ? "On, \(appState.displayMode.title)" : "Off, \(appState.displayMode.title)")
+            .accessibilityHint(colorScheme == .dark ? "Switch to day display" : "Switch to night display")
 
             // North indicator: only while the map is rotated (track-up or rotate gesture)
             if abs(mapViewModel.mapDirection) > 0.5 {
@@ -103,10 +131,10 @@ struct NorthIndicator: View {
                 .fill(.ultraThinMaterial)
             VStack(spacing: 0) {
                 Image(systemName: "arrowtriangle.up.fill")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.footnote.weight(.bold))
                     .foregroundStyle(.red)
                 Text("N")
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .font(.callout.weight(.heavy))
             }
             .rotationEffect(.degrees(-mapDirection))
         }
@@ -128,15 +156,17 @@ struct RecenterButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: "location.fill")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.title3.weight(.semibold))
                 Text("Recenter")
-                    .font(.system(size: 20, weight: .bold, design: .rounded))
+                    .font(.title3.weight(.bold))
             }
             .padding(.horizontal, 20)
             .frame(height: MapControlMetrics.size + 4)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.blue)
+        .tint(Palette.accent)
+        .foregroundStyle(Palette.onAccent)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .accessibilityIdentifier("Recenter")
         .accessibilityLabel("Recenter on aircraft")
     }

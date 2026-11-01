@@ -2,10 +2,8 @@
 //  BetaBanner.swift
 //  efb-212
 //
-//  Dismissable beta disclaimer banner shown on first launch.
-//  Per CONTEXT.md: "Beta -- Report issues via TestFlight feedback"
-//  Sets expectations without being annoying -- dismissed once and never shown again.
-//  Uses @AppStorage("hasDismissedBetaBanner") for persistence across launches.
+//  Dismissable beta notice shown until first dismissed; after that the same line lives in
+//  Settings > About. Uses @AppStorage("hasDismissedBetaBanner") for persistence.
 //  Declared in PrivacyInfo.xcprivacy UserDefaults reason CA92.1.
 //
 
@@ -18,23 +16,27 @@ struct BetaBanner: View {
         if !dismissed {
             HStack {
                 Image(systemName: "info.circle")
-                    .foregroundStyle(.blue)
-                Text("Beta -- Report issues via TestFlight feedback")
-                    .font(.caption)
+                    .foregroundStyle(Palette.accentText)
+                Text("Beta build. Report problems in Settings › Feedback.")
+                    .font(.footnote)
+                    .foregroundStyle(Palette.primaryText)
                 Spacer()
                 Button {
                     dismissed = true
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
+                .accessibilityLabel("Dismiss beta notice")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color.blue.opacity(0.15))
+            .background(Palette.infoFill)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .padding(.horizontal, 16)
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
     }
 }

@@ -1,53 +1,53 @@
-# Archive Configuration — verified 2026-07-04
+# Archive configuration: verified 2026-10-31
 
-Pulled from `xcodebuild -showBuildSettings -configuration Release`.
+Read from `efb-212.xcodeproj/project.pbxproj` and from the Info.plist of the archived app.
 
-## Verified settings (Release)
+## Release settings (app target)
 | Setting | Value | Notes |
 |---|---|---|
-| PRODUCT_BUNDLE_IDENTIFIER | `quartermint.efb-212` | matches CLAUDE.md |
+| PRODUCT_BUNDLE_IDENTIFIER | `io.omer.efb` | set by the owner; keep |
+| DEVELOPMENT_TEAM | `6F8N897928` | set by the owner; keep. Test targets and the project-level default still carry the old team `SKGLKG576D`; harmless for the app archive |
+| CODE_SIGN_STYLE | `Automatic` | |
 | MARKETING_VERSION | `1.0` | store version |
 | CURRENT_PROJECT_VERSION | `1` | build number |
-| IPHONEOS_DEPLOYMENT_TARGET | `26.0` | iOS 26 minimum |
-| PRODUCT_NAME | `efb-212` | internal name (display name is "OpenEFB" via app) |
-| CODE_SIGN_STYLE | `Automatic` | |
-| DEVELOPMENT_TEAM | `SKGLKG576D` | |
-| TARGETED_DEVICE_FAMILY | `1,2` | **iPhone + iPad — see decision below** |
-| SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD | `YES` | app will be offered on Apple Silicon Macs |
-| GENERATE_INFOPLIST_FILE | `YES` | many Info.plist keys come from INFOPLIST_KEY_* build settings |
-| SKIP_INSTALL | `NO` | correct for an app target |
+| IPHONEOS_DEPLOYMENT_TARGET | `26.0` | |
+| TARGETED_DEVICE_FAMILY | `2` | iPad only |
+| SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD | `NO` | no Mac listing |
+| ITSAppUsesNonExemptEncryption | `NO` | standard HTTPS only; no per-upload export question |
+| PRODUCT_NAME | `efb-212` | display name still `efb-212`; see open items |
+| Info.plist category | `public.app-category.productivity` | metadata doc proposes Navigation as primary category in App Store Connect (separate setting) |
 
-## Privacy usage strings (present, verified)
-- `NSMicrophoneUsageDescription` (Info.plist): "OpenEFB records cockpit audio during flights for transcription and debrief."
-- `NSSpeechRecognitionUsageDescription` (Info.plist): "OpenEFB transcribes cockpit audio in real-time to create flight transcripts."
-- `INFOPLIST_KEY_NSLocationWhenInUseUsageDescription`: "OpenEFB uses your location to show your position on the aviation map and provide navigation guidance."
-- `INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription`: "OpenEFB uses your location in the background to continue tracking your flight when the screen is off."
-- `UIBackgroundModes` includes `location` (backed by the Always usage string above — consistent).
+## Usage strings (present)
+- `NSMicrophoneUsageDescription`: "OpenEFB records cockpit audio during flights for transcription and debrief."
+- `NSSpeechRecognitionUsageDescription`: "OpenEFB transcribes cockpit audio in real-time to create flight transcripts."
+- `NSLocationWhenInUseUsageDescription`: "OpenEFB uses your location to show your position on the aviation map and provide navigation guidance."
+- `NSLocationAlwaysAndWhenInUseUsageDescription`: "OpenEFB uses your location in the background to continue tracking your flight when the screen is off."
+- `UIBackgroundModes` includes `location`.
 
-## Two decisions to make before archiving
-
-### 1. Export compliance (recommended: add the key)
-`ITSAppUsesNonExemptEncryption` is **not set**. Without it, App Store Connect
-asks the export-compliance question on every single upload. The app only uses
-standard HTTPS (aviationweather.gov for METAR/TAF) and no custom/proprietary
-crypto, which is exempt. Add:
-
+## Release archive check (run 2026-10-31)
 ```
-ITSAppUsesNonExemptEncryption = NO
+xcodebuild archive -project efb-212.xcodeproj -scheme efb-212 -configuration Release \
+  -destination 'generic/platform=iOS' -archivePath /tmp/efb.xcarchive \
+  CODE_SIGNING_ALLOWED=NO
 ```
-as an `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption` build setting (or an
-Info.plist entry). This removes the per-upload prompt.
+Result: **ARCHIVE SUCCEEDED**. The archived `efb-212.app` reports:
+`CFBundleIdentifier io.omer.efb`, `CFBundleShortVersionString 1.0`, `CFBundleVersion 1`,
+`ITSAppUsesNonExemptEncryption false`, `UIDeviceFamily [2]`, `MinimumOSVersion 26.0`, and contains
+`PrivacyInfo.xcprivacy`. Two deprecation warnings only (`allowBluetooth` in `AudioRecorder.swift`,
+`setVisibleCoordinateBounds` in `FlightPlanViewModel.swift`). Nothing was uploaded.
 
-### 2. Device family (iPad-only?)
-Currently `1,2` (iPhone + iPad) with Mac-Designed-for-iPad ON. The PRD describes
-OpenEFB as an **iPad VFR EFB**. If iPhone/Mac are not intended launch targets,
-set `TARGETED_DEVICE_FAMILY = 2` (iPad only) before archiving — otherwise the
-listing must satisfy iPhone screenshot requirements and iPhone-layout QA too.
-This is a product call, not a blocker; left as-is it will still archive.
+## Versions and proposal
+Current: `1.0 (1)`. Proposed first TestFlight upload: `1.0 (1)`. Next uploads: `1.0 (2)`, `1.0 (3)` and so on.
+Bump `MARKETING_VERSION` only when starting a new release (for example `1.1`).
 
 ## Archive steps
 1. Scheme `efb-212`, Release configuration.
 2. Destination: Any iOS Device (arm64).
-3. Product → Archive.
-4. Organizer → Distribute App → App Store Connect → Upload.
-5. Automatic signing with team SKGLKG576D handles provisioning.
+3. Product > Archive.
+4. Organizer > Distribute App > App Store Connect > Upload.
+5. Automatic signing with team `6F8N897928` handles provisioning.
+
+## Open items
+- Display name: set `INFOPLIST_KEY_CFBundleDisplayName = OpenEFB` before public release.
+- Third-party SDK privacy manifests (MapLibre, GRDB) were not inspected here; Xcode reports any missing
+  manifest at upload validation. These are the only two SwiftPM dependencies.

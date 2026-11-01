@@ -12,6 +12,7 @@ import GRDB
 @testable import efb_212
 
 @Suite("RecordingCoordinator Tests", .serialized)
+@MainActor
 struct RecordingCoordinatorTests {
 
     // MARK: - Helpers
@@ -42,7 +43,7 @@ struct RecordingCoordinatorTests {
 
         _ = try await coordinator.startRecording()
 
-        let status = await coordinator.state.recordingStatus
+        let status = coordinator.state.recordingStatus
         #expect(status == .recording)
     }
 
@@ -59,7 +60,7 @@ struct RecordingCoordinatorTests {
         _ = try await coordinator.startRecording()
         let summary = await coordinator.stopRecording()
 
-        let status = await coordinator.state.recordingStatus
+        let status = coordinator.state.recordingStatus
         #expect(status == .idle)
         #expect(summary != nil)
         #expect(summary?.flightID != nil)
@@ -141,8 +142,8 @@ struct RecordingCoordinatorTests {
 
         await coordinator.syncPhaseAndLevel()
 
-        let level = await coordinator.state.audioLevel
-        let phase = await coordinator.state.currentPhase
+        let level = coordinator.state.audioLevel
+        let phase = coordinator.state.currentPhase
         #expect(level == -20)
         #expect(phase == .preflight)  // tracker has seen no fixes yet
 
@@ -165,7 +166,7 @@ struct RecordingCoordinatorTests {
         var level: Float = -160
         for _ in 0..<30 {
             try await Task.sleep(for: .milliseconds(100))
-            level = await coordinator.state.audioLevel
+            level = coordinator.state.audioLevel
             if level == -30 { break }
         }
         #expect(level == -30)
@@ -185,7 +186,7 @@ struct RecordingCoordinatorTests {
 
         await coordinator.syncPhaseAndLevel()
 
-        let level = await coordinator.state.audioLevel
+        let level = coordinator.state.audioLevel
         #expect(level == -160)
     }
 
@@ -203,7 +204,7 @@ struct RecordingCoordinatorTests {
         await MainActor.run { coordinator.state.recordingStatus = .countdown(remaining: 1) }
 
         _ = try await coordinator.startRecording()
-        let status = await coordinator.state.recordingStatus
+        let status = coordinator.state.recordingStatus
         #expect(status == .recording)
 
         _ = await coordinator.stopRecording()

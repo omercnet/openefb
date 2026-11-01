@@ -21,12 +21,14 @@ struct TranscriptPanelView: View {
             HStack {
                 Image(systemName: "text.bubble")
                     .font(.caption)
+                    .accessibilityHidden(true)
                 Text("Transcript")
                     .font(.caption.bold())
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Text("\(segments.count) segments")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+                    .foregroundStyle(Palette.secondaryText)
             }
             .foregroundStyle(.secondary)
             .padding(.horizontal, 12)
@@ -52,6 +54,7 @@ struct TranscriptPanelView: View {
             Image(systemName: "text.bubble")
                 .font(.title2)
                 .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
             Text("No transcript available")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -111,31 +114,38 @@ private struct TranscriptSegmentRow: View {
     let isActive: Bool
     let formattedTime: String
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 8))
+        layout {
             // Timestamp
             Text(formattedTime)
-                .font(.caption2.monospacedDigit())
-                .foregroundStyle(.tertiary)
-                .frame(width: 48, alignment: .trailing)
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(Palette.secondaryText)
+                .frame(minWidth: 48, alignment: typeSize.isAccessibilitySize ? .leading : .trailing)
 
             // Segment text
             VStack(alignment: .leading, spacing: 2) {
                 Text(segment.text)
                     .font(isActive ? .caption.bold() : .caption)
-                    .foregroundStyle(isActive ? .primary : .secondary)
+                    .foregroundStyle(isActive ? Palette.primaryText : Palette.secondaryText)
 
                 // Flight phase badge
                 Text(segment.flightPhase.capitalized)
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                    .font(.caption)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 6)
-                .fill(isActive ? Color.blue.opacity(0.15) : Color.clear)
+                .fill(isActive ? Palette.infoFill : Color.clear)
         )
         .animation(.easeInOut(duration: 0.2), value: isActive)
     }

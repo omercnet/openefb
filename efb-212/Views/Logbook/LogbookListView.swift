@@ -3,7 +3,8 @@
 //  efb-212
 //
 //  Chronological logbook list with confirmed/unconfirmed indicators,
-//  manual entry creation, and summary footer.
+//  manual entry creation, and summary footer. Shown as the Logbook section of the Flights
+//  tab, inside its NavigationStack (T22).
 //  Confirmed entries navigate to read-only detail; unconfirmed to editable view.
 //
 
@@ -17,41 +18,40 @@ struct LogbookListView: View {
     @State private var viewModel: LogbookViewModel?
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if let vm = viewModel {
-                    if vm.entries.isEmpty {
-                        ContentUnavailableView {
-                            Label("No Flights Yet", systemImage: "book.closed")
-                        } description: {
-                            Text("Your flights will appear here after recording. You can also add entries manually.")
-                        }
-                    } else {
-                        logbookList(vm: vm)
+        Group {
+            if let vm = viewModel {
+                if vm.entries.isEmpty {
+                    ContentUnavailableView {
+                        Label("No entries yet", systemImage: "book.closed")
+                    } description: {
+                        Text("Recorded flights appear here. Add an entry with +.")
                     }
                 } else {
-                    ProgressView("Loading...")
+                    logbookList(vm: vm)
                 }
+            } else {
+                ProgressView("Loading...")
             }
-            .navigationTitle("Logbook")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        addManualEntry()
-                    } label: {
-                        Image(systemName: "plus")
-                    }
+        }
+        .navigationTitle("Logbook")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    addManualEntry()
+                } label: {
+                    Image(systemName: "plus")
                 }
+                .accessibilityLabel("Add logbook entry")
             }
-            .sheet(isPresented: Binding(
-                get: { viewModel?.isShowingManualEntry ?? false },
-                set: { viewModel?.isShowingManualEntry = $0 }
-            )) {
-                if let vm = viewModel, let entry = vm.selectedEntry {
-                    NavigationStack {
-                        LogbookEntryEditView(entry: entry, viewModel: vm, isReadOnly: false)
-                            .navigationTitle("New Entry")
-                    }
+        }
+        .sheet(isPresented: Binding(
+            get: { viewModel?.isShowingManualEntry ?? false },
+            set: { viewModel?.isShowingManualEntry = $0 }
+        )) {
+            if let vm = viewModel, let entry = vm.selectedEntry {
+                NavigationStack {
+                    LogbookEntryEditView(entry: entry, viewModel: vm, isReadOnly: false)
+                        .navigationTitle("New Entry")
                 }
             }
         }
@@ -93,6 +93,7 @@ struct LogbookListView: View {
                 }
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .accessibilityElement(children: .combine)
             }
         }
     }
@@ -117,6 +118,7 @@ struct LogbookListView: View {
                     Text("\(entry.departureICAO ?? "---") -> \(entry.arrivalICAO ?? "---")")
                         .font(.body)
                         .fontWeight(.medium)
+                        .accessibilityLabel("\(entry.departureICAO ?? "Unknown") to \(entry.arrivalICAO ?? "Unknown")")
                 }
 
                 Spacer()
@@ -134,13 +136,16 @@ struct LogbookListView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .padding(.leading, 4)
+                        .accessibilityLabel("Confirmed")
                 } else {
                     Image(systemName: "pencil.circle")
                         .foregroundStyle(.orange)
                         .padding(.leading, 4)
+                        .accessibilityLabel("Draft, not confirmed")
                 }
             }
             .padding(.vertical, 2)
+            .accessibilityElement(children: .combine)
         }
     }
 

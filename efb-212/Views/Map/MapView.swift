@@ -17,6 +17,8 @@ struct MapView: UIViewRepresentable {
 
     let mapService: MapService
     let mapViewModel: MapViewModel
+    /// Effective scheme set by DisplayModeModifier (dark = night palette).
+    @Environment(\.colorScheme) private var colorScheme
 
     // MARK: - UIViewRepresentable
 
@@ -77,7 +79,11 @@ struct MapView: UIViewRepresentable {
 
         // Sync base map style and sectional opacity (opacity only when it changed: this
         // update runs once a second for the GPS clock and a raster-opacity write re-renders)
-        mapService.setMapStyle(mapViewModel.appState.mapStyle)
+        mapService.setMapStyle(
+            mapViewModel.appState.mapStyle,
+            sectional: mapViewModel.appState.visibleLayers.contains(.sectional)
+        )
+        mapService.applyDisplayMode(night: colorScheme == .dark)
         let opacity = mapViewModel.appState.sectionalOpacity
         if context.coordinator.appliedSectionalOpacity != opacity {
             context.coordinator.appliedSectionalOpacity = opacity
@@ -87,12 +93,14 @@ struct MapView: UIViewRepresentable {
 
     // MARK: - Coordinator
 
-    nonisolated class Coordinator: NSObject, MLNMapViewDelegate {
+    /// MapLibre calls its delegate on the main thread, so the conformance is main-actor isolated
+    /// (SE-0470) rather than hopping in each callback.
+    class Coordinator: NSObject, @MainActor MLNMapViewDelegate {
         let mapViewModel: MapViewModel
         let mapService: MapService
 
         /// Last sectional opacity pushed to the map (nil until the first update).
-        @MainActor var appliedSectionalOpacity: Double?
+        var appliedSectionalOpacity: Double?
 
         init(mapViewModel: MapViewModel, mapService: MapService) {
             self.mapViewModel = mapViewModel

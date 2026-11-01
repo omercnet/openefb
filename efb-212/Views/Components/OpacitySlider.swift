@@ -12,23 +12,23 @@ struct OpacitySlider: View {
     @Binding var opacity: Double
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Space.xs) {
             HStack {
-                Text("Sectional Opacity")
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
+                Text("Opacity")
+                    .font(TypeRole.label)
+                    .foregroundStyle(Palette.secondaryText)
                 Spacer()
                 Text("\(Int(opacity * 100))%")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
-                    .monospacedDigit()
+                    .font(TypeRole.valueSmall)
+                    .foregroundStyle(Palette.primaryText)
             }
+            .accessibilityHidden(true)  // the slider below speaks label and value
 
             Slider(value: $opacity, in: 0.0...1.0)
+                .frame(minHeight: 44)
+                .accessibilityLabel("Sectional chart opacity")
+                .accessibilityValue("\(Int(opacity * 100)) percent")
         }
-        .padding(.horizontal, 16)
     }
 }
 

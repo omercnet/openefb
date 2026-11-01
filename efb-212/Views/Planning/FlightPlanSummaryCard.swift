@@ -24,9 +24,12 @@ struct FlightPlanSummaryCard: View {
                     .font(.headline.bold())
                 Image(systemName: "arrow.right")
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 Text(destination)
                     .font(.headline.bold())
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Route \(departure) to \(destination)")
 
             Divider()
 
@@ -39,6 +42,9 @@ struct FlightPlanSummaryCard: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Distance")
+                .accessibilityValue("\(String(format: "%.1f", distanceNM)) nautical miles")
 
                 VStack {
                     Text(ete)
@@ -47,6 +53,9 @@ struct FlightPlanSummaryCard: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Estimated time en route")
+                .accessibilityValue(ete)
 
                 if let fuel = fuelGallons {
                     VStack {
@@ -56,6 +65,9 @@ struct FlightPlanSummaryCard: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Fuel")
+                    .accessibilityValue("\(String(format: "%.1f", fuel)) gallons")
                 }
             }
         }

@@ -49,9 +49,9 @@ nonisolated enum NotamError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "Add a free FAA NOTAM API key in Settings to see NOTAMs."
+            return "NOTAMs need a free FAA API key. Add it in Settings › NOTAM API."
         case .credentialsRejected:
-            return "The FAA rejected the NOTAM API key. Check the client ID and secret in Settings."
+            return "The FAA rejected the NOTAM API key. Check the client ID and secret in Settings › NOTAM API."
         }
     }
 }

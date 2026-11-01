@@ -14,6 +14,7 @@ import GRDB
 @testable import efb_212
 
 @Suite("AutoStart Tests", .serialized)
+@MainActor
 struct AutoStartTests {
 
     // MARK: - Helpers
@@ -70,10 +71,10 @@ struct AutoStartTests {
 
         await coordinator.cancelCountdown()
 
-        let status = await coordinator.state.recordingStatus
+        let status = coordinator.state.recordingStatus
         #expect(status == .idle)
 
-        let remaining = await coordinator.state.countdownRemaining
+        let remaining = coordinator.state.countdownRemaining
         #expect(remaining == 0)
     }
 

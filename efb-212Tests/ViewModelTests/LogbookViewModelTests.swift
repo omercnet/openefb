@@ -169,4 +169,11 @@ struct LogbookViewModelTests {
         #expect(LogbookViewModel.formatDurationHM(150) == "0h 2m")
         #expect(LogbookViewModel.formatDurationHM(90_061) == "25h 1m")   // no day rollover
     }
+
+    @Test func subMinuteFlightShowsSecondsNotZeroHours() {
+        #expect(LogbookViewModel.formatDurationHM(48) == "48s")      // the 48 s flight from the review
+        #expect(LogbookViewModel.formatDurationHM(59.9) == "59s")    // truncates, never rounds up to a minute
+        #expect(LogbookViewModel.formatDurationHM(60) == "0h 1m")
+        #expect(LogbookViewModel.formatDurationHM(-5) == "0s")
+    }
 }

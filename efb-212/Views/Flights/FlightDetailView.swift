@@ -14,6 +14,7 @@ struct FlightDetailView: View {
     let flightRecord: SchemaV1.FlightRecord
     @Environment(AppState.self) private var appState
     @State private var debriefEngine = DebriefEngine()
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -67,7 +68,10 @@ struct FlightDetailView: View {
 
             LabeledContent("Date", value: Self.dateFormatter.string(from: flightRecord.startDate))
 
-            HStack {
+            let routeLayout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 8))
+            routeLayout {
                 VStack(alignment: .leading) {
                     Text("From")
                         .font(.caption)
@@ -80,10 +84,12 @@ struct FlightDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .accessibilityElement(children: .combine)
 
-                Image(systemName: "arrow.right")
+                Image(systemName: typeSize.isAccessibilitySize ? "arrow.down" : "arrow.right")
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading) {
                     Text("To")
@@ -97,6 +103,7 @@ struct FlightDetailView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .accessibilityElement(children: .combine)
 
                 Spacer()
             }
@@ -129,7 +136,7 @@ struct FlightDetailView: View {
 
             if appState.recordingStatus != .idle {
                 // Recording is active -- disable replay
-                Label("Stop the current recording to replay a flight", systemImage: "exclamationmark.triangle")
+                Label("End the recording to replay a flight", systemImage: "exclamationmark.triangle")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             } else if flightRecord.trackPointCount > 0 {
@@ -139,11 +146,13 @@ struct FlightDetailView: View {
                     HStack {
                         Image(systemName: "play.circle")
                             .font(.title3)
+                            .accessibilityHidden(true)
                         Text("Replay Flight")
                             .font(.body.bold())
                         Spacer()
                         Image(systemName: "chevron.right")
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                     }
                     .padding()
                     .background(
@@ -162,6 +171,19 @@ struct FlightDetailView: View {
 
     // MARK: - Debrief Section
 
+    /// Flights shorter than this, with no transcript, give the debrief nothing to work with.
+    nonisolated static let minimumDebriefDurationSeconds: Double = 60   // seconds
+
+    /// Why a debrief is not offered, or nil when it is. A debrief needs either a transcript or
+    /// a flight of at least `minimumDebriefDurationSeconds`.
+    nonisolated static func debriefIneligibleReason(
+        durationSeconds: Double,
+        transcriptSegmentCount: Int
+    ) -> String? {
+        guard transcriptSegmentCount == 0, durationSeconds < minimumDebriefDurationSeconds else { return nil }
+        return "Too short for a debrief: this flight is under a minute and has no transcript."
+    }
+
     @ViewBuilder
     private var debriefSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -170,7 +192,16 @@ struct FlightDetailView: View {
 
             switch debriefEngine.availabilityStatus {
             case .available:
-                if let recordingDB = appState.getOrCreateRecordingDatabase() {
+                if !flightRecord.hasDebrief,
+                   let reason = Self.debriefIneligibleReason(
+                       durationSeconds: flightRecord.durationSeconds,
+                       transcriptSegmentCount: flightRecord.transcriptSegmentCount
+                   ) {
+                    Label(reason, systemImage: "info.circle")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("debrief-ineligible")
+                } else if let recordingDB = appState.getOrCreateRecordingDatabase() {
                     let metadata = buildMetadata()
 
                     NavigationLink {
@@ -184,22 +215,24 @@ struct FlightDetailView: View {
                         HStack {
                             Image(systemName: flightRecord.hasDebrief ? "brain" : "sparkles")
                                 .font(.title3)
+                                .accessibilityHidden(true)
                             Text(flightRecord.hasDebrief ? "View Debrief" : "Generate Debrief")
                                 .font(.body.bold())
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .foregroundStyle(.secondary)
+                                .accessibilityHidden(true)
                         }
                         .padding()
                         .background(
                             RoundedRectangle(cornerRadius: 10)
-                                .fill(flightRecord.hasDebrief ? Color.blue.opacity(0.1) : Color.purple.opacity(0.1))
+                                .fill(flightRecord.hasDebrief ? Palette.infoFill : Color.purple.opacity(0.1))
                         )
                     }
                     .buttonStyle(.plain)
                 } else {
                     // RecordingDatabase initialization failed
-                    Label("Recording database unavailable", systemImage: "exclamationmark.triangle")
+                    Label("Recording database could not be opened", systemImage: "exclamationmark.triangle")
                         .foregroundStyle(.secondary)
                 }
 
@@ -220,9 +253,14 @@ struct FlightDetailView: View {
             Image(systemName: "apple.intelligence")
                 .font(.largeTitle)
                 .foregroundStyle(.secondary)
-            Text("AI Debrief requires Apple Intelligence.")
+                .accessibilityHidden(true)
+            Text("Debrief needs Apple Intelligence.")
                 .font(.headline)
-            Text("You can still review your flight track, transcript, and logbook entry.")
+            Text(reason)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            Text("Track, transcript and logbook still work.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

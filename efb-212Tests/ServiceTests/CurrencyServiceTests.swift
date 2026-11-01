@@ -11,6 +11,7 @@ import Foundation
 @testable import efb_212
 
 @Suite("CurrencyService Tests")
+@MainActor
 struct CurrencyServiceTests {
 
     // MARK: - Medical Status (FAR 61.23)

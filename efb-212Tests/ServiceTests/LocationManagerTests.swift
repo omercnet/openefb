@@ -54,7 +54,7 @@ struct LocationManagerTests {
     @Test func negativeSpeedReturnsZero() {
         // CLLocation reports -1 for invalid speed. LocationService guards < 0 -> 0
         let speedMS: Double = -1.0
-        let knots = speedMS >= 0 ? speedMS * 1.94384 : 0
+        let knots = max(speedMS, 0) * 1.94384
         #expect(knots == 0, "Negative speed should map to 0 knots")
     }
 }

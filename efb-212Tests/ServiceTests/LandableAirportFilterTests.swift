@@ -118,6 +118,17 @@ struct LandableAirportFilterTests {
         #expect(LandableAirportFilter.isLandable(Self.privateField))
     }
 
+    @Test func militaryIsFlaggedMilNotPvtAndStillListed() {
+        let moffett = Self.airport("KNUQ", ownership: .military, runways: [Self.runway("14R/32L", length: 9200, surface: .asphalt)])
+        #expect(LandableAirportFilter.isMilitary(moffett))
+        #expect(LandableAirportFilter.isPrivateUse(moffett) == false)
+        #expect(LandableAirportFilter.isMilitary(Self.kpao) == false)
+        #expect(LandableAirportFilter.isMilitary(Self.privateField) == false)
+        #expect(LandableAirportFilter.landable([Self.kpao, moffett]).map(\.icao) == ["KPAO", "KNUQ"])
+        let entry = NearestAirportEntry(airport: moffett, distance: 3, bearing: 90)
+        #expect(entry.isMilitary && !entry.isPrivateUse)
+    }
+
     @Test func longestRunwayPrefersLandableSurface() {
         let longest = LandableAirportFilter.longestRunway(Self.mixedSurfaces)
         #expect(longest?.id == "18/36")   // 1800 ft concrete beats 4000 ft dirt

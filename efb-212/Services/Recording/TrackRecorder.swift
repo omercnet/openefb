@@ -13,7 +13,7 @@ import Foundation
 import CoreLocation
 
 /// Summary returned when track recording stops.
-struct TrackRecorderSummary: Sendable {
+nonisolated struct TrackRecorderSummary: Sendable {
     let trackPointCount: Int
     let phaseMarkers: [PhaseMarkerRecord]
     let currentPhase: FlightPhaseType
@@ -127,7 +127,8 @@ actor TrackRecorder {
 
         // Run through phase detector
         let previousPhase = _currentPhase
-        let newPhase = phaseDetector.process(point)
+        // verticalAccuracy < 0: no altitude (Wi-Fi-only fix); phase detection falls back to speed
+        let newPhase = phaseDetector.process(point, hasAltitude: location.verticalAccuracy >= 0)
         _currentPhase = newPhase
 
         if newPhase != previousPhase, let lastMarker = phaseDetector.phaseMarkers.last {

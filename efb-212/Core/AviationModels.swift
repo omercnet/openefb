@@ -16,7 +16,7 @@ import CoreLocation
 
 // MARK: - Airport
 
-struct Airport: Identifiable, Codable, Equatable, Hashable, Sendable {
+nonisolated struct Airport: Identifiable, Codable, Equatable, Hashable, Sendable {
     var id: String { icao }
     let icao: String                     // ICAO identifier (e.g., "KPAO")
     let faaID: String?                   // FAA LID if different (e.g., "PAO")
@@ -37,7 +37,7 @@ struct Airport: Identifiable, Codable, Equatable, Hashable, Sendable {
     let runways: [Runway]
     let frequencies: [Frequency]
 
-    nonisolated init(
+    init(
         icao: String,
         faaID: String? = nil,
         name: String,
@@ -92,7 +92,7 @@ struct Airport: Identifiable, Codable, Equatable, Hashable, Sendable {
 
 // MARK: - Runway
 
-struct Runway: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct Runway: Identifiable, Codable, Equatable, Sendable {
     let id: String                       // e.g., "13/31"
     let length: Int                      // feet
     let width: Int                       // feet
@@ -131,9 +131,21 @@ struct Runway: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+// MARK: - Aviation Data Cycle
+
+/// FAA NASR cycle the bundled aviation database was built from (`metadata` table).
+/// NASR publishes every 28 days; data past `expires` is out of date, not merely old.
+nonisolated struct AviationDataCycle: Equatable, Sendable {
+    let source: String          // e.g. "FAA NASR 28-day subscription CSV"
+    let effective: Date         // cycle effective date (00:00 UTC)
+    let expires: Date           // effective + 28 days (00:00 UTC)
+
+    nonisolated func isExpired(at date: Date = Date()) -> Bool { date >= expires }
+}
+
 // MARK: - Frequency
 
-struct Frequency: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct Frequency: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let type: FrequencyType
     let frequency: Double                // MHz (e.g., 118.6)
@@ -149,7 +161,7 @@ struct Frequency: Identifiable, Codable, Equatable, Sendable {
 
 // MARK: - Navaid
 
-struct Navaid: Identifiable, Codable, Equatable, Hashable, Sendable {
+nonisolated struct Navaid: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String                       // e.g., "SJC"
     let name: String                     // "San Jose"
     let type: NavaidType
@@ -186,7 +198,7 @@ struct Navaid: Identifiable, Codable, Equatable, Hashable, Sendable {
 
 // MARK: - Airspace
 
-struct Airspace: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct Airspace: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let classification: AirspaceClass
     let name: String                     // "SFO Class B"
@@ -316,7 +328,7 @@ nonisolated struct TFRAltitude: Codable, Equatable, Sendable {
 
 // MARK: - Flight Plan
 
-struct FlightPlan: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct FlightPlan: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var name: String?
     var departure: String                // ICAO
@@ -364,7 +376,7 @@ struct FlightPlan: Identifiable, Codable, Equatable, Sendable {
 
 // MARK: - Waypoint
 
-struct Waypoint: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct Waypoint: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var identifier: String               // ICAO, navaid ID, or lat/lon
     var name: String
@@ -398,7 +410,7 @@ struct Waypoint: Identifiable, Codable, Equatable, Sendable {
 
 // MARK: - Weather Cache
 
-struct WeatherCache: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct WeatherCache: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     var stationID: String                // ICAO (e.g., "KPAO")
     var rawMETAR: String?                // Raw METAR text
@@ -459,7 +471,7 @@ struct WeatherCache: Identifiable, Codable, Equatable, Sendable {
 
 // MARK: - Chart Region
 
-struct ChartRegion: Identifiable, Codable, Equatable, Sendable {
+nonisolated struct ChartRegion: Identifiable, Codable, Equatable, Sendable {
     let id: String                       // e.g., "San_Francisco"
     let name: String                     // "San Francisco"
     let effectiveDate: Date

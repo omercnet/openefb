@@ -35,6 +35,7 @@ private final class NotamRequestRecorder: @unchecked Sendable {
 }
 
 @Suite("NOTAM Service Tests", .serialized)
+@MainActor
 struct NotamServiceTests {
 
     // MARK: - Fixtures
@@ -49,7 +50,7 @@ struct NotamServiceTests {
     )
 
     /// Documented-format page (built from docs, see file header) for icaoLocation=KPAO.
-    static let kpaoPage = #"""
+    nonisolated static let kpaoPage = #"""
     {
       "pageSize": 100, "pageNum": 1, "totalCount": 6, "totalPages": 1,
       "items": [
@@ -178,7 +179,7 @@ struct NotamServiceTests {
     """#.data(using: .utf8)!
 
     /// One-item documented-format page with a permanent NOTAM, for network tests run at wall-clock time.
-    static func permanentPage(number: String, pageNum: Int, totalPages: Int) -> Data {
+    nonisolated static func permanentPage(number: String, pageNum: Int, totalPages: Int) -> Data {
         let json = """
         {"pageSize":100,"pageNum":\(pageNum),"totalCount":\(totalPages),"totalPages":\(totalPages),
          "items":[{"type":"Feature","properties":{"coreNOTAMData":{

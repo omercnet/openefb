@@ -23,10 +23,60 @@ nonisolated enum MapQueryRegion {
     /// Re-query thresholds: the centre moved this far, or the radius changed this much.
     static let requeryDistanceNM: Double = 5         // nautical miles
     static let requeryRadiusRatio: Double = 0.20     // 20 %
+    /// Below this map zoom the airport layer shows only towered public airports, queried over
+    /// the whole visible region. Above it, the 500 NM cap no longer clips the view.
+    static let lowZoomThreshold: Double = 7.0
+    /// Largest region radius for the low-zoom towered query (covers CONUS from its centre).
+    static let maxLowZoomRadiusNM: Double = 3000     // nautical miles
+
+    /// True when the map is zoomed out far enough that only towered airports are drawn.
+    static func isLowZoom(_ zoom: Double) -> Bool { zoom < lowZoomThreshold }
+
+    /// Grid columns across the longer visible axis for low-zoom spatial thinning.
+    static let lowZoomGridCells: Double = 28
+
+    /// One airport per grid cell over the visible bounds, so dense metro areas don't pile into
+    /// a clump while sparse regions keep every field. Deterministic: the lowest ICAO id wins
+    /// a cell. Degenerate bounds return the input unchanged.
+    static func thinSpatially(
+        _ airports: [Airport],
+        south: Double, west: Double, north: Double, east: Double,
+        cells: Double = lowZoomGridCells
+    ) -> [Airport] {
+        let cell = max(north - south, east - west) / cells   // degrees
+        guard cell > 0 else { return airports }
+        var best: [String: Airport] = [:]
+        for airport in airports {
+            let key = "\(Int(((airport.latitude - south) / cell).rounded(.down))),\(Int(((airport.longitude - west) / cell).rounded(.down)))"
+            if let existing = best[key], existing.icao <= airport.icao { continue }
+            best[key] = airport
+        }
+        return best.values.sorted { $0.icao < $1.icao }
+    }
+
+    /// Radius covering the whole visible region for the low-zoom towered query: like
+    /// `radiusNM` but capped at `maxLowZoomRadiusNM` instead of `maxRadiusNM`.
+    static func lowZoomRadiusNM(
+        center: CLLocationCoordinate2D,
+        northEast: CLLocationCoordinate2D,
+        southWest: CLLocationCoordinate2D
+    ) -> Double {
+        let farthest = farthestCornerNM(center: center, northEast: northEast, southWest: southWest)
+        return min(max(farthest * marginFactor, minRadiusNM), maxLowZoomRadiusNM)
+    }
 
     /// Query radius covering everything on screen: distance from the centre to the farthest
     /// visible corner, plus margin, clamped to [minRadiusNM, maxRadiusNM].
     static func radiusNM(
+        center: CLLocationCoordinate2D,
+        northEast: CLLocationCoordinate2D,
+        southWest: CLLocationCoordinate2D
+    ) -> Double {
+        let farthest = farthestCornerNM(center: center, northEast: northEast, southWest: southWest)
+        return min(max(farthest * marginFactor, minRadiusNM), maxRadiusNM)
+    }
+
+    private static func farthestCornerNM(
         center: CLLocationCoordinate2D,
         northEast: CLLocationCoordinate2D,
         southWest: CLLocationCoordinate2D
@@ -37,8 +87,7 @@ nonisolated enum MapQueryRegion {
             CLLocationCoordinate2D(latitude: northEast.latitude, longitude: southWest.longitude),
             CLLocationCoordinate2D(latitude: southWest.latitude, longitude: northEast.longitude),
         ]
-        let farthest = corners.map { haversineNM(from: center, to: $0) }.max() ?? minRadiusNM
-        return min(max(farthest * marginFactor, minRadiusNM), maxRadiusNM)
+        return corners.map { haversineNM(from: center, to: $0) }.max() ?? minRadiusNM
     }
 
     /// Whether the region changed enough to hit the database again.

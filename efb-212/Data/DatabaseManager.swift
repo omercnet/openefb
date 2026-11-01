@@ -47,6 +47,10 @@ final class DatabaseManager: DatabaseServiceProtocol, @unchecked Sendable {
         try aviationDB.airports(near: coordinate, radiusNM: radiusNM)
     }
 
+    nonisolated func toweredAirports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] {
+        try aviationDB.toweredAirports(near: coordinate, radiusNM: radiusNM)
+    }
+
     nonisolated func nearestAirports(to coordinate: CLLocationCoordinate2D, count: Int) throws -> [Airport] {
         try aviationDB.nearestAirports(to: coordinate, count: count)
     }
@@ -61,6 +65,10 @@ final class DatabaseManager: DatabaseServiceProtocol, @unchecked Sendable {
 
     nonisolated func navaids(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Navaid] {
         try aviationDB.navaids(near: coordinate, radiusNM: radiusNM)
+    }
+
+    nonisolated func dataCycle() throws -> AviationDataCycle? {
+        try aviationDB.dataCycle()
     }
 }
 
@@ -81,6 +89,10 @@ final class UnavailableDatabaseService: DatabaseServiceProtocol, @unchecked Send
         throw EFBError.databaseCorrupted
     }
 
+    nonisolated func toweredAirports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] {
+        throw EFBError.databaseCorrupted
+    }
+
     nonisolated func nearestAirports(to coordinate: CLLocationCoordinate2D, count: Int) throws -> [Airport] {
         throw EFBError.databaseCorrupted
     }
@@ -94,6 +106,10 @@ final class UnavailableDatabaseService: DatabaseServiceProtocol, @unchecked Send
     }
 
     nonisolated func navaids(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Navaid] {
+        throw EFBError.databaseCorrupted
+    }
+
+    nonisolated func dataCycle() throws -> AviationDataCycle? {
         throw EFBError.databaseCorrupted
     }
 }

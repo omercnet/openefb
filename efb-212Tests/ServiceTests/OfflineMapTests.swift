@@ -100,8 +100,14 @@ struct OfflineMapTests {
         #expect(both == bigBytes + OfflineTileMath.estimatedBytes(bounds: big, layer: .street))
     }
 
-    @Test func satelliteAndTerrainAreOffByDefault() {
-        #expect(OfflineLayer.allCases.filter(\.isDefaultEnabled) == [.sectional, .street])
+    @Test func onlyRedistributableLayersAreDownloadable() {
+        #expect(OfflineLayer.allCases == [.sectional, .street])
+    }
+
+    @Test func onlineOnlyBaseMapsNeverReadAsOfflineReady() {
+        let packs = [Self.pack(.sectional, cycle: Self.utc(2026, 10, 29, 9, 1)), Self.pack(.street)]
+        #expect(OfflineStatusResolver.status(visible: Self.view, style: .satellite, packs: packs) == .notDownloaded)
+        #expect(OfflineStatusResolver.status(visible: Self.view, style: .terrain, packs: packs) == .notDownloaded)
     }
 
     // MARK: - Status

@@ -12,27 +12,36 @@ import SwiftUI
 struct CurrencyBadge: View {
     let status: CurrencyStatus
     let label: String
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 12, height: 12)
-            Text(label)
-                .font(.subheadline)
-            Spacer()
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+            : AnyLayout(HStackLayout(spacing: 6))
+        layout {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 12, height: 12)
+                    .accessibilityHidden(true)
+                Text(label)
+                    .font(.subheadline)
+            }
+            if !typeSize.isAccessibilitySize { Spacer() }
+            // Status in words (primary text for contrast); the dot colour only reinforces it.
             Text(statusText)
                 .font(.caption)
-                .foregroundStyle(statusColor)
-                .fontWeight(.medium)
+                .foregroundStyle(Palette.primaryText)
+                .fontWeight(.semibold)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private var statusColor: Color {
         switch status {
         case .current: return .green
-        case .warning: return .yellow
-        case .expired: return .red
+        case .warning: return Palette.caution
+        case .expired: return Palette.warning
         }
     }
 

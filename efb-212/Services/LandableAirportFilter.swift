@@ -52,9 +52,15 @@ nonisolated enum LandableAirportFilter {
     }
 
     /// Private-use fields need prior permission; flag them so the pilot knows.
-    /// Note: the bundled database currently records every airport as public.
+    /// Ownership comes from NASR FACILITY_USE_CODE (PR = private use). Military fields are `.military` (see `isMilitary`).
     static func isPrivateUse(_ airport: Airport) -> Bool {
         airport.ownership == .privateOwned
+    }
+
+    /// Military fields (NASR ownership MA/MN/MR/CG): not available for normal use, but kept in
+    /// the Nearest list for emergency landings.
+    static func isMilitary(_ airport: Airport) -> Bool {
+        airport.ownership == .military
     }
 }
 

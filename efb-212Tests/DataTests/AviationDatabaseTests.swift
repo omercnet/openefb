@@ -17,6 +17,7 @@ import GRDB
 @testable import efb_212
 
 @Suite("AviationDatabase Query Tests")
+@MainActor
 struct AviationDatabaseTests {
 
     // MARK: - Fixture
@@ -386,5 +387,37 @@ struct AviationDatabaseTests {
 
         let found = try db.airspaces(near: CLLocationCoordinate2D(latitude: 37.6, longitude: -122.4), radiusNM: 30)
         #expect(found.map(\.name) == ["SFO Class B Inner"])
+    }
+
+    // MARK: - Towered airports (low-zoom layer)
+
+    @Test func toweredAirportsReturnsOnlyPublicFixedWingFieldsWithATowerFrequency() throws {
+        let db = try Self.makeDatabase(
+            airports: [
+                AirportRow(icao: "KPAO", name: "Palo Alto", lat: 37.46, lon: -122.11),            // CTAF only
+                AirportRow(icao: "KSFO", name: "San Francisco Intl", lat: 37.62, lon: -122.38),  // towered
+                AirportRow(icao: "KSQL", name: "San Carlos", lat: 37.51, lon: -122.25),          // towered
+                AirportRow(icao: "KNUQ", name: "Moffett", lat: 37.42, lon: -122.05, ownership: "military"),
+                AirportRow(icao: "4CA4", name: "Private Tower", lat: 37.40, lon: -122.00, ownership: "private"),
+                AirportRow(icao: "CA01", name: "Hospital", lat: 37.45, lon: -122.15, type: "heliport"),
+                AirportRow(icao: "KFAR", name: "Far Away Towered", lat: 47.0, lon: -100.0),
+            ],
+            frequencies: [
+                FrequencyRow(airport: "KPAO", id: "f1", type: "ctaf", name: "CTAF", frequency: 118.6),
+                FrequencyRow(airport: "KSFO", id: "f2", type: "tower", name: "Tower", frequency: 120.5),
+                FrequencyRow(airport: "KSQL", id: "f3", type: "tower", name: "Tower", frequency: 119.0),
+                FrequencyRow(airport: "KNUQ", id: "f4", type: "tower", name: "Tower", frequency: 126.0),
+                FrequencyRow(airport: "4CA4", id: "f5", type: "tower", name: "Tower", frequency: 121.0),
+                FrequencyRow(airport: "CA01", id: "f6", type: "tower", name: "Tower", frequency: 122.0),
+                FrequencyRow(airport: "KFAR", id: "f7", type: "tower", name: "Tower", frequency: 123.0),
+            ]
+        )
+        let center = CLLocationCoordinate2D(latitude: 37.5, longitude: -122.2)
+
+        let near = try db.toweredAirports(near: center, radiusNM: 100)
+        #expect(Set(near.map(\.icao)) == ["KSFO", "KSQL"])
+
+        let wide = try db.toweredAirports(near: center, radiusNM: 1500)
+        #expect(Set(wide.map(\.icao)) == ["KSFO", "KSQL", "KFAR"])
     }
 }

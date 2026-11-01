@@ -25,6 +25,7 @@ nonisolated final class RequestLog: @unchecked Sendable {
 }
 
 @Suite("Weather Service Tests")
+@MainActor
 struct WeatherServiceTests {
 
     // MARK: - Helpers

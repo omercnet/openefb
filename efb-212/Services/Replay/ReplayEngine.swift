@@ -133,7 +133,7 @@ final class ReplayEngine {
         // Start 20Hz timer for tick updates
         playbackTimer?.invalidate()
         playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 self?.tick()
             }
         }

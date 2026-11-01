@@ -97,61 +97,61 @@ enum EFBError: LocalizedError, Identifiable {
     var errorDescription: String? {
         switch self {
         case .gpsUnavailable:
-            return "GPS is unavailable. Ensure Location Services are enabled for this app."
+            return "No GPS position. Turn on Location for OpenEFB in Settings › Privacy & Security › Location Services."
 
         case .chartExpired(let date):
             let formatter = DateFormatter()
             formatter.dateStyle = .medium
-            return "Chart expired on \(formatter.string(from: date)). Download the latest chart for current navigation data."
+            return "Chart expired \(formatter.string(from: date)). Download the current chart before using it."
 
         case .chartDownloadFailed(let region):
-            return "Failed to download chart for \(region). Check your network connection and try again."
+            return "Chart download for \(region) failed. Check the internet connection and try again."
 
         case .chartCorrupted(let region):
-            return "Chart data for \(region) is corrupted. Delete and re-download the chart."
+            return "The \(region) chart file is damaged. Delete it and download it again."
 
         case .weatherStale(let age):
             let minutes = Int(age / 60)
-            return "Weather data is \(minutes) minutes old and may be unreliable. Refresh when possible."
+            return "Weather is \(minutes) min old. Refresh before relying on it."
 
         case .weatherFetchFailed(let underlying):
-            return "Unable to fetch weather: \(underlying.localizedDescription)"
+            return "Weather download failed: \(underlying.localizedDescription)"
 
         case .recordingFailed(let underlying):
-            return "Flight recording error: \(underlying.localizedDescription)"
+            return "Recording failed: \(underlying.localizedDescription)"
 
         case .audioSessionFailed(let underlying):
-            return "Audio session configuration failed: \(underlying.localizedDescription)"
+            return "Cockpit audio could not start: \(underlying.localizedDescription)"
 
         case .transcriptionUnavailable:
-            return "Speech recognition is not available on this device. Transcription will be skipped."
+            return "Speech recognition is not available on this iPad. The flight records without a transcript."
 
         case .microphonePermissionDenied:
-            return "Microphone access is required for cockpit audio recording. Enable in Settings > Privacy > Microphone."
+            return "Microphone is off, so no cockpit audio is recorded. Turn it on in Settings › OpenEFB › Microphone."
 
         case .databaseCorrupted:
-            return "Aviation database is corrupted. Re-import NASR data from Settings."
+            return "The airport database could not be opened. Reinstall OpenEFB."
 
         case .databaseMigrationFailed(let underlying):
-            return "Database migration failed: \(underlying.localizedDescription). Please reinstall the app or contact support."
+            return "The flight database could not be updated: \(underlying.localizedDescription). Reinstall OpenEFB."
 
         case .nasrImportFailed(let underlying):
-            return "NASR data import failed: \(underlying.localizedDescription). Try again or download a fresh data set."
+            return "FAA airport data import failed: \(underlying.localizedDescription). Try again with a fresh NASR download."
 
         case .tfrFetchFailed(let underlying):
-            return "Unable to fetch TFR data: \(underlying.localizedDescription)"
+            return "TFRs could not be loaded: \(underlying.localizedDescription)"
 
         case .networkUnavailable:
-            return "No network connection. Weather and chart downloads are unavailable."
+            return "No internet. Weather, TFRs and downloads are unavailable; downloaded maps and the airport database still work."
 
         case .debriefFailed(let underlying):
-            return "AI debrief generation failed: \(underlying.localizedDescription)"
+            return "Debrief failed: \(underlying.localizedDescription)"
 
         case .debriefUnavailable(let reason):
             return reason
 
         case .airportNotFound(let icao):
-            return "Airport \"\(icao)\" not found in the database. Verify the identifier or update your aviation data."
+            return "\(icao) is not in the airport database. Check the identifier."
         }
     }
 

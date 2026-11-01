@@ -25,21 +25,22 @@ struct PirepSection: View {
 
     @State private var state: LoadState = .loading
     @State private var expandedIDs: Set<String> = []
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("PIREPS")
-                    .font(.caption)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                SectionHeader("PIREPS")
                 Spacer()
                 Button {
                     Task { await load() }
                 } label: {
                     Image(systemName: "arrow.clockwise")
-                        .font(.caption)
+                        .font(.body)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .foregroundStyle(Palette.accentText)
                 .accessibilityLabel("Refresh PIREPs")
             }
 
@@ -48,13 +49,18 @@ struct PirepSection: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, alignment: .leading)
             case .failed(let message):
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .font(.subheadline)
-                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    Label("PIREPs not loaded: \(message)", systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.caution)
+                    Button("Retry") { Task { await load() } }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                }
             case .loaded(let pireps) where pireps.isEmpty:
                 Text("No PIREPs within 50 NM in the last 2 hours.")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Palette.secondaryText)
             case .loaded(let pireps):
                 ForEach(pireps) { pirep in
                     row(pirep)
@@ -72,26 +78,30 @@ struct PirepSection: View {
     private func row(_ pirep: Pirep) -> some View {
         let isExpanded = expandedIDs.contains(pirep.id)
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
+            let headerLayout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.xs))
+                : AnyLayout(HStackLayout(spacing: 6))
+            headerLayout {
                 if pirep.isUrgent {
                     Label("URGENT", systemImage: "exclamationmark.triangle.fill")
                         .font(.caption.weight(.bold))
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Palette.warning)
                 }
                 Text(pirep.altitudeText)
                     .font(.subheadline.weight(.semibold))
                 if let aircraft = pirep.aircraftType {
                     Text(aircraft)
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                 }
-                Spacer()
-                WeatherBadge(observationTime: pirep.observationTime)
+                if !typeSize.isAccessibilitySize { Spacer() }
+                DataAgeBadge(.pirep, observed: pirep.observationTime)
             }
+            .accessibilityElement(children: .combine)
 
             Text(locationText(pirep))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
 
             ForEach(summaryLines(pirep), id: \.self) { line in
                 Text(line)
@@ -106,29 +116,33 @@ struct PirepSection: View {
                 HStack {
                     Text("Raw report")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
                     Spacer()
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+                        .font(.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                        .accessibilityHidden(true)
                 }
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
 
             if isExpanded {
                 Text(pirep.rawText)
-                    .font(.caption2.monospaced())
+                    .font(.footnote.monospaced())
                     .textSelection(.enabled)
             }
         }
         .padding(8)
         .background(
-            pirep.isUrgent ? Color.red.opacity(0.15) : Color.secondary.opacity(0.08),
+            pirep.isUrgent ? Palette.warning.opacity(0.15) : Palette.fill,
             in: RoundedRectangle(cornerRadius: 8)
         )
         .overlay {
             if pirep.isUrgent {
-                RoundedRectangle(cornerRadius: 8).stroke(Color.red, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8).stroke(Palette.warning, lineWidth: 1)
             }
         }
     }

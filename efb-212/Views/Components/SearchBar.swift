@@ -17,7 +17,7 @@ struct SearchBar: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
+                .foregroundStyle(Palette.secondaryText)
                 .accessibilityHidden(true)  // decorative per UI-SPEC accessibility
 
             TextField(placeholder, text: $text)
@@ -26,16 +26,19 @@ struct SearchBar: View {
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.characters)  // ICAO IDs are uppercase
                 .onSubmit(onSubmit)
+                .frame(minHeight: 44)
 
             if !text.isEmpty {
                 Button(action: { text = "" }) {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(Palette.secondaryText)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Clear search")
             }
         }
-        .padding(8)
+        .padding(.horizontal, 8)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }

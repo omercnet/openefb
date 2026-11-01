@@ -55,7 +55,7 @@ struct LogbookEntryTests {
 
     @Test func formatDurationHMZero() {
         let result = LogbookViewModel.formatDurationHM(0)
-        #expect(result == "0h 0m")
+        #expect(result == "0s")
     }
 
     @Test func formatDurationHM2Hours() {

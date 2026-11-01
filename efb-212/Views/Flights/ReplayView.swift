@@ -55,27 +55,28 @@ struct ReplayView: View {
 
     @ViewBuilder
     private var replayContent: some View {
-        ZStack {
-            // Main content: map + optional transcript panel
-            HStack(spacing: 0) {
-                // Left: Replay map (takes remaining space)
-                ReplayMapView(
-                    replayEngine: viewModel.replayEngine,
-                    autoFollow: $viewModel.autoFollow
+        HStack(spacing: 0) {
+            // Left: Replay map with its controls overlaid. The overlay is scoped to the map so
+            // the readouts and toggle never sit over the transcript panel.
+            ReplayMapView(
+                replayEngine: viewModel.replayEngine,
+                autoFollow: $viewModel.autoFollow
+            )
+            .overlay { replayControlsOverlay }
+            // Right: Transcript panel (300pt, collapsible)
+            if viewModel.isTranscriptPanelExpanded {
+                TranscriptPanelView(
+                    segments: viewModel.replayEngine.transcriptSegments,
+                    activeIndex: viewModel.replayEngine.currentTranscriptIndex
                 )
-
-                // Right: Transcript panel (~300pt, collapsible)
-                if viewModel.isTranscriptPanelExpanded {
-                    TranscriptPanelView(
-                        segments: viewModel.replayEngine.transcriptSegments,
-                        activeIndex: viewModel.replayEngine.currentTranscriptIndex
-                    )
-                    .frame(width: 300)
-                    .transition(.move(edge: .trailing))
-                }
+                .frame(width: 300)
+                .transition(.move(edge: .trailing))
             }
+        }
+    }
 
-            // Overlay controls
+    @ViewBuilder
+    private var replayControlsOverlay: some View {
             VStack {
                 HStack(alignment: .top) {
                     // Top-left: Playback controls
@@ -129,7 +130,7 @@ struct ReplayView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
             }
-        }
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)  // Map overlay controls cap at xxxLarge
     }
 
     // MARK: - Playback Controls Overlay
@@ -143,9 +144,9 @@ struct ReplayView: View {
             } label: {
                 Image(systemName: viewModel.replayEngine.isPlaying ? "pause.fill" : "play.fill")
                     .font(.title2)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Palette.onAccent)
                     .frame(width: 44, height: 44)
-                    .background(Circle().fill(.blue))
+                    .background(Circle().fill(Palette.accent))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(viewModel.replayEngine.isPlaying ? "Pause" : "Play")
@@ -159,9 +160,13 @@ struct ReplayView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
+                    .frame(minWidth: 44, minHeight: 44)
                     .background(Capsule().fill(.black.opacity(0.6)))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Playback speed")
+            .accessibilityValue("\(Int(viewModel.replayEngine.playbackSpeed)) times")
             .popover(isPresented: $viewModel.showSpeedPicker) {
                 speedPickerContent
             }
@@ -173,9 +178,9 @@ struct ReplayView: View {
                 } label: {
                     Image(systemName: "location.fill")
                         .font(.body)
-                        .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(.orange))
+                        .foregroundStyle(Palette.onAccent)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Palette.accent))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Re-center map")
@@ -201,14 +206,17 @@ struct ReplayView: View {
                             .font(.body.monospacedDigit())
                         if speed == viewModel.replayEngine.playbackSpeed {
                             Image(systemName: "checkmark")
+                                .accessibilityHidden(true)
                                 .font(.caption)
                         }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .padding(.horizontal, 16)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("\(Int(speed)) times speed")
+                .accessibilityAddTraits(speed == viewModel.replayEngine.playbackSpeed ? .isSelected : [])
             }
         }
         .padding(.vertical, 8)
@@ -223,29 +231,38 @@ struct ReplayView: View {
             // Ground speed -- knots
             VStack(spacing: 2) {
                 Text("GS")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("\(Int(viewModel.replayEngine.currentSpeed))")
                     .font(.subheadline.bold().monospacedDigit())
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Ground speed")
+            .accessibilityValue("\(Int(viewModel.replayEngine.currentSpeed)) knots")
 
             // Altitude -- feet MSL
             VStack(spacing: 2) {
                 Text("ALT")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("\(Int(viewModel.replayEngine.currentAltitude))")
                     .font(.subheadline.bold().monospacedDigit())
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Altitude")
+            .accessibilityValue("\(Int(viewModel.replayEngine.currentAltitude)) feet")
 
             // Heading -- degrees true
             VStack(spacing: 2) {
                 Text("HDG")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
                 Text("\(Int(viewModel.replayEngine.currentHeading))\u{00B0}")
                     .font(.subheadline.bold().monospacedDigit())
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Heading")
+            .accessibilityValue("\(Int(viewModel.replayEngine.currentHeading)) degrees")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -265,9 +282,10 @@ struct ReplayView: View {
             Image(systemName: viewModel.isTranscriptPanelExpanded ? "sidebar.trailing" : "text.bubble")
                 .font(.body)
                 .foregroundStyle(.primary)
-                .frame(width: 36, height: 36)
+                .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(viewModel.isTranscriptPanelExpanded ? "Hide transcript" : "Show transcript")
@@ -279,9 +297,10 @@ struct ReplayView: View {
     private var audioMutedIndicator: some View {
         HStack(spacing: 4) {
             Image(systemName: "speaker.slash.fill")
-                .font(.caption2)
+                .font(.caption)
+                .accessibilityHidden(true)
             Text("Audio muted at \(viewModel.replayEngine.playbackSpeed, specifier: "%.0f")x")
-                .font(.caption2)
+                .font(.caption)
         }
         .foregroundStyle(.secondary)
         .padding(.horizontal, 10)
@@ -298,6 +317,7 @@ struct ReplayView: View {
             Image(systemName: "text.bubble.fill")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .accessibilityHidden(true)
             Text(segment.text)
                 .font(.caption)
                 .lineLimit(2)
@@ -314,12 +334,13 @@ struct ReplayView: View {
     private var recordingActiveGuard: some View {
         VStack(spacing: 16) {
             Image(systemName: "record.circle")
+                .accessibilityHidden(true)
                 .font(.largeTitle)
                 .foregroundStyle(.red)
-            Text("Stop recording before replaying a flight.")
+            Text("End the recording first")
                 .font(.headline)
                 .multilineTextAlignment(.center)
-            Text("An active flight recording is in progress. End the recording from the Map tab to enable replay.")
+            Text("A recording is running. End it from the Map tab, then replay.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -346,9 +367,10 @@ struct ReplayView: View {
     private func errorState(_ error: String) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
+                .accessibilityHidden(true)
                 .font(.largeTitle)
                 .foregroundStyle(.orange)
-            Text("Could not load flight")
+            Text("Flight not loaded")
                 .font(.headline)
             Text(error)
                 .font(.subheadline)

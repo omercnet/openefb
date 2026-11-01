@@ -108,3 +108,67 @@ nonisolated enum GPSStatus: Equatable, Sendable {
         }
     }
 }
+
+// MARK: - GPSFailureReason
+
+/// Why CoreLocation is not delivering a usable position. "GPS LOST" alone tells the pilot
+/// nothing; this names the cause and, when the pilot can fix it, points at Settings.
+nonisolated enum GPSFailureReason: Equatable, Sendable {
+    /// Location access denied for this app, or Location Services off device-wide.
+    case authorizationDenied
+    /// Location access blocked by restrictions (parental controls, MDM). Settings cannot fix it.
+    case authorizationRestricted
+    /// Access granted but no position source: Wi-Fi-only iPad with no network, airplane mode.
+    case locationUnavailable
+    /// Stream is running but no fix arrived within `noFixGraceSeconds` of starting.
+    case noFixYet
+    /// The location stream itself ended with an error.
+    case streamFailed
+
+    /// How long after tracking starts, with no fix, before `noFixYet` is shown. Cold GPS
+    /// starts take a few seconds; a Wi-Fi-only iPad never gets there.
+    static let noFixGraceSeconds: TimeInterval = 15   // seconds
+
+    /// Map the flags of a location update that carried no position. nil when none of the
+    /// flags explain the missing position (e.g. a stationary notice).
+    static func from(
+        authorizationDenied: Bool,
+        authorizationRestricted: Bool,
+        locationUnavailable: Bool
+    ) -> GPSFailureReason? {
+        if authorizationDenied { return .authorizationDenied }
+        if authorizationRestricted { return .authorizationRestricted }
+        if locationUnavailable { return .locationUnavailable }
+        return nil
+    }
+
+    var title: String {
+        switch self {
+        case .authorizationDenied: return "Location access is off"
+        case .authorizationRestricted: return "Location access is restricted"
+        case .locationUnavailable: return "No position source"
+        case .noFixYet: return "Waiting for a GPS fix"
+        case .streamFailed: return "GPS stopped"
+        }
+    }
+
+    var message: String {
+        switch self {
+        case .authorizationDenied:
+            return "The moving map, NRST and recording need your position. Allow Location for OpenEFB in Settings \u{203A} Privacy & Security \u{203A} Location Services."
+        case .authorizationRestricted:
+            return "Location is blocked by a restriction on this iPad (Screen Time or device management)."
+        case .locationUnavailable:
+            return "No GPS receiver is answering. Wi-Fi-only iPads have no GPS: connect an external GPS, or check Airplane Mode."
+        case .noFixYet:
+            return "No position yet. Outdoors a fix takes under a minute; a Wi-Fi-only iPad has no GPS and needs an external receiver."
+        case .streamFailed:
+            return "Position updates ended unexpectedly. Relaunch OpenEFB; if it repeats, check Location in Settings."
+        }
+    }
+
+    /// Only a denial can be fixed in Settings. Restricted and hardware causes cannot.
+    var offersSettings: Bool {
+        self == .authorizationDenied
+    }
+}

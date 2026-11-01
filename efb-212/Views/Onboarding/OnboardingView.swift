@@ -2,8 +2,9 @@
 //  OnboardingView.swift
 //  efb-212
 //
-//  First-time user onboarding walkthrough: 3 swipeable pages introducing
-//  GPS navigation, moving map features, and flight recording.
+//  First-run screen: one page, one button. States what the app does, what works offline, and the
+//  "not for primary navigation" disclaimer, then "I understand". (Was 4 swipe-only pages with no
+//  visible way forward; the cut review, T14, reduced first run to a single acknowledgement.)
 //  Completion persisted via @AppStorage so onboarding only shows once.
 //
 
@@ -11,82 +12,91 @@ import SwiftUI
 
 struct OnboardingView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
-    @State private var currentPage = 0
+
+    @ScaledMetric(relativeTo: .largeTitle) private var heroSize: CGFloat = 64
 
     var body: some View {
-        VStack {
-            TabView(selection: $currentPage) {
-                OnboardingPage(
-                    systemImage: "location.fill",
-                    tint: .blue,
-                    title: "Navigate with GPS",
-                    description: "OpenEFB uses your location to show your position on VFR sectional charts in real time."
-                )
-                .tag(0)
+        GeometryReader { geo in
+            ScrollView {
+                VStack(spacing: 28) {
+                    Spacer(minLength: 0)
 
-                OnboardingPage(
-                    systemImage: "map.fill",
-                    tint: .green,
-                    title: "Your Moving Map",
-                    description: "Airports, weather, airspace, and TFRs at your fingertips. Works offline with downloaded charts."
-                )
-                .tag(1)
+                    Image(systemName: "location.fill")
+                        .font(.system(size: heroSize))
+                        .foregroundStyle(Palette.accentText)
+                        .accessibilityHidden(true)
 
-                VStack(spacing: 24) {
-                    OnboardingPage(
-                        systemImage: "record.circle",
-                        tint: .red,
-                        title: "Record Every Flight",
-                        description: "One tap to capture GPS track and cockpit audio. Get an AI-powered debrief after landing."
-                    )
+                    Text("OpenEFB")
+                        .font(.largeTitle.bold())
+                        .accessibilityAddTraits(.isHeader)
 
-                    Button("Get Started") {
-                        hasSeenOnboarding = true
+                    VStack(alignment: .leading, spacing: 20) {
+                        row(
+                            systemImage: "map.fill",
+                            title: "See where you are",
+                            text: "Your position on the FAA sectional, with airspace, airports, TFRs and METARs around you."
+                        )
+                        row(
+                            systemImage: "icloud.slash",
+                            title: "Know what works offline",
+                            text: "Airports and the map regions you download work in the air. Weather, TFRs and NOTAMs need the internet."
+                        )
+                        row(
+                            systemImage: "exclamationmark.shield.fill",
+                            title: Disclaimers.primaryNavigation.title,
+                            text: Disclaimers.onboardingSummary,
+                            tint: Palette.caution
+                        )
                     }
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: 280)
-                    .padding(.vertical, 14)
-                    .background(.blue)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(maxWidth: 560, alignment: .leading)
+                    .padding(.horizontal, 32)
+
+                    Button {
+                        hasSeenOnboarding = true
+                    } label: {
+                        Text("I understand")
+                            .font(.headline)
+                            .foregroundStyle(Palette.onAccent)
+                            .frame(maxWidth: 280, minHeight: 44)
+                            .padding(.vertical, 14)
+                            .background(Palette.accent)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                     .padding(.bottom, 40)
+
+                    Spacer(minLength: 0)
                 }
-                .tag(2)
+                .padding(.vertical, 20)
+                .frame(maxWidth: .infinity, minHeight: geo.size.height)
             }
-            .tabViewStyle(.page(indexDisplayMode: .always))
         }
         .background(Color(.systemBackground))
     }
-}
 
-// MARK: - Onboarding Page
-
-private struct OnboardingPage: View {
-    let systemImage: String
-    let tint: Color
-    let title: String
-    let description: String
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-
+    private func row(
+        systemImage: String,
+        title: String,
+        text: String,
+        tint: Color = Palette.accentText
+    ) -> some View {
+        HStack(alignment: .top, spacing: 16) {
             Image(systemName: systemImage)
-                .font(.system(size: 80))
+                .font(.title2)
                 .foregroundStyle(tint)
-
-            Text(title)
-                .font(.title)
-                .fontWeight(.bold)
-
-            Text(description)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-
-            Spacer()
+                .frame(width: 36)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(text)
+                    .font(.body)
+                    .foregroundStyle(Palette.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .accessibilityElement(children: .combine)
     }
 }
 

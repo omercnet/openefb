@@ -22,6 +22,8 @@ final class RecordingDatabaseService: DatabaseServiceProtocol, @unchecked Sendab
     private(set) var airportQueries: [(center: CLLocationCoordinate2D, radiusNM: Double)] = []
     private(set) var navaidQueryCount = 0
     private(set) var airspaceQueryCount = 0
+    var toweredList: [Airport] = []
+    private(set) var toweredQueries: [(center: CLLocationCoordinate2D, radiusNM: Double)] = []
 
     func airport(byICAO icao: String) throws -> Airport? { airportList.first { $0.icao == icao } }
 
@@ -29,6 +31,12 @@ final class RecordingDatabaseService: DatabaseServiceProtocol, @unchecked Sendab
         airportQueries.append((coordinate, radiusNM))
         if failAirportQueries { throw EFBError.databaseCorrupted }
         return airportList
+    }
+
+    func toweredAirports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] {
+        toweredQueries.append((coordinate, radiusNM))
+        if failAirportQueries { throw EFBError.databaseCorrupted }
+        return toweredList
     }
 
     func nearestAirports(to coordinate: CLLocationCoordinate2D, count: Int) throws -> [Airport] {
@@ -46,6 +54,8 @@ final class RecordingDatabaseService: DatabaseServiceProtocol, @unchecked Sendab
         navaidQueryCount += 1
         return navaidList
     }
+
+    func dataCycle() throws -> AviationDataCycle? { nil }
 }
 
 @Suite("Map Loading Flow Integration Tests")
@@ -63,11 +73,19 @@ struct MapLoadingFlowTests {
         let db: RecordingDatabaseService
     }
 
-    static func makeHarness(airports: [Airport] = [kpao, ksql]) -> Harness {
+    /// Zero debounce: region changes issued back-to-back still coalesce (each cancels the
+    /// previous task before it runs), and `settleDebounce` awaits the survivor, so no test
+    /// depends on wall-clock time. `zoom` defaults to a zoomed-in view (full airport query).
+    static func makeHarness(airports: [Airport]? = nil, zoom: Double = 11) -> Harness {
+        let airports = airports ?? [kpao, ksql]
         let db = RecordingDatabaseService()
         db.airportList = airports
         let appState = AppState()
-        let vm = MapViewModel(appState: appState, mapService: MapService(), databaseService: db)
+        appState.mapZoom = zoom
+        let vm = MapViewModel(
+            appState: appState, mapService: MapService(), databaseService: db,
+            regionChangeDebounce: .zero
+        )
         return Harness(vm: vm, appState: appState, db: db)
     }
 
@@ -89,9 +107,9 @@ struct MapLoadingFlowTests {
         h.vm.onRegionChanged(center: center, zoom: zoom, northEast: b.ne, southWest: b.sw, direction: 0)
     }
 
-    /// Wait past the 500 ms region-change debounce.
-    func settleDebounce() async throws {
-        try await Task.sleep(for: .milliseconds(800))
+    /// Wait until the pending debounced region change has been applied.
+    func settleDebounce(_ h: Harness) async {
+        await h.vm.settleRegionChange()
     }
 
     // MARK: - Initial / layer-driven load
@@ -175,7 +193,7 @@ struct MapLoadingFlowTests {
         changeRegion(h, to: last)
         #expect(h.db.airportQueries.isEmpty, "nothing may query before the debounce elapses")
 
-        try await settleDebounce()
+        await settleDebounce(h)
 
         #expect(h.db.airportQueries.count == 1)
         #expect(h.db.airportQueries.first?.center.latitude == last.latitude)
@@ -186,13 +204,13 @@ struct MapLoadingFlowTests {
     @Test func smallPanAtSameZoomUpdatesAppStateButDoesNotRequery() async throws {
         let h = Self.makeHarness()
         changeRegion(h, to: Self.kpaoCoord)
-        try await settleDebounce()
+        await settleDebounce(h)
         #expect(h.db.airportQueries.count == 1)
 
         // About 1 NM north: well inside the 5 NM requery threshold.
         let nudged = CLLocationCoordinate2D(latitude: Self.kpaoCoord.latitude + 1.0 / 60.0, longitude: Self.kpaoCoord.longitude)
         changeRegion(h, to: nudged)
-        try await settleDebounce()
+        await settleDebounce(h)
 
         #expect(h.db.airportQueries.count == 1)
         #expect(h.appState.mapCenter.latitude == nudged.latitude)
@@ -201,14 +219,81 @@ struct MapLoadingFlowTests {
     @Test func panningFarEnoughRequeriesAtTheNewCenter() async throws {
         let h = Self.makeHarness()
         changeRegion(h, to: Self.kpaoCoord)
-        try await settleDebounce()
+        await settleDebounce(h)
 
         let farther = CLLocationCoordinate2D(latitude: Self.kpaoCoord.latitude + 0.5, longitude: Self.kpaoCoord.longitude)  // ~30 NM
         changeRegion(h, to: farther)
-        try await settleDebounce()
+        await settleDebounce(h)
 
         #expect(h.db.airportQueries.count == 2)
         #expect(h.db.airportQueries.last?.center.latitude == farther.latitude)
+    }
+
+    // MARK: - Low zoom: towered airports over the whole visible region
+
+    /// A CONUS-sized view: about 25 deg x 59 deg.
+    func changeToConusRegion(_ h: Harness, zoom: Double = 4) {
+        let center = CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0)
+        h.vm.onRegionChanged(
+            center: center, zoom: zoom,
+            northEast: CLLocationCoordinate2D(latitude: 50.0, longitude: -66.0),
+            southWest: CLLocationCoordinate2D(latitude: 25.0, longitude: -125.0),
+            direction: 0
+        )
+    }
+
+    @Test func lowZoomQueriesToweredAirportsOverTheWholeRegionNotACappedDisc() async {
+        let h = Self.makeHarness(zoom: 4)
+        h.db.toweredList = [Self.kpao]
+
+        changeToConusRegion(h)
+        await settleDebounce(h)
+
+        #expect(h.db.airportQueries.isEmpty, "the full 500 NM disc query must not run at low zoom")
+        let radius = h.db.toweredQueries.last?.radiusNM ?? 0
+        #expect(radius > MapQueryRegion.maxRadiusNM)
+        #expect(radius <= MapQueryRegion.maxLowZoomRadiusNM)
+        #expect(h.vm.visibleAirports.map(\.icao) == ["KPAO"])
+    }
+
+    @Test func zoomingInAcrossTheThresholdSwitchesToTheFullAirportQuery() async {
+        let h = Self.makeHarness(zoom: 4)
+        h.db.toweredList = [Self.kpao]
+        changeRegion(h, to: Self.kpaoCoord, zoom: MapQueryRegion.lowZoomThreshold - 0.5)
+        await settleDebounce(h)
+        #expect(h.db.toweredQueries.count == 1)
+        #expect(h.db.airportQueries.isEmpty)
+
+        // Same centre, same visible bounds: only the zoom crosses the threshold.
+        changeRegion(h, to: Self.kpaoCoord, zoom: MapQueryRegion.lowZoomThreshold)
+        await settleDebounce(h)
+
+        #expect(h.db.airportQueries.count == 1)
+        #expect(h.vm.visibleAirports.map(\.icao) == ["KPAO", "KSQL"])
+    }
+
+    @Test func zoomingOutAcrossTheThresholdSwitchesToTowered() async {
+        let h = Self.makeHarness(zoom: 11)
+        h.db.toweredList = [Self.kpao]
+        changeRegion(h, to: Self.kpaoCoord, zoom: MapQueryRegion.lowZoomThreshold)
+        await settleDebounce(h)
+        #expect(h.db.airportQueries.count == 1)
+
+        changeRegion(h, to: Self.kpaoCoord, zoom: MapQueryRegion.lowZoomThreshold - 0.5)
+        await settleDebounce(h)
+
+        #expect(h.db.toweredQueries.count == 1)
+        #expect(h.vm.visibleAirports.map(\.icao) == ["KPAO"])
+    }
+
+    @Test func layerToggleAtLowZoomUsesTheTowerQuery() {
+        let h = Self.makeHarness(zoom: 4)
+        h.db.toweredList = [Self.kpao]
+
+        Self.loadViaLayerToggle(h)
+
+        #expect(h.db.airportQueries.isEmpty)
+        #expect(h.vm.visibleAirports.map(\.icao) == ["KPAO"])
     }
 
     // MARK: - Airport tap

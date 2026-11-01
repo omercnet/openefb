@@ -45,6 +45,7 @@ struct efb_212App: App {
                     ])
             } else {
                 ContentView()
+                    .appliesDisplayMode()
                     .environment(appState)
                     .modelContainer(for: [
                         SchemaV1.UserSettings.self,

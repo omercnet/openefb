@@ -16,6 +16,9 @@ struct FlightHistoryListView: View {
     @Query(sort: \SchemaV1.FlightRecord.startDate, order: .reverse)
     private var flightRecords: [SchemaV1.FlightRecord]
 
+    /// Decorative empty-state glyph size, scaled with Dynamic Type.
+    @ScaledMetric(relativeTo: .largeTitle) private var heroSize: CGFloat = 48
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateStyle = .medium
@@ -56,11 +59,12 @@ struct FlightHistoryListView: View {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "airplane")
-                .font(.system(size: 48))
+                .font(.system(size: heroSize))
                 .foregroundStyle(.tertiary)
-            Text("No flights recorded yet.")
+                .accessibilityHidden(true)
+            Text("No flights yet")
                 .font(.headline)
-            Text("Start a recording from the Map tab.")
+            Text("Recordings from the Map tab appear here.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -88,6 +92,7 @@ private struct FlightHistoryRow: View {
                     Image(systemName: "arrow.right")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel("to")
                     Text(record.arrivalICAO ?? "---")
                         .font(.headline)
                 }
@@ -106,12 +111,16 @@ private struct FlightHistoryRow: View {
                     Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
                         .font(.caption)
                         .foregroundStyle(.orange)
+                        .accessibilityHidden(true)
                     Text("\(record.trackPointCount)")
-                        .font(.caption2)
+                        .font(.footnote.monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("\(record.trackPointCount) track points")
             }
         }
+        .accessibilityElement(children: .combine)
         .padding(.vertical, 4)
     }
 }

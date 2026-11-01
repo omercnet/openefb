@@ -1,0 +1,15 @@
+ 
+ AIP for ISRAEL(section AD-1.3)valid from 06 AUG 2026 AD 1.3 INDEX TO AERODROMES AND HELIPORTS 1. Aerodromes Aerodrome/heliport name
+Location indicator | Type of traffic permitted to use the aerodrome/heliport | Reference to AD Section and remarks | 
+ International – National
+(INTL-NTL) | IFR-CVFR | S = Scheduled
+NS = Non - scheduled 
+P = Private | 
+ 1 | 2 | 3 | 4 | 5 | 
+ HAIFA
+LLHA | INTL-NTL | CVFR | S-NS-P | AD 2.2 | 
+ TEL-AVIV/BEN-GURION
+LLBG | INTL-NTL | IFR-CVFR | S-NS-P | AD 2.5 | 
+ EILAT/ILAN & ASAF RAMON
+LLER | INTL-NTL | IFR-CVFR | S-NS-P | AD 2.7 | 
+ 2. Heliports NIL 

@@ -1,0 +1,94 @@
+
+	Aeronautical Information Service
+Notam
+                                Display times are in UTC Format only
+Valid From:   
+Region:
+North
+Center
+South
+Series:          
+A
+C
+All
+Weather Types:
+Hours Ahead:
+Location:
+Non Active:
+                                                        -->
+                                                                                    NOTAM NO
+                                                                                    Location
+                                                                                    Message Text
+                                                                                    Type
+                                                                                    Location
+                                                                                    Message Text
+                                                                                                                            C2269/26
+                                                                                                                            LLLL
+                                                                                                                            E) HEL RTE CLSD                                                         
+                                                                                                                               GALIM-DAROM-ATLIT-HASID.                                             
+                                                                                                                               ATLIT-FRDIS.                                                         
+                                                                                                                            C2268/26
+                                                                                                                            LLLL
+                                                                                                                            E) ULTRALIGHT RTE CLSD                                                  
+                                                                                                                               DAROM-HOTRM-BOREN-FRDIS.)                                            
+                                                                                                                            C2267/26
+                                                                                                                            LLLL
+                                                                                                                            E) CVFR RTE CLSD                                                        
+                                                                                                                               GALIM-DAROM-HOTRM-BOREN-FRDIS.)                                      
+                                                                                                                            C2264/26
+                                                                                                                            LLLL
+                                                                                                                            E) HEL RTE CLSD                                                         
+                                                                                                                               GALIM-SUVAS.                                                         
+                                                                                                                               GALIM-KONFO.                                                         
+                                                                                                                            A0849/26
+                                                                                                                            LLLL
+                                                                                                                            E) ATS RTE CLSD                                                         
+                                                                                                                               P68 BTN GALIM-MERVA.                                                 
+                                                                                                                               Q17 BTN ATLIT-ZAHAV.                                                 
+                                                                                                                            C2263/26
+                                                                                                                            LLLV
+                                                                                                                            E) AIRSRRIP CLSD.)                                                      
+                                                                                                                            C2262/26
+                                                                                                                            LLBO
+                                                                                                                            E) AIRSTRIP CLSD TO ALL FLT.)                                           
+                                                                                                                            C2261/26
+                                                                                                                            LLLL
+                                                                                                                            E) AN AREA BTN FLW PSN CLSD TO ALL FLT, FM GND UP TO 12,000FT AMSL      
+                                                                                                                               323334N0345409E 324716N0345650E 324734N0345630E                      
+                                                                                                                               324938N0345558E 330007N0345704E 330423N0344903E                      
+                                                                                                                            C2260/26
+                                                                                                                            LLLL
+                                                                                                                            E) UAS/UAV ACT WILL TAKE PLACE AT YERUHAM.                              
+                                                                                                                               AN AREA BTN FLW PSN 305830N0345551E 305823N0345644E                  
+                                                                                                                               305803N0345708E 305709N0345649E 305624N0345614E                      
+                                                                                                                            C2259/26
+                                                                                                                            LLLL
+                                                                                                                            E) AN AREA AT HACHULA-LAKE WI 0.54NM RADIUS CENTERED ON                 
+                                                                                                                               PSN 330651N0353618E CLSD FM GND UP TO 660FT AGL                      
+                                                                                                                               TO ALL FLT, OPS OF AGRICULTURE FLT AVBL WITH 15MIN                   
+                                                                                                                            C2256/26
+                                                                                                                            LLLL
+                                                                                                                            E) CAPTIVE BALLOON WILL TAKE PLACE AT TAMRAH.                           
+                                                                                                                               AN AREA WI 0.3NM RADIUS CENTERED ON PSN 325058N0351056E              
+                                                                                                                               CLSD FM GND UP TO 1,800FT AMSL, TO ALL FLT INCLUDING                 
+                                                                                                                            C2253/26
+                                                                                                                            LLLL
+                                                                                                                            E) HEL RTE CLSD  GALIM-SUVAS.)                                          
+                                                                                                                            C2252/26
+                                                                                                                            LLLL
+                                                                                                                            E) HEL RTE CLSD                                                         
+                                                                                                                               SFAIM-SUVAS.                                                         
+                                                                                                                               SFAIM-KONFO.                                                         
+                                                                                                                            C2250/26
+                                                                                                                            LLLL
+                                                                                                                            E) OPS OF FIBER OPTIC GUIDED UAS AND THE USE OF CELLULAR                
+                                                                                                                               COMMUNICATIONS IN UAS OPS IS PROHIBIRED WITHIN TEL AVIV              
+                                                                                                                               FIR. FOR FURTHER INFORMATION PLEASE REFER TO CAA SITE -              
+                                                                                                                            C2251/26
+                                                                                                                            LLLL
+                                                                                                                            E) CVFR RTE CLSD  TAVOR-DESHE.)                                         
+                                                                                                                            C2249/26
+                                                                                                                            LLLL
+                                                               
+
+[... truncated sample ...]

@@ -10,7 +10,7 @@ docs/ folder first (docs/CUSTOMER.md, docs/IMPROVE-APP-PLAN.md, docs/DESIGN.md w
   project.pbxproj), keep the edit minimal and re-read the file right before editing.
 - Do NOT git commit, stash, reset, checkout or rebase. Commit signing is unavailable, and the
   integrator snapshots the tree.
-- Project build settings: SWIFT_VERSION 5 with SWIFT_DEFAULT_ACTOR_ISOLATION=MainActor. Pure
+- Project build settings: SWIFT_VERSION 6.0, strict concurrency complete, SWIFT_DEFAULT_ACTOR_ISOLATION=MainActor. Pure
   parsing and model code used off the main actor must be `nonisolated`. Copy patterns from
   Services/WeatherService.swift and efb-212Tests/ServiceTests/WeatherParsingTests.swift.
 - For network tests, use `StubURLProtocol.session { request in (200, data) }` from
@@ -24,20 +24,20 @@ docs/ folder first (docs/CUSTOMER.md, docs/IMPROVE-APP-PLAN.md, docs/DESIGN.md w
   - Keep standard aviation abbreviations.
   - Never show stale or unvalidated data as current.
   - Minimal animation in flight.
-## Build and test: your own simulator, through tools/sim-test.sh
-Each agent gets its own simulator so nobody waits. Set `SIM_TAG` to your ticket id and use
-`tools/sim-test.sh`; it creates "OpenEFB · <worktree> · <ticket>" on first use and reuses it.
-NEVER touch simulators that aren't yours (no `simctl shutdown all`, `delete all` or `erase`).
+## Build and test: claim a simulator from the pool, through tools/sim-test.sh
+Reuse simulators; don't create fresh ones. At the start, claim a free agent simulator, which reuses one from a
+finished task and only creates one when all are busy. Release it at the end. Never delete simulators.
 ```
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-export SIM_TAG=<your-ticket-id>              # e.g. T07; also gives you a private derived-data dir
+export SIM_TAG=$(tools/sim-test.sh claim <your-ticket-id>)   # e.g. prints T09; also selects its derived-data dir
 tools/sim-test.sh build -quiet                                       # compile app + tests
 tools/sim-test.sh test -only-testing:efb-212Tests/<SuiteName>        # run your suites
 RESULT=/tmp/<ticket>.xcresult tools/sim-test.sh test -only-testing:efb-212UITests/<YourTmpTests>
 tools/sim-test.sh demo                       # install + launch the built app at KPAO on your sim
 tools/sim-test.sh id                         # your sim UDID, for `simctl io <id> screenshot` etc.
-tools/sim-test.sh delete                     # delete your sim when you are completely done
+tools/sim-test.sh release                    # when you are completely done (do NOT delete the sim)
 ```
+NEVER touch simulators that aren't yours (no `simctl shutdown all`, `delete all` or `erase`).
 Before you finish, run the FULL unit suite once (`-only-testing:efb-212Tests`) and make sure it is
 green. If another agent's in-progress edit breaks the build in a file you don't own, wait a few
 minutes and retry. Don't fix their file.

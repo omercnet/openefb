@@ -15,8 +15,8 @@ struct DatabaseUnavailableBanner: View {
 
     /// Fixed pilot-facing copy. The EFBError itself stays in AppState.databaseError for
     /// diagnostics; its generic text is not shown because it would not help the pilot here.
-    static let title = "Airport database unavailable \u{2014} reinstall the app"
-    static let detail = "No airports, airspace or navaids can be shown."
+    static let title = "Airport database could not be opened"
+    static let detail = "No airports, airspace or navaids will show. Reinstall OpenEFB."
 
     var body: some View {
         if appState.databaseError != nil {
@@ -24,6 +24,7 @@ struct DatabaseUnavailableBanner: View {
                 Image(systemName: "exclamationmark.octagon.fill")
                     .font(.title3)
                     .foregroundStyle(.white)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(Self.title)
@@ -39,7 +40,8 @@ struct DatabaseUnavailableBanner: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-            .background(Color.red)
+            // Deep red so white text clears 4.5:1 (system red under white is ~3.6:1), day and night.
+            .background(Color(red: 0.70, green: 0.07, blue: 0.07))
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("databaseUnavailableBanner")
         }

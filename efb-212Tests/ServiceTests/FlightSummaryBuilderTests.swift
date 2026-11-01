@@ -10,6 +10,7 @@ import Foundation
 @testable import efb_212
 
 @Suite("FlightSummaryBuilder Tests")
+@MainActor
 struct FlightSummaryBuilderTests {
 
     // MARK: - Test Helpers

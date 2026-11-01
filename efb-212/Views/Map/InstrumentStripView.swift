@@ -46,6 +46,8 @@ struct InstrumentStripView: View {
         .padding(.vertical, 8)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Instruments")
         .accessibilityIdentifier("Instrument strip")
     }
 
@@ -121,19 +123,21 @@ struct GPSStatusChip: View {
         return true
     }
 
+    @ScaledMetric(relativeTo: .callout) private var statusSize: CGFloat = 15
+
     var body: some View {
         HStack(spacing: 6) {
             Circle()
                 .fill(tint)
                 .frame(width: 12, height: 12)
             Text(status.label)
-                .font(.system(size: 15, weight: .bold, design: .monospaced))
+                .font(.system(size: statusSize, weight: .bold, design: .monospaced))
                 .foregroundStyle(isAlert ? tint : .primary)
                 .lineLimit(1)
                 .fixedSize()
         }
         .padding(.horizontal, 10)
-        .frame(height: 44)
+        .frame(minHeight: 44)
         .background(isAlert ? tint.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier("GPS status")
@@ -150,28 +154,52 @@ struct InstrumentCell: View {
     let value: String
     let unit: String
     var dimmed: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+    // Instrument readouts keep exact point sizes but scale with Dynamic Type.
+    @ScaledMetric(relativeTo: .caption) private var labelSize: CGFloat = 13
+    @ScaledMetric(relativeTo: .largeTitle) private var valueSize: CGFloat = 28
+
+    /// Night: low-luminance text instead of bright white (F16).
+    private var valueStyle: Color {
+        if dimmed { return .secondary }
+        return colorScheme == .dark ? NightPalette.text : .primary
+    }
+
+    /// Spoken form: "Ground speed 95 knots"; stale data is announced, never color alone.
+    private var spoken: (name: String, unit: String) {
+        switch label {
+        case "GS": return ("Ground speed", "knots")
+        case "ALT": return ("Altitude", "feet")
+        case "VS": return ("Vertical speed", "feet per minute")
+        case "TRK": return ("Track", "degrees")
+        case "DTG": return ("Distance to go", "nautical miles")
+        case "ETE": return ("Estimated time enroute", "")
+        default: return (label, unit)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 2) {
             Text(label)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: labelSize, weight: .semibold))
                 .foregroundStyle(.secondary)
             HStack(alignment: .lastTextBaseline, spacing: 3) {
                 Text(value)
-                    .font(.system(size: 28, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(dimmed ? .secondary : .primary)
-                    .opacity(dimmed ? 0.6 : 1.0)
+                    .font(.system(size: valueSize, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(valueStyle)
+                    // Stale values are grey and announced; no extra fade (kept >= 4.5:1)
                 if !unit.isEmpty {
                     Text(unit)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: labelSize, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
             }
         }
         .frame(minWidth: 84)
         .padding(.horizontal, 6)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label) \(value) \(unit)\(dimmed ? ", stale" : "")")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken.name)
+        .accessibilityValue("\(value) \(spoken.unit)\(dimmed ? ", stale" : "")")
     }
 }
 

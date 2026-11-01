@@ -4,12 +4,13 @@
 //
 //  Recording UI state management. Bridges RecordingCoordinator.State
 //  to SwiftUI via @Observable. Handles start/stop/countdown actions,
-//  formatted elapsed time, transcript panel toggle, and stop confirmation.
+//  formatted elapsed time, the discarded-recording notice, and stop confirmation.
 //
 //  Periodically syncs from coordinator state (every 0.5s) for flight phase
 //  and audio level updates.
 //
 
+import AVFoundation
 import CoreLocation
 import Foundation
 import Observation
@@ -28,8 +29,12 @@ final class RecordingViewModel {
     var audioLevel: Float = -160  // dBFS
     var countdownRemaining: Int = 0
     var showStopConfirmation: Bool = false
-    var isTranscriptPanelExpanded: Bool = false
     var lastError: EFBError?
+    /// The last stopped recording had no track points and was not saved. Shown until dismissed.
+    var showDiscardedNotice: Bool = false
+    /// True while microphone access is denied. Recording still captures the GPS track; the
+    /// overlay says audio and transcript are off and how to fix it (Settings).
+    var microphoneDenied: Bool = false
 
     // MARK: - Dependencies
 
@@ -37,11 +42,14 @@ final class RecordingViewModel {
     private weak var appState: AppState?
     private var syncTask: Task<Void, Never>?
 
-    /// Optional logbook integration -- set from view layer to enable auto-population.
-    var logbookViewModel: LogbookViewModel?
+    /// Creates the FlightRecord + draft logbook entry when a recording stops.
+    var persistence: (any FlightPersistenceServiceProtocol)?
 
-    /// SwiftData model context for logbook entry creation (injected from view layer).
+    /// SwiftData model context the persisted records are inserted into (injected from the view layer).
     var modelContext: ModelContext?
+
+    /// What happened to the last stopped recording (saved, or discarded because it had no track).
+    var lastPersistenceResult: FlightPersistenceResult?
 
     // MARK: - Init
 
@@ -58,6 +66,13 @@ final class RecordingViewModel {
 
     /// Start a new flight recording.
     func startRecording() async {
+        lastError = nil
+        showDiscardedNotice = false
+        // Ask once (system prompt); afterwards the state comes from Settings.
+        if AVAudioApplication.shared.recordPermission == .undetermined {
+            _ = await AVAudioApplication.requestRecordPermission()
+        }
+        microphoneDenied = AVAudioApplication.shared.recordPermission == .denied
         do {
             let flightID = try await coordinator.startRecording()
             appState?.activeFlightRecordID = flightID
@@ -72,48 +87,31 @@ final class RecordingViewModel {
     }
 
     /// Confirm stop after dialog approval.
-    /// After stopping the recording, auto-creates a logbook entry (LOG-01) if
-    /// logbookViewModel and modelContext are available.
+    /// After stopping, FlightPersistenceService creates the FlightRecord and draft logbook entry
+    /// (or discards a recording with no track points).
     func confirmStop() async {
         showStopConfirmation = false
         let summary = await coordinator.stopRecording()
         appState?.activeFlightRecordID = nil
+        // Don't leave the shared status at .recording until the next 0.5 s sync tick:
+        // Flight Detail disables Replay while it isn't .idle.
+        appState?.recordingStatus = .idle
 
-        // LOG-01: Auto-create logbook entry from recording data
-        if let summary, let logbookVM = logbookViewModel, let ctx = modelContext {
-            // Resolve departure airport from first track point via R-tree nearest lookup
-            var depICAO: String?
-            var depName: String?
-            var arrICAO: String?
-            var arrName: String?
+        guard let summary, let persistence, let ctx = modelContext else { return }
+        let result = persistence.persist(
+            summary: summary,
+            aircraftProfileID: appState?.activeAircraftProfileID,
+            pilotProfileID: appState?.activePilotProfileID,
+            modelContext: ctx
+        )
+        lastPersistenceResult = result
+        showDiscardedNotice = Self.shouldShowDiscardedNotice(for: result)
+    }
 
-            if let dbService = appState?.sharedDatabaseService {
-                // Use summary departure/arrival if coordinator resolved them
-                if let icao = summary.departureICAO {
-                    depICAO = icao
-                    depName = (try? dbService.airport(byICAO: icao))?.name
-                }
-                if let icao = summary.arrivalICAO {
-                    arrICAO = icao
-                    arrName = (try? dbService.airport(byICAO: icao))?.name
-                }
-            }
-
-            let aircraftID = appState?.activeAircraftProfileID
-            let pilotID = appState?.activePilotProfileID
-
-            logbookVM.createFromRecording(
-                summary: summary,
-                departureICAO: depICAO,
-                departureName: depName,
-                arrivalICAO: arrICAO,
-                arrivalName: arrName,
-                aircraftProfileID: aircraftID,
-                aircraftType: nil,  // Will be populated from aircraft profile in edit view
-                pilotProfileID: pilotID,
-                modelContext: ctx
-            )
-        }
+    /// A recording with no track points is discarded; tell the pilot instead of dropping it silently.
+    nonisolated static func shouldShowDiscardedNotice(for result: FlightPersistenceResult) -> Bool {
+        if case .discardedEmpty = result { return true }
+        return false
     }
 
     /// Cancel an active auto-start countdown.
@@ -121,10 +119,6 @@ final class RecordingViewModel {
         await coordinator.cancelCountdown()
     }
 
-    /// Toggle the live transcript panel expanded/collapsed.
-    func toggleTranscriptPanel() {
-        isTranscriptPanelExpanded.toggle()
-    }
 
     // MARK: - Formatted Output
 
@@ -160,6 +154,9 @@ final class RecordingViewModel {
 
                 let state = self.coordinator.state
                 self.recordingStatus = state.recordingStatus
+                // Covers auto-started recordings and permission changed in Settings mid-flight.
+                self.microphoneDenied = state.recordingStatus == .recording
+                    && AVAudioApplication.shared.recordPermission == .denied
                 self.elapsedTime = state.elapsedTime
                 self.currentPhase = state.currentPhase
                 self.recentTranscripts = state.recentTranscripts

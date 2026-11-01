@@ -8,6 +8,16 @@
 **Deployment Target:** iPad, iOS 26.0
 **Database:** Dual — GRDB (aviation data) + SwiftData (user data)
 
+> **Note, 2026-11-01: where the shipped app differs from this PRD.** The body below is the original plan and has not been rewritten; when it disagrees with `efb-212/`, the code wins. Status: TestFlight beta (1.0, build 1); see `README.md` and `AGENTS.md`.
+>
+> - **Tabs:** the app has 3 tabs, Map / Flights / Settings, not 5 (see the "5-tab bar" check in §18). Logbook is a section of Flights (History / Logbook / Plans); Aircraft & Pilot profiles are under Settings > Profiles. Planning is reached from the map's plan button or the Flights > Plans section.
+> - **State and concurrency:** `AppState` and the view models use `@Observable`, not `ObservableObject`/Combine; `AppState` is one flat class with no `NavigationState`/`MapState`/`RecordingState`/`FlightPlanState` sub-objects. The project builds in Swift 6.0 language mode with default MainActor isolation. Bundle ID is `io.omer.efb`.
+> - **Dependencies:** only MapLibre Native iOS and GRDB are SwiftPM packages. **SwiftNASR** is not used: FAA NASR is parsed offline by `tools/nasr-importer` into a bundled `aviation.sqlite` (19,134 airports). **aviationCharts/GDAL/MBTiles** is not used. **SFR SPM packages** (§10) were never extracted; recording code lives in the app (`Services/Recording/`), and `EFBRecordingCoordinator` is `RecordingCoordinator`.
+> - **Charts:** the VFR sectional is FAA raster tiles streamed from ArcGIS (zoom 8-12), with offline regions as MapLibre offline packs (sectional and Street only). Satellite and Terrain are online-only and are to be removed before a public release.
+> - **AI debrief:** on-device Apple Foundation Models only. There is no Claude API / cloud AI option and no premium tier or CloudKit sync (CloudKit-ready models only; sync is not enabled).
+> - **Also shipped (check the PRD body before assuming these are planned or absent):** PIREPs, winds aloft, AIRMET/SIGMET, NOTAMs (the pilot's own FAA key), FAA d-TPP charts and a georeferenced airport diagram overlay, offline map regions, replay, a logbook with drafts, flight-phase detection and auto-start, night/auto display mode, proximity alerts, first-run onboarding.
+> - **Not built:** `DeviceCapabilities` (§8.5.10), IFR procedures, ADS-B, weight and balance.
+
 ---
 
 ## Table of Contents

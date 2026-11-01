@@ -16,6 +16,7 @@ import Speech
 @testable import efb_212
 
 @Suite("TranscriptionService Tests")
+@MainActor
 struct TranscriptionServiceTests {
 
     // MARK: - Helpers

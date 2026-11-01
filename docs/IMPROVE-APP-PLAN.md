@@ -33,7 +33,7 @@ Work items live in beads (epic `efb-77r`). This file holds phase status and deci
 | 6 | made-to-stick | pending | POSITIONING.md, EXPERIMENTS.md | efb-77r.8 | |
 | 7 | influence-psychology | skipped: no in-app upsell surfaces | | | 2026-10-31 |
 | 8 | high-perf-browser | skipped: native app, no browser surface | | | 2026-10-31 |
-| 9 | steve-jobs-design-review | pending (after discovery interviews) | PRODUCT.md, DESIGN.md, EXPERIMENTS.md | efb-77r.6 | |
+| 9 | steve-jobs-design-review | in-progress: review and first cuts done on assumptions (T14); awaiting pilot interviews to confirm the Recommend items | PRODUCT.md, DESIGN.md | efb-77r.6 | 2026-11-01 |
 
 Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reason> · skipped: <reason>
 
@@ -48,3 +48,4 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-31 | 1 | Failure mode: Little Hire (every flight) | One in-flight gap sends the pilot back to ForeFlight |
 | 2026-10-31 | 1 | Phase 1 rests on assumptions; run discovery interviews before the cut pass | No user evidence yet |
 | 2026-10-31 | 2-3 | Fix every severity 3-4 finding now; severity 1-2 go into phases 4-6 | Safety tool: no in-flight trust defects backlogged |
+| 2026-11-01 | 9 | One-page onboarding; TFR layer on by default; no placeholder ownship | J1 trust: fewest steps to the map, hazards on, no fake position |

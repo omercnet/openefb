@@ -21,13 +21,11 @@ struct WindsAloftSection: View {
 
     @State private var forecast: WindsAloftForecast = .sixHour
     @State private var state: LoadState = .loading
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("WINDS ALOFT")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+            SectionHeader("WINDS ALOFT")
 
             Picker("Forecast", selection: $forecast) {
                 ForEach(WindsAloftForecast.allCases) { period in
@@ -41,9 +39,14 @@ struct WindsAloftSection: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, alignment: .leading)
             case .failed(let message):
-                Label(message, systemImage: "exclamationmark.triangle")
-                    .font(.subheadline)
-                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    Label("Winds aloft not loaded: \(message)", systemImage: "exclamationmark.triangle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.caution)
+                    Button("Retry") { Task { await load() } }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                }
             case .loaded(let report):
                 reportView(report)
             }
@@ -58,71 +61,84 @@ struct WindsAloftSection: View {
     @ViewBuilder
     private func reportView(_ report: WindsAloftReport) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
+            let headerLayout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.xs))
+                : AnyLayout(HStackLayout(spacing: Space.s))
+            headerLayout {
                 Text("\(report.station.id) · \(report.station.name) · \(Int(report.distanceNM.rounded())) NM")
                     .font(.subheadline.weight(.semibold))
-                Spacer()
-                // Forecast products are judged by their FOR USE window, not by time since
-                // issue (WeatherBadge would read STALE 2 h after issue while still current).
-                forUseBadge(report)
+                    .accessibilityLabel("Station \(report.station.id), \(report.station.name), \(Int(report.distanceNM.rounded())) nautical miles")
+                if !typeSize.isAccessibilitySize { Spacer() }
+                // Forecast products are judged by their FOR USE window, not by time since issue.
+                DataAgeBadge(.windsAloft, validFrom: report.forUseStart, validUntil: report.forUseEnd)
             }
 
             Text(periodText(report))
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
 
             if !report.isInForUsePeriod(at: Date()) {
                 Label("Outside the forecast's for-use period", systemImage: "clock.badge.exclamationmark")
                     .font(.caption)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Palette.caution)
             }
 
             Grid(alignment: .trailing, horizontalSpacing: 16, verticalSpacing: 4) {
                 GridRow {
                     Text("ALT (ft MSL)").gridColumnAlignment(.leading)
-                    Text("DIR (°T)")
-                    Text("SPD (kt)")
-                    Text("TEMP (°C)")
+                        .accessibilityLabel("Altitude feet MSL, direction degrees true, speed knots, temperature Celsius")
+                    Text("DIR (°T)").accessibilityHidden(true)
+                    Text("SPD (kt)").accessibilityHidden(true)
+                    Text("TEMP (°C)").accessibilityHidden(true)
                 }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Palette.secondaryText)
 
                 ForEach(report.levels, id: \.altitude) { level in
                     GridRow {
+                        // VoiceOver reads the whole level from the first cell; the other cells are hidden.
                         Text(level.altitude.formatted())  // feet MSL
                             .gridColumnAlignment(.leading)
+                            .accessibilityLabel("\(level.altitude.formatted()) feet")
+                            .accessibilityValue(spokenLevel(level))
                         if level.isLightAndVariable {
                             Text("Light & variable")
                                 .gridCellColumns(2)
+                                .accessibilityHidden(true)
                         } else {
                             Text(level.direction.map { String(format: "%03d", $0) } ?? "—")  // degrees true
+                                .accessibilityHidden(true)
                             Text(level.speed.map { "\($0)" } ?? "—")                           // knots
+                                .accessibilityHidden(true)
                         }
                         Text(level.temperature.map { "\($0)" } ?? "—")                       // degrees Celsius
+                            .accessibilityHidden(true)
                     }
                     .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(level.isForecast ? Color.primary : Color.secondary)
+                    .foregroundStyle(level.isForecast ? Palette.primaryText : Palette.secondaryText)
                 }
             }
 
             if report.levels.contains(where: { !$0.isForecast }) {
                 Text("— Not forecast within 1,500 ft of station elevation (\(report.station.elevation.formatted()) ft MSL).")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.caption)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
     }
 
-    @ViewBuilder
-    private func forUseBadge(_ report: WindsAloftReport) -> some View {
-        let current = report.isInForUsePeriod(at: Date())
-        Text(current ? "Current" : "Not current")
-            .font(.caption)
-            .foregroundStyle(current ? Color.secondary : Color.orange)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Capsule().fill((current ? Color.secondary : Color.orange).opacity(0.15)))
+    private func spokenLevel(_ level: WindsAloftLevel) -> String {
+        var parts: [String] = []
+        if level.isLightAndVariable {
+            parts.append("wind light and variable")
+        } else if let dir = level.direction, let spd = level.speed {
+            parts.append("wind \(dir) degrees at \(spd) knots")
+        }
+        if let temp = level.temperature { parts.append("temperature \(temp) degrees Celsius") }
+        if !level.isForecast { parts.append("not forecast") }
+        return parts.isEmpty ? "no data" : parts.joined(separator: ", ")
     }
+
 
     private func periodText(_ report: WindsAloftReport) -> String {
         var parts: [String] = []

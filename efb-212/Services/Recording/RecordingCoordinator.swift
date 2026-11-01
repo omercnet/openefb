@@ -60,6 +60,7 @@ actor RecordingCoordinator {
     private var autoStartTask: Task<Void, Never>?
     private var autoStopTask: Task<Void, Never>?
     private var currentFlightID: UUID?
+    private var autoStartGate = AutoStartGate()
     private var recordingStartDate: Date?
     private var audioOutputURL: URL?
 
@@ -194,6 +195,9 @@ actor RecordingCoordinator {
         timerTask?.cancel()
         timerTask = nil
 
+        // A manual stop must not re-arm auto-start while the aircraft is still moving
+        autoStartGate.manualStop()
+
         // Stop auto-stop monitoring
         autoStopTask?.cancel()
         autoStopTask = nil
@@ -280,7 +284,8 @@ actor RecordingCoordinator {
                     continue
                 }
 
-                if speed > threshold {
+                let allowed = await self.updateAutoStartGate(speed: speed, threshold: threshold)
+                if speed > threshold && allowed {
                     if speedAboveThresholdSince == nil {
                         speedAboveThresholdSince = Date()
                     }
@@ -292,7 +297,7 @@ actor RecordingCoordinator {
                         await self.startCountdown()
                     }
                 } else {
-                    // Speed dropped below threshold
+                    // Speed dropped below threshold, or auto-start is held off after a manual stop
                     if countdownStarted {
                         await self.cancelCountdown()
                         countdownStarted = false
@@ -308,6 +313,14 @@ actor RecordingCoordinator {
         autoStartTask?.cancel()
         autoStartTask = nil
     }
+
+    /// Feed ground speed (knots) to the post-stop gate. False while auto-start is held off.
+    func updateAutoStartGate(speed: Double, threshold: Double) -> Bool {
+        autoStartGate.update(speedKts: speed, thresholdKts: threshold)
+    }
+
+    /// True while a manual stop is holding auto-start off.
+    var isAutoStartSuppressed: Bool { autoStartGate.isSuppressed }
 
     /// Cancel an active countdown.
     func cancelCountdown() async {
@@ -409,11 +422,11 @@ enum RecordingError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .alreadyRecording:
-            return "A recording is already in progress."
+            return "A recording is already running."
         case .invalidState:
-            return "Recording is in an invalid state for this operation."
+            return "The recording cannot do that in its current state."
         case .notRecording:
-            return "No recording is currently active."
+            return "No recording is running."
         }
     }
 }

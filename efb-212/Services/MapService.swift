@@ -59,6 +59,7 @@ final class MapService {
     /// Called when map style finishes loading. Creates all GeoJSON sources and style layers.
     func onStyleLoaded(style: MLNStyle) {
         appliedMapStyle = nil  // fresh style: base layers back to their JSON defaults
+        appliedNight = nil
         addOwnshipLayer(to: style)
         addAirportLayer(to: style)
         addNavaidLayer(to: style)
@@ -78,12 +79,23 @@ final class MapService {
         style.setImage(createOwnshipChevron(fill: .systemBlue), forName: Self.ownshipLiveIcon)
         style.setImage(createOwnshipChevron(fill: .systemGray), forName: Self.ownshipStaleIcon)
 
-        // Single point feature for ownship
-        let point = MLNPointFeature()
-        point.coordinate = CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0)
-        point.attributes = ["heading": 0, "icon": Self.ownshipLiveIcon]
+        // Ownship exists only once there is a fix. Before that the source is empty: a chevron at
+        // a placeholder position would read as the aircraft's live position (it used to sit in
+        // Kansas). A style reload re-seeds from the last fix.
+        let seed: MLNPointFeature?
+        if let location = lastOwnshipLocation {
+            let point = MLNPointFeature()
+            point.coordinate = location.coordinate
+            point.attributes = [
+                "heading": lastOwnshipHeading,
+                "icon": ownshipStale ? Self.ownshipStaleIcon : Self.ownshipLiveIcon
+            ]
+            seed = point
+        } else {
+            seed = nil
+        }
 
-        let source = MLNShapeSource(identifier: "ownship", shape: point, options: nil)
+        let source = MLNShapeSource(identifier: "ownship", shape: seed, options: nil)
         style.addSource(source)
         self.ownshipSource = source
 
@@ -111,25 +123,28 @@ final class MapService {
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image { context in
             let ctx = context.cgContext
-            // Aviation chevron pointing up: triangle shape
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: 16, y: 3))      // top center (nose)
+            path.addLine(to: CGPoint(x: 26, y: 28))   // bottom right
+            path.addLine(to: CGPoint(x: 16, y: 22))   // center notch
+            path.addLine(to: CGPoint(x: 6, y: 28))    // bottom left
+            path.closeSubpath()
+
+            // Dark halo first (outer ring), then fill, then a thin white inner edge: reads on
+            // yellow city tint, blue water and dark terrain alike (F13)
+            ctx.setLineJoin(.round)
+            ctx.setStrokeColor(UIColor(white: 0.05, alpha: 1).cgColor)
+            ctx.setLineWidth(4.0)
+            ctx.addPath(path)
+            ctx.strokePath()
+
             ctx.setFillColor(fill.cgColor)
-            ctx.beginPath()
-            ctx.move(to: CGPoint(x: 16, y: 2))     // top center (nose)
-            ctx.addLine(to: CGPoint(x: 26, y: 28))  // bottom right
-            ctx.addLine(to: CGPoint(x: 16, y: 22))  // center notch
-            ctx.addLine(to: CGPoint(x: 6, y: 28))   // bottom left
-            ctx.closePath()
+            ctx.addPath(path)
             ctx.fillPath()
 
-            // White outline for contrast
             ctx.setStrokeColor(UIColor.white.cgColor)
-            ctx.setLineWidth(1.0)
-            ctx.beginPath()
-            ctx.move(to: CGPoint(x: 16, y: 2))
-            ctx.addLine(to: CGPoint(x: 26, y: 28))
-            ctx.addLine(to: CGPoint(x: 16, y: 22))
-            ctx.addLine(to: CGPoint(x: 6, y: 28))
-            ctx.closePath()
+            ctx.setLineWidth(1.5)
+            ctx.addPath(path)
             ctx.strokePath()
         }
     }
@@ -146,10 +161,11 @@ final class MapService {
         self.airportSource = source
 
         let circleLayer = MLNCircleStyleLayer(identifier: "airport-circles", source: source)
-        circleLayer.circleRadius = NSExpression(forConstantValue: 5)
+        circleLayer.circleRadius = NSExpression(forConstantValue: 6.5)
         circleLayer.circleColor = NSExpression(forConstantValue: UIColor.systemCyan)
-        circleLayer.circleStrokeWidth = NSExpression(forConstantValue: 1)
-        circleLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor.white)
+        // Dark ring: cyan on the sectional's yellow city tint needs a contrasting outline (F13)
+        circleLayer.circleStrokeWidth = NSExpression(forConstantValue: 2.5)
+        circleLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor(white: 0.08, alpha: 1))
 
         // All airports visible — zoom-dependent filtering deferred to future optimization
         circleLayer.circleOpacity = NSExpression(forConstantValue: 1.0)
@@ -169,10 +185,11 @@ final class MapService {
         self.navaidSource = source
 
         let circleLayer = MLNCircleStyleLayer(identifier: "navaid-circles", source: source)
-        circleLayer.circleRadius = NSExpression(forConstantValue: 4)
+        circleLayer.circleRadius = NSExpression(forConstantValue: 5)
         circleLayer.circleColor = NSExpression(forConstantValue: UIColor.systemPurple)
-        circleLayer.circleStrokeWidth = NSExpression(forConstantValue: 1)
-        circleLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor.white)
+        // Dark ring: legible over the yellow city tint of the sectional (F13)
+        circleLayer.circleStrokeWidth = NSExpression(forConstantValue: 2)
+        circleLayer.circleStrokeColor = NSExpression(forConstantValue: UIColor(white: 0.08, alpha: 1))
         style.addLayer(circleLayer)
     }
 
@@ -690,23 +707,27 @@ final class MapService {
 
     // MARK: - Base Map Style
 
-    /// Base map last applied to the current style; nil until applied after a style load.
+    /// Base map and sectional state last applied to the current style; nil until applied after a style load.
     private var appliedMapStyle: MapStyle?
+    private var appliedSectional: Bool?
 
-    /// Show the base-style.json layers for `mapStyle`, hide the rest. Toggles visibility
-    /// instead of swapping styles, so the flight data layers added in `onStyleLoaded` survive.
-    func setMapStyle(_ mapStyle: MapStyle) {
-        guard mapStyle != appliedMapStyle, let style = mapView?.style else { return }
+    /// Show the base-style.json layers for `mapStyle`, hide the rest, and show the FAA sectional
+    /// over any base map when `sectional` is true (F17: the sectional is an overlay, not a base).
+    /// `.vfrSectional` is the legacy "street" base. Toggles visibility instead of swapping styles,
+    /// so the flight data layers added in `onStyleLoaded` survive.
+    func setMapStyle(_ mapStyle: MapStyle, sectional: Bool) {
+        guard mapStyle != appliedMapStyle || sectional != appliedSectional,
+              let style = mapView?.style else { return }
 
-        // VFR draws the FAA sectional over the street map (sectional tiles cover zoom 8-12 only)
         let showStreet = mapStyle == .street || mapStyle == .vfrSectional
         for layer in style.layers where layer.identifier.hasPrefix("street-") {
             layer.isVisible = showStreet
         }
         style.layer(withIdentifier: "base-satellite")?.isVisible = mapStyle == .satellite
         style.layer(withIdentifier: "base-terrain")?.isVisible = mapStyle == .terrain
-        style.layer(withIdentifier: "base-vfr-sectional")?.isVisible = mapStyle == .vfrSectional
+        style.layer(withIdentifier: "base-vfr-sectional")?.isVisible = sectional
         appliedMapStyle = mapStyle
+        appliedSectional = sectional
     }
 
     // MARK: - Sectional Opacity
@@ -715,6 +736,39 @@ final class MapService {
     func setSectionalOpacity(_ opacity: Double) {
         let value = NSExpression(forConstantValue: opacity)
         (mapView?.style?.layer(withIdentifier: "base-vfr-sectional") as? MLNRasterStyleLayer)?.rasterOpacity = value
+    }
+
+    // MARK: - Night Dimming
+
+    /// Night state last applied to the current style; nil until applied after a style load.
+    private var appliedNight: Bool?
+
+    /// Dim (night) or restore (day) the raster base layers: sectional, satellite, terrain.
+    /// Brightness ceiling + desaturation keep the chart readable without washing out night vision.
+    func applyDisplayMode(night: Bool) {
+        guard night != appliedNight, let style = mapView?.style else { return }
+        for id in ["base-vfr-sectional", "base-satellite", "base-terrain"] {
+            guard let layer = style.layer(withIdentifier: id) as? MLNRasterStyleLayer else { continue }
+            layer.maximumRasterBrightness = NSExpression(
+                forConstantValue: night ? NightPalette.rasterBrightnessMax : 1.0
+            )
+            layer.rasterSaturation = NSExpression(
+                forConstantValue: night ? NightPalette.rasterSaturation : 0.0
+            )
+        }
+        // Symbol dots: bright cyan/purple glare against the dimmed chart, so mute them at night.
+        if let airports = style.layer(withIdentifier: "airport-circles") as? MLNCircleStyleLayer {
+            airports.circleColor = NSExpression(
+                forConstantValue: night ? NightPalette.airportDot : UIColor.systemCyan
+            )
+        }
+        if let navaids = style.layer(withIdentifier: "navaid-circles") as? MLNCircleStyleLayer {
+            navaids.circleColor = NSExpression(
+                forConstantValue: night ? NightPalette.navaidDot : UIColor.systemPurple
+            )
+        }
+        airportDiagramOverlay.applyDisplayMode(night: night)
+        appliedNight = night
     }
 
     // MARK: - Animation

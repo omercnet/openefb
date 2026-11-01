@@ -24,7 +24,7 @@ final class AviationDatabase: @unchecked Sendable {
     /// Version of the bundled aviation.sqlite. Bump this whenever tools/nasr-importer regenerates
     /// the file. The install fingerprint also includes the bundled file size, so a regenerated
     /// file with a forgotten bump is still re-copied in most cases.
-    nonisolated static let bundledDataVersion = "2026-10-30"
+    nonisolated static let bundledDataVersion = "nasr-2026-10-29"
 
     /// Name of the installed database file and its version marker (both in the install directory).
     nonisolated static let installedFileName = "aviation.sqlite"
@@ -134,6 +134,30 @@ final class AviationDatabase: @unchecked Sendable {
         }
     }
 
+    /// NASR cycle from the `metadata` table (keys `nasr_effective`, `nasr_expires`, `source`).
+    /// nil when the table is absent or the dates are missing or unparseable.
+    nonisolated func dataCycle() throws -> AviationDataCycle? {
+        try dbPool.read { db in
+            guard try db.tableExists("metadata") else { return nil }
+            let rows = try Row.fetchAll(db, sql: "SELECT key, value FROM metadata")
+            let values = Dictionary(rows.compactMap { row -> (String, String)? in
+                guard let key: String = row["key"], let value: String = row["value"] else { return nil }
+                return (key, value)
+            }, uniquingKeysWith: { first, _ in first })
+
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = "yyyy-MM-dd"
+            guard let effectiveText = values["nasr_effective"], let effective = formatter.date(from: effectiveText),
+                  let expiresText = values["nasr_expires"], let expires = formatter.date(from: expiresText) else {
+                return nil
+            }
+            return AviationDataCycle(source: values["source"] ?? "FAA NASR", effective: effective, expires: expires)
+        }
+    }
+
     /// Fetch airports within a radius of a coordinate using R-tree spatial index.
     /// Returns basic Airport structs without runways/frequencies for performance.
     nonisolated func airports(near center: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] {
@@ -151,6 +175,33 @@ final class AviationDatabase: @unchecked Sendable {
                 INNER JOIN airports_rtree r ON a.rowid = r.rowid
                 WHERE r.min_lat <= ? AND r.max_lat >= ?
                   AND r.min_lon <= ? AND r.max_lon >= ?
+                """, arguments: [maxLat, minLat, maxLon, minLon])
+
+            return rows.map { self.airportFromRow($0, runways: [], frequencies: []) }
+        }
+    }
+
+    /// Towered public airports in the box covering a radius of a coordinate. Used at low zoom,
+    /// where showing every field would be unreadable. Towered = has a `tower` frequency row.
+    /// Returns basic Airport structs without runways/frequencies.
+    nonisolated func toweredAirports(near center: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] {
+        let latDelta = radiusNM / 60.0
+        let lonDelta = radiusNM / (60.0 * max(cos(center.latitude * .pi / 180.0), 0.01))
+
+        let minLat = center.latitude - latDelta
+        let maxLat = center.latitude + latDelta
+        let minLon = center.longitude - lonDelta
+        let maxLon = center.longitude + lonDelta
+
+        return try dbPool.read { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT a.* FROM airports a
+                INNER JOIN airports_rtree r ON a.rowid = r.rowid
+                WHERE r.min_lat <= ? AND r.max_lat >= ?
+                  AND r.min_lon <= ? AND r.max_lon >= ?
+                  AND a.type = 'airport' AND a.ownership = 'public'
+                  AND EXISTS (SELECT 1 FROM frequencies f
+                              WHERE f.airport_icao = a.icao AND f.type = 'tower')
                 """, arguments: [maxLat, minLat, maxLon, minLon])
 
             return rows.map { self.airportFromRow($0, runways: [], frequencies: []) }

@@ -11,15 +11,15 @@ import CoreLocation
 
 // MARK: - Navigation
 
-enum AppTab: String, CaseIterable, Sendable {
-    case map, flights, logbook, aircraft, settings
+/// Tab bar: Map / Flights / Settings. Logbook lives in Flights (History / Logbook / Plans) and
+/// Aircraft & Pilot under Settings (T22, efb-77r.22/.23).
+nonisolated enum AppTab: String, CaseIterable, Sendable {
+    case map, flights, settings
 
     var title: String {
         switch self {
         case .map: return "Map"
         case .flights: return "Flights"
-        case .logbook: return "Logbook"
-        case .aircraft: return "Aircraft"
         case .settings: return "Settings"
         }
     }
@@ -28,8 +28,6 @@ enum AppTab: String, CaseIterable, Sendable {
         switch self {
         case .map: return "map"
         case .flights: return "airplane"
-        case .logbook: return "book.closed"
-        case .aircraft: return "airplane.circle"
         case .settings: return "gear"
         }
     }
@@ -198,7 +196,7 @@ enum AirspaceClass: String, Codable, CaseIterable, Sendable {
     case tfr
 }
 
-enum FlightCategory: String, Codable, CaseIterable, Sendable {
+nonisolated enum FlightCategory: String, Codable, CaseIterable, Sendable {
     case vfr      // Ceiling > 3000 AGL AND visibility > 5 SM
     case mvfr     // Ceiling 1000-3000 AGL OR visibility 3-5 SM
     case ifr      // Ceiling 500-999 AGL OR visibility 1-3 SM
@@ -224,7 +222,7 @@ enum WaypointType: String, Codable, CaseIterable, Sendable {
 
 // MARK: - Error Severity
 
-enum ErrorSeverity: Sendable {
+nonisolated enum ErrorSeverity: Sendable {
     case critical   // Red banner, persistent until resolved
     case error      // Red toast, auto-dismiss after 5s
     case warning    // Yellow toast, auto-dismiss after 3s
@@ -233,14 +231,14 @@ enum ErrorSeverity: Sendable {
 
 // MARK: - Lightweight Structs
 
-struct WindInfo: Codable, Equatable, Sendable {
+nonisolated struct WindInfo: Codable, Equatable, Sendable {
     let direction: Int       // degrees true (0 = variable)
     let speed: Int           // knots
     let gusts: Int?          // knots (nil if no gusts)
     let isVariable: Bool
 }
 
-struct BoundingBox: Codable, Equatable, Sendable {
+nonisolated struct BoundingBox: Codable, Equatable, Sendable {
     let minLatitude: Double
     let maxLatitude: Double
     let minLongitude: Double
@@ -254,7 +252,7 @@ struct BoundingBox: Codable, Equatable, Sendable {
     }
 }
 
-struct VSpeeds: Codable, Equatable, Sendable {
+nonisolated struct VSpeeds: Codable, Equatable, Sendable {
     var vr: Int?     // Rotation speed -- knots
     var vx: Int?     // Best angle of climb -- knots
     var vy: Int?     // Best rate of climb -- knots
@@ -291,7 +289,7 @@ enum CurrencyStatus: String, Codable, CaseIterable, Sendable {
 // MARK: - Recording Types
 
 /// Recording lifecycle state.
-enum RecordingStatus: Equatable, Sendable {
+nonisolated enum RecordingStatus: Equatable, Sendable {
     case idle
     case countdown(remaining: Int)   // auto-start 3-second countdown
     case recording
@@ -313,7 +311,7 @@ enum FlightPhaseType: String, Codable, CaseIterable, Sendable {
 }
 
 /// Audio recording quality profile per user decision D-01 (two profiles, Standard default).
-enum AudioQualityProfile: String, Codable, CaseIterable, Sendable {
+nonisolated enum AudioQualityProfile: String, Codable, CaseIterable, Sendable {
     case standard   // 16kHz, 32kbps AAC (~14 MB/hr)
     case high       // 22kHz, 64kbps AAC (~28 MB/hr)
 
@@ -349,7 +347,7 @@ enum InterruptionGapReason: Codable, Sendable, Equatable {
 
 // MARK: - Airspace Geometry
 
-enum AirspaceGeometry: Codable, Equatable, Sendable {
+nonisolated enum AirspaceGeometry: Codable, Equatable, Sendable {
     case polygon(coordinates: [[Double]])  // Array of [lat, lon] pairs
     case circle(center: [Double], radiusNM: Double)  // [lat, lon], radius in NM
 

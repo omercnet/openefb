@@ -19,6 +19,9 @@ protocol DatabaseServiceProtocol: Sendable {
     /// Fetch airports within a radius of a coordinate.
     func airports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport]
 
+    /// Towered public airports within a radius of a coordinate (low-zoom map layer).
+    func toweredAirports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport]
+
     /// Fetch the N nearest airports to a coordinate, sorted by distance.
     func nearestAirports(to coordinate: CLLocationCoordinate2D, count: Int) throws -> [Airport]
 
@@ -30,6 +33,9 @@ protocol DatabaseServiceProtocol: Sendable {
 
     /// Fetch navaids within a radius of a coordinate.
     func navaids(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Navaid]
+
+    /// NASR cycle of the aviation database; nil when the database has no cycle metadata.
+    func dataCycle() throws -> AviationDataCycle?
 }
 
 // MARK: - Location Service Protocol
@@ -116,10 +122,12 @@ protocol TranscriptionServiceProtocol: Sendable {
 final class PlaceholderDatabaseService: DatabaseServiceProtocol, @unchecked Sendable {
     func airport(byICAO icao: String) throws -> Airport? { nil }
     func airports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] { [] }
+    func toweredAirports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] { [] }
     func nearestAirports(to coordinate: CLLocationCoordinate2D, count: Int) throws -> [Airport] { [] }
     func searchAirports(query: String, limit: Int) throws -> [Airport] { [] }
     func airspaces(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airspace] { [] }
     func navaids(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Navaid] { [] }
+    func dataCycle() throws -> AviationDataCycle? { nil }
 }
 
 /// Placeholder location service -- no-op tracking.

@@ -54,6 +54,7 @@ struct AircraftEditView: View {
                     TextField("N-number (e.g., N12345)", text: $nNumber)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
+                        .accessibilityLabel("N-number")
 
                     if showValidationError && nNumber.trimmingCharacters(in: .whitespaces).isEmpty {
                         Text("N-number is required")
@@ -63,6 +64,7 @@ struct AircraftEditView: View {
 
                     TextField("Aircraft type (e.g., Cessna 172SP)", text: $aircraftType)
                         .autocorrectionDisabled()
+                        .accessibilityLabel("Aircraft type")
                 }
 
                 // MARK: - Performance
@@ -70,12 +72,15 @@ struct AircraftEditView: View {
                 Section("Performance") {
                     TextField("Usable Fuel (gal)", text: $fuelCapacity)
                         .keyboardType(.decimalPad)
+                        .accessibilityLabel("Usable fuel in gallons")
 
                     TextField("Fuel Burn (GPH)", text: $fuelBurn)
                         .keyboardType(.decimalPad)
+                        .accessibilityLabel("Fuel burn in gallons per hour")
 
                     TextField("Cruise Speed (kts)", text: $cruiseSpeed)
                         .keyboardType(.decimalPad)
+                        .accessibilityLabel("Cruise speed in knots")
                 }
 
                 // MARK: - V-Speeds (Optional)
@@ -208,15 +213,21 @@ private struct VSpeedField: View {
     let label: String
     @Binding var text: String
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        HStack {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+        layout {
             Text(label)
                 .font(.subheadline)
             Spacer()
             TextField("kts", text: $text)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.trailing)
-                .frame(width: 80)
+                .frame(minWidth: 80, maxWidth: 120)
+                .accessibilityLabel("\(label) in knots")
         }
     }
 }

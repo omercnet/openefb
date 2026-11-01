@@ -20,8 +20,9 @@ final class ReplayViewModel {
 
     // MARK: - UI State
 
-    /// Right panel visibility -- transcript panel expanded/collapsed
-    var isTranscriptPanelExpanded: Bool = true
+    /// Right panel visibility. Starts collapsed; `loadFlight` expands it only when the flight
+    /// has transcript segments, so a flight without audio never opens an empty 300pt panel.
+    var isTranscriptPanelExpanded: Bool = false
 
     /// Map auto-centers on replay marker; user pan disables, re-center button re-enables
     var autoFollow: Bool = true
@@ -49,7 +50,7 @@ final class ReplayViewModel {
         loadError = nil
 
         guard let recordingDB = appState.getOrCreateRecordingDatabase() else {
-            loadError = "Could not access recording database."
+            loadError = "The recording database could not be opened. Reinstall OpenEFB."
             isLoading = false
             return
         }
@@ -74,9 +75,10 @@ final class ReplayViewModel {
                 recordingDB: recordingDB,
                 audioURL: audioURL
             )
+            isTranscriptPanelExpanded = !replayEngine.transcriptSegments.isEmpty
             isLoading = false
         } catch {
-            loadError = "Failed to load flight data: \(error.localizedDescription)"
+            loadError = "Track data could not be read: \(error.localizedDescription)"
             isLoading = false
         }
     }

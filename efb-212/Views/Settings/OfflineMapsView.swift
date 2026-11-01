@@ -11,11 +11,12 @@ import SwiftUI
 
 struct OfflineMapsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var service = OfflineMapService.shared
 
     /// Selected area id; `currentViewID` means the visible map box.
     @State private var selection: String = OfflineMapsView.currentViewID
-    @State private var enabledLayers: Set<OfflineLayer> = Set(OfflineLayer.allCases.filter(\.isDefaultEnabled))
+    @State private var enabledLayers: Set<OfflineLayer> = Set(OfflineLayer.allCases)
     @State private var errorMessage: String?
 
     static let currentViewID = "__current_view__"
@@ -40,7 +41,7 @@ struct OfflineMapsView: View {
                 .accessibilityIdentifier("sectional-cycle-line")
             LabeledContent("Storage used", value: OfflineSizeFormatter.string(bytes: service.storageUsedBytes))
         } footer: {
-            Text("FAA sectionals are revised every 56 days. A downloaded sectional from an earlier cycle is marked Expired and must be downloaded again.")
+            Text("FAA sectionals change every 56 days. A downloaded sectional from an earlier cycle is marked EXPIRED; download it again.")
         }
     }
 
@@ -63,14 +64,9 @@ struct OfflineMapsView: View {
             ForEach(OfflineLayer.allCases) { layer in
                 VStack(alignment: .leading, spacing: 2) {
                     Toggle(layer.displayName, isOn: binding(for: layer))
-                    Text("Zoom \(layer.zoomRange.lowerBound)-\(layer.zoomRange.upperBound)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    if let note = layer.termsNote {
-                        Text(note)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(layer.detailDescription)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             }
 
@@ -89,9 +85,12 @@ struct OfflineMapsView: View {
             .accessibilityIdentifier("offline-download-button")
 
             if let errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                Label {
+                    Text(errorMessage).foregroundStyle(Palette.primaryText)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Palette.caution)
+                }
+                .font(.footnote)
             }
         }
     }
@@ -102,8 +101,8 @@ struct OfflineMapsView: View {
     private var packsSection: some View {
         Section("Downloaded") {
             if service.packs.isEmpty {
-                Text("Nothing downloaded. The map needs the internet.")
-                    .foregroundStyle(.secondary)
+                Text("Nothing downloaded yet. Without a region, the map needs the internet.")
+                    .foregroundStyle(Palette.secondaryText)
             }
             ForEach(service.packs) { pack in
                 packRow(pack)
@@ -111,50 +110,71 @@ struct OfflineMapsView: View {
         }
     }
 
+    private func isFailed(_ pack: OfflinePackSummary) -> Bool {
+        if case .failed = pack.state { return true }
+        return false
+    }
+
     private func packRow(_ pack: OfflinePackSummary) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("\(pack.context.name) · \(pack.context.layer.displayName)")
-                    .font(.body)
-                Spacer()
-                if pack.isExpired() {
-                    Text("EXPIRED")
-                        .font(.caption2.weight(.bold))
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.orange, in: Capsule())   // amber = caution
-                        .foregroundStyle(.black)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("\(pack.context.name) · \(pack.context.layer.displayName)")
+                        .font(.body)
+                    Spacer()
+                    if let effective = pack.context.cycleEffective, pack.context.layer.expiresWithChartCycle {
+                        DataAgeBadge(.chartCycle,
+                                     validUntil: effective.addingTimeInterval(TimeInterval(SectionalCycle.lengthDays) * 86_400))
+                            .hiddenWhenFresh()
+                    }
+                }
+
+                switch pack.state {
+                case .complete:
+                    Text("\(OfflineSizeFormatter.string(bytes: pack.completedBytes))"
+                         + (pack.context.cycleEffective.map { " · cycle \(Self.dateString($0))" } ?? ""))
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                case .downloading, .paused:
+                    ProgressView(value: pack.fraction)
+                        .accessibilityValue("\(Int(pack.fraction * 100)) percent")
+                    Text("\(Int(pack.fraction * 100))% · \(pack.state == .paused ? "paused" : "downloading")")
+                        .font(.footnote)
+                        .foregroundStyle(Palette.secondaryText)
+                case .failed(let message):
+                    Label {
+                        Text("Failed: \(message)").foregroundStyle(Palette.primaryText)
+                    } icon: {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Palette.caution)
+                    }
+                    .font(.footnote)
                 }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(pack.context.name), \(pack.context.layer.displayName)")
+            .accessibilityValue(accessibilityStatus(pack))
 
-            switch pack.state {
-            case .complete:
-                Text("\(OfflineSizeFormatter.string(bytes: pack.completedBytes))"
-                     + (pack.context.cycleEffective.map { " · cycle \(Self.dateString($0))" } ?? ""))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            case .downloading, .paused:
-                ProgressView(value: pack.fraction)
-                Text("\(Int(pack.fraction * 100))% · \(pack.state == .paused ? "paused" : "downloading")")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            case .failed(let message):
-                Text(message).font(.caption).foregroundStyle(.red)
-            }
-
-            HStack(spacing: 16) {
+            let buttonLayout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 16))
+            buttonLayout {
                 if pack.state == .downloading {
-                    Button("Pause") { service.pause(pack) }
+                    Button { service.pause(pack) } label: { tapTarget("Pause") }
                 } else if pack.state == .paused {
-                    Button("Resume") { service.resume(pack) }
+                    Button { service.resume(pack) } label: { tapTarget("Resume") }
                 }
-                if pack.isExpired() {
-                    Button("Download again") {
+                if pack.isExpired() || isFailed(pack) {
+                    Button {
                         do { try service.redownload(pack) } catch { errorMessage = error.localizedDescription }
+                    } label: {
+                        tapTarget(isFailed(pack) ? "Retry" : "Download again")
                     }
                 }
                 Spacer()
-                Button(pack.state == .complete ? "Delete" : "Cancel", role: .destructive) {
+                Button(role: .destructive) {
                     service.delete(pack)
+                } label: {
+                    tapTarget(pack.state == .complete ? "Delete" : "Cancel")
                 }
             }
             .buttonStyle(.borderless)
@@ -163,17 +183,40 @@ struct OfflineMapsView: View {
         .padding(.vertical, 4)
     }
 
+    /// Button label padded to the 44x44pt minimum hit target.
+    private func tapTarget(_ title: String) -> some View {
+        Text(title)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+    }
+
+    /// Spoken status for a pack row: state, progress or size, cycle, expiry.
+    private func accessibilityStatus(_ pack: OfflinePackSummary) -> String {
+        let expired = pack.isExpired() ? ", expired, download again" : ""
+        switch pack.state {
+        case .complete:
+            let size = OfflineSizeFormatter.string(bytes: pack.completedBytes)
+            let cycle = pack.context.cycleEffective.map { ", cycle \(Self.dateString($0))" } ?? ""
+            return "Downloaded, \(size)\(cycle)\(expired)"
+        case .downloading, .paused:
+            let verb = pack.state == .paused ? "Paused" : "Downloading"
+            return "\(verb), \(Int(pack.fraction * 100)) percent\(expired)"
+        case .failed(let message):
+            return "Failed: \(message)"
+        }
+    }
+
     // MARK: - Copy
 
     private var copySection: some View {
         Section("What works offline") {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Offline on this iPad: the airport and navaid database, regions you download here (FAA sectional and street maps), and FAA charts and airport diagram PDFs you have opened.")
-                Text("Needs the internet: weather (METAR, TAF, winds aloft), TFRs, NOTAMs, PIREPs, AIRMET/SIGMET, and any map area you have not downloaded.")
-                Text("Satellite and Terrain tiles come from third-party servers with usage limits (Esri, OpenTopoMap). They are off by default; download only small areas.")
+                Text("Works offline: the airport and navaid database, regions downloaded here (sectional and street), and FAA charts and airport diagrams you have opened.")
+                Text("Needs the internet: weather (METAR, TAF, winds aloft), TFRs, NOTAMs, PIREPs, AIRMET/SIGMET and map areas not downloaded.")
+                Text("Satellite and Terrain base maps are online only.")
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Palette.secondaryText)
         }
     }
 

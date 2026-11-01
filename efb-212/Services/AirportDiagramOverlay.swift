@@ -36,8 +36,20 @@ final class AirportDiagramOverlay {
     nonisolated static let renderScale: CGFloat = 3
     /// Raster opacity on the map.
     nonisolated static let opacity = 0.85
+    /// Backing fill under the diagram quad: hides the sectional, which is upscaled past its native zoom 12
+    /// into blurry blocks and would otherwise sit behind the black taxiway ink. Opacity by zoom: still
+    /// translucent at 14 so the chart context stays visible, nearly solid once the pilot is taxiing.
+    nonisolated static let backingOpacityByZoom: [Double: Double] = [14.0: 0.85, 15.0: 0.97]
+    /// Day backing: paper white (the diagram ink is black).
+    nonisolated static let dayBackingColor = UIColor(white: 1.0, alpha: 1)
+    /// Night backing: near-black, no bright slab in the cockpit.
+    nonisolated static let nightBackingColor = UIColor(white: 0.10, alpha: 1)
+    /// Night ink: raster-brightness-min lifts the black ink to this luminance (the PNG background is
+    /// transparent, so only the ink changes), giving a light-on-dark diagram capped below white.
+    nonisolated static let nightInkBrightnessMin = 0.72
+    nonisolated static let nightInkBrightnessMax = 0.82
     /// Bump when the georeferencing algorithm changes so cached fits are recomputed.
-    nonisolated static let cacheVersion = 1
+    nonisolated static let cacheVersion = 2
     /// Polling interval for camera changes (the map delegate belongs to the map view wrapper).
     nonisolated static let cameraPollInterval: TimeInterval = 0.75
 
@@ -62,8 +74,13 @@ final class AirportDiagramOverlay {
     private struct Entry {
         let sourceID: String
         let layerID: String
+        let backingSourceID: String
+        let backingLayerID: String
         let georeference: AirportDiagramGeoreference
     }
+
+    /// Night palette applied to drawn diagrams; set by `MapService.applyDisplayMode`.
+    private(set) var isNight = false
 
     private var entries: [String: Entry] = [:]          // ICAO -> drawn diagram
     private var loading: Set<String> = []                // ICAO being fetched / fitted
@@ -124,6 +141,7 @@ final class AirportDiagramOverlay {
         let visible = isEnabled && mapView.zoomLevel >= Self.minimumZoom
         for entry in entries.values {
             style?.layer(withIdentifier: entry.layerID)?.isVisible = visible
+            style?.layer(withIdentifier: entry.backingLayerID)?.isVisible = visible
         }
         guard isEnabled, zoomedIn, let databaseService else { return }
 
@@ -252,31 +270,74 @@ final class AirportDiagramOverlay {
             topRight: CLLocationCoordinate2D(latitude: corners[3].latitude, longitude: corners[3].longitude)
         )
         let sourceID = "apd-source-\(airport.icao)", layerID = "apd-layer-\(airport.icao)"
+        let backingSourceID = "apd-backing-source-\(airport.icao)", backingLayerID = "apd-backing-\(airport.icao)"
+        let visible = isEnabled && (mapView?.zoomLevel ?? 0) >= Self.minimumZoom
+
+        var ring = corners.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+        let backingSource = MLNShapeSource(identifier: backingSourceID, shape: MLNPolygon(coordinates: &ring, count: UInt(ring.count)), options: nil)
+        style.addSource(backingSource)
+        let backing = MLNFillStyleLayer(identifier: backingLayerID, source: backingSource)
+        backing.fillOpacity = NSExpression(
+            forMLNInterpolating: .zoomLevelVariable, curveType: .linear, parameters: nil,
+            stops: NSExpression(forConstantValue: Self.backingOpacityByZoom)
+        )
+        backing.minimumZoomLevel = Float(Self.minimumZoom)
+        backing.isVisible = visible
+
         let source = MLNImageSource(identifier: sourceID, coordinateQuad: quad, image: image)
         style.addSource(source)
         let layer = MLNRasterStyleLayer(identifier: layerID, source: source)
         layer.rasterOpacity = NSExpression(forConstantValue: Self.opacity)
         layer.minimumZoomLevel = Float(Self.minimumZoom)
-        layer.isVisible = isEnabled && (mapView?.zoomLevel ?? 0) >= Self.minimumZoom
+        layer.isVisible = visible
+        Self.style(backing: backing, diagram: layer, night: isNight)
         // Below the airport dots (and therefore below ownship, routes, weather), above the sectional.
         if let airports = style.layer(withIdentifier: "airport-circles") {
+            style.insertLayer(backing, below: airports)
             style.insertLayer(layer, below: airports)
         } else if let ownship = style.layer(withIdentifier: "ownship-symbol") {
+            style.insertLayer(backing, below: ownship)
             style.insertLayer(layer, below: ownship)
         } else {
+            style.addLayer(backing)
             style.addLayer(layer)
         }
-        entries[airport.icao] = Entry(sourceID: sourceID, layerID: layerID, georeference: georeference)
+        entries[airport.icao] = Entry(
+            sourceID: sourceID, layerID: layerID,
+            backingSourceID: backingSourceID, backingLayerID: backingLayerID, georeference: georeference
+        )
         shownAirports = entries.keys.sorted()
         logger.notice("APD \(airport.icao, privacy: .public) drawn: \(georeference.diagnostics.method.rawValue, privacy: .public), \(georeference.diagnostics.feetPerPoint, format: .fixed(precision: 1), privacy: .public) ft/pt")
+    }
+
+    /// Day: black ink on a white backing. Night: dark backing, ink lifted to light grey (no white slab).
+    private static func style(backing: MLNFillStyleLayer, diagram: MLNRasterStyleLayer, night: Bool) {
+        backing.fillColor = NSExpression(forConstantValue: night ? nightBackingColor : dayBackingColor)
+        diagram.minimumRasterBrightness = NSExpression(forConstantValue: night ? nightInkBrightnessMin : 0.0)
+        diagram.maximumRasterBrightness = NSExpression(forConstantValue: night ? nightInkBrightnessMax : 1.0)
+    }
+
+    /// Switches drawn diagrams between the day and night rendering; later diagrams follow suit.
+    func applyDisplayMode(night: Bool) {
+        isNight = night
+        guard let style else { return }
+        for entry in entries.values {
+            guard let backing = style.layer(withIdentifier: entry.backingLayerID) as? MLNFillStyleLayer,
+                  let diagram = style.layer(withIdentifier: entry.layerID) as? MLNRasterStyleLayer else { continue }
+            Self.style(backing: backing, diagram: diagram, night: night)
+        }
     }
 
     /// Removes every drawn diagram (used when the style is replaced or in tests).
     func removeAll() {
         guard let style else { return }
         for entry in entries.values {
-            if let layer = style.layer(withIdentifier: entry.layerID) { style.removeLayer(layer) }
-            if let source = style.source(withIdentifier: entry.sourceID) { style.removeSource(source) }
+            for layerID in [entry.layerID, entry.backingLayerID] {
+                if let layer = style.layer(withIdentifier: layerID) { style.removeLayer(layer) }
+            }
+            for sourceID in [entry.sourceID, entry.backingSourceID] {
+                if let source = style.source(withIdentifier: sourceID) { style.removeSource(source) }
+            }
         }
         entries = [:]
         shownAirports = []

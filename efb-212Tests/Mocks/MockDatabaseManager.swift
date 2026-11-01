@@ -13,12 +13,17 @@ final class MockDatabaseManager: DatabaseServiceProtocol, @unchecked Sendable {
     var airports: [Airport] = []
     var airspacesData: [Airspace] = []
     var navaids: [Navaid] = []
+    var cycle: AviationDataCycle?
 
     func airport(byICAO icao: String) throws -> Airport? {
         airports.first { $0.icao == icao }
     }
 
     func airports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] {
+        airports
+    }
+
+    func toweredAirports(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airport] {
         airports
     }
 
@@ -40,4 +45,6 @@ final class MockDatabaseManager: DatabaseServiceProtocol, @unchecked Sendable {
     func navaids(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Navaid] {
         navaids
     }
+
+    func dataCycle() throws -> AviationDataCycle? { cycle }
 }

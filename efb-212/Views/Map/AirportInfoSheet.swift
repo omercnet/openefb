@@ -12,6 +12,7 @@ import SwiftUI
 struct AirportInfoSheet: View {
 
     @Environment(AppState.self) private var appState
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     let databaseService: any DatabaseServiceProtocol
     let weatherService: any WeatherServiceProtocol
@@ -28,25 +29,29 @@ struct AirportInfoSheet: View {
         NavigationStack {
             ScrollView {
                 if let airport {
-                    VStack(alignment: .leading, spacing: 20) {
-                        headerSection(airport)
-                        infoChipsRow(airport)
-                        twoColumnBody(airport)
-                        Divider()
-                        AirportChartsSection(airport: airport, service: chartService)
+                    // Order by J1 relevance: identity, weather + frequencies, runways, NOTAMs, charts, PIREPs, winds.
+                    VStack(alignment: .leading, spacing: Space.xl) {
+                        VStack(alignment: .leading, spacing: Space.m) {
+                            headerSection(airport)
+                            infoChipsRow(airport)
+                        }
+                        weatherAndFrequencies(airport)
+                        runwaysSection(airport)
                         Divider()
                         NotamSection(airport: airport, service: notamService)
                         Divider()
-                        HStack(alignment: .top, spacing: 24) {
+                        AirportChartsSection(airport: airport, service: chartService)
+                        Divider()
+                        sideBySide(spacing: Space.xl) {
                             PirepSection(airport: airport, service: pirepService)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             WindsAloftSection(airport: airport, service: windsAloftService)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    .padding(.bottom, 24)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
+                    .padding(.bottom, Space.xl)
+                    .padding(.horizontal, Space.xl)
+                    .padding(.top, Space.s)
                 } else {
                     ProgressView("Loading airport...")
                         .padding(.top, 40)
@@ -58,14 +63,17 @@ struct AirportInfoSheet: View {
                         appState.isPresentingAirportInfo = false
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Palette.secondaryText)
                             .font(.title2)
+                            .frame(minWidth: 44, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .accessibilityLabel("Close")
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        // Opens at ~60% so identity, weather and frequencies are visible without dragging.
+        .presentationDetents([.fraction(0.62), .large])
         .presentationBackground(.regularMaterial)
         .onAppear {
             loadAirport()
@@ -76,32 +84,20 @@ struct AirportInfoSheet: View {
 
     @ViewBuilder
     private func headerSection(_ airport: Airport) -> some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                // ICAO identifier
-                HStack(spacing: 8) {
-                    Text(airport.icao)
-                        .font(.system(.largeTitle, design: .rounded, weight: .semibold))
+        VStack(alignment: .leading, spacing: Space.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.m) {
+                Text(airport.icao)
+                    .font(TypeRole.title)
 
-                    // Flight category dot + label
-                    if let wx = weatherViewModel?.currentWeather {
-                        HStack(spacing: 4) {
-                            FlightCategoryDot(category: wx.flightCategory)
-                            Text(wx.flightCategory.rawValue.uppercased())
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(FlightCategoryDot(category: wx.flightCategory).color)
-                        }
-                    }
+                // Flight category, next to the identifier (dot + text, never colour alone)
+                if let wx = weatherViewModel?.currentWeather {
+                    FlightCategoryDot(category: wx.flightCategory, showsLabel: true)
                 }
-
-                // Airport name
-                Text(airport.name)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
             }
 
-            Spacer()
+            Text(airport.name)
+                .font(TypeRole.body)
+                .foregroundStyle(Palette.secondaryText)
         }
     }
 
@@ -110,19 +106,12 @@ struct AirportInfoSheet: View {
     @ViewBuilder
     private func infoChipsRow(_ airport: Airport) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                // Elevation chip
-                infoChip(icon: "arrow.up", text: "\(Int(airport.elevation))' MSL")
-
-                // Type chip
+            HStack(spacing: Space.s) {
+                infoChip(icon: "arrow.up", text: "\(Int(airport.elevation))' MSL")  // feet MSL
                 infoChip(icon: "airplane", text: airport.type.rawValue.capitalized)
-
-                // Pattern altitude chip
                 if let tpa = airport.patternAltitude {
-                    infoChip(icon: "arrow.clockwise", text: "TPA \(tpa)'")
+                    infoChip(icon: "arrow.clockwise", text: "TPA \(tpa)'")  // feet MSL
                 }
-
-                // Fuel chip
                 if !airport.fuelTypes.isEmpty {
                     infoChip(icon: "fuelpump", text: airport.fuelTypes.joined(separator: ", "))
                 }
@@ -132,110 +121,179 @@ struct AirportInfoSheet: View {
 
     @ViewBuilder
     private func infoChip(icon: String, text: String) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Space.xs) {
             Image(systemName: icon)
-                .font(.caption2)
-            Text(text)
                 .font(.caption)
+                .accessibilityHidden(true)
+            Text(text)
+                .font(TypeRole.caption)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.secondary.opacity(0.12))
+        .foregroundStyle(Palette.primaryText)
+        .padding(.horizontal, Space.m)
+        .padding(.vertical, Space.s)
+        .background(Palette.fill)
         .clipShape(Capsule())
     }
 
-    // MARK: - Two Column Body
+    /// Two columns side by side; stacked vertically at accessibility text sizes so nothing truncates.
+    @ViewBuilder
+    private func sideBySide<Content: View>(spacing: CGFloat, @ViewBuilder content: () -> Content) -> some View {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: spacing))
+        layout(content)
+    }
+
+    /// Label/value row: label column beside the value, label above the value at accessibility sizes.
+    private var rowLayout: AnyLayout {
+        typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.xs))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Space.m))
+    }
+
+    // MARK: - Weather + Frequencies
 
     @ViewBuilder
-    private func twoColumnBody(_ airport: Airport) -> some View {
-        HStack(alignment: .top, spacing: 24) {
-            // Left column: Frequencies + Runways
-            VStack(alignment: .leading, spacing: 16) {
-                frequenciesSection(airport)
-                runwaysSection(airport)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            // Right column: Weather
-            VStack(alignment: .leading, spacing: 16) {
-                weatherSection()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private func weatherAndFrequencies(_ airport: Airport) -> some View {
+        sideBySide(spacing: Space.xl) {
+            weatherSection()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            frequenciesSection(airport)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     // MARK: - Frequencies Section
 
+    /// Standard aviation abbreviations; a fixed label column means labels never hyphenate.
+    static func frequencyLabel(_ type: FrequencyType) -> String {
+        switch type {
+        case .ctaf: return "CTAF"
+        case .tower: return "TWR"
+        case .ground: return "GND"
+        case .clearance: return "CD"
+        case .approach: return "APP"
+        case .departure: return "DEP"
+        case .atis: return "ATIS"
+        case .awos: return "AWOS"
+        case .asos: return "ASOS"
+        case .unicom: return "UNICOM"
+        case .multicom: return "MULTICOM"
+        case .center: return "CTR"
+        case .fss: return "FSS"
+        case .other: return "FREQ"
+        }
+    }
+
+    /// Spoken names so VoiceOver doesn't read "TWR" / "CD" as letters.
+    static func frequencySpokenName(_ type: FrequencyType) -> String {
+        switch type {
+        case .ctaf: return "C TAF"
+        case .tower: return "Tower"
+        case .ground: return "Ground"
+        case .clearance: return "Clearance delivery"
+        case .approach: return "Approach"
+        case .departure: return "Departure"
+        case .atis: return "ATIS"
+        case .awos: return "AWOS"
+        case .asos: return "ASOS"
+        case .unicom: return "Unicom"
+        case .multicom: return "Multicom"
+        case .center: return "Center"
+        case .fss: return "Flight service"
+        case .other: return "Frequency"
+        }
+    }
+
+    /// Arrival-to-departure order: weather first, then the local frequency, then the ATC sequence.
+    private static func frequencyRank(_ type: FrequencyType) -> Int {
+        switch type {
+        case .atis, .awos, .asos: return 0
+        case .ctaf, .unicom, .multicom: return 1
+        case .approach: return 2
+        case .tower: return 3
+        case .ground: return 4
+        case .clearance: return 5
+        case .departure: return 6
+        case .center: return 7
+        case .fss: return 8
+        case .other: return 9
+        }
+    }
+
     @ViewBuilder
     private func frequenciesSection(_ airport: Airport) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("FREQUENCIES")
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionHeader("FREQUENCIES")
 
             if airport.frequencies.isEmpty {
-                // Show CTAF/UNICOM if available in airport model
                 if let ctaf = airport.ctafFrequency {
-                    frequencyRow(type: "CTAF", value: ctaf)
+                    frequencyRow(type: "CTAF", spoken: Self.frequencySpokenName(.ctaf), value: ctaf)
                 }
                 if let unicom = airport.unicomFrequency {
-                    frequencyRow(type: "UNICOM", value: unicom)
+                    frequencyRow(type: "UNICOM", spoken: Self.frequencySpokenName(.unicom), value: unicom)
                 }
                 if airport.ctafFrequency == nil && airport.unicomFrequency == nil {
                     Text("No frequencies available")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
+                        .font(TypeRole.caption)
+                        .foregroundStyle(Palette.secondaryText)
                 }
             } else {
-                ForEach(airport.frequencies) { freq in
-                    frequencyRow(type: freq.type.rawValue.uppercased(), value: freq.frequency)
+                let sorted = airport.frequencies.sorted {
+                    Self.frequencyRank($0.type) < Self.frequencyRank($1.type)
+                }
+                ForEach(sorted) { freq in
+                    frequencyRow(type: Self.frequencyLabel(freq.type),
+                                 spoken: Self.frequencySpokenName(freq.type),
+                                 value: freq.frequency)
                 }
             }
         }
     }
 
     @ViewBuilder
-    private func frequencyRow(type: String, value: Double) -> some View {
-        HStack {
+    private func frequencyRow(type: String, spoken: String, value: Double) -> some View {
+        let mhz = String(format: "%.3f", value)  // MHz
+        rowLayout {
             Text(type)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 60, alignment: .leading)
-            Text(String(format: "%.3f", value))
-                .font(.subheadline.monospaced())
+                .font(TypeRole.label)
+                .foregroundStyle(Palette.secondaryText)
+                .frame(minWidth: 72, alignment: .leading)
+            Text(mhz)
+                .font(TypeRole.value)
+                .foregroundStyle(Palette.primaryText)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+        .accessibilityValue("\(mhz) megahertz")
     }
 
     // MARK: - Runways Section
 
     @ViewBuilder
     private func runwaysSection(_ airport: Airport) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("RUNWAYS")
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: Space.s) {
+            SectionHeader("RUNWAYS")
 
             if airport.runways.isEmpty {
                 Text("No runway data available")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .font(TypeRole.caption)
+                    .foregroundStyle(Palette.secondaryText)
             } else {
                 ForEach(airport.runways) { runway in
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack {
-                            Text(runway.id)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("\(runway.length)'x\(runway.width)'")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
+                    rowLayout {
+                        Text(runway.id)
+                            .font(TypeRole.value)
+                            .frame(minWidth: 72, alignment: .leading)
+                        Text("\(runway.length)' x \(runway.width)'")  // feet
+                            .font(TypeRole.valueSmall)
                         Text(runway.surface.rawValue.capitalized)
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                            .font(TypeRole.body)
+                            .foregroundStyle(Palette.secondaryText)
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("Runway \(runway.id)")
+                    .accessibilityValue("\(runway.length) by \(runway.width) feet, \(runway.surface.rawValue.capitalized)")
                 }
             }
         }
@@ -245,13 +303,9 @@ struct AirportInfoSheet: View {
 
     @ViewBuilder
     private func weatherSection() -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Section header with manual refresh button
+        VStack(alignment: .leading, spacing: Space.s) {
             HStack {
-                Text("WEATHER")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                SectionHeader("WEATHER")
 
                 Spacer()
 
@@ -264,59 +318,62 @@ struct AirportInfoSheet: View {
                     if weatherViewModel?.isLoading == true {
                         ProgressView()
                             .controlSize(.small)
-                            .frame(width: 24, height: 24)
+                            .frame(width: 44, height: 44)
                     } else {
                         Image(systemName: "arrow.clockwise")
-                            .frame(width: 24, height: 24)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                     }
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Palette.secondaryText)
                 .accessibilityLabel("Refresh weather")
             }
 
-            // Weather content
             if let wx = weatherViewModel?.currentWeather {
                 weatherDataView(wx)
             } else if weatherViewModel?.isLoading == true {
-                HStack(spacing: 8) {
+                HStack(spacing: Space.s) {
                     ProgressView()
                         .controlSize(.small)
                     Text("Loading weather...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(TypeRole.caption)
+                        .foregroundStyle(Palette.secondaryText)
                 }
-            } else if weatherViewModel?.error != nil {
-                Text("No weather available")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+            } else if let error = weatherViewModel?.error {
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    Label("Weather not loaded", systemImage: "exclamationmark.triangle.fill")
+                        .font(TypeRole.body.weight(.semibold))
+                        .foregroundStyle(Palette.caution)
+                    Text(error.localizedDescription)
+                        .font(TypeRole.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                    Button("Retry") { Task { await weatherViewModel?.refreshWeather() } }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                }
             } else {
-                Text("No weather available")
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+                Text("No METAR for this airport.")
+                    .font(TypeRole.caption)
+                    .foregroundStyle(Palette.secondaryText)
             }
         }
     }
 
     @ViewBuilder
     private func weatherDataView(_ wx: WeatherCache) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // Flight category + staleness badge
+        VStack(alignment: .leading, spacing: Space.s) {
+            // Age badge first: "is what I see current?" before the numbers.
             HStack {
-                FlightCategoryDot(category: wx.flightCategory)
-                Text(wx.flightCategory.rawValue.uppercased())
-                    .font(.caption)
-                    .fontWeight(.semibold)
+                DataAgeBadge(.metar, observed: wx.observationTime)
                 Spacer()
-                WeatherBadge(observationTime: wx.observationTime)
             }
 
-            // Decoded weather fields
             if let vm = weatherViewModel {
-                weatherFieldRow("Wind", value: vm.decodedWind)
-                weatherFieldRow("Temp", value: vm.decodedTemp)
-                weatherFieldRow("Dewpt", value: vm.decodedDew)
-                weatherFieldRow("Vis", value: vm.decodedVisibility)
-                weatherFieldRow("Ceiling", value: vm.decodedCeiling)
+                weatherFieldRow("Wind", spoken: "Wind", value: vm.decodedWind)
+                weatherFieldRow("Vis", spoken: "Visibility", value: vm.decodedVisibility)
+                weatherFieldRow("Ceiling", spoken: "Ceiling", value: vm.decodedCeiling)
+                weatherFieldRow("Temp", spoken: "Temperature", value: vm.decodedTemp)
+                weatherFieldRow("Dewpt", spoken: "Dew point", value: vm.decodedDew)
             }
 
             // Raw METAR (expandable per user decision)
@@ -326,52 +383,57 @@ struct AirportInfoSheet: View {
                 } label: {
                     HStack {
                         Text("Raw METAR")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(TypeRole.label)
+                            .foregroundStyle(Palette.secondaryText)
                         Spacer()
                         Image(systemName: isRawMETARExpanded ? "chevron.up" : "chevron.down")
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
                     }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableButtonStyle())
 
                 if isRawMETARExpanded {
                     Text(rawMETAR)
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.primary)
-                        .padding(8)
-                        .background(.secondary.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .font(.footnote.monospaced())
+                        .foregroundStyle(Palette.primaryText)
+                        .padding(Space.s)
+                        .background(Palette.fill)
+                        .clipShape(RoundedRectangle(cornerRadius: Space.s))
                 }
             }
 
-            // TAF (if available)
             if let taf = weatherViewModel?.currentTAF {
                 Text("TAF")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 4)
+                    .font(TypeRole.label)
+                    .foregroundStyle(Palette.secondaryText)
+                    .padding(.top, Space.xs)
                 Text(taf)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.primary)
-                    .padding(8)
-                    .background(.secondary.opacity(0.08))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(Palette.primaryText)
+                    .padding(Space.s)
+                    .background(Palette.fill)
+                    .clipShape(RoundedRectangle(cornerRadius: Space.s))
             }
         }
     }
 
     @ViewBuilder
-    private func weatherFieldRow(_ label: String, value: String) -> some View {
-        HStack {
+    private func weatherFieldRow(_ label: String, spoken: String, value: String) -> some View {
+        rowLayout {
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 50, alignment: .leading)
+                .font(TypeRole.label)
+                .foregroundStyle(Palette.secondaryText)
+                .frame(minWidth: 72, alignment: .leading)
             Text(value)
-                .font(.caption.monospaced())
+                .font(TypeRole.valueSmall)
+                .foregroundStyle(Palette.primaryText)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(spoken)
+        .accessibilityValue(value)
     }
 
     // MARK: - Data Loading

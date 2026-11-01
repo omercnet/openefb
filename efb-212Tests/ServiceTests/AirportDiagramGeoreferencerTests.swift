@@ -26,20 +26,22 @@ struct AirportDiagramGeoreferencerTests {
     }
 
     static let kpao = AirportDiagramReference(latitude: 37.461102, longitude: -122.114998)
+    // Runway ends are FAA NASR APT_RWY_END (cycle 29 Oct 2026), the same data aviation.sqlite bundles
+    // (see BundledAviationDataTests), so the 50 ft cross-check runs on the app's own ends.
     static let kpaoRunways = [
         AirportDiagramRunway(identifier: "13/31", lengthFeet: 2441, widthFeet: 70,
-                             baseLatitude: 37.46379852, baseLongitude: -122.1179962,
-                             reciprocalLatitude: 37.45849991, reciprocalLongitude: -122.1119995),
+                             baseLatitude: 37.46375061, baseLongitude: -122.11765513,
+                             reciprocalLatitude: 37.45849213, reciprocalLongitude: -122.11243811),
     ]
 
     static let kbos = AirportDiagramReference(latitude: 42.36197, longitude: -71.0079)
     static let kbosRunways = [
-        AirportDiagramRunway(identifier: "04L/22R", lengthFeet: 7864, widthFeet: 150, baseLatitude: 42.358002, baseLongitude: -71.014297, reciprocalLatitude: 42.3783, reciprocalLongitude: -71.004501),
-        AirportDiagramRunway(identifier: "04R/22L", lengthFeet: 10006, widthFeet: 150, baseLatitude: 42.35110092, baseLongitude: -71.01180267, reciprocalLatitude: 42.37689972, reciprocalLongitude: -70.9992981),
-        AirportDiagramRunway(identifier: "09/27", lengthFeet: 7001, widthFeet: 150, baseLatitude: 42.35580063, baseLongitude: -71.01290131, reciprocalLatitude: 42.36019897, reciprocalLongitude: -70.98770142),
-        AirportDiagramRunway(identifier: "14/32", lengthFeet: 5000, widthFeet: 100, baseLatitude: 42.356601715087891, baseLongitude: -71.023300170898438, reciprocalLatitude: 42.348598480224609, reciprocalLongitude: -71.008201599121094),
-        AirportDiagramRunway(identifier: "15L/33R", lengthFeet: 2557, widthFeet: 100, baseLatitude: 42.373600006103516, baseLongitude: -71.009101867675781, reciprocalLatitude: 42.368598937988281, reciprocalLongitude: -71.00250244140625),
-        AirportDiagramRunway(identifier: "15R/33L", lengthFeet: 10083, widthFeet: 150, baseLatitude: 42.374298095703125, baseLongitude: -71.017898559570313, reciprocalLatitude: 42.354598999023438, reciprocalLongitude: -70.991600036621094),
+        AirportDiagramRunway(identifier: "04L/22R", lengthFeet: 7864, widthFeet: 150, baseLatitude: 42.35798825, baseLongitude: -71.01433852, reciprocalLatitude: 42.37829886, reciprocalLongitude: -71.00451386),
+        AirportDiagramRunway(identifier: "04R/22L", lengthFeet: 10006, widthFeet: 150, baseLatitude: 42.35105816, baseLongitude: -71.01179388, reciprocalLatitude: 42.37689997, reciprocalLongitude: -70.99929091),
+        AirportDiagramRunway(identifier: "09/27", lengthFeet: 7001, widthFeet: 150, baseLatitude: 42.35575416, baseLongitude: -71.01289408, reciprocalLatitude: 42.36021575, reciprocalLongitude: -70.98770211),
+        AirportDiagramRunway(identifier: "14/32", lengthFeet: 5000, widthFeet: 100, baseLatitude: 42.3565978, baseLongitude: -71.02327461, reciprocalLatitude: 42.34859902, reciprocalLongitude: -71.00824558),
+        AirportDiagramRunway(identifier: "15L/33R", lengthFeet: 2557, widthFeet: 100, baseLatitude: 42.37319466, baseLongitude: -71.00861241, reciprocalLatitude: 42.36821641, reciprocalLongitude: -71.00194466),
+        AirportDiagramRunway(identifier: "15R/33L", lengthFeet: 10083, widthFeet: 150, baseLatitude: 42.3742708, baseLongitude: -71.01789213, reciprocalLatitude: 42.35465077, reciprocalLongitude: -70.99158605),
     ]
 
     /// Ground distance in feet between a runway midpoint from the database and the fit's prediction
@@ -136,8 +138,8 @@ struct AirportDiagramGeoreferencerTests {
         let mask = try #require(fit.masks.first)
         #expect(try alpha(atPage: mask.centerX, mask.centerY) == 0)                    // inset centre is clear
         #expect(try alpha(atPage: clip.minX + 2, clip.minY + 2) == 0)                  // blank paper is clear
-        // Centre of runway 04R/22L pavement (page ~(211, 265)) is opaque.
-        #expect(try alpha(atPage: 211, 265) > 200)
+        // Centre of runway 04R/22L pavement: midpoint of the drawn runway (162.9,110.4)-(260.4,382.0).
+        #expect(try alpha(atPage: 211.6, 246.2) > 200)
         #expect(AirportDiagramGeoreferencer.pngData(image) != nil)
     }
 

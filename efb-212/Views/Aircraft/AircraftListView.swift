@@ -2,8 +2,9 @@
 //  AircraftListView.swift
 //  efb-212
 //
-//  Aircraft tab main view -- list of aircraft profiles with add/edit/delete,
-//  active selection, and navigation to pilot profile section.
+//  Settings > Aircraft & Pilot -- list of aircraft profiles with add/edit/delete,
+//  active selection, and navigation to pilot profile section. Pushed from Settings'
+//  NavigationStack, so it has no stack of its own.
 //
 
 import SwiftUI
@@ -16,7 +17,7 @@ struct AircraftListView: View {
     @State private var viewModel: AircraftProfileViewModel?
 
     var body: some View {
-        NavigationStack {
+        Group {
             List {
                 // MARK: - Aircraft Profiles Section
 
@@ -68,7 +69,7 @@ struct AircraftListView: View {
                     Text("Pilot")
                 }
             }
-            .navigationTitle("Aircraft")
+            .navigationTitle("Aircraft & Pilot")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -133,7 +134,7 @@ private struct AircraftRow: View {
                     if let fuel = profile.fuelCapacityGallons, let burn = profile.fuelBurnGPH {
                         Text("\(Int(fuel)) gal / \(String(format: "%.1f", burn)) GPH")
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Palette.secondaryText)
                     }
                 }
 
@@ -141,18 +142,20 @@ private struct AircraftRow: View {
 
                 if isActive {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(Palette.accentText)
                         .font(.title3)
+                        .accessibilityLabel("Selected")
                 }
             }
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .accessibilityAddTraits(isActive ? .isSelected : [])
         .swipeActions(edge: .trailing) {
             Button("Edit", systemImage: "pencil") {
                 onEdit()
             }
-            .tint(.blue)
+            .tint(Palette.accent)
         }
     }
 }

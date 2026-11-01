@@ -1,0 +1,16 @@
+NOTAM NO: C0005/26
+Location Indicator: LLLL
+Location Description: Tel-Aviv FIR
+Created: 01/01/2026 06:33
+Valid From: 01/01/2026 06:30
+Valid To:01/01/2029 06:33
+(C0005/26 NOTAMR C0731/25                                               
+Q) LLLL/QWULW/IV/BO /W /000/005/3231N03455E001                          
+A) LLLL B) 2601010630 C) PERM                                           
+E) UAS/UAV ACT WILL TAKE PLACE AT OR-AKIVA INDUSTRY AREA.               
+   AN AREA BTN THE FLW PSN CLSD FM GND UP TO 500FT AMSL                 
+   N323122E0345511 N323119E0345512 N323119E0345515                      
+   N323123E0345514.                                                     
+   CTN ADZ.                                                             
+   DOM AIP, PART A-17, PAGE 10, PARA 3. NISPACH 2 REF.                  
+F) GND G) 500FT AMSL)                                                   

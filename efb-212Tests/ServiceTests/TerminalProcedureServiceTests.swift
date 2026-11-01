@@ -43,11 +43,12 @@ private final class FakeNetwork: @unchecked Sendable {
 }
 
 @Suite("Terminal Procedure Service Tests")
+@MainActor
 struct TerminalProcedureServiceTests {
 
     // MARK: - Fixtures
 
-    private static func record(seq: Int, code: String, name: String, pdf: String, action: String = "") -> String {
+    nonisolated private static func record(seq: Int, code: String, name: String, pdf: String, action: String = "") -> String {
         """
                 <record>
                   <chartseq>\(seq)</chartseq>
@@ -63,7 +64,7 @@ struct TerminalProcedureServiceTests {
         """
     }
 
-    static let metafile: Data = {
+    nonisolated static let metafile: Data = {
         let xml = """
         <?xml version="1.0" encoding="utf-8" standalone="yes"?>
         <digital_tpp cycle="2611" from_edate="0901Z  10/29/26" to_edate="0901Z  11/26/26">
@@ -99,7 +100,7 @@ struct TerminalProcedureServiceTests {
         return Data(xml.utf8)
     }()
 
-    static let infoJSON = Data(
+    nonisolated static let infoJSON = Data(
         #"{"status":{"code":200,"message":"OK"},"edition":[{"geoname":"US","editionName":"CURRENT","format":"ZIP","editionDate":"10/29/2026","editionNumber":11}]}"#.utf8
     )
 
@@ -287,7 +288,7 @@ struct TerminalProcedureServiceTests {
 
     // MARK: - PDF download
 
-    private static let pdfBytes = Data("%PDF-1.4\n%fake chart body\n".utf8)
+    nonisolated private static let pdfBytes = Data("%PDF-1.4\n%fake chart body\n".utf8)
 
     @Test func downloadsPdfOnceThenServesOffline_andPurgesOlderCycles() async throws {
         let dir = try Self.tempDirectory()

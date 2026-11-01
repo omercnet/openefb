@@ -13,6 +13,7 @@ import SwiftData
 struct LogbookEntryEditView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     let entry: SchemaV1.LogbookEntry
     let viewModel: LogbookViewModel
@@ -49,6 +50,13 @@ struct LogbookEntryEditView: View {
         _notes = State(initialValue: entry.notes ?? "")
     }
 
+    /// Label + field row: side by side normally, stacked at accessibility sizes so neither truncates.
+    private var fieldRowLayout: AnyLayout {
+        typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 8))
+    }
+
     var body: some View {
         Form {
             if isReadOnly {
@@ -65,7 +73,7 @@ struct LogbookEntryEditView: View {
                 DatePicker("Date", selection: $date, displayedComponents: .date)
                     .disabled(isReadOnly)
 
-                HStack {
+                fieldRowLayout {
                     Text("Departure")
                     Spacer()
                     TextField("ICAO", text: $departureICAO)
@@ -73,9 +81,10 @@ struct LogbookEntryEditView: View {
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 120)
                         .disabled(isReadOnly)
+                        .accessibilityLabel("Departure")
                 }
 
-                HStack {
+                fieldRowLayout {
                     Text("Arrival")
                     Spacer()
                     TextField("ICAO", text: $arrivalICAO)
@@ -83,21 +92,23 @@ struct LogbookEntryEditView: View {
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 120)
                         .disabled(isReadOnly)
+                        .accessibilityLabel("Arrival")
                 }
 
-                HStack {
+                fieldRowLayout {
                     Text("Route")
                     Spacer()
                     TextField("Waypoints", text: $route)
                         .multilineTextAlignment(.trailing)
                         .disabled(isReadOnly)
+                        .accessibilityLabel("Route")
                 }
             }
 
             // MARK: - Duration
 
             Section("Duration") {
-                HStack {
+                fieldRowLayout {
                     Text("Block Time")
                     Spacer()
                     TextField("0.0", value: $durationHours, format: .number.precision(.fractionLength(1)))
@@ -105,21 +116,24 @@ struct LogbookEntryEditView: View {
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 80)
                         .disabled(isReadOnly)
+                        .accessibilityLabel("Block time in hours")
                     Text("hrs")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
             }
 
             // MARK: - Aircraft
 
             Section("Aircraft") {
-                HStack {
+                fieldRowLayout {
                     Text("Aircraft Type")
                     Spacer()
                     TextField("e.g. C172", text: $aircraftType)
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 120)
                         .disabled(isReadOnly)
+                        .accessibilityLabel("Aircraft type")
                 }
             }
 
@@ -138,6 +152,7 @@ struct LogbookEntryEditView: View {
                 TextEditor(text: $notes)
                     .frame(minHeight: 80)
                     .disabled(isReadOnly)
+                    .accessibilityLabel("Notes")
             }
 
             // MARK: - Flight Summary (read-only)
@@ -154,7 +169,7 @@ struct LogbookEntryEditView: View {
                     }
                     if entry.hasDebrief {
                         Label("AI Debrief Available", systemImage: "brain")
-                            .foregroundStyle(.blue)
+                            .foregroundStyle(Palette.accentText)
                     }
                 }
             }

@@ -53,13 +53,13 @@ final class DebriefEngine {
         /// Extracted as a static method so it can be unit tested without a real device.
         static func reasonMessage(for reasonDescription: String) -> String {
             if reasonDescription.contains("deviceNotEligible") || reasonDescription.contains("not eligible") {
-                return "This device does not support Apple Intelligence."
+                return "This iPad does not support Apple Intelligence."
             } else if reasonDescription.contains("appleIntelligenceNotEnabled") || reasonDescription.contains("not enabled") {
-                return "Apple Intelligence is not enabled. You can enable it in Settings."
+                return "Apple Intelligence is not enabled. Turn it on in Settings › Apple Intelligence & Siri."
             } else if reasonDescription.contains("modelNotReady") || reasonDescription.contains("not ready") {
-                return "Apple Intelligence is still setting up. Please try again later."
+                return "Apple Intelligence is still downloading its model. Try again later."
             } else {
-                return "AI Debrief is currently unavailable."
+                return "Debrief is unavailable right now."
             }
         }
     }
@@ -96,7 +96,7 @@ final class DebriefEngine {
             logger.warning("Foundation Models unavailable: \(message)")
 
         @unknown default:
-            availabilityStatus = .unavailable(reason: "AI Debrief is currently unavailable.")
+            availabilityStatus = .unavailable(reason: "Debrief is unavailable right now.")
             logger.warning("Foundation Models unknown availability state")
         }
     }
@@ -232,11 +232,11 @@ enum DebriefError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .sessionUnavailable:
-            return "AI debrief session is not available. Please check Apple Intelligence settings."
+            return "Apple Intelligence did not start a session. Check Settings › Apple Intelligence & Siri."
         case .emptyResponse:
-            return "The AI debrief returned no content. Please try again."
+            return "The debrief came back empty. Try again."
         case .generationFailed(let error):
-            return "Debrief generation failed: \(error.localizedDescription)"
+            return "Debrief failed: \(error.localizedDescription)"
         }
     }
 }

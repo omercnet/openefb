@@ -16,7 +16,7 @@ import CoreLocation
 // MARK: - NearestAirportEntry
 
 /// A single entry in the nearest airports list with precomputed distance and bearing.
-struct NearestAirportEntry: Identifiable, Sendable {
+nonisolated struct NearestAirportEntry: Identifiable, Sendable {
     let airport: Airport
     let distance: Double   // nautical miles
     let bearing: Double    // degrees true
@@ -28,6 +28,9 @@ struct NearestAirportEntry: Identifiable, Sendable {
 
     /// Private-use field: landing needs prior permission.
     var isPrivateUse: Bool { LandableAirportFilter.isPrivateUse(airport) }
+
+    /// Military field: emergency use only.
+    var isMilitary: Bool { LandableAirportFilter.isMilitary(airport) }
 
     /// Compact runway summary, e.g. "2441' ASPH". Nil when the airport has no runway data.
     var runwaySummary: String? {
@@ -176,5 +179,12 @@ final class NearestAirportViewModel {
                 appState.estimatedTimeEnroute = nil
             }
         }
+    }
+
+    /// Clear the active Direct-To (wrong field picked, or leg finished). DTG/ETE leave the
+    /// instrument strip. A flight-plan route is cleared the same way: see
+    /// `AppState.clearActiveNavigation()`.
+    func clearDirectTo() {
+        appState.clearActiveNavigation()
     }
 }

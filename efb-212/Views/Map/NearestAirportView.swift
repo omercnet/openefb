@@ -60,29 +60,37 @@ struct NearestAirportRow: View {
     let onDirectTo: (Airport) -> Void
     let onAirportTap: (String) -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        HStack(spacing: 12) {
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(spacing: 12))
+        layout {
             // Airport identity and runway (tap for airport info)
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(entry.airport.icao)
-                        .font(.system(size: 22, weight: .bold, design: .monospaced))
+                        .font(.title2.weight(.bold).monospaced())
                     Text(entry.airport.name)
-                        .font(.system(size: 15))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.secondaryText)
+                        .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                 }
                 HStack(spacing: 8) {
                     if let runway = entry.longestRunway {
                         Text("\(runway.id)  \(runway.length)' \(runway.surface.abbreviation)")   // feet
-                            .font(.system(size: 15, weight: .medium, design: .monospaced))
+                            .font(.subheadline.weight(.medium).monospaced())
                     } else {
                         Text("no runway data")
-                            .font(.system(size: 15, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .font(.subheadline.weight(.medium).monospaced())
+                            .foregroundStyle(Palette.secondaryText)
                     }
                     if entry.isPrivateUse {
                         PrivateUseTag()
+                    }
+                    if entry.isMilitary {
+                        MilitaryUseTag()
                     }
                 }
             }
@@ -96,10 +104,10 @@ struct NearestAirportRow: View {
             // Distance and bearing
             VStack(alignment: .trailing, spacing: 2) {
                 Text(String(format: "%.1f NM", entry.distance))
-                    .font(.system(size: 20, weight: .semibold, design: .monospaced))
+                    .font(.headline.monospaced())
                 Text(String(format: "%03.0f\u{00B0}", entry.bearing))
-                    .font(.system(size: 17, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .font(.callout.weight(.medium).monospaced())
+                    .foregroundStyle(Palette.secondaryText)
             }
             .accessibilityElement(children: .combine)
 
@@ -107,15 +115,16 @@ struct NearestAirportRow: View {
             Button(action: { onDirectTo(entry.airport) }) {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.up.right")
-                        .font(.system(size: 18, weight: .bold))
+                        .font(.body.weight(.bold))
                     Text("Direct")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.body.weight(.bold))
                 }
                 .padding(.horizontal, 14)
                 .frame(height: MapControlMetrics.size)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.blue)
+            .tint(Palette.accent)
+            .foregroundStyle(Palette.onAccent)
             .accessibilityIdentifier("Direct \(entry.airport.icao)")
             .accessibilityLabel("Direct to \(entry.airport.icao)")
         }

@@ -69,8 +69,6 @@ nonisolated struct OfflineRegionBounds: Codable, Equatable, Sendable {
 nonisolated enum OfflineLayer: String, CaseIterable, Codable, Sendable, Identifiable {
     case sectional   // FAA VFR sectional raster (public domain)
     case street      // OpenFreeMap vector tiles + Noto glyphs
-    case terrain     // OpenTopoMap raster
-    case satellite   // Esri World Imagery raster
 
     var id: String { rawValue }
 
@@ -78,8 +76,6 @@ nonisolated enum OfflineLayer: String, CaseIterable, Codable, Sendable, Identifi
         switch self {
         case .sectional: return "VFR Sectional"
         case .street: return "Street"
-        case .terrain: return "Terrain"
-        case .satellite: return "Satellite"
         }
     }
 
@@ -89,35 +85,25 @@ nonisolated enum OfflineLayer: String, CaseIterable, Codable, Sendable, Identifi
         switch self {
         case .sectional: return 8...12
         case .street: return 5...13
-        case .terrain: return 5...12
-        case .satellite: return 5...12
         }
     }
 
-    /// Terrain (OpenTopoMap) and Satellite (Esri World Imagery) are off by default: the
-    /// OpenTopoMap tile usage policy forbids bulk download and heavy app traffic, and Esri's
-    /// terms restrict offline/bulk use without an ArcGIS account (docs/TILE-SOURCES.md).
-    var isDefaultEnabled: Bool { self == .sectional || self == .street }
-
-    /// Usage note shown next to the toggle when a layer has tile-server terms.
-    var termsNote: String? {
+    /// Plain-language detail level shown in place of raw zoom numbers.
+    var detailDescription: String {
         switch self {
-        case .terrain:
-            return "OpenTopoMap is volunteer-run; its policy forbids bulk download. Keep regions small."
-        case .satellite:
-            return "Esri World Imagery terms limit offline use. Keep regions small."
-        case .sectional, .street:
-            return nil
+        case .sectional: return "Chart detail for planning and flying, regional view to airport view"
+        case .street: return "Roads and towns, country overview down to street detail"
         }
     }
+
+    // Satellite (Esri) and Terrain (OpenTopoMap) are not downloadable: their terms forbid
+    // bulk/offline use (docs/TILE-SOURCES.md). They remain online base maps (efb-zfm.8).
 
     /// base-style.json source ids this layer needs.
     var styleSources: [String] {
         switch self {
         case .sectional: return ["vfr-sectional"]
         case .street: return ["openmaptiles"]
-        case .terrain: return ["terrain"]
-        case .satellite: return ["satellite"]
         }
     }
 
@@ -128,8 +114,6 @@ nonisolated enum OfflineLayer: String, CaseIterable, Codable, Sendable, Identifi
         switch self {
         case .sectional: return 45_000
         case .street: return 60_000
-        case .terrain: return 35_000
-        case .satellite: return 30_000
         }
     }
 
@@ -337,8 +321,8 @@ nonisolated enum OfflineStatusResolver {
         switch style {
         case .vfrSectional: return [.sectional, .street]
         case .street: return [.street]
-        case .satellite: return [.satellite]
-        case .terrain: return [.terrain]
+        // Satellite and Terrain are online-only base maps: their tile providers forbid bulk download.
+        case .satellite, .terrain: return []
         }
     }
 
@@ -370,7 +354,10 @@ nonisolated enum OfflineStatusResolver {
         packs: [OfflinePackSummary],
         at date: Date = Date()
     ) -> OfflineStatus {
-        let statuses = layers(for: style).map { status(visible: visible, layer: $0, packs: packs, at: date) }
+        let styleLayers = layers(for: style)
+        // No offline pack can exist for an online-only base map: never read as ready.
+        guard !styleLayers.isEmpty else { return .notDownloaded }
+        let statuses = styleLayers.map { status(visible: visible, layer: $0, packs: packs, at: date) }
         if statuses.contains(.notDownloaded) { return .notDownloaded }
         if statuses.contains(.expired) { return .expired }
         if statuses.contains(.partial) { return .partial }
@@ -444,6 +431,8 @@ final class OfflineMapService: OfflineMapServiceProtocol {
         for name in [Notification.Name.MLNOfflinePackProgressChanged, .MLNOfflinePackError,
                      .MLNOfflinePackMaximumMapboxTilesReached] {
             notificationTokens.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] note in
+                // MapLibre posts these on `queue: .main`, so `note` never leaves the main thread.
+                nonisolated(unsafe) let note = note
                 MainActor.assumeIsolated {
                     self?.handle(note)
                 }
@@ -451,7 +440,7 @@ final class OfflineMapService: OfflineMapServiceProtocol {
         }
         // `packs` is nil until MapLibre finishes loading the database; KVO fires when it does.
         packsObservation = storage.observe(\.packs, options: [.initial, .new]) { [weak self] _, _ in
-            Task { @MainActor in self?.refresh() }
+            Task { @MainActor [weak self] in self?.refresh() }
         }
         // Unlimited tile count: the user chose the region and sees the size estimate.
         storage.setMaximumAllowedMapboxTiles(UInt64.max)
@@ -476,7 +465,9 @@ final class OfflineMapService: OfflineMapServiceProtocol {
             )
             let contextData = try JSONEncoder().encode(context)
             storage.addPack(for: region, withContext: contextData) { [weak self] pack, error in
-                Task { @MainActor in
+                // MapLibre invokes this completion on the main queue; `pack` is only used there.
+                nonisolated(unsafe) let pack = pack
+                Task { @MainActor [weak self] in
                     guard let self else { return }
                     if let error {
                         self.lastError = .chartDownloadFailed("\(name): \(error.localizedDescription)")
@@ -504,7 +495,7 @@ final class OfflineMapService: OfflineMapServiceProtocol {
         mlnPacks[pack.id] = nil
         packs.removeAll { $0.id == pack.id }
         storage.removePack(mln) { [weak self] error in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self else { return }
                 if let error {
                     self.lastError = .chartDownloadFailed("Delete failed: \(error.localizedDescription)")

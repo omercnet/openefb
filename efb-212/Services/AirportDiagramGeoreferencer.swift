@@ -14,8 +14,10 @@
 //     independent cross-check of the grid fit.
 //
 //  A fit is accepted only when the N-S and E-W scales agree within 3% (conformal gate) and, whenever the
-//  database has runway coordinates, the predicted thresholds land on the drawn runways. A wrong overlay
-//  is worse than none.
+//  database has runway coordinates, the predicted runway centrelines and midpoints land on the drawn
+//  runways within 50 ft. The bundled aviation.sqlite takes runway ends from FAA NASR APT_RWY_END
+//  (surveyed, 0.01 arc-second); the earlier OurAirports ends were 100-200 ft off and failed this gate.
+//  A wrong overlay is worse than none.
 //
 //  This file compiles in the app and in the macOS batch tool (tools/apd-georef): PDFKit, CoreGraphics
 //  and Vision only, no UIKit/AppKit, everything nonisolated.
@@ -1195,10 +1197,11 @@ nonisolated enum PDFVectorScanner {
             }
         }
 
-        /// Long, thin, dark filled polygons: runway pavement. Returns their long axes.
+        /// Long, thin, dark filled polygons: runway pavement. Returns their long axes. A few curve points
+        /// are allowed: military fields draw arrestor-gear circles as part of the runway outline.
         func runwayShapes() -> [AirportDiagramGeoreferencer.RunwayShape] {
             polygons.compactMap { polygon in
-                guard polygon.filled, polygon.darkFill, polygon.curves == 0, polygon.points.count >= 4, polygon.points.count <= 80 else { return nil }
+                guard polygon.filled, polygon.darkFill, polygon.curves <= 4, polygon.points.count >= 4, polygon.points.count <= 80 else { return nil }
                 guard let box = Self.orientedBox(polygon.points) else { return nil }
                 guard box.length >= 40, box.width >= 1.5, box.width <= 40, box.length / box.width >= 5 else { return nil }
                 // Pavement fills its box; notched outlines (EMAS, arrows) still cover most of it.

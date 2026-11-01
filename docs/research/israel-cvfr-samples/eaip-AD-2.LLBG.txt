@@ -1,0 +1,244 @@
+ 
+ AIP for ISRAEL(section AD-2.LLBG)valid from 06 AUG 2026 LLBG — TEL-AVIV/Ben-Gurion airport LLBG AD 2.1 Aerodrome Location Indicator And Name LLBG — TEL-AVIV/Ben-Gurion airport LLBG AD 2.2 Aerodrome Geographical And Administrative Data 1 | ARP coordinates and site at AD | 320034N 0345308E
+316°/1 400 M from THR 30 | 
+ 2 | Direction and distance from (city) | 115°, 19 km from Tel-Aviv city center | 
+ 3 | Elevation/Reference temperature | 134 ft/31.9°C (August) | 
+ 4 | Geoid undulation at AD ELEV PSN | 19 M | 
+ 5 | MAG VAR/Annual Change | 5°E (2019)/0.08° increasing | 
+ 6 | AD Administration, address, telephone, telefax, telex, e-mail address, AFS, website address | Israel Airports Authority (IAA) Post: Ben-Gurion Airport
+P.O.Box 7, 
+Ben-Gurion International Airport 7015001 Tel:972-3-9752000/1/2 Tel:972-3-9756242/3/4/255 (AD OPS) Email: ramste@iaa.gov.il Tel:972-3-9756215/6/7 (AIS) Fax:972-3-9752010 Email: ais@iaa.gov.il AFS:LLADZPZX | 
+ 7 | Types of traffic permitted (IFR/VFR) | IFR/CVFR | 
+ 8 | Remarks | See LLBG AD 2.22 FLIGHT PROCEDURES, para 10 | 
+ LLBG AD 2.3 Operational Hours 1 | AD Administration | H24 | 
+ 2 | Customs and immigration | H24 | 
+ 3 | Health and sanitation | H24 | 
+ 4 | AIS Briefing Office | H24 | 
+ 5 | ATS Reporting Office (ARO) | H24 | 
+ 6 | MET Briefing Office | H24 | 
+ 7 | ATS | H24 | 
+ 8 | Fuelling | H24 | 
+ 9 | Handling | H24 | 
+ 10 | Security | H24 | 
+ 11 | De-icing | Nil | 
+ 12 | Remarks | See LLBG AD 2.22 FLIGHT PROCEDURES, para 10 | 
+ LLBG AD 2.4 Handling Services And Facilities 1 | Cargo-handling facilities | Trucks 2.5-3.5 tonnes. Up to 5 tonnes handling possible | 
+ 2 | Fuel/oil types | Jet A-1 & 100LL, oil, all types normally available. | 
+ 3 | Fuelling facilities/capacity | Fueling Dept:
+Tel: 972-3-9751354, 972-3-9774046, 
+Mobile: 972-57-7263440, 
+Fax: 972-3-9751392
+Jet A-1 available through hydrants for all parking stands on aprons 'N', 'J' & 'L' and all parking stands on terminal 3 aprons.
+Refueling on parking stand J3 through Left wing only.
+Refueling through bowsers as required. | 
+ 4 | De-icing facilities | Nil | 
+ 5 | Hangar space for visiting aircraft | Available by prior coordination with: | 
+ 6 | Repair facilities for visiting aircraft | IAA/Bedek Division
+Tel: 972-3-9353822
+Fax: 972-3-9357222 EL-AL Israel Airlines LTD.
+Tel: 972-3-9714006, 
+Fax: 972-3-9714009
+Telex: 381052 H TKGK IL | 
+ 7 | Remarks | Nil | 
+ LLBG AD 2.5 Passenger Facilities 1 | Hotels | In Tel-Aviv city. | 
+ 2 | Restaurants | At AD and in Tel-Aviv city. | 
+ 3 | Transportation | Buses, taxis, train and car rental from the AD. | 
+ 4 | Medical facilities | First aid & ambulance at AD, hospitals in the vicinity of AD. | 
+ 5 | Bank and Post Office | At AD open within AD HR. | 
+ 6 | Tourist Office | At AD and in Tel-Aviv city. | 
+ 7 | Remarks | NIL | 
+ LLBG AD 2.6 Rescue And Fire Fighting Services 1 | AD category for fire fighting | Within AD HR: CAT 9 | 
+ 2 | Rescue equipment | Yes, ambulances | 
+ 3 | Capability for removal of disabled aircraft | IAA & ELAL Israel airline have common regulation for aircraft recovery. Hydraulic jacks available with MTOM up to 20 000 KG. For aircraft with a higher MTOM, IATA pool arrangement is available. 
+Contacts numbers: 
+El Al aircraft Maintenance Division: +972-3-9714590, 
+Ben-Gurion Airport Operations Center: +972-3-9756242, 
+IAA Head ground operation manager: +972-50-9752243. | 
+ 4 | Remarks | Outside AD HR, fire fighting and ambulances to be requested if the situation needs. | 
+ LLBG AD 2.7 Seasonal Availability - Clearing NIL LLBG AD 2.8 Aprons, Taxiways And Check Locations/Positions Data 1 | Designation, surface and strength of aprons (PCR) | EH: Surface: CONC, strength: 
+EH 1-6 704/R/D/W/U
+EH 7-9 1065/R/D/W/U | 
+ H: Surface: CONC/ASPH, Strength: 784/R/D/W/U, 650/F/D/X/U | 
+ J: Surface: CONC/ASPH, Strength: 956/R/C/W/U, 751/F/C/X/U | 
+ L: Surface: CONC/ASPH, Strength: 956/R/C/W/U, 751/F/C/X/U | 
+ N: Surface: CONC/ASPH, Strength: 1 204/F/D/X/U
+N11-12 775/R/D/W/U
+N13-19 675/R/D/W/U
+N20-24 1 336/R/D/W/U | 
+ V: Surface: ASPH, Strength: 474/F/D/X/U | 
+ WH: Surface: CONC, Strength:
+WH1-2, 4-9 704/R/D/W/U
+WH3 1 065/R/D/W/U | 
+ X: Surface: CONC/ASPH, Strength: 972/F/D/X/U, 1 065/R/D/W/U | 
+ Terminal 3 - Concourse | 
+ B 2-3: Surface: CONC, Strength: 704/R/D/W/U | 
+ B 6-9: Surface: CONC, Strength: 1 359/R/D/W/U | 
+ B 4-5: Surface: CONC, Strength: 704/R/D/W/U | 
+ C 2-3: Surface: CONC, Strength: 704/R/D/W/U | 
+ C 6-9: Surface: CONC, Strength: 1 359/R/D/W/U | 
+ C 4-5: Surface: CONC, Strength: 704/R/D/W/U | 
+ D 2-3: Surface: CONC, Strength: 704/R/D/W/U | 
+ D 6-9: Surface: CONC, Strength: 1 065/R/D/W/U | 
+ D 4-5: Surface: CONC, Strength: 704/R/D/W/U | 
+ E 2-3: Surface: CONC, Strength: 704/R/D/W/U | 
+ E 6-9: Surface: CONC, Strength: 1 359/R/D/W/U | 
+ E 4-5: Surface: CONC, Strength: 704/R/D/W/U | 
+ RA: Surface: ASPH, Strength: 650/F/D/X/U | 
+ RB: Surface: ASPH, Strength: 1 232/F/D/X/U | 
+ RC: Surface: ASPH, Strength: 1 232/F/D/X/U | 
+ RD: Surface: ASPH, Strength: 650/F/D/X/U | 
+ RE: Surface: ASPH, Strength: 650/F/D/X/U | 
+ 2 | Designation, width, surface and strength of taxiways | Width: 23-45 M | 
+ Surface: ASPH | 
+ Strength: | 
+ K, R, Y, Z: 787/F/C/X/U
+M 940/F/C/X/T
+M1-2 787/F/C/X/U
+M3 972/F/D/X/U
+M4 650/F/D/X/U
+K1-5 787/F/C/X/U
+N 1,060/F/C/X/T | 
+ W1-4, E, T, S: 1 232/F/D/X/U | 
+ L, J: 751/F/C/X/U | 
+ 3 | ACL location and elevation | Location: at apron | 
+ Elevation: See the appropriate Aircraft Parking Chart | 
+ 4 | VOR checkpoints | VOR: see the aerodrome chart | 
+ 5 | INS checkpoints | INS: see the aircraft parking charts | 
+ 6 | Remarks | NIL | 
+ LLBG AD 2.9 Surface Movement Guidance And Control System And Markings 1 | Use of aircraft stand ID signs, TWY guide lines and visual docking/parking guidance system of aircraft stands | Taxiing guidance signs at all intersections with TWY and RWY and at all holding positions.
+Guide lines at apron.
+Nose-in guidance at aircraft stands. | 
+ 2 | RWY and TWY markings and LGT | RWY: Designation, THR, TDZ centre line, edge runway end as appropriate, marked and lighted | 
+ TWY: Centre line, holding positions at all TWY/RWY intersections, marked and lighted. | 
+ 3 | Stop bars | TWY L, 90 M North and 75 M South of THR CL RWY 30. | 
+ Stop Bar 08-26: On TWYs - S, K, W4, W3, W2, W1, E, E1 | 
+ Stop Bar 12-30: On TWYs – K, W4, R, E, F, L | 
+ Stop Bar 03-21: On TWYs – E1, E2, N, K, E4, E5, M, T1, T2, T3, T4. | 
+ 4 | Remarks | See also LLBG AD 2.20 for taxiing to and from stands. | 
+ LLBG AD 2.10 Aerodrome Obstacles In Area 2a, Area 2b, Area 2c and Area 2d | 
+ Obstacle data for Area 2a, 2b, 2c and 2d is available by contacting the Civil Aviation Authority of Israel: Post: Ministry of Transportation
+Civil Aviation Authority
+Infrastructure Div Mrs. Nitzan Vainstain
+P.O.B 1101
+Golan House, Golan st., Airport City 7019900, Israel. Tel:+972-3-9774568 Fax:+972-3-9774599 Email: aip@mot.gov.il Last Data Mapping Date: Area 2a - 27.02.2023
+Area 2b - 14.12.2024
+Area 2c - 27.02.2023
+Area 2d - 01.08.2019 | 
+ In Area 3 | 
+ Obstacle data for Area 3 is maintained by the Israeli Airports Authority (IAA), which is the aerodrome operator of LLBG airport. However, this information is not available for publication or purchase.
+ | 
+ In Area 4 | 
+ Obstacle data for Area 4 is not applicable, since there are no ILS CAT II/III operations in LLBG airport. | 
+ LLBG AD 2.11 Meteorological Information Provided 1 | Associated MET office | Israel Meteorological Service Bet Dagan (LLBD) | 
+ 2 | Hours of service
+MET office outside hours | H24
+- | 
+ 3 | Office responsible for TAF preparation
+Periods of validity | Israel Meteorological Service, Bet Dagan (LLBD)
+24 HR (Long TAF) | 
+ 4 | Type of landing forecast
+Interval of issuance | Trend
+2 HR | 
+ 5 | Briefing/consultation provided | Telephone and/or a video conference briefing with the Meteorological Watch Office at Israel Meteorological Service, Bet Dagan, can be established in the aerodrome meteorological station | 
+ 6 | Flight documentation
+Language(s) used | Charts, OPMET information, SIGMET, Aerodrome Warnings and low level forecasts for TEL-AVIV FIR available in ICAO abbreviated plain language text or in English | 
+ 7 | Charts and other information available for briefing or consulting | Low level and upper wind and temperature chart for standard isobaric surface. Significant weather charts (low level, medium and high level) | 
+ 8 | Supplementary equipment available for providing information | Meteorological information terminal available at the AD meteorological station containing: weather radar, weather satellite image display and animation, Upper Air temperature & wind profiles derived from Israeli radiosonds and AMDAR reports , SIGWX and T+W charts and updated OPMET information | 
+ 9 | ATS units provided with information | Ben-Gurion TWR
+Ben-Gurion APP | 
+ 10 | Additional information (limitation of service, etc.) | See AD chart transmission meters location | 
+ LLBG AD 2.12 Runway Physical Characteristics Designations
+RWY NR | TRUE BRG | Dimensions of RWY (m) | Strength (PCR) and surface of RWY and SWY | THR coordinates
+RWY end coordinates
+THR geoid undulation | THR elevation and highest elevation of TDZ of precision APP RWY | Slope of
+RWY-SWY | 
+ 1 | 2 | 3 | 4 | 5 | 6 | 7 | 
+ 03 | 028.98º | 2 772 X 60 | 850/F/C/X/T 790/F/C/X/U 
+Asphalt | THR 315946.38N
+0345309.89E;
+RWY END 320105.25N
+0345400.81E;
+GUND 19.0 m | THR 134.31 ft
+TDZ - 134.38 ft | -0.73%520 m;
+0%90 m;
++0.27%960 m;
+0%50 m;
+-0.1%350 m;
+0%30 m;
++0.18%770 m | 
+ 21 | 208.98º | 2 772 X 60 | 850/F/C/X/T 790/F/C/X/U 
+Asphalt | THR 320105.25N
+0345400.81E;
+RWY END 
+315946.38N
+0345309.89E;
+GUND 19.0 m | THR 134.02 ft
+TDZ - 133.98 ft | -0.18%770 m;
+0%30 m;
++0.1%350 m;
+0%50 m;
+-0.27%960 m;
+0%90 m;
++0.73%520 m | 
+ 08 | 080.00º | 4 062 X 45 | 787/F/C/X/U
+Asphalt | THR 320046.29N
+0345139.14E;
+RWY END 320106.82N
+0345353.47E;
+GUND 19.0 m | THR 96.78 ft
+TDZ - 108.62 ft | -0.35%/-0.45%
+(462 m) 
+(3 600 m) | 
+ 26 | 260.00º | 4 062 X 45 | 787/F/C/X/U
+Asphalt | THR 320103.83N
+0345333.88E;
+RWY END 320043.97N
+0345124.02E;
+GUND 19.0 m | THR 124.31 ft
+TDZ - 124.31 ft | +0.45%/+0.35%
+(3 600 m) 
+(462 m) | 
+ 12 | 121.40º | 3 112 X 45 | 840/F/C/X/T
+Asphalt | THR 320051.14N
+0345200.56E;
+RWY END 315958.21N
+0345342.31E;
+GUND 19.0 m | THR 102.36 ft
+TDZ - 111.54 ft | +0.25%/+0.3%
+(2 581 m) 
+(531 m) | 
+ 30 | 301.40º | 3 112 X 45 | 840/F/C/X/T
+Asphalt | THR 315959.88N
+0345339.12E;
+RWY END 320051.14N
+ 0345200.56E 
+GUND 19.0 m | THR 129.85 ft
+TDZ - 129.85 ft | -0.3%/-0.25%
+(531 m) 
+(2 581 m) | 
+ SWY dimensions (m) | CWY dimensions (m) | Strip dimensions (m) | Dimensions of RESA (m) | Location And Description Of Arresting System | OFZ | Remarks | 
+ 8 | 9 | 10 | 11 | 12 | 13 | 14 | 
+ Nil | 150 X 150 | 2 892 X 280 | RESA RWY 03 – 232 X 120 | Nil | Available | Nil | 
+ Nil | 150 X 150 | 2 892 X 280 | RESA RWY 21 – 218 X 120 | Nil | Available | Nil | 
+ 400 X 90 | 520 X 150 | 4 182 X 300 | RESA RWY 08 – 255 X 90 | Nil | Available | RESA + SWY + CWY are part of the RWY | 
+ Nil | 150 X 150 | 4 182 X 300 | RESA RWY 26 – 240 X 90 | Nil | Available | Nil | 
+ 60 X 90 | 150 X 150 | 3 292 X 300 | RESA RWY 12 – 101 X 90 | Nil | Available | Nil | 
+ Nil | 150 X 150 | 3 292 X 300 | RESA RWY 30 – 240 X 90 | Nil | Available | Nil | 
+ LLBG AD 2.13 Declared Distances RWY Designator | TORA
+(m) | TODA
+(m) | ASDA
+(m) | LDA
+(m) | Remarks | 
+ 1 | 2 | 3 | 4 | 5 | 6 | 
+ 03 | 2 772 | 2 922 | 2 772 | 2 772 | Nil | 
+ 21 | 2 772 | 2 922 | 2 772 | 2 772 | Nil | 
+ 21 – E2/T2 | - | - | - | 1 084 | Distance from THR 21 to TXY E2/T2 | 
+ 21 – N | - | - | - | 1 750 | Distance from THR 21 to TXY N | 
+ 21 – E3/T3 | - | - | - | 2 014 | Distance from THR 21 to TXY E3/T3 | 
+ 21 – K | - | - | - | 2 228 | Distance from THR 21 to TXY K | 
+ 21 – M | - | - | - | 2 308 | Distance from THR 21 to TXY M | 
+ 21 – E4 | - | - | - | 2 360 | Distance from THR 21 to TXY E4 | 
+ 08 | 3 600 | 4 120 | 4 000 | 3 580 | TORA 08 for Noise Abatement Departure Procedure. RESA is part of the RWY | 
+ 26 | 4 062 | 4 212 | 4 062 | 3 462
+
+[... truncated sample ...]

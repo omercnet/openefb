@@ -19,6 +19,9 @@ struct DebriefView: View {
     /// DebriefEngine never sees the prompt in that case, so the view tracks it itself.
     @State private var promptError: Error?
 
+    /// Decorative hero glyph size, scaled with Dynamic Type.
+    @ScaledMetric(relativeTo: .largeTitle) private var heroSize: CGFloat = 48
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -49,13 +52,14 @@ struct DebriefView: View {
                     // MARK: - Initial State
                     VStack(spacing: 16) {
                         Image(systemName: "brain.head.profile")
-                            .font(.system(size: 48))
+                            .font(.system(size: heroSize))
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
 
-                        Text("Ready to analyze your flight")
+                        Text("Debrief this flight")
                             .font(.headline)
 
-                        Text("The AI will review your GPS track, transcript, and flight phases to provide personalized feedback.")
+                        Text("Apple Intelligence reviews the GPS track, transcript and flight phases on this iPad. Nothing leaves the device.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -64,9 +68,11 @@ struct DebriefView: View {
                             generateDebrief()
                         } label: {
                             Label("Generate Debrief", systemImage: "sparkles")
+                                .foregroundStyle(Palette.onAccent)
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
+                        .tint(Palette.accent)
                         .controlSize(.large)
                     }
                     .padding(.top, 32)
@@ -114,7 +120,8 @@ struct DebriefView: View {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "lightbulb.fill")
                             .foregroundStyle(.yellow)
-                            .frame(width: 20)
+                            .frame(minWidth: 20)
+                            .accessibilityHidden(true)
                         Text(improvement)
                             .font(.body)
                     }
@@ -167,7 +174,8 @@ struct DebriefView: View {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "lightbulb.fill")
                             .foregroundStyle(.yellow)
-                            .frame(width: 20)
+                            .frame(minWidth: 20)
+                            .accessibilityHidden(true)
                         Text(improvement)
                             .font(.body)
                             .contentTransition(.opacity)
@@ -198,8 +206,7 @@ struct DebriefView: View {
                         .foregroundStyle(.secondary)
                     Spacer()
                     if let executedWell = partial.executedWell {
-                        Image(systemName: executedWell ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .foregroundStyle(executedWell ? .green : .orange)
+                        ExecutionBadge(executedWell: executedWell)
                     }
                 }
             }
@@ -209,6 +216,7 @@ struct DebriefView: View {
                     HStack(alignment: .top, spacing: 6) {
                         Text("\u{2022}")
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                         Text(text)
                             .font(.subheadline)
                             .contentTransition(.opacity)
@@ -229,10 +237,11 @@ struct DebriefView: View {
     private func errorContent(_ error: Error) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 48))
+                .font(.system(size: heroSize))
                 .foregroundStyle(.orange)
+                .accessibilityHidden(true)
 
-            Text("Debrief generation failed")
+            Text("Debrief failed")
                 .font(.headline)
 
             Text(error.localizedDescription)
@@ -244,8 +253,10 @@ struct DebriefView: View {
                 generateDebrief()
             } label: {
                 Label("Try Again", systemImage: "arrow.counterclockwise")
+                    .foregroundStyle(Palette.onAccent)
             }
             .buttonStyle(.borderedProminent)
+            .tint(Palette.accent)
         }
         .padding(.top, 32)
     }
@@ -293,14 +304,14 @@ private struct PhaseObservationCard: View {
                     .font(.caption.bold())
                     .foregroundStyle(.secondary)
                 Spacer()
-                Image(systemName: observation.executedWell ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundStyle(observation.executedWell ? .green : .orange)
+                ExecutionBadge(executedWell: observation.executedWell)
             }
 
             ForEach(Array(observation.observations.enumerated()), id: \.offset) { _, text in
                 HStack(alignment: .top, spacing: 6) {
                     Text("\u{2022}")
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                     Text(text)
                         .font(.subheadline)
                 }
@@ -311,6 +322,24 @@ private struct PhaseObservationCard: View {
             RoundedRectangle(cornerRadius: 8)
                 .fill(observation.executedWell ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
         )
+    }
+}
+
+// MARK: - ExecutionBadge
+
+/// Phase verdict: glyph plus text so the result never relies on colour alone.
+private struct ExecutionBadge: View {
+    let executedWell: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(executedWell ? "Well executed" : "Needs work")
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Palette.secondaryText)
+            Image(systemName: executedWell ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundStyle(executedWell ? .green : .orange)
+                .accessibilityHidden(true)
+        }
     }
 }
 
@@ -328,9 +357,11 @@ private struct RatingView: View {
                         .font(.title2)
                 }
             }
+            .accessibilityHidden(true)
             Text("Rating: \(rating)/5")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .accessibilityLabel("Rating: \(rating) out of 5")
         }
     }
 }

@@ -23,6 +23,12 @@ nonisolated struct FlightPhaseDetector: Sendable {
     private var phaseEnteredAt: Date = Date(timeIntervalSince1970: 0)
     let hysteresisSeconds: TimeInterval = 30  // minimum time in phase before transition
 
+    /// Ground speed above which the aircraft is no longer taxiing.
+    static let taxiMaxSpeedKts: Double = 15      // knots
+    /// Ground speed above which the aircraft is treated as airborne when altitude is
+    /// unavailable (typical light-single Vr; the aircraft profile's Vr is not plumbed in).
+    static let rotationSpeedKts: Double = 55     // knots
+
     /// Track the highest cruise altitude for approach detection.
     private var maxCruiseAltitude: Double = 0
 
@@ -41,7 +47,7 @@ nonisolated struct FlightPhaseDetector: Sendable {
 
     /// Process a new track point and return the current flight phase.
     /// Call this for each GPS update (1Hz).
-    mutating func process(_ point: TrackPointRecord) -> FlightPhaseType {
+    mutating func process(_ point: TrackPointRecord, hasAltitude: Bool = true) -> FlightPhaseType {
         recentPoints.append(point)
         if recentPoints.count > 5 { recentPoints.removeFirst() }
 
@@ -51,7 +57,8 @@ nonisolated struct FlightPhaseDetector: Sendable {
         let smoothedVSI = recentPoints.map(\.verticalSpeedFPM).reduce(0, +) / Double(recentPoints.count)
 
         // Detect candidate phase
-        let candidatePhase = detectPhase(speed: smoothedSpeed, altitude: smoothedAlt, vsi: smoothedVSI)
+        let candidatePhase = detectPhase(speed: smoothedSpeed, altitude: smoothedAlt, vsi: smoothedVSI,
+                                         hasAltitude: hasAltitude)
 
         // Track max altitude during cruise for approach detection
         if currentPhase == .cruise {
@@ -101,7 +108,7 @@ nonisolated struct FlightPhaseDetector: Sendable {
 
     /// Determine the candidate phase from smoothed sensor data.
     /// Does NOT apply hysteresis -- that is handled by process().
-    private func detectPhase(speed: Double, altitude: Double, vsi: Double) -> FlightPhaseType {
+    private func detectPhase(speed: Double, altitude: Double, vsi: Double, hasAltitude: Bool) -> FlightPhaseType {
         switch currentPhase {
         case .preflight:
             // Transition to taxi when speed 5-15 kts
@@ -115,6 +122,14 @@ nonisolated struct FlightPhaseDetector: Sendable {
             if speed < 5 {
                 return .preflight
             }
+            if !hasAltitude {
+                // No altitude, so no climb to confirm: infer from ground speed alone.
+                // Above rotation speed the aircraft is airborne; above taxi speed it is
+                // on the takeoff roll. Never Taxi above the taxi speed threshold.
+                if speed > Self.rotationSpeedKts { return .departure }
+                if speed > Self.taxiMaxSpeedKts { return .takeoff }
+                return .taxi
+            }
             // Transition to takeoff when speed > 15 kts AND climbing
             if speed > 15 && vsi > 200 {
                 return .takeoff
@@ -122,8 +137,12 @@ nonisolated struct FlightPhaseDetector: Sendable {
             return .taxi
 
         case .takeoff:
+            // No altitude: above rotation speed the aircraft is airborne
+            if !hasAltitude && speed > Self.rotationSpeedKts {
+                return .departure
+            }
             // Transition to departure when > 60 kts, > 500 ft, still climbing
-            if speed > 60 && altitude > 500 && vsi > 200 {
+            if hasAltitude && speed > 60 && altitude > 500 && vsi > 200 {
                 return .departure
             }
             // Fall back to taxi if speed drops
@@ -134,8 +153,12 @@ nonisolated struct FlightPhaseDetector: Sendable {
 
         case .departure:
             // Transition to cruise when level flight (|VSI| < 200 fpm) at altitude
-            if altitude > 500 && abs(vsi) < 200 {
+            if hasAltitude && altitude > 500 && abs(vsi) < 200 {
                 return .cruise
+            }
+            // Without altitude, a departure that has slowed to taxi speed is a landing
+            if !hasAltitude && speed < Self.taxiMaxSpeedKts {
+                return .landing
             }
             return .departure
 

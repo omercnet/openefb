@@ -36,9 +36,11 @@ struct PilotEditView: View {
                 Section("Personal") {
                     TextField("Name", text: $name)
                         .textContentType(.name)
+                        .accessibilityLabel("Name")
 
                     TextField("Certificate Number", text: $certificateNumber)
                         .autocorrectionDisabled()
+                        .accessibilityLabel("Certificate number")
                 }
 
                 // MARK: - Certificate
@@ -78,6 +80,7 @@ struct PilotEditView: View {
                 Section("Experience") {
                     TextField("Total Hours", text: $totalHours)
                         .keyboardType(.decimalPad)
+                        .accessibilityLabel("Total hours")
                 }
             }
             .navigationTitle("Edit Pilot")

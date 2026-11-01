@@ -1,93 +1,123 @@
-# App Store Connect Metadata — draft, 2026-07-04
+# App Store Connect metadata: draft, 2026-10-31
 
-Draft copy in Ryan's voice conventions (no bravado, no em-dash, plain claims).
-Review and trim before submitting. Character limits noted.
+Plain claims, no bravado. Review and trim before submitting. Character limits noted.
 
-## Name (30 char max)
+## Name (30 max)
 `OpenEFB` (7)
 
-Alternative if a descriptor is wanted: `OpenEFB: VFR Flight Bag` (23)
-
-## Subtitle (30 char max)
+## Subtitle (30 max)
 `VFR moving map and debrief` (26)
 
-## Primary category
-**Navigation**
+## Categories
+Primary **Navigation**. Secondary **Utilities** (alt: Travel).
 
-## Secondary category
-**Utilities** (alt: Travel)
+## Promotional text (170 max, editable without review)
+`Free, open-source VFR flight bag for iPad. FAA sectionals, airport charts, live weather and TFRs, and an on-device debrief after you land.` (138)
 
-## Promotional text (170 char max, updatable without review)
-`Free, open-source VFR electronic flight bag for iPad. Moving-map navigation, live weather, flight recording, and an on-device debrief after you land.` (149)
-
-## Description (4000 char max)
+## Description (4000 max)
 ```
 OpenEFB is a free, open-source VFR electronic flight bag for iPad.
 
-It gives VFR pilots a moving map, live weather, and a flight recorder that
-turns each flight into a reviewable debrief, all on the device.
-
 MOVING MAP
-- Aviation moving map with VFR sectional chart overlays
-- Your position and track shown in real time
-- Airport, navaid, and airspace information from FAA data
-- Nearest-airport readout for quick situational awareness
+- FAA VFR sectional chart with your position and track
+- Airports, navaids and airspace from FAA data
+- Nearest-airport readout and a nearest list with direct-to
+- Night mode for the cockpit
+- Download map regions for use without internet
 
-WEATHER
-- METAR and TAF from the NOAA aviation weather service
-- Weather shown on the map with age and staleness indicators
-- No account or API key required
+AIRPORTS AND CHARTS
+- Runways, frequencies, METAR and TAF for each airport
+- FAA airport diagrams and terminal procedure charts
+- Airport diagram overlaid on the map where the diagram can be placed automatically (advisory: verify against the FAA diagram; the rest open as the FAA PDF)
+- PIREPs and winds aloft near the airport
+- NOTAMs, using your own free FAA API key (add it in Settings; OpenEFB does not provide one)
 
-FLIGHT PLANNING
-- Build and edit VFR routes
-- Instrument strip with heading, speed, and altitude
-- Airspace boundaries and temporary flight restrictions
+WEATHER AND ADVISORIES
+- TFRs and AIRMET/SIGMET on the map, shown for awareness only
+- Every weather and advisory item shows how old its data is
+
+PLANNING
+- Build a route, see distance, time and fuel
+- Instrument strip with ground speed, altitude and track
+- Aircraft and pilot profiles with currency warnings
 
 FLIGHT RECORDING AND DEBRIEF
-- Records your GPS track and cockpit audio during the flight
-- Transcribes cockpit audio on the device, so audio is not sent to a server
-- Replay your flight afterward with a synchronized track and transcript
-- Digital logbook for your flights
+- Records your GPS track and cockpit audio
+- Transcribes audio on the device, so audio never leaves your iPad
+- Replay a flight with its track and transcript
+- On-device debrief on supported devices (Apple Foundation Models)
+- Digital logbook
 
 PRIVACY
-- Your location, audio, transcripts, flights, and logbook stay on your device
-- No analytics, no ads, no tracking
+- No account, no analytics, no ads, no tracking
+- Location, audio, transcripts, flights and logbook stay on your device
+- Weather, TFR, NOTAM and chart requests go to NOAA and the FAA; map tiles come from the FAA sectional service (ArcGIS), OpenFreeMap, Esri and OpenTopoMap
 - Open source under MPL-2.0
 
-OpenEFB is built for personal VFR flying. It is not certified for navigation
-and is not a substitute for official charts, current weather briefings, or
-required onboard equipment. Always cross-check with approved sources.
+NEEDS THE INTERNET: weather, TFRs, NOTAMs, PIREPs and any map area you have not downloaded. Works offline: the airport
+database, downloaded map regions and FAA charts you have already opened.
+
+IMPORTANT
+OpenEFB is provided as a supplemental reference tool. It is NOT intended to be used as a primary means of navigation.
+Pilots are responsible for maintaining situational awareness through all available means including current paper
+charts, ATC communication, and visual references.
+
+Aviation data (charts, airports, frequencies, airspace) is sourced from the FAA and is subject to change. Always verify
+information against official FAA publications. Expired data is clearly marked but should not be relied upon for
+navigation.
+
+Weather information is provided for planning purposes only and may not reflect current conditions. Always obtain an
+official weather briefing from 1800wxbrief.com or FSS before flight.
+
+iPad GPS accuracy varies by model and conditions. WiFi-only iPads do not have GPS hardware. Cellular iPad GPS is not
+TSO-certified. Do not rely on iPad GPS as a sole means of position awareness.
+
+OpenEFB has not been tested, approved, or certified by the FAA or any other aviation authority. Use at your own risk.
+
+DATA SOURCES
+FAA (charts, airport data, TFRs, NOTAMs, terminal procedures), NOAA Aviation Weather Center (METAR, TAF, PIREP,
+AIRMET/SIGMET, winds aloft), map data (c) OpenStreetMap contributors via OpenFreeMap and OpenMapTiles, imagery (c) Esri,
+Maxar, Earthstar Geographics, terrain (c) OpenTopoMap (CC-BY-SA).
 ```
 
-## Keywords (100 char max, comma-separated, no spaces after commas)
-`efb,vfr,aviation,pilot,flight,moving map,sectional,metar,taf,logbook,navigation,aviation weather` (96)
+## Keywords (100 max, comma-separated, no spaces after commas)
+`efb,vfr,aviation,pilot,flight,moving map,sectional,metar,taf,tfr,notam,airport diagram,logbook,chart` (100)
 
-## Support URL
-`https://github.com/<org>/openefb` (confirm the public repo URL)
-
-## Marketing URL (optional)
-Leave blank or point to the repo/README.
+## URLs
+- Support: `https://github.com/quartermint/openefb` (matches the link in Settings; confirm it is public)
+- Marketing: blank or the same repo
 
 ## Copyright
 `2026 Quartermint`
 
-## App Review notes (private, to reviewer)
+## Privacy policy URL
+Required for the listing. Point to a `PRIVACY.md` in the repo or a page that repeats `PRIVACY_NUTRITION_LABELS.md`.
+Not created here.
+
+## App Review notes (private)
 ```
-OpenEFB is a VFR electronic flight bag. To exercise it fully:
-- Location: grant "While Using" to see the moving map center on the simulated
-  location. Background location is used to keep recording a flight track with
-  the screen off.
-- Microphone and Speech Recognition: used only to record and transcribe cockpit
-  audio on-device during a flight recording. Transcription is forced on-device
-  (requiresOnDeviceRecognition = true).
-- Weather uses the public NOAA aviationweather.gov API (no key, no account).
-No login is required.
+OpenEFB is a VFR electronic flight bag. No login is needed.
+- Location (While Using): centres the moving map on the device position. Background location keeps a recorded
+  flight track running with the screen off.
+- Microphone and Speech Recognition: used only to record and transcribe cockpit audio on the device during a flight
+  recording. Transcription is on-device (SpeechAnalyzer, or SFSpeechRecognizer with requiresOnDeviceRecognition = true).
+  The debrief uses Apple Foundation Models on the device. No audio, transcript or location is sent to a server.
+- Network: NOAA aviationweather.gov (keyless), FAA TFR, terminal chart and NOTAM services, and map tile hosts.
+  NOTAMs need a free FAA API key that the user enters in Settings > NOTAM API (a link there opens the FAA portal).
+  Without a key the airport sheet says "NOTAMs need a free FAA API key. Add it in Settings > NOTAM API."
+- To see the map without moving, use Xcode or simulator location Palo Alto (37.4611, -122.1150).
+- TFR, AIRMET/SIGMET and airport diagram overlay are advisory and are labelled as such in the app.
 ```
 
 ## Age rating
-Expected 4+ (no objectionable content). Confirm in the questionnaire.
+Expected 4+. Confirm in the questionnaire.
 
-## What to fill in
-- Confirm public GitHub repo URL for Support URL.
-- Confirm final display name (app shows "OpenEFB"; Xcode PRODUCT_NAME is efb-212).
-- Screenshots: see ../screenshots (regenerate at required store resolutions).
+## Screenshots (iPad 13-inch, 2064x2752)
+See `screenshots/README.md`. Apple's current spec: 13-inch iPad accepts 2064x2752 or 2048x2732 (portrait) and the
+landscape equivalents. Captured at 2064x2752.
+
+## To confirm before submitting
+- Public repo URL, privacy policy URL.
+- Display name: set `OpenEFB` as the home-screen name (currently `efb-212`).
+- Public release only: remove Satellite and Terrain, then delete the Esri and OpenTopoMap lines from the data sources
+  paragraph (efb-zfm.8).

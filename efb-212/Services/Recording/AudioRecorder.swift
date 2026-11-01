@@ -108,6 +108,12 @@ actor AudioRecorder: AudioRecorderProtocol {
         let file = try AVAudioFile(forWriting: outputURL, settings: outputSettings)
         outputFile = file
 
+        // The file's processing format (mono, profile sample rate) rarely equals the hardware
+        // input format (e.g. 48 kHz, possibly stereo in the simulator). Writing a mismatched
+        // buffer fails with avfaudio error -50, so convert before writing.
+        let fileFormat = file.processingFormat
+        let converter = recordingFormat == fileFormat ? nil : AVAudioConverter(from: recordingFormat, to: fileFormat)
+        let rateRatio = fileFormat.sampleRate / recordingFormat.sampleRate
         // Install tap: write to file AND stream to transcription callback
         let bufferCallback = onBufferAvailable
         let logger = self.logger
@@ -121,7 +127,27 @@ actor AudioRecorder: AudioRecorderProtocol {
             // Write to AAC file. A failure here (disk full, file vanished) is not
             // recoverable for this recording: report once and stop so audio isn't lost silently.
             do {
-                try file.write(from: buffer)
+                if let converter {
+                    let capacity = AVAudioFrameCount((Double(buffer.frameLength) * rateRatio).rounded(.up)) + 32
+                    guard let converted = AVAudioPCMBuffer(pcmFormat: fileFormat, frameCapacity: capacity) else {
+                        throw AudioRecorderError.noAudioInput
+                    }
+                    var supplied = false
+                    var conversionError: NSError?
+                    converter.convert(to: converted, error: &conversionError) { _, status in
+                        if supplied {
+                            status.pointee = .noDataNow
+                            return nil
+                        }
+                        supplied = true
+                        status.pointee = .haveData
+                        return buffer
+                    }
+                    if let conversionError { throw conversionError }
+                    try file.write(from: converted)
+                } else {
+                    try file.write(from: buffer)
+                }
             } catch {
                 let firstFailure = writeFailed.withLock { failed -> Bool in
                     defer { failed = true }
@@ -136,8 +162,9 @@ actor AudioRecorder: AudioRecorderProtocol {
                 return
             }
 
+            let bufferFrames = AVAudioFramePosition(buffer.frameLength)
             let bufferStartFrame = framesWritten.withLock { frames -> AVAudioFramePosition in
-                defer { frames += AVAudioFramePosition(buffer.frameLength) }
+                defer { frames += bufferFrames }
                 return frames
             }
             let fileTime = AVAudioTime(sampleTime: bufferStartFrame, atRate: sampleRate)
@@ -263,7 +290,7 @@ actor AudioRecorder: AudioRecorderProtocol {
             .playAndRecord,
             mode: .voiceChat,
             options: [
-                .allowBluetooth,
+                .allowBluetoothHFP,
                 .allowBluetoothA2DP,
                 .defaultToSpeaker,
                 .mixWithOthers
@@ -292,8 +319,11 @@ actor AudioRecorder: AudioRecorderProtocol {
             object: AVAudioSession.sharedInstance(),
             queue: nil
         ) { [weak self] notification in
+            // Pull Sendable values out here: `Notification` itself is not Sendable.
+            let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let optionsValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt
             Task { [weak self] in
-                await self?.handleInterruption(notification)
+                await self?.handleInterruption(typeValue: typeValue, optionsValue: optionsValue)
             }
         }
 
@@ -303,8 +333,9 @@ actor AudioRecorder: AudioRecorderProtocol {
             object: AVAudioSession.sharedInstance(),
             queue: nil
         ) { [weak self] notification in
+            let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt
             Task { [weak self] in
-                await self?.handleRouteChange(notification)
+                await self?.handleRouteChange(reasonValue: reasonValue)
             }
         }
 
@@ -341,9 +372,8 @@ actor AudioRecorder: AudioRecorderProtocol {
 
     // MARK: - Interruption Handling
 
-    private func handleInterruption(_ notification: Notification) async {
-        guard let userInfo = notification.userInfo,
-              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+    private func handleInterruption(typeValue: UInt?, optionsValue: UInt?) async {
+        guard let typeValue,
               let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
 
         switch type {
@@ -357,7 +387,7 @@ actor AudioRecorder: AudioRecorderProtocol {
         case .ended:
             // Auto-resume if system says it's safe
             logger.info("Audio interruption ended")
-            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+            if let optionsValue {
                 let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
                 if options.contains(.shouldResume) {
                     try? await resumeRecording()
@@ -371,9 +401,8 @@ actor AudioRecorder: AudioRecorderProtocol {
 
     // MARK: - Route Change Handling
 
-    private func handleRouteChange(_ notification: Notification) async {
-        guard let userInfo = notification.userInfo,
-              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+    private func handleRouteChange(reasonValue: UInt?) async {
+        guard let reasonValue,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
 
         if reason == .oldDeviceUnavailable {
@@ -403,7 +432,7 @@ enum AudioRecorderError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .noAudioInput:
-            return "No audio input available. Audio recording requires a microphone."
+            return "No microphone found. The flight records without cockpit audio."
         }
     }
 }

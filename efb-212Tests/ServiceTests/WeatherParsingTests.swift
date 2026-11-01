@@ -10,11 +10,12 @@ import Foundation
 @testable import efb_212
 
 @Suite("Weather Parsing Tests")
+@MainActor
 struct WeatherParsingTests {
 
     /// Shape captured from https://aviationweather.gov/api/data/metar?ids=KPAO&format=json
     /// (obsTime is epoch seconds, reportTime is ISO-8601 with fractional seconds, visib "10+").
-    static let kpaoJSON = """
+    nonisolated static let kpaoJSON = """
     [{"icaoId":"KPAO","obsTime":1793332020,"reportTime":"2026-10-30T04:00:00.000Z",
       "temp":14,"dewp":9.4,"wdir":330,"wspd":6,"visib":"10+","fltCat":"VFR",
       "rawOb":"METAR KPAO 300253Z 33006KT 10SM BKN180 14/09 A3002",

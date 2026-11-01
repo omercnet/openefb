@@ -111,7 +111,7 @@ struct ChartPDFView: View {
             if let document = PDFDocument(url: url) {
                 state = .loaded(document)
             } else {
-                state = .failed("This chart file could not be opened.")
+                state = .failed("The chart file could not be opened. Retry downloads it again.")
             }
         } catch {
             state = .failed(error.localizedDescription)
