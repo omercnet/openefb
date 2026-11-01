@@ -121,4 +121,13 @@ final class WeatherViewModel {
         guard let wx = currentWeather, let dew = wx.dewpoint else { return "---" }
         return "\(Int(dew))C"  // degrees Celsius
     }
+
+    /// Region whose altimeter unit the decoded fields use (US inHg, Israel hPa).
+    var region: Region = .us
+
+    /// Formatted altimeter setting in the region's unit: "30.02 inHg" or "1017 hPa".
+    var decodedAltimeter: String {
+        guard let hPa = currentWeather?.altimeterHPa else { return "---" }
+        return region.formattedAltimeter(hPa: hPa)
+    }
 }

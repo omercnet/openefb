@@ -172,12 +172,56 @@ struct PhaseWithoutAltitudeTests {
         #expect(phase == .taxi)
     }
 
-    @Test func withAltitudeTheClimbRuleStillApplies() {
-        // Level at 97 kt with a valid altitude is NOT inferred airborne by speed: unchanged behaviour.
+    @Test func withAltitudeBelowRotationSpeedLevelStaysTaxi() {
+        // Between taxi and rotation speed with a valid altitude, a takeoff needs a climb to be confirmed.
+        var detector = FlightPhaseDetector()
+        _ = feed(&detector, speed: 10, from: 0, to: 30, hasAltitude: true)
+        let phase = feed(&detector, speed: 40, from: 31, to: 80, hasAltitude: true)
+        #expect(phase == .taxi)
+    }
+
+    @Test func withAltitudeAboveRotationSpeedIsAirborneNotTaxiEvenWhenLevel() {
+        // efb-77r.36: 97 kt at a steady altitude (no climb seen) is airborne, not Taxi.
         var detector = FlightPhaseDetector()
         _ = feed(&detector, speed: 10, from: 0, to: 30, hasAltitude: true)
         let phase = feed(&detector, speed: 97, from: 31, to: 80, hasAltitude: true)
-        #expect(phase == .taxi)
+        #expect(phase == .departure)
+    }
+
+    @Test func recordingStartedInCruiseAtConstantAltitudeNeverReadsTaxi() {
+        // efb-77r.36: first fix is already 97 kt at a constant 4,500 ft MSL.
+        var detector = FlightPhaseDetector()
+        var seen: Set<FlightPhaseType> = []
+        for i in 0...120 {
+            let point = FlightPhaseDetectorTests.makePoint(
+                speed: 97, altitude: 4500, vsi: 0, secondsFromStart: 1_700_000_000 + Double(i))  // real wall-clock start
+            seen.insert(detector.process(point, hasAltitude: true))
+        }
+        #expect(!seen.contains(.taxi))
+        #expect(!seen.contains(.preflight))   // fast from the first fix: never reads Preflight either
+        #expect(detector.currentPhase == .cruise)
+    }
+
+    @Test func recordingStartedInCruiseWithoutAltitudeNeverReadsTaxi() {
+        var detector = FlightPhaseDetector()
+        var seen: Set<FlightPhaseType> = []
+        for i in 0...120 {
+            let point = FlightPhaseDetectorTests.makePoint(
+                speed: 97, altitude: 0, vsi: 0, secondsFromStart: 1_700_000_000 + Double(i))
+            seen.insert(detector.process(point, hasAltitude: false))
+        }
+        #expect(!seen.contains(.taxi))
+        #expect(detector.currentPhase == .departure)
+    }
+
+    @Test func resumedInCruiseAfterTaxiLevelFixesLeavesTaxi() {
+        // Recording ran on the ground, then the next fixes are cruise speed at constant altitude.
+        var detector = FlightPhaseDetector()
+        _ = feed(&detector, speed: 10, from: 0, to: 30, hasAltitude: true)
+        #expect(detector.currentPhase == .taxi)
+        _ = feed(&detector, speed: 110, from: 31, to: 130, hasAltitude: true)
+        #expect(detector.currentPhase != .taxi)
+        #expect(detector.currentPhase == .cruise || detector.currentPhase == .departure)
     }
 
     @Test func departureWithoutAltitudeEndsAsLandingWhenSlow() {

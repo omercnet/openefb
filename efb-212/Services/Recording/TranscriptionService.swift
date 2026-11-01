@@ -43,8 +43,8 @@ enum TranscriptionEngine: Sendable {
 
 /// Confidence and audio time range extracted from a transcription result.
 nonisolated struct TranscriptSegmentMetrics: Sendable, Equatable {
-    /// 0.0-1.0, or `TranscriptionService.unknownConfidence` when the engine gave none.
-    let confidence: Double
+    /// 0.0-1.0, or nil when the engine gave none.
+    let confidence: Double?
     let audioStartTime: TimeInterval  // seconds from start of audio file
     let audioEndTime: TimeInterval    // seconds from start of audio file
 }
@@ -52,11 +52,6 @@ nonisolated struct TranscriptSegmentMetrics: Sendable, Equatable {
 // MARK: - Transcription Service
 
 actor TranscriptionService: TranscriptionServiceProtocol {
-
-    /// Sentinel stored in `TranscriptSegmentRecord.confidence` when the engine did not
-    /// report a confidence. The column is non-null, so "unknown" cannot be nil; -1 sorts
-    /// below every real value so unverified segments are never preferred.
-    nonisolated static let unknownConfidence: Double = -1
 
     private let recordingDB: RecordingDatabase
     private let vocabularyProcessor = AviationVocabularyProcessor()
@@ -222,7 +217,7 @@ actor TranscriptionService: TranscriptionServiceProtocol {
 
     /// Extract confidence and audio time range from an attributed transcription result.
     /// Confidence is the character-length-weighted mean of the runs that carry one, or
-    /// `unknownConfidence` if none do. Time range prefers the runs' audioTimeRange
+    /// nil if none do. Time range prefers the runs' audioTimeRange
     /// attributes and falls back to `resultRange` (the result's overall range).
     nonisolated static func metrics(
         from text: AttributedString,
@@ -254,7 +249,7 @@ actor TranscriptionService: TranscriptionServiceProtocol {
             rangeEnd = CMTimeRangeGetEnd(resultRange).seconds
         }
 
-        let confidence = confidenceWeight > 0 ? weightedConfidence / confidenceWeight : unknownConfidence
+        let confidence: Double? = confidenceWeight > 0 ? weightedConfidence / confidenceWeight : nil
         return TranscriptSegmentMetrics(
             confidence: confidence,
             audioStartTime: rangeStart ?? 0,
@@ -385,8 +380,8 @@ actor TranscriptionService: TranscriptionServiceProtocol {
             if result.isFinal {
                 let segments = result.bestTranscription.segments
                 // Mean word confidence; SFSpeechRecognizer reports 0 for words it didn't score.
-                let confidence: Double = segments.isEmpty
-                    ? TranscriptionService.unknownConfidence
+                let confidence: Double? = segments.isEmpty
+                    ? nil
                     : segments.map { Double($0.confidence) }.reduce(0, +) / Double(segments.count)
                 let start = segments.first?.timestamp ?? 0
                 let end = segments.last.map { $0.timestamp + $0.duration } ?? 0

@@ -26,14 +26,17 @@ struct GPSFailureNotice: View {
             }
             if reason.offersSettings {
                 Spacer(minLength: Space.s)
-                Button("Open Settings") {
+                Button {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         openURL(url)
                     }
+                } label: {
+                    // The frame sits inside the label so the bordered button itself is >= 60 pt.
+                    Text("Open Settings")
+                        .frame(minWidth: MapControlMetrics.size, minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
-                .frame(minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
                 .accessibilityIdentifier("gps-open-settings")
             }
         }

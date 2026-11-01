@@ -422,6 +422,7 @@ nonisolated struct WeatherCache: Identifiable, Codable, Equatable, Sendable {
     var windGust: Int?                   // knots
     var visibility: String?              // statute miles (string to handle "10+" etc.)
     var ceiling: Int?                    // feet AGL
+    var altimeterHPa: Double?            // altimeter setting, hectopascals (QNH)
     var flightCategory: FlightCategory
     var observationTime: Date?           // When observation was taken
     var fetchedAt: Date                  // When data was retrieved
@@ -450,6 +451,7 @@ nonisolated struct WeatherCache: Identifiable, Codable, Equatable, Sendable {
         ceiling: Int? = nil,
         flightCategory: FlightCategory = .vfr,
         observationTime: Date? = nil,
+        altimeterHPa: Double? = nil,
         fetchedAt: Date = Date()
     ) {
         self.id = id
@@ -465,6 +467,7 @@ nonisolated struct WeatherCache: Identifiable, Codable, Equatable, Sendable {
         self.ceiling = ceiling
         self.flightCategory = flightCategory
         self.observationTime = observationTime
+        self.altimeterHPa = altimeterHPa
         self.fetchedAt = fetchedAt
     }
 }

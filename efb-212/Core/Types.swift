@@ -57,6 +57,16 @@ enum MapLayer: String, CaseIterable, Sendable {
     case navaids        // VOR/NDB icons
     case route          // Active flight plan route line
     case ownship        // Own aircraft position
+    // Israel CVFR chart (IL-3)
+    case cvfrRoutes     // Route segments + altitude labels
+    case cvfrPoints     // Reporting points
+    case cvfrAirspace   // CTR/ATZ/TMA and P/R/D
+    case cvfrRunways    // Runway lines
+    case cvfrClosures   // NOTAM route closures
+
+    /// The Israel CVFR chart layers (drawn by `IsraelChartOverlay`, not by `MapService`).
+    static let cvfrChart: [MapLayer] = [.cvfrRoutes, .cvfrPoints, .cvfrAirspace, .cvfrRunways, .cvfrClosures]
+    var isCVFRChart: Bool { Self.cvfrChart.contains(self) }
 }
 
 // MARK: - Power

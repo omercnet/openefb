@@ -7,9 +7,11 @@
 //  5-point rolling average for smoothing. Thresholds derived from SFR reference implementation.
 //
 //  Phase transitions:
-//    preflight (<5kts) -> taxi (5-15kts) -> takeoff (>15kts + climbing) ->
-//    departure (>60kts + >500ft + climbing) -> cruise (level >500ft) ->
+//    preflight (<5kts) -> taxi (5-15kts) -> takeoff (>15kts + climbing, or >55kts) ->
+//    departure (>55kts, or >60kts + >500ft + climbing) -> cruise (level >500ft) ->
 //    approach (descending) -> landing (<15kts after descent) -> postflight (<5kts sustained)
+//  Ground speed above rotation speed means airborne whatever the altitude trend, so a
+//  recording started or resumed in cruise never reads Taxi (efb-77r.30, efb-77r.36).
 //
 
 import Foundation
@@ -25,8 +27,8 @@ nonisolated struct FlightPhaseDetector: Sendable {
 
     /// Ground speed above which the aircraft is no longer taxiing.
     static let taxiMaxSpeedKts: Double = 15      // knots
-    /// Ground speed above which the aircraft is treated as airborne when altitude is
-    /// unavailable (typical light-single Vr; the aircraft profile's Vr is not plumbed in).
+    /// Ground speed above which the aircraft is treated as airborne, whatever the altitude
+    /// trend (typical light-single Vr; the aircraft profile's Vr is not plumbed in).
     static let rotationSpeedKts: Double = 55     // knots
 
     /// Track the highest cruise altitude for approach detection.
@@ -111,6 +113,10 @@ nonisolated struct FlightPhaseDetector: Sendable {
     private func detectPhase(speed: Double, altitude: Double, vsi: Double, hasAltitude: Bool) -> FlightPhaseType {
         switch currentPhase {
         case .preflight:
+            // A recording started or resumed in flight: above rotation speed, never Taxi
+            if speed > Self.rotationSpeedKts {
+                return .departure
+            }
             // Transition to taxi when speed 5-15 kts
             if speed >= 5 {
                 return .taxi
@@ -134,11 +140,16 @@ nonisolated struct FlightPhaseDetector: Sendable {
             if speed > 15 && vsi > 200 {
                 return .takeoff
             }
+            // Above rotation speed the aircraft is airborne whatever the altitude trend:
+            // a recording started or resumed in cruise sees a steady altitude and no climb.
+            if speed > Self.rotationSpeedKts {
+                return .departure
+            }
             return .taxi
 
         case .takeoff:
-            // No altitude: above rotation speed the aircraft is airborne
-            if !hasAltitude && speed > Self.rotationSpeedKts {
+            // Above rotation speed the aircraft is airborne (with or without altitude)
+            if speed > Self.rotationSpeedKts {
                 return .departure
             }
             // Transition to departure when > 60 kts, > 500 ft, still climbing

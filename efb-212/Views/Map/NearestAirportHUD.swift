@@ -27,7 +27,7 @@ struct NearestAirportHUD: View {
                     .frame(minHeight: 44)
                     .background(Palette.accent, in: RoundedRectangle(cornerRadius: 8))
 
-                if let entry {
+                if appState.region.hasAirportData, let entry {
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 10) {
                             Text(entry.airport.icao)
@@ -47,10 +47,17 @@ struct NearestAirportHUD: View {
                             if entry.isMilitary {
                                 MilitaryUseTag()
                             }
+                            if entry.requiresPPR {
+                                PprTag()
+                            }
+                            if entry.isClosedByNotam {
+                                NotamClosedTag()
+                            }
                         }
                     }
                 } else {
-                    Text(appState.gpsAvailable ? "no landable airport in range" : "waiting for GPS")
+                    Text(!appState.region.hasAirportData ? "no airport data yet"
+                         : appState.gpsAvailable ? "no landable airport in range" : "waiting for GPS")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
@@ -69,11 +76,14 @@ struct NearestAirportHUD: View {
     }
 
     private var accessibilityText: String {
+        guard appState.region.hasAirportData else { return "Nearest airports. No airport data for this region yet." }
         guard let entry else { return "Nearest airports. No landable airport yet." }
         var text = "Nearest airport \(entry.airport.icao), \(String(format: "%.1f", entry.distance)) nautical miles, bearing \(String(format: "%03.0f", entry.bearing)) degrees"
         if let runway = entry.runwaySummary { text += ", runway \(runway)" }
         if entry.isPrivateUse { text += ", private use" }
         if entry.isMilitary { text += ", military, emergency use only" }
+        if entry.requiresPPR { text += ", prior permission required" }
+        if entry.isClosedByNotam { text += ", a NOTAM names this field closed" }
         return text
     }
 }
@@ -103,6 +113,32 @@ struct MilitaryUseTag: View {
             .padding(.vertical, 2)
             .background(.orange, in: RoundedRectangle(cornerRadius: 4))
             .accessibilityLabel("Military field, emergency use only")
+    }
+}
+
+/// Amber caution tag for Israeli fields whose AIP entry requires prior permission (PPR).
+struct PprTag: View {
+    var body: some View {
+        Text("PPR")
+            .font(.footnote.weight(.heavy))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(.orange, in: RoundedRectangle(cornerRadius: 4))
+            .accessibilityLabel("Prior permission required")
+    }
+}
+
+/// Red warning tag: a current NOTAM names this field closed. The pilot must read the NOTAM.
+struct NotamClosedTag: View {
+    var body: some View {
+        Text("NOTAM CLSD")
+            .font(.footnote.weight(.heavy))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Palette.warning, in: RoundedRectangle(cornerRadius: 4))
+            .accessibilityLabel("A NOTAM names this field closed")
     }
 }
 

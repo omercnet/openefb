@@ -89,6 +89,22 @@ struct BundledAirportQueriesTests {
         #expect(nearby.contains { LandableAirportFilter.isPrivateUse($0) })
     }
 
+    @Test func knownPrivateUseFieldsFireThePrivateFlagAndPublicOnesDoNot() throws {
+        let db = try Self.makeDatabase()
+        // FAA NASR APT_BASE, cycle 2026-10-29: FACILITY_USE_CODE PR (private use).
+        let bonnyDoon = try #require(try db.airport(byICAO: "CL77"))    // OWNERSHIP PR, USE PR
+        let lasTrancas = try #require(try db.airport(byICAO: "17CL"))   // OWNERSHIP PR, USE PR
+        #expect(LandableAirportFilter.isPrivateUse(bonnyDoon))
+        #expect(LandableAirportFilter.isPrivateUse(lasTrancas))
+        // Moffett: publicly owned but USE PR (prior permission required): facility use wins.
+        #expect(LandableAirportFilter.isPrivateUse(try #require(try db.airport(byICAO: "KNUQ"))))
+        // Public-use fields (USE PU) must not be flagged.
+        for icao in ["KPAO", "KSQL", "KSFO", "KOAK"] {
+            let airport = try #require(try db.airport(byICAO: icao))
+            #expect(!LandableAirportFilter.isPrivateUse(airport), "\(icao) is public use")
+        }
+    }
+
     @Test func kpaoRunwayEndsMatchNASRSurveyWithinAMeter() throws {
         let kpao = try #require(try Self.makeDatabase().airport(byICAO: "KPAO"))
         let runway = try #require(kpao.runways.first { $0.id == "13/31" })

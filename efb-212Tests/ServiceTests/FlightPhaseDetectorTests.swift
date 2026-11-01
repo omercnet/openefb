@@ -247,15 +247,15 @@ struct FlightPhaseDetectorTests {
         for _ in 0..<40 { phase = feed(speed: 10) }
         #expect(phase == .taxi)
 
-        // Accelerate to 70 kt on the ground over 15 s
-        for i in 0..<15 { phase = feed(speed: 10 + Double(i + 1) * 4) }
-        #expect(phase == .taxi)  // not climbing yet
+        // Accelerate to 50 kt on the ground over 15 s (below rotation speed)
+        for i in 0..<15 { phase = feed(speed: 10 + Double(i + 1) * (40.0 / 15.0)) }
+        #expect(phase == .taxi)  // not climbing yet, below rotation speed
 
-        // Climb at 600 fpm (10 ft/s) at 70 kt
+        // Rotate and climb at 600 fpm (10 ft/s), accelerating through 55 kt to 70 kt
         var reachedTakeoff = false
-        for _ in 0..<90 {
+        for k in 0..<90 {
             altitude += 10
-            phase = feed(speed: 70)
+            phase = feed(speed: min(70, 50 + Double(k)))
             if phase == .takeoff { reachedTakeoff = true }
         }
         #expect(reachedTakeoff)

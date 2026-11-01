@@ -20,6 +20,8 @@ nonisolated struct NearestAirportEntry: Identifiable, Sendable {
     let airport: Airport
     let distance: Double   // nautical miles
     let bearing: Double    // degrees true
+    /// Israel only (IL-4): PPR, NOTAM closure and review status. nil for US airports.
+    var israel: IsraelAerodromeFlags? = nil
 
     var id: String { airport.icao }
 
@@ -37,6 +39,12 @@ nonisolated struct NearestAirportEntry: Identifiable, Sendable {
         guard let runway = longestRunway else { return nil }
         return "\(runway.length)' \(runway.surface.abbreviation)"   // feet
     }
+
+    /// Israel: the AIP says prior permission is required.
+    var requiresPPR: Bool { israel?.requiresPPR ?? false }
+
+    /// Israel: a current NOTAM names the field closed.
+    var isClosedByNotam: Bool { israel?.isClosedByNotam ?? false }
 }
 
 // MARK: - NearestAirportViewModel
@@ -89,11 +97,31 @@ final class NearestAirportViewModel {
     /// Last position used for nearest airport query.
     private var lastQueryPosition: CLLocation?
 
+    /// Region the last query was for, so switching region re-queries even when ownship hasn't moved.
+    private var lastQueryRegion: Region?
+
+    /// Israel (IL-4): the curated aerodromes behind the current entries, for re-flagging when a NOTAM feed arrives.
+    private var israelAerodromes: [String: IsraelAerodrome] = [:]
+    private let israelDatabaseProvider: @Sendable () throws -> any IsraelAviationDatabaseProtocol
+    private let notamFetcher: (@Sendable () async throws -> IsraelNotamReport)?
+    private var notamReport: IsraelNotamReport?
+    private var notamFetchedAt: Date?
+    private var notamTask: Task<Void, Never>?
+    /// The relay caches 5 minutes; asking more often only costs battery.
+    static let notamRefreshInterval: TimeInterval = 300
+
     // MARK: - Init
 
-    init(appState: AppState, databaseService: any DatabaseServiceProtocol) {
+    init(
+        appState: AppState,
+        databaseService: any DatabaseServiceProtocol,
+        israelDatabaseProvider: @escaping @Sendable () throws -> any IsraelAviationDatabaseProtocol = { try IsraelAviationDatabase.bundled() },
+        notamFetcher: (@Sendable () async throws -> IsraelNotamReport)? = nil
+    ) {
         self.appState = appState
         self.databaseService = databaseService
+        self.israelDatabaseProvider = israelDatabaseProvider
+        self.notamFetcher = notamFetcher
     }
 
     // MARK: - Update Nearest
@@ -101,8 +129,13 @@ final class NearestAirportViewModel {
     /// Recompute nearest landable airports from the given ownship position.
     /// Skips the query if the position moved less than `requeryDistanceNM` since the last one.
     func updateNearest(from position: CLLocation) {
-        if let lastPosition = lastQueryPosition,
+        let region = appState.region
+        if let lastPosition = lastQueryPosition, lastQueryRegion == region,
            position.distanceInNM(to: lastPosition) < Self.requeryDistanceNM {
+            return
+        }
+        if region == .israel {
+            updateNearestIsrael(from: position)
             return
         }
 
@@ -126,9 +159,71 @@ final class NearestAirportViewModel {
             nearestDistance = entries.first?.distance
             nearestBearing = entries.first?.bearing
             lastQueryPosition = position
+            lastQueryRegion = region
         } catch {
             // Non-critical -- nearest airport is informational.
             // Keep stale data rather than clearing it.
+        }
+    }
+
+    // MARK: - Israel (IL-4)
+
+    /// Nearest landable Israeli aerodromes from the curated table. Heliports, unmanned-aircraft strips and
+    /// fields with no usable runway data are not listed; PPR and NOTAM closures are flagged on each entry.
+    private func updateNearestIsrael(from position: CLLocation) {
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            let aerodromes = try israelDatabaseProvider()
+                .nearestAerodromes(to: position.coordinate, count: Self.candidateCount)
+                .filter { !IsraelAerodromeAdapter.notLandableUses.contains($0.use) }
+            israelAerodromes = Dictionary(uniqueKeysWithValues: aerodromes.map { ($0.code, $0) })
+            let entries = Self.rankLandable(
+                aerodromes.map(IsraelAerodromeAdapter.airport),
+                from: position,
+                minimumRunwayLengthFeet: Self.minimumRunwayLengthFeet,
+                limit: Self.listCount
+            )
+            publish(flagged(entries))
+            lastQueryPosition = position
+            lastQueryRegion = .israel
+            refreshNotamsIfNeeded()
+        } catch {
+            // Keep stale data rather than clearing it.
+        }
+    }
+
+    private func publish(_ entries: [NearestAirportEntry]) {
+        nearestAirports = entries
+        nearestAirport = entries.first?.airport
+        nearestDistance = entries.first?.distance
+        nearestBearing = entries.first?.bearing
+    }
+
+    private func flagged(_ entries: [NearestAirportEntry]) -> [NearestAirportEntry] {
+        entries.map { entry in
+            var copy = entry
+            if let aerodrome = israelAerodromes[entry.airport.icao] {
+                copy.israel = IsraelAerodromeAdapter.flags(for: aerodrome, report: notamReport)
+            }
+            return copy
+        }
+    }
+
+    /// Fetch the NOTAM feed (when the app gave this view model a way to) and re-flag the list on arrival.
+    /// No feed means no closure flags, never a "not closed" claim: the row just carries no NOTAM tag.
+    private func refreshNotamsIfNeeded() {
+        guard let notamFetcher, notamTask == nil else { return }
+        if let fetched = notamFetchedAt, Date().timeIntervalSince(fetched) < Self.notamRefreshInterval { return }
+        notamFetchedAt = Date()
+        notamTask = Task { [weak self] in
+            let report = try? await notamFetcher()
+            guard let self else { return }
+            self.notamTask = nil
+            if let report {
+                self.notamReport = report
+                self.publish(self.flagged(self.nearestAirports))
+            }
         }
     }
 

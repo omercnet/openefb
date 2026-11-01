@@ -118,11 +118,14 @@ final class MapViewModel {
     /// Called when map style finishes loading. Configures layers and loads initial data.
     func onMapStyleLoaded(style: MLNStyle) {
         mapService.onStyleLoaded(style: style)
+        mapService.israelChart.setActive(appState.region == .israel)
+        syncOfficialChart()
 
         // Load initial data for the CONUS view (default zoom is low: towered airports only)
-        let conusCenter = CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0)
+        let region = appState.region
+        let homeCenter = region.defaultCenter
         loadDataForRegion(
-            center: conusCenter,
+            center: homeCenter,
             radiusNM: MapQueryRegion.maxRadiusNM,
             towerRadiusNM: MapQueryRegion.isLowZoom(appState.mapZoom) ? MapQueryRegion.maxLowZoomRadiusNM : nil
         )
@@ -234,6 +237,10 @@ final class MapViewModel {
 
         mapService.updateOwnship(location: location, heading: appState.track)
 
+        // A fix outside the selected region (e.g. a US simulator fix while viewing Israel) is
+        // drawn but never pulls the camera away from the region's home view.
+        guard appState.region.contains(location.coordinate) else { return }
+
         if !hasCenteredOnFirstFix {
             hasCenteredOnFirstFix = true
             // No animation: follow takes over on the next fix and would cut it short anyway.
@@ -321,6 +328,7 @@ final class MapViewModel {
 
     /// Toggle a layer in AppState's visibleLayers set and update MapService visibility.
     func toggleLayer(_ layer: MapLayer) {
+        guard appState.region.supports(layer) else { return }  // no source in this region
         if appState.visibleLayers.contains(layer) {
             appState.visibleLayers.remove(layer)
             mapService.setLayerVisibility(layer, visible: false)
@@ -356,17 +364,102 @@ final class MapViewModel {
         }
     }
 
+    // MARK: - Region Switch (IL-2)
+    /// The one switch the Israel base-chart code (IL-9) calls when the official CAAI chart is shown or
+    /// removed: resets the CVFR overlay to the matching defaults (`IsraelChartDefaults`).
+    func setOfficialChartPresent(_ present: Bool) {
+        guard appState.region == .israel else { return }
+        mapService.israelChart.setOfficialChartPresent(present)
+        appState.visibleLayers.subtract(MapLayer.cvfrChart)
+        appState.visibleLayers.formUnion(IsraelChartDefaults.visibleLayers(officialChartPresent: present))
+        for layer in MapLayer.cvfrChart {
+            mapService.setLayerVisibility(layer, visible: appState.visibleLayers.contains(layer))
+        }
+    }
+
+    /// Official chart pack state last pushed to the map; the CVFR layer defaults are reset only on a change,
+    /// so the pilot's own layer choices survive a style reload.
+    private var officialChartApplied = false
+
+    /// Show the downloaded official CAAI chart as the Israel base chart, or remove it (nothing downloaded,
+    /// pack deleted, or another region). Call when the style loads, the region changes, or the pack changes.
+    func syncOfficialChart() {
+        let url = appState.region == .israel ? IsraelChartStore.shared.packURL : nil
+        mapService.israelOfficialChart.setPack(url)
+        let present = url != nil
+        guard present != officialChartApplied else { return }
+        officialChartApplied = present
+        setOfficialChartPresent(present)
+    }
+
+
+    /// The pilot switched region (AppState already reset the centre, zoom and layer set): hide
+    /// layers the region has no source for, clear their data so it can't read as current,
+    /// fly to the region's home view and reload the region's sources.
+    func regionDidChange() {
+        let region = appState.region
+        mapService.israelChart.setActive(region == .israel)
+        syncOfficialChart()
+        for layer in MapLayer.allCases {
+            mapService.setLayerVisibility(layer, visible: appState.visibleLayers.contains(layer))
+        }
+        mapService.setMapStyle(appState.mapStyle, sectional: appState.visibleLayers.contains(.sectional))
+
+        if !region.isAvailable(.tfrs) {
+            loadedTFRs = []
+            tfrFetchedAt = nil
+            tfrLoadFailed = false
+            mapService.updateTFRs([])
+        }
+        if !region.isAvailable(.advisories) {
+            advisoriesFetchedAt = nil
+            advisoriesLoadFailed = false
+            mapService.updateAdvisories([])
+        }
+        if !region.isAvailable(.navaids) {
+            visibleNavaids = []
+            mapService.updateNavaids([])
+        }
+        if !region.isAvailable(.airspace) {
+            visibleAirspaces = []
+            mapService.updateAirspaces([])
+        }
+        mapService.airportDiagramOverlay.region = region
+        if !region.isAvailable(.airportDiagrams) && !region.isAvailable(.israelDiagrams) {
+            mapService.airportDiagramOverlay.isEnabled = false
+        }
+        onUserMovedMap()  // stop following a GPS fix elsewhere; Recenter re-engages it
+        _oldestWeatherObservationTime = nil
+        mapService.updateWeatherDots([], stationCoordinates: [:])
+
+        mapService.setCamera(center: region.defaultCenter, zoom: region.defaultZoom, direction: 0, animated: true)
+        lastQueryCenter = nil
+        lastQueryRadiusNM = nil
+        lastQueryWasLowZoom = nil
+        loadDataForRegion(
+            center: region.defaultCenter,
+            radiusNM: MapQueryRegion.maxRadiusNM,
+            towerRadiusNM: MapQueryRegion.isLowZoom(region.defaultZoom) ? MapQueryRegion.maxLowZoomRadiusNM : nil
+        )
+    }
+
     // MARK: - Data Loading
 
     /// `towerRadiusNM` non-nil = low zoom: airports are the towered public fields over that
     /// (uncapped) region radius; navaids/airspaces still use the capped `radiusNM`.
     private func loadDataForRegion(center: CLLocationCoordinate2D, radiusNM: Double, towerRadiusNM: Double?) {
+        let region = appState.region
         isLoadingAirports = true
-        loadAirports(center: center, radiusNM: radiusNM, towerRadiusNM: towerRadiusNM)
-        if appState.visibleLayers.contains(.navaids) {
+        if region.isAvailable(.airports) {
+            loadAirports(center: center, radiusNM: radiusNM, towerRadiusNM: towerRadiusNM)
+        } else {
+            visibleAirports = []
+            mapService.updateAirports([])
+        }
+        if appState.visibleLayers.contains(.navaids), region.isAvailable(.navaids) {
             loadNavaids(center: center, radiusNM: radiusNM)
         }
-        if appState.visibleLayers.contains(.airspace) {
+        if appState.visibleLayers.contains(.airspace), region.isAvailable(.airspace) {
             loadAirspaces(center: center, radiusNM: radiusNM)
         }
 
@@ -378,12 +471,12 @@ final class MapViewModel {
         }
 
         // Load TFRs if layer visible (Plan 04)
-        if appState.visibleLayers.contains(.tfrs) {
+        if appState.visibleLayers.contains(.tfrs), region.isAvailable(.tfrs) {
             Task { await loadTFRs() }
         }
 
         // Load AIRMET/SIGMETs if layer visible
-        if appState.visibleLayers.contains(.advisories) {
+        if appState.visibleLayers.contains(.advisories), region.isAvailable(.advisories) {
             Task { await loadAdvisories() }
         }
     }
@@ -437,14 +530,19 @@ final class MapViewModel {
     /// Fetch weather for visible airports and update map weather dots.
     func loadWeatherDots() async {
         guard let weatherService else { return }
-        guard !visibleAirports.isEmpty else { return }
 
-        // Build station ID list and coordinate lookup from visible airports
-        let stationIDs = visibleAirports.map { $0.icao }
+        // Build station ID list and coordinate lookup from visible airports, plus the region's
+        // own stations (Israel has no airport data yet, so its stations come from the region).
+        var stationIDs = visibleAirports.map { $0.icao }
         var stationCoordinates: [String: CLLocationCoordinate2D] = [:]
         for airport in visibleAirports {
             stationCoordinates[airport.icao] = airport.coordinate
         }
+        for station in appState.region.weatherStations where station.hasMETAR && stationCoordinates[station.id] == nil {
+            stationIDs.append(station.id)
+            stationCoordinates[station.id] = station.coordinate
+        }
+        guard !stationIDs.isEmpty else { return }
 
         do {
             let weather = try await weatherService.fetchWeatherForStations(stationIDs)

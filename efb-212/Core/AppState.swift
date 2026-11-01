@@ -33,6 +33,31 @@ final class AppState {
     var isPresentingNearestList: Bool = false
     var searchQuery: String = ""
 
+    // MARK: - Region (IL-2)
+
+    /// Operating region; chooses the map home, weather stations, altimeter unit and which data
+    /// layers exist. Persisted in UserSettings through `RegionStore`. Changing it recentres the
+    /// map and drops layers the new region has no source for.
+    var region: Region = .us {
+        didSet {
+            guard region != oldValue else { return }
+            mapCenter = region.defaultCenter
+            mapZoom = region.defaultZoom
+            visibleLayers = visibleLayers.filter { region.supports($0) }
+            if region != .us {
+                if !region.availableMapStyles.contains(mapStyle) { mapStyle = .street }
+                // The region's own METAR stations are the only live data there: show them.
+                if !region.weatherStations.isEmpty { visibleLayers.insert(.weatherDots) }
+                // The CVFR chart is the region's chart: on by default (Israel only; the US has none).
+                visibleLayers.formUnion(MapLayer.cvfrChart.filter { region.supports($0) })
+            }
+            if region == .us, !visibleLayers.contains(.sectional) {
+                // Back in the US: restore the default overlays dropped while abroad.
+                visibleLayers.formUnion([.sectional, .tfrs])
+            }
+        }
+    }
+
     // MARK: - Map State
 
     var mapCenter: CLLocationCoordinate2D = .init(latitude: 39.0, longitude: -98.0)  // CONUS center

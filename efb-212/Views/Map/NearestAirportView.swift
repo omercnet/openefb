@@ -14,13 +14,21 @@ struct NearestAirportView: View {
     @Environment(\.dismiss) private var dismiss
 
     let entries: [NearestAirportEntry]
+    var region: Region = .us
     let onDirectTo: (Airport) -> Void
     let onAirportTap: (String) -> Void
 
     var body: some View {
         NavigationStack {
             Group {
-                if entries.isEmpty {
+                if !region.hasAirportData {
+                    // Never an empty list that reads as "no airports nearby".
+                    ContentUnavailableView(
+                        "No airport data for \(region.displayName) yet",
+                        systemImage: "airplane.circle",
+                        description: Text("Nearest airports need \(region.displayName) airport data, which is not installed yet. Weather stations are on the map.")
+                    )
+                } else if entries.isEmpty {
                     ContentUnavailableView(
                         "No landable airport in range",
                         systemImage: "airplane.circle",
@@ -91,6 +99,12 @@ struct NearestAirportRow: View {
                     }
                     if entry.isMilitary {
                         MilitaryUseTag()
+                    }
+                    if entry.requiresPPR {
+                        PprTag()
+                    }
+                    if entry.isClosedByNotam {
+                        NotamClosedTag()
                     }
                 }
             }

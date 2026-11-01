@@ -49,6 +49,9 @@ enum EFBError: LocalizedError, Identifiable {
     // Aviation Data
     case airportNotFound(String)
 
+    // Region data (IL-2)
+    case regionDataUnavailable(String)  // region display name
+
     // MARK: - Identifiable
 
     var id: String {
@@ -89,6 +92,8 @@ enum EFBError: LocalizedError, Identifiable {
             return "debriefUnavailable-\(reason)"
         case .airportNotFound(let icao):
             return "airportNotFound-\(icao)"
+        case .regionDataUnavailable(let region):
+            return "regionDataUnavailable-\(region)"
         }
     }
 
@@ -152,6 +157,9 @@ enum EFBError: LocalizedError, Identifiable {
 
         case .airportNotFound(let icao):
             return "\(icao) is not in the airport database. Check the identifier."
+
+        case .regionDataUnavailable(let region):
+            return "\(region) aviation data is not installed in this build yet."
         }
     }
 
@@ -194,6 +202,8 @@ enum EFBError: LocalizedError, Identifiable {
         case .debriefUnavailable:
             return .warning
         case .airportNotFound:
+            return .info
+        case .regionDataUnavailable:
             return .info
         }
     }

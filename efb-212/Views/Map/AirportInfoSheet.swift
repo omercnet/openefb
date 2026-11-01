@@ -22,6 +22,8 @@ struct AirportInfoSheet: View {
     let windsAloftService: any WindsAloftServiceProtocol
 
     @State private var airport: Airport?
+    /// Israel (IL-4): the curated aerodrome behind `airport`, with its sources and review status.
+    @State private var aerodrome: IsraelAerodrome?
     @State private var weatherViewModel: WeatherViewModel?
     @State private var isRawMETARExpanded: Bool = false
 
@@ -36,22 +38,43 @@ struct AirportInfoSheet: View {
                             infoChipsRow(airport)
                         }
                         weatherAndFrequencies(airport)
-                        runwaysSection(airport)
-                        Divider()
-                        NotamSection(airport: airport, service: notamService)
-                        Divider()
-                        AirportChartsSection(airport: airport, service: chartService)
-                        Divider()
-                        sideBySide(spacing: Space.xl) {
-                            PirepSection(airport: airport, service: pirepService)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            WindsAloftSection(airport: airport, service: windsAloftService)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                        if let aerodrome {
+                            IsraelAerodromeSection(aerodrome: aerodrome)
+                        } else {
+                            runwaysSection(airport)
+                        }
+                        if appState.region.isAvailable(.notams) {
+                            Divider()
+                            NotamSection(airport: airport, service: notamService)
+                        }
+                        if appState.region.isAvailable(.airportCharts) {
+                            Divider()
+                            AirportChartsSection(airport: airport, service: chartService)
+                        }
+                        if appState.region.isAvailable(.israelDiagrams) {
+                            Divider()
+                            IsraelDiagramSection(icao: airport.icao)
+                        }
+                        if appState.region.isAvailable(.pireps) || appState.region.isAvailable(.windsAloft) {
+                            Divider()
+                            sideBySide(spacing: Space.xl) {
+                                if appState.region.isAvailable(.pireps) {
+                                    PirepSection(airport: airport, service: pirepService)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                if appState.region.isAvailable(.windsAloft) {
+                                    WindsAloftSection(airport: airport, service: windsAloftService)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
                         }
                     }
                     .padding(.bottom, Space.xl)
                     .padding(.horizontal, Space.xl)
                     .padding(.top, Space.s)
+                } else if let station = appState.region.weatherStation(id: appState.selectedAirportID ?? "") {
+                    // No airport data for this region yet: the station's weather still works.
+                    stationOnlyView(station)
                 } else {
                     ProgressView("Loading airport...")
                         .padding(.top, 40)
@@ -78,6 +101,34 @@ struct AirportInfoSheet: View {
         .onAppear {
             loadAirport()
         }
+    }
+
+    // MARK: - Station Only (regions without airport data)
+
+    /// Weather for a region station that has no airport record yet (Israel before IL-4).
+    @ViewBuilder
+    private func stationOnlyView(_ station: WeatherStation) -> some View {
+        VStack(alignment: .leading, spacing: Space.xl) {
+            VStack(alignment: .leading, spacing: Space.xs) {
+                HStack(alignment: .firstTextBaseline, spacing: Space.m) {
+                    Text(station.id)
+                        .font(TypeRole.title)
+                    if let wx = weatherViewModel?.currentWeather {
+                        FlightCategoryDot(category: wx.flightCategory, showsLabel: true)
+                    }
+                }
+                Text(station.name)
+                    .font(TypeRole.body)
+                    .foregroundStyle(Palette.secondaryText)
+            }
+            weatherSection()
+            Text("Airport data for \(appState.region.displayName) is not available yet. Only this station's weather is shown.")
+                .font(TypeRole.caption)
+                .foregroundStyle(Palette.secondaryText)
+        }
+        .padding(.bottom, Space.xl)
+        .padding(.horizontal, Space.xl)
+        .padding(.top, Space.s)
     }
 
     // MARK: - Header Section
@@ -107,7 +158,11 @@ struct AirportInfoSheet: View {
     private func infoChipsRow(_ airport: Airport) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Space.s) {
-                infoChip(icon: "arrow.up", text: "\(Int(airport.elevation))' MSL")  // feet MSL
+                if let aerodrome, aerodrome.elevationFeet == nil {
+                    infoChip(icon: "arrow.up", text: "ELEV not published")
+                } else {
+                    infoChip(icon: "arrow.up", text: "\(Int(airport.elevation))' MSL")  // feet MSL
+                }
                 infoChip(icon: "airplane", text: airport.type.rawValue.capitalized)
                 if let tpa = airport.patternAltitude {
                     infoChip(icon: "arrow.clockwise", text: "TPA \(tpa)'")  // feet MSL
@@ -374,6 +429,7 @@ struct AirportInfoSheet: View {
                 weatherFieldRow("Ceiling", spoken: "Ceiling", value: vm.decodedCeiling)
                 weatherFieldRow("Temp", spoken: "Temperature", value: vm.decodedTemp)
                 weatherFieldRow("Dewpt", spoken: "Dew point", value: vm.decodedDew)
+                weatherFieldRow("Altim", spoken: "Altimeter", value: vm.decodedAltimeter)
             }
 
             // Raw METAR (expandable per user decision)
@@ -441,15 +497,22 @@ struct AirportInfoSheet: View {
     private func loadAirport() {
         guard let icao = appState.selectedAirportID else { return }
 
-        // Load airport from database
-        do {
-            airport = try databaseService.airport(byICAO: icao)
-        } catch {
-            airport = nil
+        // Load airport from database (regions without airport data have none to find).
+        // Israel reads the curated aerodromes and keeps the aerodrome for its sources and review note.
+        if appState.region == .israel {
+            aerodrome = (try? IsraelAviationDatabase.bundled().aerodrome(code: icao)) ?? nil
+            airport = aerodrome.map(IsraelAerodromeAdapter.airport)
+        } else if appState.region.hasAirportData {
+            do {
+                airport = try databaseService.airport(byICAO: icao)
+            } catch {
+                airport = nil
+            }
         }
 
         // Initialize weather view model and load weather
         let vm = WeatherViewModel(weatherService: weatherService)
+        vm.region = appState.region
         weatherViewModel = vm
         Task {
             await vm.loadWeather(for: icao)

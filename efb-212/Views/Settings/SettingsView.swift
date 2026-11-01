@@ -12,6 +12,8 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
+    @State private var regionSaveError: String?
 
     @Query(filter: #Predicate<SchemaV1.PilotProfile> { $0.isActive == true })
     private var activePilots: [SchemaV1.PilotProfile]
@@ -35,6 +37,13 @@ struct SettingsView: View {
                     Text("Beta build. Report problems with Send Feedback below.")
                         .font(.caption)
                         .foregroundStyle(Palette.secondaryText)
+                    LabeledContent("Data") {
+                        Text(dataAttribution)
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .accessibilityIdentifier("region-attribution")
                 }
 
                 // Section 2: Feedback
@@ -64,6 +73,31 @@ struct SettingsView: View {
                     .accessibilityIdentifier("aircraft-pilot-link")
                 }
 
+                // Region: which country's data sources the app reads (IL-2)
+                Section {
+                    Picker("Region", selection: regionBinding) {
+                        ForEach(Region.allCases) { region in
+                            Text(region.displayName).tag(region)
+                        }
+                    }
+                    .accessibilityIdentifier("region-picker")
+                    if let regionSaveError {
+                        Text(regionSaveError)
+                            .font(.caption)
+                            .foregroundStyle(Palette.caution)
+                    }
+                    if let dataError = appState.region.dataUnavailableError {
+                        Text(dataError.localizedDescription)
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
+                            .accessibilityIdentifier("region-data-unavailable-text")
+                    }
+                } header: {
+                    Text("Region")
+                } footer: {
+                    Text("Switching recenters the map and reloads that region's data sources. Layers with no source in a region are shown as unavailable.")
+                }
+
                 // Display: day / night / auto (F16)
                 Section {
                     Picker("Display mode", selection: displayModeBinding) {
@@ -80,17 +114,29 @@ struct SettingsView: View {
 
                 // Section 3: Charts
                 Section("Charts") {
-                    LabeledContent("Sectional cycle", value: "valid to \(OfflineMapsView.dateString(SectionalCycle.current().expires))")
-                    aviationDataRow
-                    NavigationLink("Offline Maps") { OfflineMapsView() }
-                        .accessibilityIdentifier("offline-maps-link")
-                    Text("Sectionals change every 56 days. What works offline is listed under Offline Maps.")
-                        .font(.caption)
-                        .foregroundStyle(Palette.secondaryText)
+                    if appState.region.isAvailable(.sectional) {
+                        LabeledContent("Sectional cycle", value: "valid to \(OfflineMapsView.dateString(SectionalCycle.current().expires))")
+                        aviationDataRow
+                        NavigationLink("Offline Maps") { OfflineMapsView() }
+                            .accessibilityIdentifier("offline-maps-link")
+                        Text("Sectionals change every 56 days. What works offline is listed under Offline Maps.")
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
+                    } else {
+                        NavigationLink("Offline Maps") { OfflineMapsView() }
+                            .accessibilityIdentifier("offline-maps-link")
+                        Text("FAA charts are not available in \(appState.region.displayName). "
+                             + "Offline Maps downloads the official CVFR chart.")
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
+                            .accessibilityIdentifier("charts-unavailable-text")
+                    }
                 }
 
                 // Section 4: NOTAM API
-                notamSection
+                if appState.region.isAvailable(.notams) {
+                    notamSection
+                }
 
                 // Section 5: Legal
                 Section("Legal") {
@@ -248,6 +294,30 @@ struct SettingsView: View {
 
     private var feedbackURL: URL {
         URL(string: "mailto:feedback@quartermint.com?subject=OpenEFB%20Beta%20Feedback")!
+    }
+
+    // MARK: - Region (IL-2)
+
+    private var regionBinding: Binding<Region> {
+        Binding(
+            get: { appState.region },
+            set: { newRegion in
+                guard newRegion != appState.region else { return }
+                appState.region = newRegion
+                do {
+                    try RegionStore.save(newRegion, to: modelContext)
+                    regionSaveError = nil
+                } catch {
+                    regionSaveError = "Region changed, but it could not be saved: \(error.localizedDescription)"
+                }
+            }
+        )
+    }
+
+    /// The region's data attribution for Settings > About. Israel's comes from the bundled
+    /// `israel-aviation.sqlite` metadata, including the source data date.
+    private var dataAttribution: String {
+        appState.region.dataAttribution
     }
 }
 

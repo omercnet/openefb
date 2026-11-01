@@ -1,0 +1,22 @@
+{
+  "name": "notam-relay",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Cloudflare Worker: scrapes the IAA NOTAM page every 15 minutes and serves notams.json for OpenEFB",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy",
+    "scrape": "tsx scripts/scrape-local.ts",
+    "publish-local": "wrangler kv key put --binding NOTAM_KV --remote notams.json --path .data/notams.json && wrangler kv key put --binding NOTAM_KV --remote meta.json --path .data/meta.json"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}

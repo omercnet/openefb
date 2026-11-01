@@ -1,0 +1,13 @@
+{
+  "name": "charts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "R2 hosting for OpenEFB chart packs: bucket setup, publish script, URL layout",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

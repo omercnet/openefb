@@ -82,6 +82,17 @@ final class AirportDiagramOverlay {
     /// Night palette applied to drawn diagrams; set by `MapService.applyDisplayMode`.
     private(set) var isNight = false
 
+    /// Region the map shows. Israel draws the CAAI diagrams from the downloaded `il-diagrams` pack (IL-13);
+    /// the US fits FAA d-TPP diagrams. Switching clears what is drawn.
+    var region: Region = .us {
+        didSet {
+            guard region != oldValue else { return }
+            removeAll()
+            unavailable = []
+            refresh(force: true)
+        }
+    }
+
     private var entries: [String: Entry] = [:]          // ICAO -> drawn diagram
     private var loading: Set<String> = []                // ICAO being fetched / fitted
     private var unavailable: Set<String> = []            // ICAO with no usable diagram this session
@@ -143,7 +154,12 @@ final class AirportDiagramOverlay {
             style?.layer(withIdentifier: entry.layerID)?.isVisible = visible
             style?.layer(withIdentifier: entry.backingLayerID)?.isVisible = visible
         }
-        guard isEnabled, zoomedIn, let databaseService else { return }
+        guard isEnabled, zoomedIn else { return }
+        if region == .israel {
+            refreshIsrael(mapView: mapView)
+            return
+        }
+        guard let databaseService else { return }
 
         let bounds = mapView.visibleCoordinateBounds
         let center = mapView.centerCoordinate
@@ -201,12 +217,59 @@ final class AirportDiagramOverlay {
                 logger.notice("APD \(airport.icao, privacy: .public) not drawn: \(reason, privacy: .public)")
                 unavailable.insert(airport.icao)
             case .accepted(let georeference, let image):
-                add(airport: airport, georeference: georeference, image: image)
+                add(icao: airport.icao, georeference: georeference, image: image)
             }
         } catch {
             logger.error("APD \(airport.icao, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
             unavailable.insert(airport.icao)
         }
+    }
+
+    // MARK: - Israel (IL-13)
+
+    /// Aerodromes near the camera whose diagram is georeferenced in the installed pack, nearest first.
+    /// Nothing is drawn without an installed, servable edition.
+    private func refreshIsrael(mapView: MLNMapView) {
+        guard let pack = IsraelDiagramStore.shared.pack else { return }
+        let center = mapView.centerCoordinate
+        let wanted = Self.georeferencedAerodromes(pack: pack, near: center, limit: Self.maximumAirports)
+        for icao in wanted where entries[icao] == nil && !loading.contains(icao) && !unavailable.contains(icao) {
+            loading.insert(icao)
+            Task { [weak self] in await self?.loadIsrael(icao: icao, pack: pack) }
+        }
+    }
+
+    /// Pack aerodromes with a drawable diagram, closest to `center` first.
+    nonisolated static func georeferencedAerodromes(pack: IsraelDiagramPack, near center: CLLocationCoordinate2D, limit: Int) -> [String] {
+        let origin = CLLocation(latitude: center.latitude, longitude: center.longitude)
+        let database = try? IsraelAviationDatabase.bundled()
+        let located: [(icao: String, distance: Double)] = pack.georeferencedICAOs.compactMap { icao in
+            guard let aerodrome = (try? database?.aerodrome(code: icao)) ?? nil else { return nil }
+            return (icao, origin.distance(from: CLLocation(latitude: aerodrome.latitude, longitude: aerodrome.longitude)))
+        }
+        return located.sorted { $0.distance < $1.distance }.prefix(limit).map(\.icao)
+    }
+
+    private func loadIsrael(icao: String, pack: IsraelDiagramPack) async {
+        defer { loading.remove(icao) }
+        guard case .georeferenced(let record) = pack.availability(for: icao),
+              let imageName = record.image, let jsonName = record.georeference,
+              let imageURL = pack.fileURL(imageName), let jsonURL = pack.fileURL(jsonName) else {
+            unavailable.insert(icao)
+            return
+        }
+        let decoded: (AirportDiagramGeoreference, UIImage)? = await Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: jsonURL),
+                  let georeference = try? IsraelDiagramPack.decodeGeoreference(data),
+                  let image = UIImage(contentsOfFile: imageURL.path) else { return nil }
+            return (georeference, image)
+        }.value
+        guard let (georeference, image) = decoded else {
+            logger.error("IL diagram \(icao, privacy: .public) unreadable")
+            unavailable.insert(icao)
+            return
+        }
+        add(icao: icao, georeference: georeference, image: image)
     }
 
     enum GeoreferenceOutcome {
@@ -259,8 +322,8 @@ final class AirportDiagramOverlay {
 
     // MARK: - Map Layers
 
-    private func add(airport: Airport, georeference: AirportDiagramGeoreference, image: UIImage) {
-        guard let style, entries[airport.icao] == nil else { return }
+    private func add(icao: String, georeference: AirportDiagramGeoreference, image: UIImage) {
+        guard let style, entries[icao] == nil else { return }
         let corners = georeference.clipCorners
         guard corners.count == 4 else { return }
         let quad = MLNCoordinateQuad(
@@ -269,8 +332,8 @@ final class AirportDiagramOverlay {
             bottomRight: CLLocationCoordinate2D(latitude: corners[2].latitude, longitude: corners[2].longitude),
             topRight: CLLocationCoordinate2D(latitude: corners[3].latitude, longitude: corners[3].longitude)
         )
-        let sourceID = "apd-source-\(airport.icao)", layerID = "apd-layer-\(airport.icao)"
-        let backingSourceID = "apd-backing-source-\(airport.icao)", backingLayerID = "apd-backing-\(airport.icao)"
+        let sourceID = "apd-source-\(icao)", layerID = "apd-layer-\(icao)"
+        let backingSourceID = "apd-backing-source-\(icao)", backingLayerID = "apd-backing-\(icao)"
         let visible = isEnabled && (mapView?.zoomLevel ?? 0) >= Self.minimumZoom
 
         var ring = corners.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
@@ -302,12 +365,12 @@ final class AirportDiagramOverlay {
             style.addLayer(backing)
             style.addLayer(layer)
         }
-        entries[airport.icao] = Entry(
+        entries[icao] = Entry(
             sourceID: sourceID, layerID: layerID,
             backingSourceID: backingSourceID, backingLayerID: backingLayerID, georeference: georeference
         )
         shownAirports = entries.keys.sorted()
-        logger.notice("APD \(airport.icao, privacy: .public) drawn: \(georeference.diagnostics.method.rawValue, privacy: .public), \(georeference.diagnostics.feetPerPoint, format: .fixed(precision: 1), privacy: .public) ft/pt")
+        logger.notice("APD \(icao, privacy: .public) drawn: \(georeference.diagnostics.method.rawValue, privacy: .public), \(georeference.diagnostics.feetPerPoint, format: .fixed(precision: 1), privacy: .public) ft/pt")
     }
 
     /// Day: black ink on a white backing. Night: dark backing, ink lifted to light grey (no white slab).

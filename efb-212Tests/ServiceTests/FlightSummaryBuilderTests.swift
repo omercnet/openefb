@@ -234,6 +234,35 @@ struct FlightSummaryBuilderTests {
         #expect(summary.contains("Traffic in sight"))
     }
 
+    @Test("Unscored (nil confidence) segments rank below scored ones in top-3 selection")
+    func unscoredSegmentsRankLast() {
+        let flightID = UUID()
+        let phase = PhaseMarkerRecord(
+            flightID: flightID, phase: "cruise", startTimestamp: baseDate,
+            endTimestamp: baseDate.addingTimeInterval(600), latitude: 37.5, longitude: -122.0)
+        let trackPoints = makeTrackPoints(flightID: flightID, phase: phase)
+
+        func segment(_ text: String, _ confidence: Double?, _ offset: Double) -> TranscriptSegmentRecord {
+            TranscriptSegmentRecord(
+                flightID: flightID, timestamp: baseDate.addingTimeInterval(offset), text: text,
+                confidence: confidence, audioStartTime: offset, audioEndTime: offset + 1, flightPhase: "cruise")
+        }
+        let transcripts = [
+            segment("unscored first", nil, 0),
+            segment("scored low", 0.10, 1),
+            segment("scored mid", 0.50, 2),
+            segment("scored high", 0.90, 3)
+        ]
+
+        let summary = FlightSummaryBuilder.summarizePhase(
+            phase: phase, trackPoints: trackPoints, transcripts: transcripts)
+
+        #expect(summary.contains("scored high"))
+        #expect(summary.contains("scored mid"))
+        #expect(summary.contains("scored low"))
+        #expect(!summary.contains("unscored first"))
+    }
+
     @Test("Empty track points and transcripts produces valid prompt without crash")
     func emptyDataProducesValidPrompt() {
         let prompt = FlightSummaryBuilder.buildPrompt(

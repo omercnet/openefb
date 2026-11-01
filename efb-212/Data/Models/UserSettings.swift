@@ -37,6 +37,15 @@ enum SchemaV1: VersionedSchema {
         /// UUID string of last used flight plan (for auto-load on launch).
         var lastFlightPlanID: String?
 
+        /// Operating region (`Region.rawValue`). Defaults to "us"; read through `Region`.
+        var regionRaw: String = "us"
+
+        /// The stored region; an unknown raw value reads as the US default.
+        var region: Region {
+            get { Region(rawValue: regionRaw) ?? Region.defaultRegion }
+            set { regionRaw = newValue.rawValue }
+        }
+
         /// Date this settings record was created.
         var createdAt: Date = Date()
 

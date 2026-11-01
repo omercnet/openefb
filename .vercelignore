@@ -1,0 +1,11 @@
+# `vercel deploy` from the repo root uploads only the interviews app, whose project Root Directory is
+# web/interviews. Git deploys clone the repo and ignore this file.
+/*
+!/web
+/web/*
+!/web/interviews
+/web/interviews/node_modules
+/web/interviews/.next
+/web/interviews/.vercel
+/web/interviews/.env*
+/web/interviews/.data

@@ -166,7 +166,7 @@ struct TranscriptionServiceTests {
         let metrics = TranscriptionService.metrics(from: text, resultRange: .invalid)
 
         // Length-weighted: 8 chars at 1.0, 7 chars at 0.5 -> (8 + 3.5) / 15
-        #expect(abs(metrics.confidence - 11.5 / 15) < 0.001)
+        #expect(abs((metrics.confidence ?? -1) - 11.5 / 15) < 0.001)
         #expect(metrics.audioStartTime == 10)
         #expect(metrics.audioEndTime == 12.5)
     }
@@ -180,8 +180,7 @@ struct TranscriptionServiceTests {
 
         let metrics = TranscriptionService.metrics(from: text, resultRange: range)
 
-        #expect(metrics.confidence == TranscriptionService.unknownConfidence)
-        #expect(metrics.confidence < 0)  // sorts below every real 0...1 value
+        #expect(metrics.confidence == nil)  // unknown is nil, not a sentinel
         #expect(metrics.audioStartTime == 4)
         #expect(metrics.audioEndTime == 6)
     }

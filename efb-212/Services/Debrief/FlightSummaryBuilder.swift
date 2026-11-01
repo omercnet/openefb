@@ -160,10 +160,11 @@ struct FlightSummaryBuilder {
             trackPoints.map(\.groundSpeedKnots).reduce(0, +) / Double(trackPoints.count)
         let duration = phase.endTimestamp.map { $0.timeIntervalSince(phase.startTimestamp) } ?? 0
 
-        // Select top 3 transcript segments by confidence, excluding interruption markers
+        // Select top 3 transcript segments by confidence, excluding interruption markers.
+        // Segments with unknown (nil) confidence sort below every scored one.
         let topTranscripts = transcripts
             .filter { !$0.text.hasPrefix("[INTERRUPTION:") }
-            .sorted { $0.confidence > $1.confidence }
+            .sorted { ($0.confidence ?? -1) > ($1.confidence ?? -1) }
             .prefix(3)
             .map(\.text)
 

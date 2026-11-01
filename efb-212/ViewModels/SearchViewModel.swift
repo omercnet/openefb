@@ -16,6 +16,9 @@ final class SearchViewModel {
     // MARK: - Dependencies
 
     let databaseService: any DatabaseServiceProtocol
+    /// Region the search runs in, read at search time so a region switch takes effect at once.
+    private let regionProvider: @MainActor () -> Region
+    private let israelDatabaseProvider: @Sendable () throws -> any IsraelAviationDatabaseProtocol
 
     // MARK: - State
 
@@ -29,8 +32,14 @@ final class SearchViewModel {
 
     // MARK: - Init
 
-    init(databaseService: any DatabaseServiceProtocol) {
+    init(
+        databaseService: any DatabaseServiceProtocol,
+        regionProvider: @escaping @MainActor () -> Region = { .us },
+        israelDatabaseProvider: @escaping @Sendable () throws -> any IsraelAviationDatabaseProtocol = { try IsraelAviationDatabase.bundled() }
+    ) {
         self.databaseService = databaseService
+        self.regionProvider = regionProvider
+        self.israelDatabaseProvider = israelDatabaseProvider
     }
 
     // MARK: - Search
@@ -61,7 +70,7 @@ final class SearchViewModel {
             isSearching = true
 
             do {
-                let searchResults = try databaseService.searchAirports(query: query, limit: 20)
+                let searchResults = try runSearch(query: query)
                 guard !Task.isCancelled else { return }
                 results = searchResults
             } catch {
@@ -72,6 +81,16 @@ final class SearchViewModel {
 
             isSearching = false
         }
+    }
+
+    /// Israel searches the curated aerodromes (ICAO, English or Hebrew name); everywhere else the aviation database.
+    private func runSearch(query: String) throws -> [Airport] {
+        if regionProvider() == .israel {
+            return try israelDatabaseProvider()
+                .searchAerodromes(query: query, limit: 20)
+                .map(IsraelAerodromeAdapter.airport)
+        }
+        return try databaseService.searchAirports(query: query, limit: 20)
     }
 
     /// Clear search state.

@@ -51,19 +51,20 @@ struct TrackRecorderTests {
         }
         #expect(await recorder.currentPhase == .taxi)
 
-        // Takeoff roll: accelerate 10 -> 70 kt over 15 s, still on the ground
+        // Takeoff roll: accelerate 10 -> 50 kt over 15 s, still on the ground (below rotation speed)
         for i in 0..<15 {
-            let speed = 10 + Double(i + 1) * 4
+            let speed = 10 + Double(i + 1) * (40.0 / 15.0)
             await recorder.ingest(Self.fix(second: second, speedKnots: speed, altitudeFeet: fieldElevation))
             second += 1
         }
+        #expect(await recorder.currentPhase == .taxi)
 
-        // Initial climb at 600 fpm (10 ft/s), 70 kt, for 90 s -> ~1000 ft above field
+        // Rotate and climb at 600 fpm (10 ft/s), accelerating through 55 kt to 70 kt, for 90 s -> ~1000 ft above field
         var altitude = fieldElevation
         var sawTakeoff = false
-        for _ in 0..<90 {
+        for k in 0..<90 {
             altitude += 10
-            await recorder.ingest(Self.fix(second: second, speedKnots: 70, altitudeFeet: altitude))
+            await recorder.ingest(Self.fix(second: second, speedKnots: min(70, 50 + Double(k)), altitudeFeet: altitude))
             second += 1
             if await recorder.currentPhase == .takeoff { sawTakeoff = true }
         }

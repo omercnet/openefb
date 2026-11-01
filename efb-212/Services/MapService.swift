@@ -29,6 +29,10 @@ final class MapService {
     private var replayMarkerSource: MLNShapeSource?
     /// Georeferenced FAA airport diagrams (T11); drawn below the airport layer at zoom >= 14.
     let airportDiagramOverlay = AirportDiagramOverlay()
+    /// Israel CVFR chart (IL-3): routes, points, airspace, runways, NOTAM closures. Active only in Israel.
+    let israelChart = IsraelChartOverlay()
+    /// Official CAAI CVFR chart raster from the downloaded pack (IL-9); the base chart in Israel.
+    let israelOfficialChart = IsraelOfficialChartLayer()
 
     // MARK: - Configuration
 
@@ -38,8 +42,13 @@ final class MapService {
     /// cached by MapLibre) when online; offline, the plain background shows beneath the layers.
     static let baseStyleURL: URL? = Bundle.main.url(forResource: "base-style", withExtension: "json")
 
-    /// Store reference to map view, load the bundled style, and set initial center (CONUS: 39N, 98W, zoom 5)
-    func configure(mapView: MLNMapView) {
+    /// Store reference to map view, load the bundled style, and set the initial camera
+    /// (default CONUS: 39N, 98W, zoom 5; pass the region's home view otherwise).
+    func configure(
+        mapView: MLNMapView,
+        center: CLLocationCoordinate2D = CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0),
+        zoom: Double = 5.0
+    ) {
         self.mapView = mapView
         #if DEBUG
         OfflineBlockingURLProtocol.installIfRequested()
@@ -47,11 +56,7 @@ final class MapService {
         if let styleURL = Self.baseStyleURL {
             mapView.styleURL = styleURL
         }
-        mapView.setCenter(
-            CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0),
-            zoomLevel: 5.0,
-            animated: false
-        )
+        mapView.setCenter(center, zoomLevel: zoom, animated: false)
     }
 
     // MARK: - Style Loaded
@@ -69,6 +74,8 @@ final class MapService {
         addAdvisoryLayer(to: style)
         addRouteLayer(to: style)
         if let mapView { airportDiagramOverlay.attach(style: style, mapView: mapView) }
+        israelChart.attach(style: style)
+        israelOfficialChart.attach(style: style)
     }
 
     // MARK: - Ownship Layer
@@ -683,6 +690,10 @@ final class MapService {
 
     /// Toggle style layer visibility by MapLayer enum.
     func setLayerVisibility(_ layer: MapLayer, visible: Bool) {
+        if layer.isCVFRChart {
+            israelChart.setVisible(layer, visible: visible)
+            return
+        }
         guard let style = mapView?.style else { return }
         let layerIDs = layerIdentifiers(for: layer)
         for id in layerIDs {
@@ -702,6 +713,7 @@ final class MapService {
         case .ownship: return ["ownship-symbol"]
         case .sectional: return []  // the sectional is a base-style.json layer driven by `setMapStyle`
         case .route: return ["route-line-layer"]
+        case .cvfrRoutes, .cvfrPoints, .cvfrAirspace, .cvfrRunways, .cvfrClosures: return []  // drawn by `israelChart`
         }
     }
 
@@ -768,6 +780,8 @@ final class MapService {
             )
         }
         airportDiagramOverlay.applyDisplayMode(night: night)
+        israelChart.applyDisplayMode(night: night)
+        israelOfficialChart.applyDisplayMode(night: night)
         appliedNight = night
     }
 

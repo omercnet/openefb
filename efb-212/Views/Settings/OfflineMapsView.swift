@@ -23,10 +23,16 @@ struct OfflineMapsView: View {
 
     var body: some View {
         Form {
-            cycleSection
-            downloadSection
-            packsSection
-            copySection
+            if appState.region == .israel {
+                // The FAA sectional and CONUS regions below do not apply to Israel.
+                IsraelChartDownloadSection()
+            } else {
+                cycleSection
+                IsraelChartDownloadSection()
+                downloadSection
+                packsSection
+                copySection
+            }
         }
         .navigationTitle("Offline Maps")
         .navigationBarTitleDisplayMode(.inline)

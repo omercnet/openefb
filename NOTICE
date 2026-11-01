@@ -1,0 +1,16 @@
+OpenEFB
+Copyright the OpenEFB contributors. Licensed under the Mozilla Public License 2.0 (see LICENSE).
+
+Third-party data bundled with the app
+-------------------------------------
+
+Israel aviation data (efb-212/Resources/israel-aviation.sqlite)
+  Aeronautical data: Civil Aviation Authority of Israel (CAAI), data of 25 Oct 2026
+  GIS layers published with the Israeli domestic AIP (https://www.gov.il/he/pages/aip?chapterIndex=11),
+  redistributed with CAAI's approval: CVFR reporting points and routes, CTR/ATZ/CTA, TMA, FIR,
+  prohibited/restricted/danger areas, runways. Built by tools/caai-importer.
+  This approval covers the GIS layers only. The official CVFR chart is not licensed and is not included.
+  The data is for reference; the binding publications are CAAI's official AIP and NOTAMs.
+
+US aviation data (efb-212/Resources/aviation.sqlite)
+  FAA National Airspace System Resources (NASR), built by tools/nasr-importer.

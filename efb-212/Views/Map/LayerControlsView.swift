@@ -61,7 +61,7 @@ struct LayerControlsView: View {
                     get: { appState.mapStyle == .vfrSectional ? MapStyle.street : appState.mapStyle },
                     set: { appState.mapStyle = $0 }
                 )) {
-                    ForEach(Self.baseMaps, id: \.self) { style in
+                    ForEach(appState.region.availableMapStyles, id: \.self) { style in
                         Text(styleName(for: style)).tag(style)
                     }
                 }
@@ -74,33 +74,59 @@ struct LayerControlsView: View {
             // Sectional (F17): FAA chart overlay with its own opacity
             VStack(alignment: .leading, spacing: Space.s) {
                 SectionHeader("SECTIONAL")
-                layerToggle(layer: .sectional, label: "VFR sectional chart", tint: Palette.layerSectional, padded: false)
-                if sectionalOn {
-                    OpacitySlider(opacity: $appState.sectionalOpacity)
-                    DataAgeBadge(.chartCycle, validUntil: mapViewModel.chartExpirationDate)
-                        .hiddenWhenFresh()
+                if appState.region.isAvailable(.sectional) {
+                    layerToggle(layer: .sectional, label: "VFR sectional chart", tint: Palette.layerSectional, padded: false)
+                    if sectionalOn {
+                        OpacitySlider(opacity: $appState.sectionalOpacity)
+                        DataAgeBadge(.chartCycle, validUntil: mapViewModel.chartExpirationDate)
+                            .hiddenWhenFresh()
+                    }
+                    offlineStatusRow
+                } else {
+                    unavailableRow("VFR sectional chart", padded: false)
                 }
-                offlineStatusRow
             }
             .padding(.horizontal, Space.l)
 
             Divider()
 
+            // Israel CVFR chart (IL-3): the region's own chart, from the bundled CAAI data
+            if appState.region.isAvailable(.cvfrRoutes) {
+                cvfrChartSection
+                Divider()
+            }
+
             // Data layers
             SectionHeader("DATA LAYERS")
                 .padding(.horizontal, Space.l)
-            layerToggle(layer: .airports, label: "Airports", tint: Palette.layerAirports)
-            layerToggle(layer: .airspace, label: "Airspace", tint: Palette.layerAirspace)
-            dataLayerToggle(
-                layer: .tfrs, label: "TFRs", tint: Palette.warning, product: .tfr,
-                fetchedAt: mapViewModel.tfrFetchedAt, failed: mapViewModel.tfrLoadFailed,
-                retry: { await mapViewModel.loadTFRs() }
-            )
-            dataLayerToggle(
-                layer: .advisories, label: "AIRMET/SIGMET", tint: Palette.layerAdvisory, product: .airmetSigmet,
-                fetchedAt: mapViewModel.advisoriesFetchedAt, failed: mapViewModel.advisoriesLoadFailed,
-                retry: { await mapViewModel.loadAdvisories() }
-            )
+            if appState.region.isAvailable(.airports) {
+                layerToggle(layer: .airports, label: "Airports", tint: Palette.layerAirports)
+            } else {
+                unavailableRow("Airports")
+            }
+            if appState.region.isAvailable(.airspace) {
+                layerToggle(layer: .airspace, label: "Airspace", tint: Palette.layerAirspace)
+            } else {
+                unavailableRow("Airspace")
+            }
+            if appState.region.isAvailable(.tfrs) {
+                dataLayerToggle(
+                    layer: .tfrs, label: "TFRs", tint: Palette.warning, product: .tfr,
+                    fetchedAt: mapViewModel.tfrFetchedAt, failed: mapViewModel.tfrLoadFailed,
+                    retry: { await mapViewModel.loadTFRs() }
+                )
+            } else {
+                unavailableRow("TFRs")
+            }
+            if appState.region.isAvailable(.advisories) {
+                dataLayerToggle(
+                    layer: .advisories, label: "AIRMET/SIGMET", tint: Palette.layerAdvisory, product: .airmetSigmet,
+                    fetchedAt: mapViewModel.advisoriesFetchedAt, failed: mapViewModel.advisoriesLoadFailed,
+                    retry: { await mapViewModel.loadAdvisories() }
+                )
+            } else {
+                unavailableRow("AIRMET/SIGMET")
+            }
             layerToggle(layer: .weatherDots, label: "Weather", tint: Palette.layerWeather)
 
             // Weather data age (staleness on every weather surface)
@@ -115,10 +141,64 @@ struct LayerControlsView: View {
                 .padding(.leading, 52)  // Indent under toggle
             }
 
-            layerToggle(layer: .navaids, label: "Navaids", tint: Palette.layerAdvisory)
-            airportDiagramToggle
+            if appState.region.isAvailable(.navaids) {
+                layerToggle(layer: .navaids, label: "Navaids", tint: Palette.layerAdvisory)
+            } else {
+                unavailableRow("Navaids")
+            }
+            if appState.region.isAvailable(.airportDiagrams) || appState.region.isAvailable(.israelDiagrams) {
+                airportDiagramToggle
+            } else {
+                unavailableRow("Airport diagrams")
+            }
         }
         .padding(.vertical, Space.l)
+    }
+
+    // MARK: - Israel CVFR Chart (IL-3)
+
+    private var cvfrChartSection: some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            SectionHeader("CVFR CHART")
+                .padding(.horizontal, Space.l)
+            layerToggle(layer: .cvfrRoutes, label: "Routes and altitudes", tint: Palette.layerWeather)
+            layerToggle(layer: .cvfrPoints, label: "Reporting points", tint: Palette.layerAirports)
+            layerToggle(layer: .cvfrAirspace, label: "Airspace (CTR, TMA, P/R/D)", tint: Palette.layerAdvisory)
+            layerToggle(layer: .cvfrRunways, label: "Runways", tint: Palette.layerDiagrams)
+            layerToggle(layer: .cvfrClosures, label: "NOTAM route closures", tint: Palette.warning)
+            if appState.visibleLayers.contains(.cvfrClosures) {
+                closureStatusRow
+                    .padding(.horizontal, Space.l)
+            }
+        }
+    }
+
+    /// Age of the NOTAM feed behind the closures, or why nothing is drawn. Old data is never
+    /// drawn as current: past the NOTAM limit the layer shows nothing and says so.
+    @ViewBuilder
+    private var closureStatusRow: some View {
+        switch mapViewModel.mapService.israelChart.closureStatus {
+        case .noFeed:
+            Label("No NOTAM feed: closures not shown", systemImage: "exclamationmark.triangle.fill")
+                .font(TypeRole.caption)
+                .foregroundStyle(Palette.caution)
+        case .loaded(let generatedAt, let level, let closed):
+            HStack(spacing: Space.xs) {
+                Text("Age")
+                    .font(TypeRole.caption)
+                    .foregroundStyle(Palette.secondaryText)
+                DataAgeBadge(.notam, observed: generatedAt)
+                if IsraelChartFeatureBuilder.drawableFreshness.contains(level) {
+                    Text("\(closed) segment\(closed == 1 ? "" : "s") closed")
+                        .font(TypeRole.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                } else {
+                    Text("Too old: closures hidden")
+                        .font(TypeRole.caption)
+                        .foregroundStyle(Palette.caution)
+                }
+            }
+        }
     }
 
     // MARK: - Offline Status (F6)
@@ -160,7 +240,7 @@ struct LayerControlsView: View {
             .tint(Palette.layerDiagrams)
             .frame(minHeight: 44)
             .accessibilityIdentifier("Airport diagrams")
-            Text("Advisory. Verify against the FAA diagram.")
+            Text(appState.region == .israel ? "Advisory. Verify against the CAAI diagram." : "Advisory. Verify against the FAA diagram.")
                 .font(TypeRole.caption)
                 .foregroundStyle(Palette.secondaryText)
                 .padding(.leading, 36)
@@ -250,7 +330,22 @@ struct LayerControlsView: View {
         }
     }
 
-    /// Base map choices. `.vfrSectional` is the legacy "street + sectional" value; the sectional is
-    /// now the independent `.sectional` layer, so it reads as Street here.
-    private static let baseMaps: [MapStyle] = [.street, .satellite, .terrain]
+    /// Disabled row for a layer the region has no data source for. Plain reason, never an empty layer.
+    private func unavailableRow(_ label: String, padded: Bool = true) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(Palette.secondaryText)
+            Text(appState.region.unavailableReason)
+                .font(TypeRole.caption)
+                .foregroundStyle(Palette.secondaryText)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .padding(.horizontal, padded ? Space.l : 0)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label), unavailable")
+        .accessibilityValue(appState.region.unavailableReason)
+        .accessibilityIdentifier("unavailable-\(label)")
+    }
 }

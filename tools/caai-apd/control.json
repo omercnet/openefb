@@ -1,0 +1,162 @@
+{
+ "edition": "2026-08",
+ "editionLabel": "AIRAC AMDT 001/2026 (06 AUG 2026)",
+ "aipDate": "2026-08-06",
+ "entries": [
+  {
+   "icao": "LLBG",
+   "pdf": "LL_AD_2_LLBG_ADC_V2_en.pdf",
+   "chartTitle": "AD 2 LLBG ADC-1",
+   "language": "en",
+   "scale": "1:19,048",
+   "source": "https://e-aip.azurefd.net/2026-08-06-AIRAC/graphics/eAIP/LL_AD_2_LLBG_ADC_V2_en.pdf",
+   "rotationDegrees": 0,
+   "maskRects": [
+    [
+     57.3,
+     609.9,
+     320.0,
+     146.0
+    ],
+    [
+     377.0,
+     711.6,
+     95.0,
+     44.3
+    ],
+    [
+     57.3,
+     410.8,
+     212.4,
+     199.1
+    ],
+    [
+     269.6,
+     410.8,
+     257.8,
+     88.5
+    ],
+    [
+     57.3,
+     47.9,
+     535.4,
+     362.8
+    ],
+    [
+     602.6,
+     47.9,
+     445.0,
+     173.7
+    ]
+   ],
+   "note": "maskRects: RWY/THR table, legend + north arrow + scale bar, and the four marking/lighting insets (hand-picked, page points)"
+  },
+  {
+   "icao": "LLHA",
+   "pdf": "LL_AD_2_LLHA_ADC_V1_en.pdf",
+   "chartTitle": "AD 2 LLHA ADC",
+   "language": "en",
+   "scale": "bar only",
+   "source": "https://e-aip.azurefd.net/2026-08-06-AIRAC/graphics/eAIP/LL_AD_2_LLHA_ADC_V1_en.pdf",
+   "rotationDegrees": 0
+  },
+  {
+   "icao": "LLER",
+   "pdf": "LL_AD_2_LLER_ADCU_V2_en.pdf",
+   "chartTitle": "AD 2 LLER ADCU-1 (apron U only)",
+   "language": "en",
+   "scale": "bar only",
+   "source": "https://e-aip.azurefd.net/2026-08-06-AIRAC/graphics/eAIP/LL_AD_2_LLER_ADCU_V2_en.pdf"
+  },
+  {
+   "icao": "LLHZ",
+   "pdf": "AIP-D-LLHZ-p227.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.227)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 227)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLIB",
+   "pdf": "AIP-D-LLIB-p281.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.281)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 281)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLBS",
+   "pdf": "AIP-D-LLBS-p303.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.303)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 303)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLMG",
+   "pdf": "AIP-D-LLMG-p327.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.327)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 327)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLMZ",
+   "pdf": "AIP-D-LLMZ-p339.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.339)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 339)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLEY",
+   "pdf": "AIP-D-LLEY-p346.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.346)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 346)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLFK",
+   "pdf": "AIP-D-LLFK-p360.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.360)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 360)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLKZ",
+   "pdf": "AIP-D-LLKZ-p368.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.368)",
+   "language": "he/en",
+   "scale": "1:15,250",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 368)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLKS",
+   "pdf": "AIP-D-LLKS-p375.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.375)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 375)",
+   "note": "domestic AIP 1/26"
+  },
+  {
+   "icao": "LLRS",
+   "pdf": "AIP-D-LLRS-p395.pdf",
+   "chartTitle": "Domestic AIP chapter D/E aerodrome chart (full-AIP PDF p.395)",
+   "language": "he/en",
+   "scale": "bar only",
+   "source": "https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf (page 395)",
+   "note": "domestic AIP 1/26"
+  }
+ ]
+}

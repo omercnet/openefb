@@ -60,7 +60,7 @@ struct TranscriptSegmentRecord: Codable, FetchableRecord, PersistableRecord, Sen
     let flightID: UUID
     let timestamp: Date
     let text: String
-    let confidence: Double         // 0.0-1.0
+    let confidence: Double?        // 0.0-1.0; nil when the speech engine reported none
     let audioStartTime: TimeInterval
     let audioEndTime: TimeInterval
     let flightPhase: String        // FlightPhaseType raw value
@@ -70,7 +70,7 @@ struct TranscriptSegmentRecord: Codable, FetchableRecord, PersistableRecord, Sen
         flightID: UUID,
         timestamp: Date = Date(),
         text: String,
-        confidence: Double,
+        confidence: Double?,
         audioStartTime: TimeInterval,
         audioEndTime: TimeInterval,
         flightPhase: String
@@ -216,6 +216,34 @@ final class RecordingDatabase: @unchecked Sendable {
                 )
                 """)
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_debrief_results_flight ON debrief_results(flightID)")
+        }
+        // v3: transcript_segments.confidence becomes nullable (nil = engine reported none).
+        // Earlier builds stored -1 for unknown; those rows become NULL. SQLite cannot drop
+        // NOT NULL in place, so rebuild the table.
+        migrator.registerMigration("v3_nullable_transcript_confidence") { db in
+            try db.execute(sql: """
+                CREATE TABLE transcript_segments_new (
+                    id TEXT PRIMARY KEY,
+                    flightID TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    text TEXT NOT NULL,
+                    confidence REAL,
+                    audioStartTime REAL NOT NULL,
+                    audioEndTime REAL NOT NULL,
+                    flightPhase TEXT NOT NULL
+                )
+                """)
+            try db.execute(sql: """
+                INSERT INTO transcript_segments_new
+                    (id, flightID, timestamp, text, confidence, audioStartTime, audioEndTime, flightPhase)
+                SELECT id, flightID, timestamp, text,
+                       CASE WHEN confidence < 0 THEN NULL ELSE confidence END,
+                       audioStartTime, audioEndTime, flightPhase
+                FROM transcript_segments
+                """)
+            try db.execute(sql: "DROP TABLE transcript_segments")
+            try db.execute(sql: "ALTER TABLE transcript_segments_new RENAME TO transcript_segments")
+            try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_transcript_segments_flight ON transcript_segments(flightID)")
         }
         try migrator.migrate(dbPool)
     }

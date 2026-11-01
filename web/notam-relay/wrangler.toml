@@ -1,0 +1,11 @@
+name = "openefb-notam-relay"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+# NOTAM_KV, created 2026-11-01 on account omercnet (wrangler kv namespace create NOTAM_KV)
+[[kv_namespaces]]
+binding = "NOTAM_KV"
+id = "e1fc305c0b8141848ed7a54c35f2a337"

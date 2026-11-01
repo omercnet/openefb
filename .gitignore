@@ -27,3 +27,35 @@ _archive/
 
 # gstack local artifacts
 .gstack/
+
+# CAAI raw GIS downloads (not redistributed in git)
+tools/caai-importer/input/
+
+tools/caai-importer/.venv/
+tools/caai-importer/__pycache__/
+
+# CAAI CVFR chart pipeline: source PDFs (© CAAI / Mapa, not redistributed), venv, built packs
+tools/caai-chart/input/
+tools/caai-chart/.venv/
+tools/caai-chart/out/
+tools/caai-chart/__pycache__/
+
+# web/: server-side pieces (Next.js, Workers)
+web/**/node_modules
+web/**/.wrangler
+web/**/.vercel
+/.vercel
+web/**/.next
+web/**/out
+web/**/.data
+web/**/.env.local
+web/**/*.tsbuildinfo
+web/**/next-env.d.ts
+# IL-13 CAAI aerodrome-diagram pipeline: source PDFs (c CAAI, not redistributed), probe binary, output
+tools/caai-apd/input/
+tools/caai-apd/out/
+tools/caai-apd/caai-apd
+# Screenshots showing official CAAI chart/diagram artwork (base map rights: Mapa Ltd). Keep them local until the owner
+# confirms the CAAI/Mapa permission covers publishing the chart artwork.
+docs/design/screenshots/IL-9/
+docs/design/screenshots/IL-13/

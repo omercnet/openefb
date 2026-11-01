@@ -114,6 +114,29 @@ final class RecordingViewModel {
         return false
     }
 
+    /// How serious `lastError` is for the pilot.
+    nonisolated enum ProblemSeverity: Equatable, Sendable {
+        /// Recording continues (e.g. the audio stopped but the GPS track is still recording). Amber.
+        case caution
+        /// Recording has stopped or never started. Red.
+        case warning
+    }
+
+    /// Amber while the recording is still running (recording or paused); red once it has stopped
+    /// or failed to start (idle, countdown cancelled, stopping).
+    nonisolated static func problemSeverity(for status: RecordingStatus) -> ProblemSeverity {
+        switch status {
+        case .recording, .paused: return .caution
+        case .idle, .countdown, .stopping: return .warning
+        }
+    }
+
+    /// Severity of the current `lastError`, from the live recording status.
+    var lastErrorSeverity: ProblemSeverity { Self.problemSeverity(for: recordingStatus) }
+
+    /// Clear the recording problem notice.
+    func dismissError() { lastError = nil }
+
     /// Cancel an active auto-start countdown.
     func cancelCountdown() async {
         await coordinator.cancelCountdown()

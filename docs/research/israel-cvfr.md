@@ -43,6 +43,22 @@ machine-readable route data) resolve in opposite directions:
    convenience only; the binding publications are the official ones" and carries no explicit license. Need a written
    OK from CAAI (`aip@mot.gov.il`) before shipping them in the app. Risk: medium; the data is factual aeronautical
    information CAAI itself hands out, but the surrounding gov.il/Mapa copyright notice is broad.
+   **Resolved 2026-11-01: the owner reports that CAAI approved redistribution of the GIS layers** (efb-aac.1 closed).
+   Keep the approval email with the project records. Add CAAI's requested attribution wording to the app's About
+   screen and to `NOTICE` if they specified one; otherwise use "Aeronautical data: Civil Aviation Authority of Israel
+   (CAAI), AIP amendment <n>". The official chart is still not licensed (Mapa Ltd).
+   **Not public domain (checked 2026-11-01).** Israeli works made by the State are State-owned (Copyright Act 2007 §36);
+   §6 frees only statutes, regulations, Knesset protocols and court decisions. §5 leaves facts and data unprotected,
+   but a compilation of data, including a database, is a protected work, so the selection and arrangement can carry
+   copyright (https://www.wipo.int/wipolex/en/text/202010). data.gov.il has an explicit open license (copy,
+   redistribute, derivative works, commercial use, attribution required; https://data.gov.il/he/terms-of-use). Its
+   Ministry of Transport aviation sets are planning buffers, not navigation data:
+   - "נתיבי טיסה": 1 merged polygon, fields OID/Shape_Length/Shape_Area/YEARMONTH=202512, no altitudes, no point codes;
+   - airports: 8 rows;
+   - navaids: 8 rows;
+   - hospital helipads: 21 rows.
+   These were checked through `datastore_search`. No reporting points, CTR/TMA or P/R/D layer is on data.gov.il, so the
+   layers we need remain unlicensed.
 2. NOTAM feed stability (scraping a government WebForms page) and the absence of structured route-closure data.
 3. Hebrew-only domestic AIP (per-aerodrome visual charts, airstrip chapters) — needs a Hebrew-reading owner for data
    curation; the eAIP only covers LLBG, LLHA, LLER.
@@ -188,9 +204,8 @@ Domestic AIP, chapter A-07 & chapter B-03)" (`https://e-aip.azurefd.net/2026-08-
 | **flight-maps.com** (community) | mbtiles of the CVFR/LSA/ATS charts, airstrip/frequency KMZ, "SkyDemon Israel Airspace" and "ForeFlight Israel Airspace" user files. | Shows what pilots already load into other EFBs. | Unlicensed re-publication of CAAI charts; don't reuse. | Reference only. |
 | **Brook46/israel-airspace-map** (GitHub, Python) | Pipeline: IAA NOTAM list + detail pages, eAIP ENR 2.1/5.1/AD 2.17, domestic PDF tables, chart vector georeferencing. No LICENSE file. | Proof that scraping works; its NOTAM parser (Q-line, coordinates, schedules) is worth reading. | No license → can't copy code; can copy approach. | Reference. |
 
-Sample GeoJSON extracts: `caai-gis-cvfr-points-2026.geojson` (all 198), `caai-gis-cvfr-routes-2026-sample.geojson`
-(25 of 275), `caai-gis-ctr-2026-sample.geojson`, `caai-gis-prd-2026-sample.geojson`. These are for evaluation only
-until the license question is settled.
+The GeoJSON evaluation extracts that lived in the samples folder were removed once CAAI approved redistribution:
+the full layers are now imported by `tools/caai-importer` into `efb-212/Resources/israel-aviation.sqlite` (IL-1).
 
 Reporting-point / route key: route segments reference points by their 5-letter code (`firstWayPo`/`secondWayp`, e.g.
 `HADRA`→`DALIA`), aerodromes by ICAO (`LLEK`). NOTAM closures use the same codes ("CVFR RTE CLSD TAVOR-DESHE"), so a
@@ -310,3 +325,43 @@ Critical path: IL-0/IL-1 → IL-3 → IL-7 → IL-8; IL-6 in parallel after IL-1
    LCLK/LCPH — note flight-maps.com ships Larnaca/Paphos charts), or a one-off?
 7. Pricing: Air Map Israel is ₪0–50. A free OpenEFB with optional sync is competitive; confirm no premium feature is
    Israel-gated.
+
+## 11. CVFR chart rendering notes for the CFI review (IL-3, IL-12)
+
+The app draws the chart from the CAAI layers (`Services/IsraelChart*.swift`). Points for the reviewer:
+
+- **Altitude references are inferred.** The CAAI layers carry none. IL-1 stores MSL for every non-zero airspace limit and
+  SFC for 0, UNL for 99000. The airspace tap sheet says so on every limit that rests on that inference. Please confirm
+  against the AIP (A-17, ENR 5.1) that no CTR/TMA/P/R/D limit is AGL or a flight level.
+- **Route altitudes** are per direction, feet, flown on the controlling unit's QNH. The map label reads along the line:
+  an arrow points the way the text runs, so "2500 -> / <- 3000" means 2500 flying with the text and 3000 against it. Text
+  that CAAI publishes as two numbers ("2500/3500") is shown as published, never reduced to one number.
+- **Colours:** civil routes solid green, by-request dashed green, military blue and tagged "MIL". Ordinary airspace is
+  indigo; P/R/D are amber (caution). Red is used only for NOTAM route closures ("CLSD to HH:MMZ", dashed red hatch).
+- **Closures** draw only from a NOTAM feed whose scrape time is under 6 h old. Between 1 h and 6 h they still draw, and
+  every label adds "(data Nh MMm old)". Past 6 h, or with no feed, nothing is drawn and the layer panel says why. D)
+  schedules are not evaluated on the map: a scheduled closure is drawn for its whole validity window and the schedule text
+  is in the NOTAM list. Please say whether that is too aggressive.
+- **Not drawn:** the FIR boundary, heliport/ultralight/ATS closure chains, border buffers (IL-8).
+- **Offline:** the chart layers, labels and symbols are local sprites and need no network. The street base map under them is
+  online only.
+
+## 12. Aerodrome diagrams inventory (IL-13, 2026-11-01)
+
+Sources fetched with plain curl (no WAF): eAIP `https://e-aip.azurefd.net/2026-08-06-AIRAC/html/eAIP/LL-AD-2.<ICAO>-en-GB.html`
+(PDFs under `.../graphics/eAIP/`, cycle AIRAC AMDT 001/2026, 06 AUG 2026) and the full domestic AIP
+`https://www.gov.il/BlobFolder/guide/aip/he/פמת מלא 1-26.pdf` (95 MB, downloaded; chapters ד/ה not yet inventoried).
+Everything is stored in `tools/caai-apd/input/` (gitignored). Charts are (c) CAAI; permission is with the owner, so nothing is published.
+
+| Aerodrome | Chart | Scale | Vector | Lang | Edition | Georef status |
+|---|---|---|---|---|---|---|
+| LLBG | `LL_AD_2_LLBG_ADC_V2_en.pdf` (AD 2 LLBG ADC-1) | 1:19,048 | yes (11.7k paths) | en | AMDT 001/2026, 06 AUG 2026 | runway-only fit, 3 runways, worst residual 65 ft (gate 50): rejected by the unmodified core |
+| LLHA | `LL_AD_2_LLHA_ADC_V1_en.pdf` | bar scale only | yes | en | AMDT 001/2026 | one runway: "orientation ambiguous" |
+| LLER | only apron charts (ADCRST, ADCU, ADCV), no aerodrome chart | 100 m bar | yes | en | AMDT 001/2026 | apron sheets, no runway: sheet only |
+| LLHZ, LLIB, LLEY, LLMZ, LLKS, others | domestic AIP chapter ד/ה | not yet inventoried | | he | AIP 1/26 | pending |
+
+Key finding: unlike FAA APDs, the Israeli charts have **no lat/lon graticule labels** (the only "N/S" matches are
+bearing and threshold tables). The core's grid method does not apply; only the runway method (thresholds from
+`israel-aviation.sqlite` `runways`, plus AD 2.12 coordinates printed on the chart) can fit them. A single runway
+cannot fix orientation (LLHA), and LLBG's three-runway fit lands 36/52/65 ft off with translation chosen from one runway.
+Next step: a wrapper-side least-squares fit over all drawn runways (scale + translation, rotation 0), keeping the 50 ft gate.

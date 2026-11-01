@@ -120,7 +120,7 @@ struct MapContainerView: View {
                     // Top-left: Search bar + chart expiration badge
                     VStack(alignment: .leading, spacing: 8) {
                         // Search toggle button
-                        if !showingSearch {
+                        if !showingSearch, appState.region.hasAirportData {
                             Button {
                                 showingSearch = true
                             } label: {
@@ -192,6 +192,12 @@ struct MapContainerView: View {
                         if let viewModel = mapViewModel {
                             DataAgeBadge(.chartCycle, validUntil: viewModel.chartExpirationDate)
                                 .hiddenWhenFresh()
+                        }
+
+                        // Official CAAI chart edition (IL-9): which edition is shown, update, or not downloaded
+                        if appState.region == .israel {
+                            IsraelChartBadge()
+                            IsraelDiagramBadge(overlay: mapViewModel?.mapService.airportDiagramOverlay)
                         }
                     }
                     .padding(.leading, 16)
@@ -342,12 +348,22 @@ struct MapContainerView: View {
             )
         }
 
+        // MARK: - Israel CVFR Chart Sheet (IL-3)
+
+        .sheet(item: Binding(
+            get: { mapService.israelChart.selection },
+            set: { mapService.israelChart.selection = $0 }
+        )) { selection in
+            IsraelChartSheet(selection: selection)
+        }
+
         // MARK: - Nearest Airport List Sheet
 
         .sheet(isPresented: $appState.isPresentingNearestList) {
             if let nearestVM = nearestAirportVM, let viewModel = mapViewModel {
                 NearestAirportView(
                     entries: nearestVM.nearestAirports,
+                    region: appState.region,
                     onDirectTo: { nearestVM.setDirectTo(airport: $0) },
                     onAirportTap: { viewModel.onAirportTapped(icao: $0) }
                 )
@@ -366,7 +382,9 @@ struct MapContainerView: View {
             guard let position = newPosition else { return }
 
             // Update nearest airport (throttled inside VM to 0.5 NM)
-            nearestAirportVM?.updateNearest(from: position)
+            if appState.region.hasAirportData {
+                nearestAirportVM?.updateNearest(from: position)
+            }
 
             // Update ownship on map
             mapService.updateOwnship(location: position, heading: appState.track)
@@ -374,10 +392,12 @@ struct MapContainerView: View {
             // Check proximity alerts (throttled internally to 10s)
             mapViewModel?.checkProximityAlerts()
 
-            // First GPS fix: animate from CONUS to user position
+            // First GPS fix: animate from the home view to the user position (only inside the region)
             if !appState.firstLocationReceived {
                 appState.firstLocationReceived = true
-                mapService.animateToLocation(position.coordinate, zoom: 10.0)
+                if appState.region.contains(position.coordinate) {
+                    mapService.animateToLocation(position.coordinate, zoom: 10.0)
+                }
             }
         }
 
@@ -385,6 +405,19 @@ struct MapContainerView: View {
 
         .onChange(of: reachabilityService.isConnected) { _, newValue in
             appState.networkAvailable = newValue
+        }
+
+        // MARK: - Region Switch (IL-2)
+
+        .onChange(of: appState.region) { _, _ in
+            mapViewModel?.regionDidChange()
+            // A new region has its own airports: list them now, not at the next GPS fix.
+            if appState.region.hasAirportData, let position = appState.ownshipPosition {
+                nearestAirportVM?.updateNearest(from: position)
+            }
+        }
+        .onChange(of: IsraelChartStore.shared.packURL) { _, _ in
+            mapViewModel?.syncOfficialChart()
         }
     }
 
@@ -395,6 +428,9 @@ struct MapContainerView: View {
     /// AppState.databaseError drives the "Airport database unavailable" banner.
     private func initializeServices() {
         guard mapViewModel == nil else { return }  // already initialized
+
+        // Saved operating region (before any view model or map reads it)
+        appState.region = RegionStore.load(from: modelContext)
 
         // Database service (single shared instance, created once by AppState)
         let databaseService = appState.getOrCreateDatabaseService()
@@ -412,6 +448,7 @@ struct MapContainerView: View {
         vm.tfrService = tfrService
         vm.airSigmetService = airSigmetService
         vm.proximityAlertService = proxService
+        mapService.airportDiagramOverlay.region = appState.region
         mapService.airportDiagramOverlay.configure(chartService: chartService, databaseService: databaseService)
 
         mapViewModel = vm
@@ -425,14 +462,17 @@ struct MapContainerView: View {
         locationService = locService
         Task { await locService.startTracking() }
 
-        // NearestAirportViewModel
+        // NearestAirportViewModel (Israel: curated aerodromes, flagged against the NOTAM feed when one is configured)
+        let israelNotams = IsraelNotamService()
         nearestAirportVM = NearestAirportViewModel(
             appState: appState,
-            databaseService: databaseService
+            databaseService: databaseService,
+            notamFetcher: { try await israelNotams.fetchFeed(forceRefresh: false) }
         )
 
         // SearchViewModel
-        searchViewModel = SearchViewModel(databaseService: databaseService)
+        let appStateForSearch = appState
+        searchViewModel = SearchViewModel(databaseService: databaseService, regionProvider: { appStateForSearch.region })
 
         // Start reachability monitoring
         reachabilityService.start()

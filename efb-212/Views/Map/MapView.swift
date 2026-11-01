@@ -29,12 +29,9 @@ struct MapView: UIViewRepresentable {
     func makeUIView(context: Context) -> MLNMapView {
         let mapView = MLNMapView(frame: .zero)
 
-        // Initial CONUS center (39N, 98W, zoom 5) per user decision
-        mapView.setCenter(
-            CLLocationCoordinate2D(latitude: 39.0, longitude: -98.0),
-            zoomLevel: 5.0,
-            animated: false
-        )
+        // Initial camera: the region's home view (US: CONUS 39N, 98W, zoom 5)
+        let region = mapViewModel.appState.region
+        mapView.setCenter(region.defaultCenter, zoomLevel: region.defaultZoom, animated: false)
 
         // We render our own ownship -- never show the system puck
         mapView.showsUserLocation = false
@@ -46,7 +43,7 @@ struct MapView: UIViewRepresentable {
         mapView.delegate = context.coordinator
 
         // Configure MapService with this map view
-        mapService.configure(mapView: mapView)
+        mapService.configure(mapView: mapView, center: region.defaultCenter, zoom: region.defaultZoom)
 
         // Add tap gesture for GeoJSON feature detection (airport tapping)
         let tapGesture = UITapGestureRecognizer(
@@ -84,6 +81,7 @@ struct MapView: UIViewRepresentable {
             sectional: mapViewModel.appState.visibleLayers.contains(.sectional)
         )
         mapService.applyDisplayMode(night: colorScheme == .dark)
+        mapService.israelChart.tick()  // closure freshness + feed refresh (cheap no-op outside Israel)
         let opacity = mapViewModel.appState.sectionalOpacity
         if context.coordinator.appliedSectionalOpacity != opacity {
             context.coordinator.appliedSectionalOpacity = opacity
@@ -156,15 +154,27 @@ struct MapView: UIViewRepresentable {
 
             let point = sender.location(in: mapView)
 
-            // Query visible features at tap point in the airport circle layer
+            // Israel CVFR chart: aerodromes open the airport sheet (IL-4); reporting points and
+            // airspace open their own sheet
+            if let selection = mapService.israelChart.hitTest(in: mapView, at: point) {
+                if case .aerodrome(let code) = selection {
+                    mapViewModel.onAirportTapped(icao: code)
+                } else {
+                    mapService.israelChart.selection = selection
+                }
+                return
+            }
+
+            // Query visible features at tap point in the airport and weather-station circle layers
             let features = mapView.visibleFeatures(
                 at: point,
-                styleLayerIdentifiers: Set(["airport-circles"])
+                styleLayerIdentifiers: Set(["airport-circles", "weather-circles"])
             )
 
-            // Extract ICAO from first matching feature
+            // Extract ICAO from first matching feature (weather dots carry `stationID`)
             if let feature = features.first,
-               let icao = feature.attribute(forKey: "icao") as? String {
+               let icao = (feature.attribute(forKey: "icao") as? String)
+                    ?? (feature.attribute(forKey: "stationID") as? String) {
                 mapViewModel.onAirportTapped(icao: icao)
             }
         }

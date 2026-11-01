@@ -208,6 +208,12 @@ actor WeatherService: WeatherServiceProtocol {
                 fltCat = computeFlightCategory(ceiling: ceiling, visibility: visib)
             }
 
+            // Altimeter: aviationweather.gov sends `altim` in hPa (e.g. 1017 for Q1017). A value
+            // under 100 can only be inHg, so convert rather than show 30 hPa.
+            let altimeterHPa: Double? = parseDouble(entry["altim"]).map {
+                $0 < 100 ? $0 * Region.hPaPerInHg : $0
+            }
+
             // Observation time
             let obsTime: Date?
             if let epoch = parseDouble(entry["obsTime"]) {
@@ -230,6 +236,7 @@ actor WeatherService: WeatherServiceProtocol {
                 ceiling: ceiling,
                 flightCategory: fltCat,
                 observationTime: obsTime,
+                altimeterHPa: altimeterHPa,
                 fetchedAt: Date()
             )
         }

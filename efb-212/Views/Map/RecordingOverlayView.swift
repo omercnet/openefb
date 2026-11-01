@@ -182,14 +182,17 @@ struct RecordingOverlayView: View {
             Text("The GPS track still records. For cockpit audio, turn the microphone on in Settings \u{203A} OpenEFB \u{203A} Microphone.")
                 .font(TypeRole.caption)
                 .foregroundStyle(Palette.secondaryText)
-            Button("Open Settings") {
+            Button {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     openURL(url)
                 }
+            } label: {
+                // The frame sits inside the label so the bordered button itself is >= 60 pt.
+                Text("Open Settings")
+                    .frame(minWidth: MapControlMetrics.size, minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .frame(minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
         }
         .padding(Space.m)
         .background(.regularMaterial)
@@ -200,29 +203,52 @@ struct RecordingOverlayView: View {
 
     // MARK: - Recording error
 
-    /// A failed start or a mid-flight failure (e.g. audio write error). Amber, dismissible.
+    /// A failed start or a mid-flight failure (e.g. audio write error), dismissible.
+    /// Amber (caution) while recording continues, red (warning) once recording has stopped.
     private func recordingErrorNotice(_ error: EFBError) -> some View {
-        HStack(alignment: .top, spacing: Space.s) {
+        let isCaution = viewModel.lastErrorSeverity == .caution
+        let tint = isCaution ? Palette.caution : Palette.warning
+        return HStack(alignment: .top, spacing: Space.s) {
             VStack(alignment: .leading, spacing: Space.xs) {
-                Label("Recording problem", systemImage: "exclamationmark.triangle.fill")
+                Label(isCaution ? "Audio stopped" : "Recording failed",
+                      systemImage: "exclamationmark.triangle.fill")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Palette.caution)
-                Text(error.localizedDescription)
+                    .foregroundStyle(tint)
+                Text(isCaution
+                     ? "Cockpit audio and transcript stopped. The GPS track is still recording. \(Self.detail(of: error))"
+                     : "Recording is not running. \(Self.detail(of: error))")
                     .font(TypeRole.caption)
                     .foregroundStyle(Palette.secondaryText)
             }
             Spacer(minLength: Space.s)
-            Button("Dismiss") { viewModel.lastError = nil }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .frame(minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
-                .accessibilityLabel("Dismiss recording problem")
+            Button { viewModel.dismissError() } label: {
+                // The frame sits inside the label so the bordered button itself is >= 60 pt.
+                Text("Dismiss")
+                    .frame(minWidth: MapControlMetrics.size, minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .accessibilityLabel("Dismiss recording problem")
         }
         .padding(Space.m)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius)
+                .stroke(tint, lineWidth: 2)
+        )
         .frame(maxWidth: 420, alignment: .leading)
-        .accessibilityIdentifier("recording-error-notice")
+        .accessibilityIdentifier(isCaution ? "recording-error-notice-caution" : "recording-error-notice-warning")
+    }
+
+    /// The underlying cause without the "Recording failed:" prefix the notice title already says.
+    private static func detail(of error: EFBError) -> String {
+        switch error {
+        case .recordingFailed(let underlying), .audioSessionFailed(let underlying):
+            return underlying.localizedDescription
+        default:
+            return error.localizedDescription
+        }
     }
 
     // MARK: - Discarded recording
@@ -239,11 +265,14 @@ struct RecordingOverlayView: View {
                     .foregroundStyle(Palette.secondaryText)
             }
             Spacer(minLength: Space.s)
-            Button("Dismiss") { viewModel.showDiscardedNotice = false }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .frame(minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
-                .accessibilityLabel("Dismiss recording not saved notice")
+            Button { viewModel.showDiscardedNotice = false } label: {
+                // The frame sits inside the label so the bordered button itself is >= 60 pt.
+                Text("Dismiss")
+                    .frame(minWidth: MapControlMetrics.size, minHeight: MapControlMetrics.size)  // in-flight control: >= 60 pt
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .accessibilityLabel("Dismiss recording not saved notice")
         }
         .padding(Space.m)
         .background(.regularMaterial)
