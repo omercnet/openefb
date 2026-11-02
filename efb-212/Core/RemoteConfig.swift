@@ -200,7 +200,7 @@ nonisolated struct RemoteConfig: Equatable, Sendable {
             if let list = raw as? [[String: Any]] {
                 for (index, entry) in list.enumerated() {
                     if let notice = notice(from: entry) { notices.append(notice) }
-                    else { ignored.append("notices[\(index)]: needs an id and an English text") }
+                    else { ignored.append("notices[\(index)]: needs an id, an English text, and valid regions and until values") }
                 }
             } else {
                 ignored.append("notices: not a list of objects")
@@ -220,8 +220,19 @@ nonisolated struct RemoteConfig: Equatable, Sendable {
               let text = RemoteText(json: entry["text"]) else { return nil }
         // A remote notice is never red: anything but "caution" shows as info.
         let severity = RemoteNotice.Severity(rawValue: entry["severity"] as? String ?? "") ?? .info
-        let regions = Set((entry["regions"] as? [String]) ?? [])
-        return RemoteNotice(id: id, severity: severity, regions: regions, until: date(entry["until"]), text: text)
+        // regions and until narrow where and how long a notice shows. A present but malformed value rejects the
+        // notice: ignoring it would widen the notice to every region or to no end date.
+        var regions: Set<String> = []
+        if let rawRegions = entry["regions"] {
+            guard let list = rawRegions as? [String] else { return nil }
+            regions = Set(list)
+        }
+        var until: Date?
+        if let rawUntil = entry["until"] {
+            guard let parsed = date(rawUntil) else { return nil }
+            until = parsed
+        }
+        return RemoteNotice(id: id, severity: severity, regions: regions, until: until, text: text)
     }
 
     /// JSON numbers arrive as NSNumber; reject booleans and fractions.

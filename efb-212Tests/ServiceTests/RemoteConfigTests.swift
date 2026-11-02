@@ -135,6 +135,19 @@ struct RemoteConfigTests {
         #expect(config.notices.map(\.severity) == [.info, .info])
     }
 
+    @Test func aNoticeWithMalformedRegionsOrUntilIsDroppedInsteadOfWidened() throws {
+        let config = try RemoteConfig.parse(Self.file { object in
+            object["notices"] = [
+                ["id": "string-region", "regions": "israel", "text": Self.text("x")],
+                ["id": "date-only", "until": "2026-11-09", "text": Self.text("x")],
+                ["id": "number-until", "until": 5, "text": Self.text("x")],
+                ["id": "fine", "regions": ["israel"], "until": Self.iso(Self.t0.addingTimeInterval(Self.day)), "text": Self.text("x")],
+            ]
+        }, now: Self.t0)
+        #expect(config.notices.map(\.id) == ["fine"])
+        #expect(config.ignored.count == 3)
+    }
+
     @Test func hebrewIsUsedOnlyOnAHebrewDeviceAndWhenAHebrewTextExists() {
         let both = RemoteText(english: "Update", hebrew: "עדכנו")
         #expect(both.resolved(preferredLanguage: "he-IL") == "עדכנו")
