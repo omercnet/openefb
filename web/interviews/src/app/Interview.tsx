@@ -55,7 +55,6 @@ function fmt(s: number): string {
 }
 
 export default function Interview(props: {
-  interviewer: string;
   contactEmail: string;
   code: string;
   maxMinutes: number;
@@ -507,7 +506,7 @@ export default function Interview(props: {
       {n}
     </div>
   );
-  const ctx = { interviewer: props.interviewer, contactEmail: props.contactEmail, maxMinutes: props.maxMinutes };
+  const ctx = { contactEmail: props.contactEmail, maxMinutes: props.maxMinutes };
   const emailNode = props.contactEmail ? (
     <a href={`mailto:${props.contactEmail}`} dir="ltr">
       {props.contactEmail}

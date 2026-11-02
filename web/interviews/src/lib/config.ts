@@ -33,9 +33,6 @@ export const config = {
   get inviteCode() {
     return process.env.INVITE_CODE || "";
   },
-  get interviewerName() {
-    return process.env.INTERVIEWER_NAME || "the researcher";
-  },
   get contactEmail() {
     return process.env.CONTACT_EMAIL || "";
   },

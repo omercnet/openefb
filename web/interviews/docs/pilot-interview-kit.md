@@ -47,7 +47,7 @@ I'm not selling anything. Can you walk me through your last flight?"
 - Generics ("I always…") → "Tell me about the most recent time."
 
 ## Close (the ask)
-"Can I send you a TestFlight build to try on one real flight, then do a 10-minute call after?"
+"We're building a free, open-source iPad app for VFR pilots called OpenEFB. Would you be open to us sending you a TestFlight build to try on one real flight, then a 10-minute call after? Thank you for your time either way."
 Record yes/no. Yes plus an actual flight is the commitment we're looking for.
 
 ## Notes template (one per interview)

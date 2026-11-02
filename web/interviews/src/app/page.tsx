@@ -10,7 +10,6 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ c
   return (
     <main>
       <Interview
-        interviewer={config.interviewerName}
         contactEmail={config.contactEmail}
         code={code ?? ""}
         maxMinutes={Math.round(config.maxSessionSeconds / 60)}

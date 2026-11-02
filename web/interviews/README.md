@@ -62,7 +62,7 @@ silent. Microphone access works on `localhost` and HTTPS only.
 | `VAD_INTERRUPT_RESPONSE` | no | Default `true`; `false` stops detected speech from cutting off the interviewer. |
 | `SUMMARY_MODEL` | no | e.g. `gpt-4.1-mini`. If set, each finished interview is auto-summarised into the notes template. |
 | `CRON_SECRET` | prod | Random string; Vercel Cron sends it as a Bearer token to `/api/cron/reap`. |
-| `INTERVIEWER_NAME`, `CONTACT_EMAIL` | recommended | Shown on the consent screen (who is asking; where to send deletion requests). |
+| `CONTACT_EMAIL` | recommended | Shown on the consent screen (where to send deletion requests). |
 
 ## Languages and noise
 
@@ -101,7 +101,6 @@ npx vercel env add OPENAI_API_KEY production
 npx vercel env add ADMIN_PASSWORD production
 npx vercel env add CRON_SECRET production
 npx vercel env add INVITE_CODE production            # optional
-npx vercel env add INTERVIEWER_NAME production
 npx vercel env add CONTACT_EMAIL production
 npx vercel env add SUMMARY_MODEL production          # optional
 npx vercel --prod

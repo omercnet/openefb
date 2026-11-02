@@ -6,7 +6,6 @@ import type { Lang } from "@/lib/lang";
  * round) keeps its own direction and doesn't reorder the neighbouring punctuation.
  */
 export interface Ctx {
-  interviewer: string;
   contactEmail: string;
   maxMinutes: number;
 }
@@ -60,16 +59,16 @@ const B = ({ children }: { children: ReactNode }) => <bdi>{children}</bdi>;
 
 const en: Strings = {
   pageTitle: "A 20-minute chat about flying with your iPad",
-  intro: (c) => (
+  intro: () => (
     <>
-      For VFR pilots. No sales pitch: <B>{c.interviewer}</B> just wants to hear about your last few flights.
+      For VFR pilots. No sales pitch, we&apos;d simply love to hear about your last few flights. Thank you for giving us your time.
     </>
   ),
   readFirst: "Before we start, please read this",
   rules: [
-    (c) => (
+    () => (
       <>
-        <b>Who&apos;s asking:</b> <B>{c.interviewer}</B>. You&apos;ll talk with an <b>AI voice interviewer</b> (not a person), running on OpenAI&apos;s speech technology, so your voice is processed by OpenAI.
+        <b>Who&apos;s asking:</b> we&apos;re the small team behind OpenEFB, a free, open-source iPad app for VFR pilots. You&apos;ll talk with an <b>AI voice interviewer</b> (not a person) that speaks on our behalf, running on OpenAI&apos;s speech technology, so your voice is processed by OpenAI.
       </>
     ),
     () => (
@@ -77,9 +76,9 @@ const en: Strings = {
         <b>What&apos;s recorded:</b> the conversation is <b>audio-recorded and transcribed</b>. If you choose to share an email at the end, that is stored too.
       </>
     ),
-    (c) => (
+    () => (
       <>
-        <b>How it&apos;s used:</b> to study how pilots use iPads in the cockpit. Only <B>{c.interviewer}</B> can see it. Short quotes may be used in notes without your name.
+        <b>How it&apos;s used:</b> to help us understand how pilots use iPads in the cockpit. Only our team can see it. Short quotes may be used in our notes without your name.
       </>
     ),
     (c) => (
@@ -134,16 +133,16 @@ const en: Strings = {
 // he: numbers with a minus sign are wrapped in LRI/PDI (U+2066/U+2069) so "-62 dBFS" isn't reordered inside RTL text
 const he: Strings = {
   pageTitle: "שיחה של 20 דקות על טיסה עם ה-iPad",
-  intro: (c) => (
+  intro: () => (
     <>
-      לטייסי VFR. בלי מכירות: <B>{c.interviewer}</B> פשוט רוצה לשמוע על הטיסות האחרונות שלכם.
+      לטייסי VFR. בלי מכירות, פשוט נשמח לשמוע על הטיסות האחרונות שלכם. תודה שאתם נותנים לנו מזמנכם.
     </>
   ),
   readFirst: "לפני שמתחילים, בבקשה לקרוא את זה",
   rules: [
-    (c) => (
+    () => (
       <>
-        <b>מי שואל:</b> <B>{c.interviewer}</B>. השיחה היא עם <b>מראיין קולי מבוסס בינה מלאכותית</b> (לא בן אדם), שרץ על טכנולוגיית הדיבור של <B>OpenAI</B>, ולכן הקול מעובד אצל OpenAI.
+        <b>מי שואל:</b> אנחנו הצוות הקטן מאחורי <B>OpenEFB</B>, אפליקציית iPad חופשית ופתוחה לטייסי VFR. השיחה היא עם <b>מראיין קולי מבוסס בינה מלאכותית</b> (לא בן אדם) שמדבר בשמנו, ורץ על טכנולוגיית הדיבור של <B>OpenAI</B>, ולכן הקול מעובד אצל OpenAI.
       </>
     ),
     () => (
@@ -151,9 +150,9 @@ const he: Strings = {
         <b>מה מוקלט:</b> השיחה <b>מוקלטת ומתומללת</b>. אם משאירים אימייל בסוף, גם הוא נשמר.
       </>
     ),
-    (c) => (
+    () => (
       <>
-        <b>למה זה משמש:</b> כדי ללמוד איך טייסים משתמשים ב-iPad בקוקפיט. רק <B>{c.interviewer}</B> רואה את זה. ציטוטים קצרים עשויים להופיע בסיכומים בלי שם.
+        <b>למה זה משמש:</b> כדי שנבין טוב יותר איך טייסים משתמשים ב-iPad בקוקפיט. רק הצוות שלנו רואה את זה. ציטוטים קצרים עשויים להופיע בסיכומים שלנו בלי שם.
       </>
     ),
     (c) => (
