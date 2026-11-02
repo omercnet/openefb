@@ -109,7 +109,7 @@ struct IsraelRouteFollowingBar: View {
             .foregroundStyle(.black)
             .padding(.horizontal, Space.m)
             .padding(.vertical, Space.s)
-            .background(Color.orange, in: RoundedRectangle(cornerRadius: 8))
+            .background(Palette.cautionFill, in: RoundedRectangle(cornerRadius: Radius.s))
             .accessibilityIdentifier(identifier)
     }
 
@@ -119,7 +119,7 @@ struct IsraelRouteFollowingBar: View {
                 .font(.headline)
                 .padding(.horizontal, Space.l)
                 .frame(minWidth: MapControlMetrics.size, minHeight: MapControlMetrics.size)  // 60 pt target
-                .background(Palette.fill, in: RoundedRectangle(cornerRadius: 8))
+                .background(Palette.fill, in: RoundedRectangle(cornerRadius: Radius.s))
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressableButtonStyle())

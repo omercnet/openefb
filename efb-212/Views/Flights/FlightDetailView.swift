@@ -177,8 +177,8 @@ struct FlightDetailView: View {
                     }
                     .padding()
                     .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.orange.opacity(0.1))
+                        RoundedRectangle(cornerRadius: Radius.m)
+                            .fill(Palette.caution.opacity(0.1))
                     )
                 }
                 .buttonStyle(.plain)
@@ -246,8 +246,8 @@ struct FlightDetailView: View {
                         }
                         .padding()
                         .background(
-                            RoundedRectangle(cornerRadius: 10)
-                                .fill(flightRecord.hasDebrief ? Palette.infoFill : Color.purple.opacity(0.1))
+                            RoundedRectangle(cornerRadius: Radius.m)
+                                .fill(flightRecord.hasDebrief ? Palette.infoFill : Palette.fill)
                         )
                     }
                     .buttonStyle(.plain)
@@ -292,7 +292,7 @@ struct FlightDetailView: View {
         .frame(maxWidth: .infinity)
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: Radius.m)
                 .fill(.quaternary)
         )
     }

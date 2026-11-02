@@ -21,15 +21,34 @@ enum Space {
     static let xxl: CGFloat = 32    // major breaks
 }
 
+// MARK: - Corner radius
+
+/// Corner radius scale. Tags and chips use `xs`, rows and notices `s`, controls and inline cards `m`,
+/// panels and floating chrome `l`. Never a literal radius in a view.
+enum Radius {
+    static let xs: CGFloat = 4      // PVT / MIL / PPR tags, stop square
+    static let s: CGFloat = 8       // rows, banners, quiet fills
+    static let m: CGFloat = 10      // map controls, inline cards
+    static let l: CGFloat = 14      // panels: instrument strip, layer panel, NRST box, primary buttons
+}
+
 // MARK: - Type roles
 
 /// Type roles built from Dynamic Type text styles. Values are emphasized over labels:
 /// a label is small and secondary, the value it describes is larger and primary.
+/// Kanaf voice: expanded SF Pro for names and headings, regular width for values read up close,
+/// condensed SF Pro with fixed-width digits for the instrument readouts (SF Mono ignores width).
 enum TypeRole {
     /// Airport identifier / sheet title.
-    static let title = Font.system(.largeTitle, design: .rounded, weight: .semibold)
+    static let title = Font.system(.largeTitle, weight: .bold).width(.expanded)
+    /// Compact identifier next to a distance, e.g. "KPAO" in the NRST box.
+    static let identifier = Font.title3.weight(.bold).width(.expanded)
     /// Section heading, e.g. "FREQUENCIES".
-    static let sectionHeader = Font.caption.weight(.bold)
+    static let sectionHeader = Font.caption.weight(.bold).width(.expanded)
+    /// Instrument readout digits at an exact point size (the caller scales it with `@ScaledMetric`).
+    static func readout(size: CGFloat) -> Font {
+        Font.system(size: size, weight: .semibold).width(.condensed).monospacedDigit()
+    }
     /// Field label, e.g. "Wind", "TWR". Always paired with `Palette.secondaryText`.
     static let label = Font.footnote.weight(.medium)
     /// Primary value: frequency, runway ident, decoded weather.
@@ -68,6 +87,16 @@ enum Palette {
     static let onWarning = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark ? .black : .white
     })
+    /// Success / "all good" glyphs and text (confirmed entry, GPS fix, VFR dot). Day #147832 on the light
+    /// material 5.0:1; night systemGreen. Never used for anything but "fine".
+    static let ok = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark ? .systemGreen : UIColor(red: 0.078, green: 0.471, blue: 0.196, alpha: 1)
+    })
+    /// Solid amber fill for caution chips and banners (PVT/MIL/PPR tags, offline pill, route altitude
+    /// caution). Always carries black text: 9:1 (white on this amber is 2.2:1). For amber *text* use `caution`.
+    static let cautionFill = Color.orange
+    /// North marker on the compass button. A compass convention, not a warning: the one red that is not `warning`.
+    static let northMarker = Color.red
     /// Quiet container fill for rows and chips.
     static let fill = Color.secondary.opacity(0.12)
     /// Active route line on the map: aviation magenta (never red, which is reserved for closures and
@@ -82,7 +111,7 @@ enum Palette {
     // Map layer toggle tints. A toggle track is a UI component: >= 3:1 against the panel
     // material (WCAG 1.4.11). System tints are 2.0-2.3:1 by day, so day uses darker variants of
     // the same hues; night keeps the system dark-scheme tints (all >= 4.8:1 on #1C1C1E).
-    /// Sectional toggle. Day systemBlue 3.6:1; night #4678BE 3.8:1 (`accent` night is 1.9:1).
+    /// Sectional toggle. Day systemBlue 3.2:1 on #F2F2F7 (3.6:1 for the older #007AFF); night #4678BE 3.8:1 (`accent` night is 1.9:1).
     static let layerSectional = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
             ? UIColor(red: 0.275, green: 0.471, blue: 0.745, alpha: 1)
@@ -109,32 +138,34 @@ enum Palette {
         trait.userInterfaceStyle == .dark ? .systemTeal : UIColor(red: 0, green: 0.471, blue: 0.51, alpha: 1)
     })
 
-    // Interactive accent. Day: system blue. Night (dark scheme = cockpit night palette): a muted,
-    // low-luminance blue so buttons don't glare (F16). All pairs below are >= 4.5:1.
+    // Interactive accent: Kanaf navy, the blue of the app icon. Day #1556B8; Increase Contrast #0C4091.
+    // Night (dark scheme = cockpit night palette): a muted, low-luminance blue so buttons don't glare (F16).
+    // All pairs below are >= 4.5:1. `accentText` reads the `AccentColor` asset, which is also the app-wide tint.
+
+    private static let accentDay = UIColor(red: 0.082, green: 0.337, blue: 0.722, alpha: 1)          // #1556B8
+    private static let accentDayHighContrast = UIColor(red: 0.047, green: 0.251, blue: 0.569, alpha: 1) // #0C4091
+    private static let accentNight = UIColor(red: 0.18, green: 0.29, blue: 0.43, alpha: 1)            // #2E4A6E
 
     /// Filled-button background (NRST, Direct-To, Recenter, Play, primary onboarding action).
-    /// Night #2E4A6E (L 0.06) under `onAccent` (L 0.57): 5.4:1. Day: white on systemBlue, 4.6:1.
+    /// Day #1556B8 under white: 6.9:1 (Increase Contrast #0C4091: 9.7:1).
+    /// Night #2E4A6E (L 0.06) under `onAccent` (L 0.57): 6.4:1.
     static let accent = Color(UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0.18, green: 0.29, blue: 0.43, alpha: 1)
-            : .systemBlue
+        if trait.userInterfaceStyle == .dark { return accentNight }
+        return trait.accessibilityContrast == .high ? accentDayHighContrast : accentDay
     })
     /// Text and glyphs drawn on `accent`.
     static let onAccent = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark ? UIColor(white: 0.85, alpha: 1) : .white
     })
     /// Accent-coloured text/icons on a plain background (links, "selected" checkmarks, info glyphs).
-    /// Night #8FB4E0 on black: 9.8:1; day systemBlue on white: 4.5:1 (large/bold glyphs).
-    static let accentText = Color(UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0.56, green: 0.71, blue: 0.88, alpha: 1)
-            : .systemBlue
-    })
+    /// The `AccentColor` asset: day #1556B8 on #F2F2F7 6.2:1 (white 6.9:1); night #8FB4E0 on #1C1C1E 7.9:1
+    /// (on black 9.8:1). Increase Contrast variants are darker by day and lighter by night.
+    static let accentText = Color("AccentColor")
     /// Tinted container behind informational notices (beta banner, selected transcript row).
     static let infoFill = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0.18, green: 0.29, blue: 0.43, alpha: 0.35)
-            : UIColor.systemBlue.withAlphaComponent(0.15)
+            ? accentNight.withAlphaComponent(0.35)
+            : accentDay.withAlphaComponent(0.15)
     })
 }
 
@@ -151,5 +182,22 @@ struct SectionHeader: View {
             .font(TypeRole.sectionHeader)
             .foregroundStyle(Palette.secondaryText)
             .accessibilityAddTraits(.isHeader)
+    }
+}
+
+// MARK: - Floating control surface
+
+extension View {
+    /// Surface for floating in-flight map controls: Kanaf-navy tinted Liquid Glass with `Palette.onAccent` glyphs.
+    /// Always tinted: untinted glass takes on the sectional's yellow and loses glyph contrast. Group neighbouring
+    /// surfaces in a `GlassEffectContainer`. Reduce Transparency is handled by the system.
+    func mapControlSurface(cornerRadius: CGFloat = MapControlMetrics.cornerRadius) -> some View {
+        mapControlSurface(in: .rect(cornerRadius: cornerRadius))
+    }
+
+    /// Same surface in any shape, e.g. the round record button.
+    func mapControlSurface(in shape: some Shape) -> some View {
+        foregroundStyle(Palette.onAccent)
+            .glassEffect(.regular.tint(Palette.accent), in: shape)
     }
 }

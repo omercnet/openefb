@@ -34,7 +34,7 @@ struct BetaBanner: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Palette.infoFill)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.s))
             .padding(.horizontal, 16)
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }

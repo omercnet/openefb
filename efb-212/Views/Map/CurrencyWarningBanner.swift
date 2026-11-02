@@ -68,7 +68,7 @@ struct CurrencyWarningBanner: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.m))
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
     }

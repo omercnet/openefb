@@ -187,7 +187,7 @@ struct FlightPlanView: View {
 
                             if record.id == viewModel.activePlanID {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(Palette.ok)
                                     .accessibilityLabel("Active plan")
                             }
                         }
@@ -235,7 +235,7 @@ struct FlightPlanView: View {
             }
         }
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
     }
 
     // MARK: - ViewModel Initialization

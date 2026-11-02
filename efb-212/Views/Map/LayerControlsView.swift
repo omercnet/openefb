@@ -25,7 +25,7 @@ struct LayerControlsView: View {
         }
         .frame(width: typeSize.isAccessibilitySize ? 420 : 300)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: Space.l))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.l))
     }
 
     private var panelContent: some View {

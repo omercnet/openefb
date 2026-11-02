@@ -59,7 +59,7 @@ struct IsraelAlertBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             !prominent && alert.severity != alerts.first?.severity ? background(for: alert.severity) : .clear,
-            in: RoundedRectangle(cornerRadius: 8)
+            in: RoundedRectangle(cornerRadius: Radius.s)
         )
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("israel-alert-\(alert.id)")
@@ -68,7 +68,7 @@ struct IsraelAlertBanner: View {
 
     /// Red warning (white text, 5.4:1 on the day red) or amber caution (black text, 9:1).
     private func background(for severity: IsraelAlert.Severity) -> Color {
-        severity == .warning ? Palette.warning : Color.orange
+        severity == .warning ? Palette.warning : Palette.cautionFill
     }
 
     private func foreground(for severity: IsraelAlert.Severity) -> Color {
@@ -90,7 +90,7 @@ struct IsraelAlertsSuspendedBanner: View {
         .foregroundStyle(.black)
         .padding(Space.m)
         .frame(maxWidth: 520, alignment: .leading)
-        .background(Color.orange, in: RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .background(Palette.cautionFill, in: RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Caution: alerts off, no GPS position. Airspace, border and route closure alerts resume with a fix.")
         .accessibilityIdentifier("israel-alerts-suspended")

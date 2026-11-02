@@ -22,13 +22,14 @@ struct NearestAirportHUD: View {
             HStack(spacing: horizontalSizeClass == .compact ? 8 : 12) {
                 // Fixed label: always reads "NRST"
                 Text("NRST")
-                    .font(.title3.weight(.heavy))
+                    // Expanded on iPad; regular width on iPhone, where the readout needs the room.
+                    .font(horizontalSizeClass == .compact ? .title3.weight(.heavy) : .title3.weight(.heavy).width(.expanded))
                     .lineLimit(1)
                     .fixedSize()
                     .foregroundStyle(Palette.onAccent)
                     .padding(.horizontal, 10)
                     .frame(minHeight: 44)
-                    .background(Palette.accent, in: RoundedRectangle(cornerRadius: 8))
+                    .background(Palette.accent, in: RoundedRectangle(cornerRadius: Radius.s))
 
                 if appState.region.hasAirportData, let entry {
                     VStack(alignment: .leading, spacing: 2) {
@@ -58,7 +59,7 @@ struct NearestAirportHUD: View {
                         } else {
                             HStack(spacing: 10) {
                                 Text(entry.airport.icao)
-                                    .font(.title3.weight(.bold).monospaced())
+                                    .font(TypeRole.identifier)
                                 Text(String(format: "%.1f NM", entry.distance))
                                     .font(.headline.monospaced())
                                 Text(String(format: "%03.0f\u{00B0}", entry.bearing))
@@ -97,7 +98,7 @@ struct NearestAirportHUD: View {
             .padding(.vertical, 8)
             .frame(minHeight: MapControlMetrics.size + 4)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.l))
         }
         .buttonStyle(PressableButtonStyle())
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
@@ -126,10 +127,12 @@ struct PrivateUseTag: View {
     var body: some View {
         Text("PVT")
             .font(.footnote.weight(.heavy))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(.black)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(.orange, in: RoundedRectangle(cornerRadius: 4))
+            .background(Palette.cautionFill, in: RoundedRectangle(cornerRadius: Radius.xs))
             .accessibilityLabel("Private use")
     }
 }
@@ -139,10 +142,12 @@ struct MilitaryUseTag: View {
     var body: some View {
         Text("MIL")
             .font(.footnote.weight(.heavy))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(.black)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(.orange, in: RoundedRectangle(cornerRadius: 4))
+            .background(Palette.cautionFill, in: RoundedRectangle(cornerRadius: Radius.xs))
             .accessibilityLabel("Military field, emergency use only")
     }
 }
@@ -152,10 +157,12 @@ struct PprTag: View {
     var body: some View {
         Text("PPR")
             .font(.footnote.weight(.heavy))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(.black)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(.orange, in: RoundedRectangle(cornerRadius: 4))
+            .background(Palette.cautionFill, in: RoundedRectangle(cornerRadius: Radius.xs))
             .accessibilityLabel("Prior permission required")
     }
 }
@@ -165,10 +172,12 @@ struct NotamClosedTag: View {
     var body: some View {
         Text("NOTAM CLSD")
             .font(.footnote.weight(.heavy))
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(.white)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(Palette.warning, in: RoundedRectangle(cornerRadius: 4))
+            .background(Palette.warning, in: RoundedRectangle(cornerRadius: Radius.xs))
             .accessibilityLabel("A NOTAM names this field closed")
     }
 }

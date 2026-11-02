@@ -61,7 +61,7 @@ struct IsraelAerodromeSection: View {
         .foregroundStyle(Palette.caution)
         .padding(Space.m)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.fill, in: RoundedRectangle(cornerRadius: 10))
+        .background(Palette.fill, in: RoundedRectangle(cornerRadius: Radius.m))
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("israel-unreviewed-note")
     }

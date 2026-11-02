@@ -41,7 +41,7 @@ struct IsraelChartHintBanner: View {
         }
         .padding(.leading, Space.m)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
         .frame(maxWidth: 360, alignment: .leading)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("israel-chart-hint")

@@ -191,7 +191,7 @@ struct LogbookEntryEditView: View {
                         dismiss()
                     }
                     .fontWeight(.semibold)
-                    .tint(.green)
+                    .tint(Palette.ok)
                 }
             }
         }

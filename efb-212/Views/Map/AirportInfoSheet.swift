@@ -484,7 +484,7 @@ struct AirportInfoSheet: View {
                         .foregroundStyle(Palette.primaryText)
                         .padding(Space.s)
                         .background(Palette.fill)
-                        .clipShape(RoundedRectangle(cornerRadius: Space.s))
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
                 }
             }
         }
@@ -513,7 +513,7 @@ struct AirportInfoSheet: View {
                     .foregroundStyle(Palette.primaryText)
                     .padding(Space.s)
                     .background(Palette.fill)
-                    .clipShape(RoundedRectangle(cornerRadius: Space.s))
+                    .clipShape(RoundedRectangle(cornerRadius: Radius.s))
                 if weatherViewModel?.tafFailed == true {
                     Label("TAF refresh failed. Showing the last forecast.", systemImage: "exclamationmark.triangle.fill")
                         .font(TypeRole.caption)
