@@ -18,13 +18,32 @@ SCENARIOS=("$@")
 [ ${#SCENARIOS[@]} -gt 0 ] || SCENARIOS=(il-cvfr-llhz-llib-nominal il-cvfr-llhz-llib-deviations il-closed-leg il-gps-loss us-kpao-ksql)
 
 mkdir -p "$OUT" "$CRASH_DIR"
+
+# stamp <message>: timestamped progress line, so a hung step is visible in the job log.
+stamp() { echo "[$(date +%H:%M:%S)] $*"; }
+
+# limited <seconds> <command...>: run with a deadline (macOS has no timeout(1)); 124 when it ran out.
+limited() {
+  local secs=$1 pid watchdog rc
+  shift
+  "$@" &
+  pid=$!
+  { sleep "$secs"; kill -9 "$pid"; } >/dev/null 2>&1 &   # no stdout: an orphaned sleep must not hold a pipe open
+  watchdog=$!
+  wait "$pid" 2>/dev/null; rc=$?
+  kill "$watchdog" 2>/dev/null; wait "$watchdog" 2>/dev/null
+  [ "$rc" -eq 137 ] && rc=124
+  return "$rc"
+}
+
 SIM=$(tools/sim-test.sh id)
+stamp "simulator $SIM"
 xcrun simctl boot "$SIM" 2>/dev/null || true
-xcrun simctl bootstatus "$SIM" -b >/dev/null
+limited 300 xcrun simctl bootstatus "$SIM" -b >/dev/null || { echo "fly-scenarios: simulator did not boot" >&2; exit 1; }
 
 # The app's launchd job has a numeric PID while it runs ("-" or no line once it exits or crashes).
 app_running() {
-  xcrun simctl spawn "$SIM" launchctl list |
+  limited 30 xcrun simctl spawn "$SIM" launchctl list |
     awk -v job="UIKitApplication:$BUNDLE" 'index($3, job) == 1 && $1 ~ /^[0-9]+$/ { found = 1 } END { exit !found }'
 }
 
@@ -40,27 +59,34 @@ for name in "${SCENARIOS[@]}"; do
   wall=$(( secs / SPEED + 1 ))
   quarter=$(( (wall + 3) / 4 ))
   marker=$(mktemp)
-  since=$(date '+%Y-%m-%d %H:%M:%S')
   problems=()
   echo "::group::$name (${secs}s at ${SPEED}x, ~${wall}s)"
 
-  tools/fly.sh israel "$name" --speed "$SPEED" --sim "$SIM"
+  # Stream the app's log while it flies (`log show` after the fact can take minutes on a fresh simulator).
+  xcrun simctl spawn "$SIM" log stream --style compact --level debug \
+    --predicate "subsystem == \"$BUNDLE\"" >"$OUT/$name.log" 2>&1 &
+  logpid=$!
+
+  stamp "launch $name"
+  limited 120 tools/fly.sh israel "$name" --speed "$SPEED" --sim "$SIM" || problems+=("launch failed or timed out")
   sleep 5   # launch, first frame
   for pct in 0 25 50 75 100; do
+    [ ${#problems[@]} -eq 0 ] || break
     [ "$pct" -gt 0 ] && sleep "$quarter"
-    xcrun simctl io "$SIM" screenshot "$OUT/$name-$pct.png" >/dev/null 2>&1 || true
-    app_running || { problems+=("app not running at $pct%"); break; }
+    stamp "checkpoint $pct%"
+    limited 60 xcrun simctl io "$SIM" screenshot "$OUT/$name-$pct.png" >/dev/null 2>&1 || true
+    app_running || problems+=("app not running at $pct%")
   done
 
-  xcrun simctl spawn "$SIM" log show --style compact --start "$since" \
-    --predicate "subsystem == \"$BUNDLE\"" >"$OUT/$name.log" 2>&1 || true
+  sleep 2
+  kill "$logpid" 2>/dev/null || true; wait "$logpid" 2>/dev/null || true
   grep -q "Scenario $name x" "$OUT/$name.log" || problems+=("no 'Scenario $name' load notice in the app log")
   while IFS= read -r report; do
     cp "$report" "$OUT/"
     problems+=("crash report $(basename "$report")")
   done < <(find "$CRASH_DIR" -name 'efb-212*' -newer "$marker" 2>/dev/null)
   rm -f "$marker"
-  tools/fly.sh stop >/dev/null 2>&1 || true
+  limited 60 tools/fly.sh stop >/dev/null 2>&1 || true
 
   if [ ${#problems[@]} -eq 0 ]; then
     echo "$name: OK"
