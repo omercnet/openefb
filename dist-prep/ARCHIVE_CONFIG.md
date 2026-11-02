@@ -14,7 +14,8 @@ Read from `efb-212.xcodeproj/project.pbxproj` and from the Info.plist of the arc
 | TARGETED_DEVICE_FAMILY | `2` | iPad only |
 | SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD | `NO` | no Mac listing |
 | ITSAppUsesNonExemptEncryption | `NO` | standard HTTPS only; no per-upload export question |
-| PRODUCT_NAME | `efb-212` | display name still `efb-212`; see open items |
+| PRODUCT_NAME | `efb-212` | file/bundle name only |
+| INFOPLIST_KEY_CFBundleDisplayName | `OpenEFB` | home-screen name (set by T30) |
 | Info.plist category | `public.app-category.productivity` | metadata doc proposes Navigation as primary category in App Store Connect (separate setting) |
 
 ## Usage strings (present)
@@ -48,6 +49,5 @@ Bump `MARKETING_VERSION` only when starting a new release (for example `1.1`).
 5. Automatic signing with team `6F8N897928` handles provisioning.
 
 ## Open items
-- Display name: set `INFOPLIST_KEY_CFBundleDisplayName = OpenEFB` before public release.
-- Third-party SDK privacy manifests (MapLibre, GRDB) were not inspected here; Xcode reports any missing
-  manifest at upload validation. These are the only two SwiftPM dependencies.
+- None for the display name (set by T30). `PrivacyInfo.xcprivacy` now declares FileTimestamp `C617.1`.
+- MapLibre and GRDB both ship their own privacy manifests (inspected 2026-11-02).

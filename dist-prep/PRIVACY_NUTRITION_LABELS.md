@@ -43,23 +43,34 @@ The NOTAM relay itself scrapes the Israel Airports Authority site; the app never
   request goes to any AI service.**
 - Flights, logbook, aircraft and pilot profiles: SwiftData and GRDB on the device. CloudKit sync is not enabled.
 
-## `PrivacyInfo.xcprivacy` (checked, unchanged)
+## `PrivacyInfo.xcprivacy` (re-audited 2026-11-02, T30)
 - `NSPrivacyTracking = false`, no tracking domains.
-- Declares `PreciseLocation` and `AudioData` as not linked, not used for tracking, purpose App Functionality.
-  This is conservative: both are processed on the device only, so over-declaring is harmless. `PrivacyManifestTests`
-  pins these entries, so they stay.
-- Required-reason API: `UserDefaults` with `CA92.1`. The audit found no other required-reason API use in app code
-  (no file timestamp, boot time or disk-space calls; the only `attributesOfItem` call reads a file **size**).
-- `PrivacyManifestTests` passes (included in the 1065-test run of 2026-11-02).
+- `NSPrivacyCollectedDataTypes` declares one type, `CoarseLocation`: not linked, not used for tracking, purpose App
+  Functionality (owner decision Q13 = B). It matches the App Store label below. `PreciseLocation` and `AudioData` are no
+  longer declared: GPS and audio stay on the device and no request carries them. `PrivacyManifestTests` pins this.
+- Required-reason APIs:
+  - `UserDefaults` with `CA92.1` (the app's own defaults).
+  - `FileTimestamp` with `C617.1` (added by T30): `FlightRecoveryService.swift:128` reads `.creationDate` of the app's own
+    recorded audio files in its container. Other `attributesOfItem` calls (`AviationDatabase`, `IsraelChartService`) read
+    only file **size**.
+  - No boot-time, disk-space or active-keyboard calls in app code (grep of `systemUptime`, `mach_absolute_time`,
+    `volumeAvailableCapacity`, `systemFreeSize`).
+- SDK manifests: MapLibre ships its own (FileTimestamp C617.1, SystemBootTime 35F9.1, UserDefaults CA92.1, nothing
+  collected, no tracking); GRDB ships one declaring nothing. Both are bundled by Xcode, so the app manifest needs only
+  the app's own use.
+- Export compliance: the only cryptography is CryptoKit `SHA256` (file integrity), Keychain storage and HTTPS, all
+  exempt; `ITSAppUsesNonExemptEncryption = NO` is set in `Info.plist`.
+- `PrivacyManifestTests` asserts both required-reason entries.
 
-## Answers to enter in App Store Connect
-Apple counts data as "collected" when it is transmitted off the device and kept by the developer or partners in a
-way that can be read. The developer receives nothing.
-- **Do you or your third-party partners collect data from this app?** -> **No**. Card shows "Data Not Collected".
-- Be ready for a reviewer question about the tile hosts: they see an IP address and the tile being fetched, like any
-  map client, and the developer does not receive that data. If you prefer to be conservative, you may instead declare
-  **Coarse Location**, not linked to identity, not used for tracking, purpose App Functionality. That is a choice, not a
-  requirement.
+## Answers to enter in App Store Connect (owner decision Q13 = B)
+Apple counts data as "collected" when it leaves the device. Requests reveal the map area on screen (tile hosts), the
+selected airport or a coarse region (weather APIs) and the IP address to third parties; the NOTAM relay and R2 see the IP
+address and the file requested.
+- **Do you or your third-party partners collect data from this app?** -> **Yes**.
+- **Data types:** **Coarse Location** only. Linked to the user: **No**. Used for tracking: **No**. Purpose: **App Functionality**.
+- **Diagnostics: not declared.** Grep of `efb-212` (2026-11-02) finds no MetricKit, crash reporter, analytics SDK or log
+  shipping; nothing diagnostic leaves the device. (Apple's own TestFlight/App Store crash reports are Apple's, not ours.)
+- Re-declare if a diagnostics path is added.
 
 ## Re-check when any of these change
 1. CloudKit sync is turned on.

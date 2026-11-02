@@ -29,8 +29,8 @@ The project's Ignored Build Step is `if [ -n "$VERCEL_GIT_PREVIOUS_SHA" ] && git
    `wrangler.toml`; `npx wrangler deploy`; optional `wrangler secret put RUN_SECRET`; check `/health` after 15-60 min
    (a cold backfill takes 3-4 runs). Point the app at the new URL through the `israelNotamFeedURL` default, or change `IsraelNotamService.defaultFeedURL`.
 2. **charts:** `cd web/charts && npm ci && npx wrangler r2 bucket create openefb-charts`, then `r2 bucket cors set` and
-   `r2 bucket dev-url enable` (commands in its README). Publish with `web/charts/publish.sh ... --remote`; `--approve` is the owner's go-ahead, and
-   the CAAI chart and diagram artwork needs the owner's confirmation that publishing it is permitted first.
+   `r2 bucket dev-url enable` (commands in its README). Publish with `web/charts/publish.sh ... --remote`; `--approve` is the owner's go-ahead.
+   CAAI approved in-app use of the chart and diagram artwork (chart base map (c) Mapa Ltd, used under that approval).
 3. **interviews:** `cd web/interviews && npx vercel login && npx vercel link` (Root Directory `web/interviews`), create the
    private Blob store, add the env vars listed in its README, `npx vercel --prod`. The standalone `~/dev/pilot-interviews` repo is retired.
 

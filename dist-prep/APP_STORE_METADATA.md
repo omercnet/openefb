@@ -51,7 +51,7 @@ FLIGHT RECORDING AND DEBRIEF
 PRIVACY
 - No account, no analytics, no ads, no tracking
 - Location, audio, transcripts, flights and logbook stay on your device
-- Weather, TFR, NOTAM and chart requests go to NOAA and the FAA; map tiles come from the FAA sectional service (ArcGIS), OpenFreeMap, Esri and OpenTopoMap; in Israel mode, NOTAMs come from a relay the developer runs on Cloudflare and chart packs download from Cloudflare R2. None of these requests carries your position
+- Weather, TFR, NOTAM and chart requests go to NOAA and the FAA; map tiles come from the FAA sectional service (ArcGIS), OpenFreeMap, Esri and OpenTopoMap; in Israel mode, NOTAMs come from a relay the developer runs on Cloudflare and chart packs download from Cloudflare R2. These requests can reveal the map area on screen or the airport you selected, and your IP address, to those hosts; none carries your GPS coordinates, and the developer receives none of it
 - Open source under MPL-2.0
 
 NEEDS THE INTERNET: weather, TFRs, NOTAMs, PIREPs and any map area you have not downloaded. Works offline: the airport
@@ -125,8 +125,9 @@ landscape equivalents. Captured at 2064x2752.
 
 ## To confirm before submitting
 - Public repo URL, privacy policy URL.
-- Display name: set `OpenEFB` as the home-screen name (currently `efb-212`).
+- Display name: `OpenEFB` is set as the home-screen name (`INFOPLIST_KEY_CFBundleDisplayName`, T30).
 - Public release only: remove Satellite and Terrain, then delete the Esri and OpenTopoMap lines from the data sources
   paragraph (efb-zfm.8).
 - Owner decision: whether the listing names Israel (see `README.md`, "Pending owner decision"). The description above names no Israeli feature and is otherwise US-only; only its privacy, data-source and data-accuracy lines, and the review notes, cover Israel mode.
-- Public release only: CAAI/Mapa permission to host the CVFR chart and aerodrome diagrams (`NOTICE`).
+- Privacy label (owner decision Q13 = B): declare Coarse Location, not linked to you, not used for tracking, purpose App Functionality; nothing else (see `PRIVACY_NUTRITION_LABELS.md`).
+- CAAI approved in-app use of the CVFR chart and aerodrome diagrams (`NOTICE`). Screenshots that show that artwork stay out of git (`docs/handoff/COMMON.md`).

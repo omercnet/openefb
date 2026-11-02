@@ -35,14 +35,17 @@ owner to review. Nothing has been uploaded and nothing was changed in App Store 
 2. Distribute > App Store Connect > Upload, then TestFlight.
 3. Paste metadata from `APP_STORE_METADATA.md`. Answer privacy questions from `PRIVACY_NUTRITION_LABELS.md`.
 4. Upload `screenshots/` (13-inch iPad slot). Internal TestFlight does not need them; the public listing does.
-5. Version proposal for the first TestFlight upload: **1.0 (build 1)**. Increase `CURRENT_PROJECT_VERSION` by one
-   for every further upload of the same version; move `MARKETING_VERSION` only for a new release train.
+5. **Build numbers:** Version proposal for the first TestFlight upload: **1.0 (build 1)**. App Store Connect rejects an
+   upload whose build number isn't higher than every earlier upload of the same version. Increase
+   `CURRENT_PROJECT_VERSION` by one for every further upload of the same version (set it for the app target in both
+   Debug and Release); move `MARKETING_VERSION` only for a new release train, and then the build may restart at 1.
 
 ## Before the public release (not blocking TestFlight)
 - Remove Satellite and Terrain base maps unless licensed hosting replaces them (beads efb-zfm.8). See
   `docs/TILE-SOURCES.md`. Decision Q1 = A: all four base maps stay for TestFlight.
-- Home-screen name: `PRODUCT_NAME` is `efb-212`. The status bar in screenshots shows `efb-212`. Set the display
-  name to `OpenEFB` (`INFOPLIST_KEY_CFBundleDisplayName`) before public release. Not changed here.
+- Home-screen name: set to `OpenEFB` (`INFOPLIST_KEY_CFBundleDisplayName`, T30). `PRODUCT_NAME` stays `efb-212`
+  (file name only). Re-capture screenshots if the status bar still shows the old name.
+- TestFlight text, reviewer notes and tester plan: `TESTFLIGHT.md`.
 - Confirm the public repository URL (Settings links `https://github.com/quartermint/openefb`).
 - Re-check the privacy answers if any analytics SDK, CloudKit sync or an AI service is added.
 - **Pending owner decision: Israel in the listing.** The App Store description, subtitle, keywords and screenshots describe
@@ -53,8 +56,8 @@ owner to review. Nothing has been uploaded and nothing was changed in App Store 
   review notes. If it doesn't: keep the listing as is. Until decided, `APP_STORE_METADATA.md` carries only the
   corrections that keep its data-source and privacy lines true for a build that contains Israel mode.
 - **CAAI chart and diagram artwork on R2:** the CVFR chart and the aerodrome diagrams are hosted on the project's R2
-  bucket and downloaded by the app. Their copyright is CAAI's (chart base map: Mapa Ltd), and this repo records no
-  permission to distribute them (`NOTICE`). Settle that before a public release.
+  bucket and downloaded by the app. CAAI approved in-app use of the chart and diagrams (chart base map © Mapa Ltd, used
+  under that approval for in-app display); see `NOTICE`. Copyright stays with CAAI and Mapa Ltd.
 
 ## Files
 - `ARCHIVE_CONFIG.md`: verified build settings, usage strings, archive result, versions.

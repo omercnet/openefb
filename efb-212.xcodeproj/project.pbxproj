@@ -416,6 +416,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = OpenEFB;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "OpenEFB uses your location in the background to continue tracking your flight when the screen is off.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "OpenEFB uses your location to show your position on the aviation map and provide navigation guidance.";
@@ -454,6 +455,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = OpenEFB;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "OpenEFB uses your location in the background to continue tracking your flight when the screen is off.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "OpenEFB uses your location to show your position on the aviation map and provide navigation guidance.";

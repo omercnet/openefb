@@ -12,9 +12,8 @@ Israel aviation data (efb-212/Resources/israel-aviation.sqlite)
   The 49 curated aerodromes (tools/caai-importer/curated/aerodromes-il.csv) are transcribed from the Israeli domestic
   AIP, the eAIP (AD 2) and the CAAI GIS layers, with the source of every value recorded in the file; values marked
   unreviewed have not been checked by a person.
-  This approval covers the GIS layers only. The official CVFR chart and the aerodrome diagrams are not licensed to this
-  project (see "Downloaded charts" below). The data is for reference; the binding publications are CAAI's official AIP
-  and NOTAMs.
+  CAAI has also approved in-app use of the official CVFR chart and the aerodrome diagrams (see "Downloaded charts"
+  below). The data is for reference; the binding publications are CAAI's official AIP and NOTAMs.
 
 US aviation data (efb-212/Resources/aviation.sqlite)
   FAA National Airspace System Resources (NASR), cycle 2026-10-29, and FAA AIS class airspace, built by
@@ -50,8 +49,8 @@ Downloaded charts (hosted by the project on Cloudflare R2; not part of the MPL-l
   Official CVFR chart ("מפת נתיבי תובלה נמוכים", domestic AIP B-03 appendix A): (c) CAAI. Geographic information
   (base map): (c) Mapa Ltd. Converted and validated by tools/caai-chart; the app installs a published edition only.
   Israeli aerodrome diagrams (eAIP AD 2 and domestic AIP chapters D and E): (c) CAAI. Georeferenced by tools/caai-apd.
-  These are not covered by CAAI's approval of the GIS layers; the project's right to host them is not recorded in
-  this repository.
+  CAAI approved in-app use of the chart and the diagrams; the chart's base map is used under that approval for in-app
+  display. Copyright stays with CAAI and Mapa Ltd, and the files are not part of the MPL-licensed work.
 
 Software
 --------

@@ -74,8 +74,8 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 
 - **Unreviewed by Israeli pilots.** No Israeli CFI has reviewed the Israel mode yet (efb-aac.13). The 49 curated aerodromes are transcribed from the AIP and carry an amber "Unreviewed data" note on the airport sheet until the owner marks each field reviewed; confirm every value against the AIP.
 - **The bundled CAAI data is a snapshot**: data of 25 Oct 2026, imported 2026-11-01, with no AIP amendment number recorded. The app shows the data date. The binding publications are CAAI's AIP and NOTAMs.
-- **The official CVFR chart is a separate download** with its own validation gate: the app installs an edition only when it is published and passed the gate (cross-validated p95 of at most 200 m against CAAI's own reporting points; the 2025-02 chart measured 187 m, which is the chart's own drafting error). The chart is © CAAI, the base map © Mapa Ltd, and neither is covered by CAAI's approval of the GIS layers or by this project's license. Without the download, the app draws the CVFR routes, points and airspace from the vectors.
-- **Aerodrome diagrams are placed at ±100 ft**, twice the 50 ft US gate, and only when the chart passes the runway and ARP checks: 5 of 13 Israeli charts are placed (LLBG, LLHA, LLIB, LLBS, LLEY); the rest open as sheet-only PDFs. The badge shows the edition and "±100 ft". Verify against the printed chart. Diagram artwork is © CAAI and is not covered by the GIS-layer approval.
+- **The official CVFR chart is a separate download** with its own validation gate: the app installs an edition only when it is published and passed the gate (cross-validated p95 of at most 200 m against CAAI's own reporting points; the 2025-02 chart measured 187 m, which is the chart's own drafting error). The chart is © CAAI and the base map © Mapa Ltd; CAAI approved in-app use of the chart, and the base map is used under that approval for in-app display. Neither is covered by this project's license. Without the download, the app draws the CVFR routes, points and airspace from the vectors.
+- **Aerodrome diagrams are placed at ±100 ft**, twice the 50 ft US gate, and only when the chart passes the runway and ARP checks: 5 of 13 Israeli charts are placed (LLBG, LLHA, LLIB, LLBS, LLEY); the rest open as sheet-only PDFs. The badge shows the edition and "±100 ft". Verify against the printed chart. Diagram artwork is © CAAI; CAAI approved its in-app use.
 - **NOTAM route closures** come from the project's relay, which scrapes the IAA site, and are parsed by rules. A closure the parser can't read in full shows as "possible closure, read NOTAM"; a closure the planner can't place on the network blocks filing ("Unresolved closure: check NOTAM"). The relay refreshes every 15 minutes, the app judges the feed's age from the relay's own scrape time and not from the download time, and it serves the last saved copy when a refresh fails. If the IAA blocks the relay, the feed stops updating.
 - **Filing:** the app builds the FPL text; you send it to ais@iaa.gov.il yourself. The app sends nothing.
 - **Sport-aviation (LSA) weekend rules** follow the AIP text; the layer has no holiday calendar, so you declare holiday eves in the plan.
@@ -157,7 +157,7 @@ openefb/
 
 ## Data Sources
 
-All free to use. The FAA and NOAA data is public domain. CAAI approved redistribution of its GIS layers only (see `NOTICE`); the chart and diagram artwork is not covered by that approval. Map tiles have their own terms:
+All free to use. The FAA and NOAA data is public domain. CAAI approved redistribution of its GIS layers and in-app use of the official CVFR chart and aerodrome diagrams (see `NOTICE`); that artwork stays © CAAI (base map © Mapa Ltd) and is outside this project's license. Map tiles have their own terms:
 
 | Source | Data | Update Cycle |
 |--------|------|-------------|

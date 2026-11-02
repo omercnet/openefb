@@ -2,7 +2,7 @@
 
 Runs the app's airport-diagram georeferencer (`efb-212/Services/AirportDiagramGeoreferencer.swift`, the same
 core that `tools/apd-georef` and the iPad app compile) over the Israeli aerodrome charts and produces the
-`il-diagrams` pack. The charts are (c) CAAI. Build locally; the owner uploads and approves with `web/charts/publish.sh`. Edition 2026-08b is published on R2 (`publishedAt` 2026-11-02); this repository records no CAAI permission for the diagram artwork, so check with the owner before publishing another edition.
+`il-diagrams` pack. The charts are (c) CAAI, who approved their in-app use. Build locally; the owner uploads and approves with `web/charts/publish.sh`. Edition 2026-08b is published on R2 (`publishedAt` 2026-11-02).
 
 Israeli diagrams carry no lat/lon graticule, so the grid method does not apply. The core fits scale and rotation
 from the drawn runway polygons and picks the translation from one runway. This tool then refits scale and

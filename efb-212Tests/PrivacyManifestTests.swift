@@ -81,7 +81,7 @@ struct PrivacyManifestTests {
         #expect(domains.isEmpty, "Tracking domains should be empty (no tracking)")
     }
 
-    @Test("Collected data types include PreciseLocation and AudioData")
+    @Test("Collected data types declare only Coarse Location")
     func collectedDataTypes() throws {
         let manifest = try loadPrivacyManifest()
 
@@ -90,15 +90,13 @@ struct PrivacyManifestTests {
             return
         }
 
-        #expect(collectedTypes.count == 2, "Should declare exactly 2 collected data types")
-
+        // Matches the App Store privacy label (Q13): map area and airport requests reach third-party hosts.
+        // Location and audio are otherwise processed on the device only.
         let dataTypeNames = collectedTypes.compactMap {
             $0["NSPrivacyCollectedDataType"] as? String
         }
-        #expect(dataTypeNames.contains("NSPrivacyCollectedDataTypePreciseLocation"),
-                "Must declare precise location collection")
-        #expect(dataTypeNames.contains("NSPrivacyCollectedDataTypeAudioData"),
-                "Must declare audio data collection")
+        #expect(dataTypeNames == ["NSPrivacyCollectedDataTypeCoarseLocation"],
+                "Must declare Coarse Location and nothing else")
 
         // Verify neither is used for tracking
         for entry in collectedTypes {
@@ -119,7 +117,7 @@ struct PrivacyManifestTests {
         }
     }
 
-    @Test("Accessed API types include UserDefaults with CA92.1 reason")
+    @Test("Accessed API types declare UserDefaults (CA92.1) and FileTimestamp (C617.1)")
     func accessedAPITypes() throws {
         let manifest = try loadPrivacyManifest()
 
@@ -128,22 +126,20 @@ struct PrivacyManifestTests {
             return
         }
 
-        #expect(apiTypes.count == 1, "Should declare exactly 1 accessed API type")
-
-        guard let firstAPI = apiTypes.first else {
-            Issue.record("No API type entries found")
-            return
+        var reasonsByCategory: [String: [String]] = [:]
+        for entry in apiTypes {
+            guard let category = entry["NSPrivacyAccessedAPIType"] as? String,
+                  let reasons = entry["NSPrivacyAccessedAPITypeReasons"] as? [String] else {
+                Issue.record("API entry missing category or reasons: \(entry)")
+                continue
+            }
+            reasonsByCategory[category] = reasons
         }
 
-        let apiType = firstAPI["NSPrivacyAccessedAPIType"] as? String
-        #expect(apiType == "NSPrivacyAccessedAPICategoryUserDefaults",
-                "Must declare UserDefaults API access")
-
-        guard let reasons = firstAPI["NSPrivacyAccessedAPITypeReasons"] as? [String] else {
-            Issue.record("Missing reasons array for UserDefaults API")
-            return
-        }
-        #expect(reasons.contains("CA92.1"),
+        #expect(reasonsByCategory["NSPrivacyAccessedAPICategoryUserDefaults"]?.contains("CA92.1") == true,
                 "UserDefaults reason must include CA92.1 (app's own defaults)")
+        // FlightRecoveryService reads the creation date of the app's own audio files.
+        #expect(reasonsByCategory["NSPrivacyAccessedAPICategoryFileTimestamp"]?.contains("C617.1") == true,
+                "FileTimestamp reason must include C617.1 (files inside the app container)")
     }
 }
