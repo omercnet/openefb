@@ -84,7 +84,12 @@ for name in "${SCENARIOS[@]}"; do
 
   sleep 2
   kill "$logpid" 2>/dev/null || true; wait "$logpid" 2>/dev/null || true
-  grep -q "Scenario $name x" "$OUT/$name.log" || problems+=("no 'Scenario $name' load notice in the app log")
+  if ! grep -q "Scenario $name x" "$OUT/$name.log"; then
+    # The stream may have subscribed after the notice: look it up in the stored log, with a deadline.
+    limited 120 xcrun simctl spawn "$SIM" log show --style compact --last 10m \
+      --predicate "subsystem == \"$BUNDLE\" AND category == \"ScenarioPlayback\"" >>"$OUT/$name.log" 2>&1 || true
+    grep -q "Scenario $name x" "$OUT/$name.log" || problems+=("no 'Scenario $name' load notice in the app log")
+  fi
   while IFS= read -r report; do
     cp "$report" "$OUT/"
     problems+=("crash report $(basename "$report")")
