@@ -29,6 +29,8 @@ gh pr merge --squash --repo omercnet/openefb
 
 The integrator's `git commit-tree` snapshot flow (docs/handoff/COMMON.md) still works on a branch; it must now end in a pull request instead of a push to `main`. The pull request title becomes the squash commit, so write it as a Conventional Commit.
 
+A CodeRabbit "changes requested" review blocks the merge until its comments are fixed or the review is dismissed, even with no required approvals.
+
 Run the simulator scenarios locally with `tools/sim-test.sh build` then `tools/ci/fly-scenarios.sh [scenario ...]` (`OUT=<dir>`, `SPEED=<n>`).
 
 ## Not done
@@ -36,3 +38,4 @@ Run the simulator scenarios locally with `tools/sim-test.sh build` then `tools/c
 - Actions are referenced by major version tag, not commit SHA.
 - No required reviewers: a sole owner cannot approve their own pull request.
 - Release builds, TestFlight upload and signing are not in CI (no secrets are configured).
+- One run saw `LocationServiceCharacterizationTests/fixIsConvertedToKnotsFeetAndDegrees` miss its 10 s wait on a cold runner; the next run passed. If it recurs, raise the wait in `waitUntil` or run the suite without parallel clones.

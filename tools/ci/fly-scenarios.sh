@@ -28,7 +28,8 @@ limited() {
   shift
   "$@" &
   pid=$!
-  { sleep "$secs"; kill -9 "$pid"; } >/dev/null 2>&1 &   # no stdout: an orphaned sleep must not hold a pipe open
+  # Kill the children first (fly.sh waits on simctl), then the command. No stdout: an orphaned sleep must not hold a pipe open.
+  { sleep "$secs"; pkill -9 -P "$pid"; kill -9 "$pid"; } >/dev/null 2>&1 &
   watchdog=$!
   wait "$pid" 2>/dev/null; rc=$?
   kill "$watchdog" 2>/dev/null; wait "$watchdog" 2>/dev/null
@@ -66,9 +67,12 @@ for name in "${SCENARIOS[@]}"; do
   xcrun simctl spawn "$SIM" log stream --style compact --level debug \
     --predicate "subsystem == \"$BUNDLE\"" >"$OUT/$name.log" 2>&1 &
   logpid=$!
+  # Let the stream subscribe before the app starts: the load notice is logged once, at launch. (The stream's own
+  # header cannot signal readiness: it is block-buffered into the file.)
+  sleep 4
 
   stamp "launch $name"
-  limited 120 tools/fly.sh israel "$name" --speed "$SPEED" --sim "$SIM" || problems+=("launch failed or timed out")
+  limited 120 tools/fly.sh israel "$name" --speed "$SPEED" || problems+=("launch failed or timed out")
   sleep 5   # launch, first frame
   for pct in 0 25 50 75 100; do
     [ ${#problems[@]} -eq 0 ] || break
