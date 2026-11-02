@@ -181,7 +181,7 @@ All free to use. The FAA and NOAA data is public domain. CAAI approved redistrib
 | **Phase 2** | Flight recording, replay, logbook and on-device debrief | Built; in TestFlight beta |
 | **Phase 3** | IFR procedures, ADS-B traffic, advanced features | Planned |
 
-Open work is tracked in beads (`bd ready`).
+Open work is tracked on the Paseo Progress dashboard (`paseo-progress show`).
 
 ## Contributing
 

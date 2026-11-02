@@ -25,8 +25,8 @@ executed 967 test cases (966 passed). The one failure, `CVFRDebriefTests.planned
 1. Test behavior the pilot depends on: wrong or stale data shown as current, a lost recording, a wrong
    alert. Do not test wiring, mock echoes or incidental defaults.
 2. Characterization tests pin what the code does today, wrong or not. A pinned bug carries a comment
-   `// BUG(<slug>): pins current behavior; <what is wrong>` and a bead (`bd create ... --deps
-   discovered-from:efb-dzz`). Fixing it is a separate behavior change: flip the assertion in the same commit.
+   `// BUG(<slug>): pins current behavior; <what is wrong>` and a ticket on the Paseo Progress dashboard.
+   Fixing it is a separate behavior change: flip the assertion in the same commit.
 3. Structure-only and behavior-only changes never share a commit.
 4. Inject clocks and streams (`now:`, `updates:`); never sleep over 100 ms except where a grace timer is the
    subject (these use 25-250 ms).

@@ -31,7 +31,7 @@ Paseo scripts (`paseo.json`; run from the Paseo app or `paseo script start <name
 | `fly-israel` | Flies the Israel CVFR scenario `il-cvfr-llhz-llib-nominal` at 4x through the DEBUG scenario player (`tools/fly.sh israel <scenario> [--speed N] [--start S] [--notams FILE] [--sim udid\|tag]`; `tools/fly.sh list` shows the scenarios in `tools/flight-sim/`). |
 | `test` | Full unit suite on the worktree simulator. |
 | `build` | Compile app + tests (no simulator). |
-| `ready` | `bd ready`: unblocked work. |
+| `ready` | `paseo-progress show`: open tickets and questions on the dashboard. |
 | `check` | `tools/check.sh`: the pre-commit checks (gitleaks, forbidden files, plist/JSON/shell/Python lint, swift-format report, web tests) over the whole tree, plus a full-history gitleaks scan. See "Hooks". |
 
 Worktree setup resolves SwiftPM packages and creates the worktree's simulator; teardown deletes it.
@@ -229,18 +229,17 @@ lefthook (`lefthook.yml`) runs on each clone after `mise use -g lefthook@latest 
 - Skip: `git commit --no-verify`, or `LEFTHOOK_EXCLUDE=<job>,<job>`.
 - The integrator commits with `git commit-tree`, which bypasses hooks: run `tools/check.sh` first (`--staged` for staged files only, `--quick` to skip the history scan).
 
-## Issue Tracking (beads)
+## Issue Tracking (Paseo Progress)
 
-This project uses bd (beads) for issue tracking. The database lives in the main checkout at `/Users/omer/dev/openefb/.beads` and is shared by all worktrees.
+Work is tracked on the Paseo Progress dashboard with `paseo-progress` (run it from the checkout the work happens in; `paseo-progress show` lists tickets and open questions). Beads is retired: its database at `/Users/omer/dev/openefb/.beads` is kept read-only as history, and the `efb-*` IDs in older docs refer to it.
 
-- Run `bd prime` for workflow context and command guidance.
-- Use `bd ready`, `bd show <id>`, `bd update <id> --claim`, and `bd close <id>`.
-- Use `bd remember "insight"` for durable project facts; keep per-operator preferences in your harness's own memory.
+- The integrator adds tickets (`ticket add`), asks the owner questions (`question ask`), and marks tickets done after verifying.
+- Agents update their ticket's stage, the ticker, activity and deliverables as described in `docs/handoff/COMMON.md`, and never mark a ticket done.
 - Do not use markdown TODO lists for task tracking.
 
 ## Known Issues
 
-Open work is tracked in beads (`bd ready`, `bd list`). Notable open items as of 2026-11-02:
+Open work is on the Paseo Progress dashboard (`paseo-progress show`). Notable open items as of 2026-11-02 (`efb-*` IDs are the retired beads records):
 
 - **Satellite and Terrain base maps** use Esri World Imagery and OpenTopoMap tiles whose terms don't allow a public release; remove them before the public release (efb-zfm.8, `docs/TILE-SOURCES.md`). Both are online-only; offline downloads cover the sectional and Street only.
 - **FAA airport diagrams:** 820 of the 925 (88.6%, cycle 2611) pass the georeferencing gates; the rest show only as PDFs (`docs/design/apd-georef-report.md`).

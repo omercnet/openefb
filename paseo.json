@@ -24,7 +24,7 @@
       "command": "tools/sim-test.sh build -quiet"
     },
     "ready": {
-      "command": "bd ready"
+      "command": "paseo-progress show"
     },
     "check": {
       "command": "tools/check.sh"

@@ -45,7 +45,7 @@ Intelligence. Satellite and Terrain base maps need a connection and are for test
 7. Display mode Day / Night / Auto outdoors or at low brightness.
 8. Settings > About: version, build, data attributions, Send Feedback.
 
-**Known issues** (open beads): Satellite/Terrain terms (efb-zfm.8, removed before public release); 8 of 13 Israeli
+**Known issues** (open tickets; `efb-*` are the original beads IDs): Satellite/Terrain terms (efb-zfm.8, removed before public release); 8 of 13 Israeli
 diagrams show as sheet-only PDFs (efb-aac.17); open Israel UX findings efb-aac.19 to efb-aac.30 (chart edition age
 display, slow edition check on a bad connection, some red tints, 125-row briefing without a plan, layer-row wording);
 Israel data awaiting CFI review (efb-aac.13); recorded-flight damaged/recovered status can be erased by a note edit

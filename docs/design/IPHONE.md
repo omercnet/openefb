@@ -54,4 +54,4 @@ Severity: 0 fine, 1 cosmetic, 2 awkward, 3 a core flow is hard or a number is tr
 
 ## Left over
 
-Filed under epic efb-zfm with label `iphone` (see beads).
+Tracked as the iPhone ticket on the Paseo Progress dashboard (originally filed as beads efb-zfm.21 to .24).

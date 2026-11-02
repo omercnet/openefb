@@ -85,10 +85,10 @@ Git hooks (lefthook, `lefthook.yml`) block secrets, forbidden files and broken p
 a `.env*` file or a `*TmpTests.swift` in a tree that will be committed. Details: `tools/hooks/README.md`.
 
 ## Tracking
-- beads: `bd update <issue> --claim` at start. Record notable decisions with `bd update <issue> --notes "..."`.
-  For a follow-up you discover but don't own: `bd create "<title>" -t bug|task -p 2 --deps discovered-from:<issue> -d "..."`.
-  Do NOT close your issue; the integrator closes it after verifying.
-- Paseo dashboard (plain words, for a product manager):
+Work is tracked on the Paseo Progress dashboard (`paseo-progress`), not beads. Each brief names its ticket (T##).
+- Follow-ups you discover but don't own: list them in your final reply; the integrator adds them as tickets.
+- Record notable decisions with `paseo-progress activity add "<text>" --ticket <TICKET>`.
+- Dashboard updates (plain words, for a product manager):
   - at each new stage: `cd <worktree> && paseo-progress ticket update <TICKET> --stage <Build|Review|Fixes|Verify>`
   - between stages: `cd <worktree> && paseo-progress ticker set "<what you are doing now>"`
   - milestones: `paseo-progress activity add "<text>" --ticket <TICKET>`
