@@ -6,6 +6,7 @@
 //  first, with read/unread tracking. Opened from the map controls and from the Israel flight plan screen.
 //
 
+import CoreLocation
 import SwiftUI
 
 struct IsraelBriefingView: View {
