@@ -20,6 +20,10 @@ nonisolated struct IsraelRouteAltitudeRow: Equatable, Sendable, Identifiable {
     let routeType: String
     /// "CLSD to 13:30Z" when a drawn closure covers the segment.
     let closure: String?
+    /// Red for a full closure, amber for partial and "check NOTAM"; nil without a closure.
+    var closureSeverity: IsraelClosureSeverity? = nil
+    /// Exceptions as written, or the unread clause, shown under the closure line.
+    var closureNotes: [String] = []
 }
 
 nonisolated struct IsraelPointDetail: Equatable, Sendable, Identifiable {
@@ -94,15 +98,18 @@ nonisolated enum IsraelChartDetails {
         let code = point.code.uppercased()
         var rows: [IsraelRouteAltitudeRow] = []
         for segment in segments where segment.fromCode.uppercased() == code || segment.toCode.uppercased() == code {
-            let closure = closures[segment.id]?.text
+            let mark = closures[segment.id]
+            let closure = mark?.text
             let type = routeTypeText(segment)
             rows.append(IsraelRouteAltitudeRow(
                 segmentID: segment.id, from: segment.fromCode, to: segment.toCode,
-                altitude: altitudeText(segment.altitudeForward), routeType: type, closure: closure
+                altitude: altitudeText(segment.altitudeForward), routeType: type, closure: closure,
+                closureSeverity: mark?.severity, closureNotes: mark?.notes ?? []
             ))
             rows.append(IsraelRouteAltitudeRow(
                 segmentID: segment.id, from: segment.toCode, to: segment.fromCode,
-                altitude: altitudeText(segment.altitudeReverse), routeType: type, closure: closure
+                altitude: altitudeText(segment.altitudeReverse), routeType: type, closure: closure,
+                closureSeverity: mark?.severity, closureNotes: mark?.notes ?? []
             ))
         }
         // Leaving this point first, then arriving; stable by neighbour code.

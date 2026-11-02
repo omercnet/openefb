@@ -43,9 +43,14 @@ nonisolated struct IsraelChartSegmentLabel: Equatable, Sendable {
 /// A NOTAM closure applied to a segment.
 nonisolated struct IsraelChartClosureMark: Equatable, Sendable {
     let notamID: String
-    /// "CLSD" plus the validity window the pilot can read at a glance ("CLSD to 13:30Z").
+    /// "CLSD" plus the validity window the pilot can read at a glance ("CLSD to 13:30Z"); partial closures
+    /// carry their altitudes ("CLSD 2500 \u{00B7} AVBL 3000"), unread ones say "CHECK NOTAM".
     let text: String
     let schedule: String?
+    /// Red (full) or amber (partial, check NOTAM).
+    var severity: IsraelClosureSeverity = .full
+    /// Extra lines for the tap sheet: exceptions as written, or the unread clause.
+    var notes: [String] = []
 }
 
 nonisolated struct IsraelChartSegmentFeature: Sendable, Identifiable {
@@ -355,16 +360,19 @@ nonisolated enum IsraelChartFeatureBuilder {
         }
         // Past its useful life but not expired: still drawn, and every label says how old the data is.
         let ageNote = freshness == .old ? dataAgeText(report.feed.generatedAt, now: now) : nil
-        let cvfr = report.feed.closures.filter { $0.routeKind.uppercased() == chartRouteKind }
+        let cvfr = report.feed.closures.filter { $0.covers(chartRouteKind) }
         let mapping = IsraelNotamClosureMapper.map(cvfr, using: network, at: now)
         var marks: [Int: IsraelChartClosureMark] = [:]
         for match in mapping.matches {
             let mark = IsraelChartClosureMark(
                 notamID: match.closure.notamId,
                 text: closureText(match.closure, now: now, dataAge: ageNote),
-                schedule: match.closure.schedule
+                schedule: match.closure.schedule,
+                severity: match.closure.severity,
+                notes: closureNotes(match.closure)
             )
-            for segment in match.segments where marks[segment.id] == nil {
+            for segment in match.segments {
+                if let existing = marks[segment.id], rank(existing.severity) >= rank(mark.severity) { continue }
                 marks[segment.id] = mark
             }
         }
@@ -377,11 +385,27 @@ nonisolated enum IsraelChartFeatureBuilder {
         return minutes >= 60 ? "\(minutes / 60)h\(String(format: "%02d", minutes % 60))m" : "\(minutes)m"
     }
 
-    /// "CLSD to 13:30Z", "CLSD to 3 Nov 13:30Z" (end on another UTC day), "CLSD" (no end); with
-    /// `dataAge`, "CLSD to 13:30Z (data 1h20m old)".
+    /// Full: "CLSD to 13:30Z", "CLSD to 3 Nov 13:30Z" (end on another UTC day), "CLSD" (no end).
+    /// Partial: "CLSD 2500 (middle dot) AVBL 3000 to 13:30Z", "CLSD EXC to 13:30Z" (exceptions in the tap sheet).
+    /// Unread: "CHECK NOTAM". With `dataAge`, "... (data 1h20m old)".
     static func closureText(_ closure: IsraelRouteClosure, now: Date, dataAge: String? = nil) -> String {
-        var text = "CLSD"
-        if let end = closure.validTo {
+        var text: String
+        switch closure.severity {
+        case .check:
+            text = "CHECK NOTAM"
+        case .full:
+            text = "CLSD"
+        case .partial:
+            let closed = (closure.closedAltitudes ?? []).map(\.chartText)
+            let open = (closure.availableAltitudes ?? []).map { $0.limit.chartText }
+            let hasExceptions = !(closure.exceptions ?? []).isEmpty
+            var parts = [closed.isEmpty ? "CLSD" : "CLSD " + closed.joined(separator: "/")]
+            if !open.isEmpty { parts.append("AVBL " + open.joined(separator: "/")) }
+            if hasExceptions { parts.append("EXC") }
+            // "CLSD EXC" reads better than "CLSD (dot) EXC" when exceptions are the only condition.
+            text = parts.joined(separator: closed.isEmpty && open.isEmpty ? " " : " \u{00B7} ")
+        }
+        if closure.severity != .check, let end = closure.validTo {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
             let sameDay = calendar.isDate(end, inSameDayAs: now)
@@ -393,6 +417,25 @@ nonisolated enum IsraelChartFeatureBuilder {
         }
         if let dataAge { text += " (data \(dataAge) old)" }
         return text
+    }
+
+    /// Lines for the tap sheet under the closure label: exceptions as written, or why the pilot must read the NOTAM.
+    static func closureNotes(_ closure: IsraelRouteClosure) -> [String] {
+        var notes = (closure.exceptions ?? []).map { "EXC " + $0 }
+        if closure.severity == .check {
+            notes.append("Possible closure not read in full: read NOTAM \(closure.notamId).")
+            if let raw = closure.raw, !raw.isEmpty { notes.append(raw) }
+        }
+        return notes
+    }
+
+    /// full > check > partial: when several closures cover a segment, the most restrictive reading is drawn.
+    static func rank(_ severity: IsraelClosureSeverity) -> Int {
+        switch severity {
+        case .full: return 3
+        case .check: return 2
+        case .partial: return 1
+        }
     }
 
     // MARK: Helpers

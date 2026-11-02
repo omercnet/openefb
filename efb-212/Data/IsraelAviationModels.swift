@@ -229,6 +229,7 @@ nonisolated enum IsraelAerodromeUse: String, Sendable {
     case agricultural   // crop-spraying strip run by an operator
     case hospital       // hospital helipad
     case foreign        // outside Israel, drawn for orientation only
+    case ultralight     // ultralight (מז"ם / אז"ם) strip: not for conventional GA aircraft
 }
 
 /// Prior-permission-required status as the AIP states it. `unknown` = the AIP says nothing general.

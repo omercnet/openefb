@@ -18,7 +18,8 @@ h2 { font-size: 1.1rem; margin: 24px 0 8px; }
 p, li { color: var(--text); }
 .muted { color: var(--muted); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin: 14px 0; }
-.card ul { margin: 6px 0 0; padding-left: 1.2em; }
+.card ul { margin: 6px 0 0; padding-inline-start: 1.2em; }
+fieldset.card legend { padding: 0 6px; font-weight: 600; }
 .check { display: flex; gap: 12px; align-items: flex-start; margin: 18px 0; cursor: pointer; }
 .check input { width: 24px; height: 24px; flex: none; margin-top: 2px; accent-color: var(--accent); }
 button, .btn {
@@ -40,7 +41,7 @@ button.danger { background: var(--bad); }
 @keyframes pulse { 50% { transform: scale(1.08); box-shadow: 0 0 0 22px rgba(77,163,255,.16); } }
 .status { font-size: 1.3rem; font-weight: 600; }
 .timer { font-variant-numeric: tabular-nums; color: var(--muted); }
-.notice { border-left: 4px solid var(--warn); background: #2a2214; padding: 12px 14px; border-radius: 8px; margin: 14px 0; }
+.notice { border-inline-start: 4px solid var(--warn); background: #2a2214; padding: 12px 14px; border-radius: 8px; margin: 14px 0; }
 .notice.bad { border-color: var(--bad); background: #2b1517; }
 .notice.good { border-color: var(--good); background: #11271d; }
 a { color: var(--accent); }
@@ -52,9 +53,11 @@ th { color: var(--muted); font-weight: 600; }
 .tag.yes { background: #14402f; color: var(--good); }
 .tag.no { background: #3a1d20; color: var(--bad); }
 .turn { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: var(--panel); }
-.turn.pilot { border-left: 3px solid var(--good); }
-.turn.interviewer { border-left: 3px solid var(--accent); }
+.turn.pilot { border-inline-start: 3px solid var(--good); }
+.turn.interviewer { border-inline-start: 3px solid var(--accent); }
 .turn small { color: var(--muted); }
 main.wide { max-width: 1000px; }
 audio { width: 100%; margin: 8px 0; }
 pre { white-space: pre-wrap; background: var(--panel); padding: 12px; border-radius: 10px; border: 1px solid var(--line); overflow-x: auto; }
+/* each line of the exported notes picks its own direction, so Hebrew transcript lines read right-to-left */
+pre { unicode-bidi: plaintext; }

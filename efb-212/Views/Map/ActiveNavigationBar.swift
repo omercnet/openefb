@@ -47,6 +47,11 @@ struct ActiveNavigationBar: View {
         if let direct = appState.directToAirport {
             return "DIRECT \(direct.icao)"
         }
+        if appState.activeFlightPlan, let leg = appState.activeRoute?.current,
+           let dest = appState.activeRoute?.destinationCode {
+            // Multi-leg CVFR route: the next reporting point and the altitude published for this leg.
+            return "\u{2192} \(leg.toCode) \(leg.altitudeText) FT \u{00B7} \(dest)"
+        }
         if appState.activeFlightPlan,
            let dep = appState.activePlanDeparture, let dest = appState.activePlanDestination {
             return "\(dep) \u{2192} \(dest)"

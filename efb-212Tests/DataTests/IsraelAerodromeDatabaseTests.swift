@@ -136,10 +136,13 @@ struct IsraelAerodromeDatabaseTests {
         #expect(yahav.elevationFeet == -177)
     }
 
-    @Test func militaryFieldsAreMarkedAndHaveNoCivilData() throws {
+    @Test func militaryFieldsAreMarkedAndCarryOnlyTheirPublishedUnitFrequencies() throws {
         let tel = try #require(try Self.bundled().aerodrome(code: "LLEK"))
         #expect(tel.use == .military)
-        #expect(tel.frequencies.isEmpty)
+        // A-07 §12 publishes the unit frequencies; they are labelled military control, not civil services.
+        #expect(tel.frequencies.map(\.mhz) == ["128.150", "129.050"])
+        #expect(tel.frequencies.allSatisfy { $0.service.contains("military control") })
+        #expect(tel.ppr == .yes && tel.pprText?.contains("CAAI authorization") == true)
         #expect(tel.uncertainGroups.contains("runways"))
         #expect(tel.runways.allSatisfy { $0.designator == "?" })
     }
@@ -154,9 +157,11 @@ struct IsraelAerodromeDatabaseTests {
 
     // MARK: - Review status
 
-    @Test func nothingIsReviewedUntilTheOwnerChecksIt() throws {
+    @Test func onlyFullyAdjudicatedAerodromesAreReviewed() throws {
         let all = try Self.bundled().aerodromes(in: .wholeCountry)
-        #expect(all.allSatisfy { $0.reviewStatus == .unreviewed && !$0.isReviewed })
+        let unreviewed = Set(all.filter { !$0.isReviewed }.map(\.code))
+        #expect(unreviewed.isEmpty)   // all 49 reviewed; owner resolved the fable vs astra conflicts (Q7 = B)
+        #expect(all.filter(\.isReviewed).count == 49)
     }
 
     @Test func everyValueGroupNamesItsSource() throws {

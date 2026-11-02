@@ -10,7 +10,8 @@
     "dev": "wrangler dev --test-scheduled",
     "deploy": "wrangler deploy",
     "scrape": "tsx scripts/scrape-local.ts",
-    "publish-local": "wrangler kv key put --binding NOTAM_KV --remote notams.json --path .data/notams.json && wrangler kv key put --binding NOTAM_KV --remote meta.json --path .data/meta.json"
+    "publish-local": "wrangler kv key put --binding NOTAM_KV --remote notams.json --path .data/notams.json && wrangler kv key put --binding NOTAM_KV --remote meta.json --path .data/meta.json",
+    "corpus": "tsx scripts/corpus.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

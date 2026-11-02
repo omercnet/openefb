@@ -35,9 +35,14 @@ export function toMarkdown(iv: Interview): string {
   // template order: commitment sits before the hypotheses row
   rows.splice(rows.length - 1, 0, commitRow);
 
+  // Hebrew: a leading RLM (U+200F) makes each line's base direction right-to-left in editors and viewers (the space keeps ** flanking valid)
+  // and the label sits in an LRI..PDI isolate (inside the **, which keeps flanking valid) so "[00:01] Pilot:" keeps its reading order
+  const rtl = iv.lang === "he" ? "\u200F " : "";
+  const lri = iv.lang === "he" ? "\u2066" : "";
+  const pdi = iv.lang === "he" ? "\u2069" : "";
   const transcript = iv.transcript
     .filter((e) => e.text.trim())
-    .map((e) => `**[${mmss(e.t)}] ${e.role === "pilot" ? "Pilot" : "Interviewer"}:** ${e.text.trim()}`)
+    .map((e) => `${rtl}**${lri}[${mmss(e.t)}] ${e.role === "pilot" ? "Pilot" : "Interviewer"}:${pdi}** ${e.text.trim()}`)
     .join("\n\n");
 
   const dur = iv.durationSec != null ? `${Math.round(iv.durationSec / 60)} min` : "in progress";
@@ -47,6 +52,7 @@ export function toMarkdown(iv: Interview): string {
     `- Date: ${iv.startedAt}`,
     `- Duration: ${dur}`,
     `- Status: ${iv.status}`,
+    `- Language: ${iv.lang === "he" ? "Hebrew (he)" : "English (en)"}`,
     iv.outcome?.note ? `- Closing note: ${iv.outcome.note}` : "",
     iv.summary ? "" : "- (No automatic summary; set SUMMARY_MODEL to generate the notes fields.)",
     "",

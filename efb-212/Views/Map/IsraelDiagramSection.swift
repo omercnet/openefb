@@ -32,7 +32,7 @@ struct IsraelDiagramSection: View {
     private var content: some View {
         switch store.availability(for: icao) {
         case .georeferenced(let record):
-            Text("On the map at zoom 14 and closer. \(record.chart), \(editionText).")
+            Text("On the map at zoom 14 and closer, placed to about ±\(store.pack?.index.accuracyFeet ?? 100) ft. \(record.chart), \(editionText).")
                 .font(.subheadline)
                 .foregroundStyle(Palette.secondaryText)
             sheetButton("View chart sheet")

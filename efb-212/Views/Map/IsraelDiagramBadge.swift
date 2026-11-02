@@ -3,7 +3,7 @@
 //  efb-212
 //
 //  Edition badge for the CAAI aerodrome diagrams on the Israel map (IL-13): shown while a diagram is
-//  drawn, with the edition and date as printed on the charts.
+//  on screen, with the edition and date as printed on the charts and the accuracy gate they passed.
 //
 
 import SwiftUI
@@ -13,7 +13,7 @@ struct IsraelDiagramBadge: View {
     @State private var store = IsraelDiagramStore.shared
 
     var body: some View {
-        if let overlay, !overlay.shownAirports.isEmpty, let pack = store.pack {
+        if let overlay, overlay.isShowing, let pack = store.pack {
             Text("\(pack.badgeText): \(overlay.shownAirports.joined(separator: ", "))")
                 .font(TypeRole.caption)
                 .foregroundStyle(Palette.secondaryText)

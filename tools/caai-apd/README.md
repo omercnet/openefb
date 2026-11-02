@@ -6,12 +6,14 @@ core that `tools/apd-georef` and the iPad app compile) over the Israeli aerodrom
 
 Israeli diagrams carry no lat/lon graticule, so the grid method does not apply. The core fits scale and rotation
 from the drawn runway polygons and picks the translation from one runway. This tool then refits scale and
-translation by least squares over all matched runways and applies the US gates: every runway within 50 ft
-(cross-track, along-track and midpoint) and within 5% of the database length. Control truth is the CAAI GIS runway
-ends in `efb-212/Resources/israel-aviation.sqlite` (`runways`).
+translation by least squares over all matched runways and applies the Israeli gate (owner decision Q6): every
+runway within 100 ft (cross-track, along-track and midpoint; the US keeps 50 ft in the core) and within 5% of the
+database length. Control truth is the CAAI GIS runway ends in `efb-212/Resources/israel-aviation.sqlite` (`runways`).
 
-A diagram is georeferenced only with at least two independently matched runways. A single runway fixes scale and
-position from the same two points that would validate them, so it cannot be checked: it stays "sheet only".
+A single-runway field can't check itself, so it also needs the printed ARP symbol (a circle with a cross beside an
+"ARP" label) to land within 100 ft plus the AIP's 1 arc-second rounding (61.5 m N-S, 56.5 m E-W) of the AIP ARP.
+Its rotation comes from the GIS runway bearing and must be within 10 degrees of north-up. No ARP symbol, or one
+outside the box, means "sheet only". Never placed without an independent check. Coverage: docs/design/caai-apd-report.md.
 
 ## Inputs (not committed)
 
@@ -38,6 +40,5 @@ chart title, language, scale, reason; what the app reads first); `manifest.json`
 sha256 per file, `published: false`, validation; the `--manifest` input of `web/charts/publish.sh --product il-diagrams`);
 `results.json` (every chart with its residuals or rejection reason).
 
-`--dev-runway-tolerance FEET` loosens the gate to produce a pack for wiring and screenshots. It writes to
-`out/dev-<edition>/` and sets `validation.passed = false`, so the app's `isServable` rejects it unless the developer
-setting for unpublished editions is on. Never publish a dev pack.
+`--dev-runway-tolerance FEET` overrides the runway gate (not the ARP check) to produce a pack for wiring tests. It writes
+to `out/dev-<edition>/` and sets `validation.passed = false`. Never publish a dev pack.

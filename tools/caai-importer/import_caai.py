@@ -475,14 +475,15 @@ def build_runways(frame):
 
 DEFAULT_CURATED = HERE / "curated" / "aerodromes-il.csv"
 AERODROME_TYPES = ("airport", "airstrip", "heliport")
-AERODROME_USES = ("civil", "military", "uas", "agricultural", "hospital", "foreign")
+AERODROME_USES = ("civil", "military", "uas", "agricultural", "hospital", "foreign", "ultralight")
 REVIEW_STATUSES = ("unreviewed", "reviewed")
 PPR_VALUES = ("yes", "no", "unknown")
 # A GIS point or runway must lie this close to the aerodrome row that claims it. The AIP ARP and the
 # GIS ARP differ by up to ~2.8 km for the two LLNV rows (Negav / Nevatim), so this is generous.
 ARP_MATCH_M = 5000.0
-# 'DES LxW surface [hdg a/b T|M]'; DES may be '?' (unpublished) or a range like '175-305'.
-CURATED_RWY = re.compile(r"^(\S+) (\d+(?:\.\d+)?)x(\d+(?:\.\d+)?) (\w+)(?: hdg (\d+(?:\.\d+)?)/(\d+(?:\.\d+)?) ([TM]))?$")
+# 'DES LxW surface [hdg a/b T|M]'; DES may be '?' (unpublished) or a range like '175-305'; surface may be
+# composite as published ('concrete+asphalt', 'asphalt/concrete').
+CURATED_RWY = re.compile(r"^(\S+) (\d+(?:\.\d+)?)x(\d+(?:\.\d+)?) ([\w+/]+)(?: hdg (\d+(?:\.\d+)?)/(\d+(?:\.\d+)?) ([TM]))?$")
 CURATED_FREQ = re.compile(r"^(\d{3}\.\d{3}) (.+)$")
 
 
@@ -524,7 +525,7 @@ def load_curated(path):
     required = ["code", "name_he", "name_en", "type", "use", "lat", "lon", "elevation_ft", "runways", "frequencies",
                 "circuit_altitude_ft", "circuit_direction", "hours", "ppr", "ppr_text", "remarks", "source_identity",
                 "source_runways", "source_frequencies", "source_circuit", "source_hours", "source_remarks",
-                "uncertain", "notes", "review_status"]
+                "uncertain", "notes", "review_status", "reviewed_by"]
     missing = [c for c in required if c not in (reader.fieldnames or [])]
     if missing:
         fail("%s lacks columns %s" % (path.name, missing))
@@ -542,6 +543,8 @@ def load_curated(path):
             fail("%s: ppr %r is not one of %s" % (code, r["ppr"], PPR_VALUES))
         if r["review_status"] not in REVIEW_STATUSES:
             fail("%s: review_status %r is not one of %s" % (code, r["review_status"], REVIEW_STATUSES))
+        if bool(clean(r["reviewed_by"])) != (r["review_status"] == "reviewed"):
+            fail("%s: reviewed rows name their reviewers in reviewed_by, unreviewed rows leave it empty" % code)
         if not clean(r["name_en"]) or not clean(r["name_he"]):
             fail("%s: names in both languages are required" % code)
         try:
@@ -697,7 +700,7 @@ CREATE TABLE aerodromes (
     code TEXT NOT NULL UNIQUE,      -- ICAO where one exists, else a short slug
     name_he TEXT NOT NULL, name_en TEXT NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('airport','airstrip','heliport')),
-    use TEXT NOT NULL CHECK (use IN ('civil','military','uas','agricultural','hospital','foreign')),
+    use TEXT NOT NULL CHECK (use IN ('civil','military','uas','agricultural','hospital','foreign','ultralight')),
     lat REAL NOT NULL, lon REAL NOT NULL,   -- degrees, WGS-84 (AIP ARP)
     elevation_ft INTEGER,                   -- feet MSL, negative below sea level
     circuit_altitude_ft INTEGER,            -- feet MSL (QNH)

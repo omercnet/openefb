@@ -4,9 +4,9 @@ Scrapes the Israel Airports Authority (IAA) NOTAM page every 15 minutes and serv
 that file; it never contacts the IAA site. Background: `docs/research/israel-cvfr.md` section 6.
 
 ```
-Cron Trigger (*/15) -> scheduled() -> IAA list page -> one detail page per NEW or changed NOTAM (max 40 per run)
+Cron Trigger (*/15) -> scheduled() -> IAA list page -> one detail page per NEW or changed NOTAM (max 36 per run)
                                    -> parse (Q-line, A-G, coordinates, route-closure chains)
-                                   -> KV: notams.json, detail-cache.json, meta.json
+                                   -> KV: notams.json, detail-cache.json, meta.json, history-*.json
 app -> GET /notams.json   (Cache-Control: public, max-age=300; CORS *)
 ops -> GET /health        (200 while the last good scrape is <= 45 min old, else 503)
 you -> POST /run          (Bearer RUN_SECRET; manual scrape, e.g. the first run after deploy)
@@ -18,9 +18,9 @@ you -> POST /run          (Bearer RUN_SECRET; manual scrape, e.g. the first run 
   items from KV for every NOTAM it has seen. Measured in Node (same V8, warm), CPU per run: **~2.3 ms** with nothing new,
   **~3.5 ms** when 40 detail pages are parsed, 0.1 ms to decode the list page. Network waits don't count as CPU. These are
   Node numbers: workerd doesn't expose CPU time locally, so check `wrangler tail` / the dashboard's CPU time after deploy.
-- **Subrequests (50 per invocation):** list (1) plus at most 40 detail pages. A cold start therefore backfills over 3-4
+- **Subrequests (50 per invocation, KV calls count):** list (1) plus at most 36 detail pages, leaving room for up to 9 KV calls. A cold start therefore backfills over 3-4
   runs (about an hour); NOTAMs not yet fetched are published with `parsed: false` and raw list text meanwhile.
-- **KV writes (1000 per day):** a run writes `notams.json` and `meta.json` (and the cache only when it changed): 192-288 a day.
+- **KV writes (1000 per day):** a run writes `notams.json` and `meta.json` (and the cache only when it changed): 192-288 a day. History adds two writes only on runs that saw a new NOTAM (at most 192 a day, in practice a few dozen): well inside 1000.
 - Wall time of a cold 40-detail run: ~22 s (400 ms politeness delay between requests). Waiting isn't CPU.
 
 ## What the scraper does
@@ -40,6 +40,20 @@ you -> POST /run          (Bearer RUN_SECRET; manual scrape, e.g. the first run 
 D)/E)/F)/G), geometry, `closures[]`, `cancelledBy`/`replacedBy`, `parsed`, `raw`. `closures[]` are chains of point codes
 (`CVFR RTE CLSD GALIM-DAROM-HOTRM`) of items not cancelled or replaced. Expired NOTAMs stay in the IAA list; consumers
 filter on validity.
+
+Each closure is one clause of E): `routeKind` (CVFR when the clause covers CVFR, kept for builds that read only that field),
+`routeKinds` (all kinds: "CVFR AND HEL RTE CLSD"), `chain`, `closedAltitudes` / `availableAltitudes` (feet; AT, BLW, ABV, BTN;
+`direction: "BIDIRECTIONAL"`), `exceptions` (raw text, e.g. "PPR FLT FM IAF"), `partial` (closed only at some altitudes, or with
+exceptions), `parsed` and `raw`. A clause that looks like a closure but cannot be read in full is still emitted, with
+`parsed: false` (no chain, or an altitude condition left unread): consumers must show it as "possible closure, read NOTAM".
+Fields are only ever added: shipped app builds decode this file.
+
+## History corpus
+
+Every NOTAM the relay sees is recorded once (id plus verbatim ICAO text) in KV: `history-index.json` (all ids) and
+`history-YYYY-MM-DD.json` (`[{ id, raw, seenAt }]`, first seen that UTC day). Use it as a regression corpus:
+`npx wrangler kv key get --binding NOTAM_KV --remote history-2026-11-01.json`. Local coverage check over any archive of
+`{ notams: [{ id, description }] }`: `npm run corpus -- /tmp/notams.json [--misses] [--flagged]` (keep such archives out of the repo).
 
 ## Run it locally
 

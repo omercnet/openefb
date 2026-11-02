@@ -22,6 +22,7 @@ export default async function Admin() {
           <tr>
             <th>Date (UTC)</th>
             <th>Duration</th>
+            <th>Lang</th>
             <th>Pilot</th>
             <th>Commitment</th>
             <th>Status</th>
@@ -37,6 +38,9 @@ export default async function Admin() {
               <tr key={i.id}>
                 <td>{i.startedAt.slice(0, 16).replace("T", " ")}</td>
                 <td>{i.durationSec != null ? mmss(i.durationSec * 1000) : "live"}</td>
+                <td>
+                  <span className="tag">{i.lang === "he" ? "עברית (he)" : "en"}</span>
+                </td>
                 <td>{who || <span className="muted">-</span>}</td>
                 <td>{c ? <span className={`tag ${c}`}>{c}</span> : <span className="muted">-</span>}</td>
                 <td>

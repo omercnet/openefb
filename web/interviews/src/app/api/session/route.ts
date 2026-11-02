@@ -1,13 +1,22 @@
 import { randomBytes } from "node:crypto";
 import { config, utcDate } from "@/lib/config";
 import { activePath, saveInterview } from "@/lib/interviews";
-import { sessionConfig } from "@/lib/interviewer";
+import { noiseReductionFor, sessionConfig } from "@/lib/interviewer";
+import { parseDevice, parseLang } from "@/lib/lang";
 import { checkLimits, clientIp, hashIp, inviteOk, reserve } from "@/lib/limits";
 import { createCall, hangup } from "@/lib/openai";
 import { putObject } from "@/lib/storage";
 import { CONSENT_VERSION, type Interview } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+function cleanMic(v: unknown): NonNullable<Interview["noise"]>["mic"] {
+  if (!v || typeof v !== "object") return undefined;
+  const m = v as Record<string, unknown>;
+  const b = (x: unknown) => (typeof x === "boolean" ? x : undefined);
+  const n = (x: unknown) => (typeof x === "number" && Number.isFinite(x) ? x : undefined);
+  return { noiseSuppression: b(m.noiseSuppression), echoCancellation: b(m.echoCancellation), autoGainControl: b(m.autoGainControl), channelCount: n(m.channelCount), sampleRate: n(m.sampleRate) };
+}
 
 const json = (body: unknown, status = 200) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
@@ -20,7 +29,7 @@ const json = (body: unknown, status = 200) =>
 export async function POST(req: Request) {
   const raw = await req.text();
   if (raw.length > 100_000) return json({ error: "Request too large" }, 413);
-  let body: { sdp?: unknown; consent?: unknown; consentVersion?: unknown; code?: unknown };
+  let body: { sdp?: unknown; consent?: unknown; consentVersion?: unknown; code?: unknown; lang?: unknown; device?: unknown; mic?: unknown; ambientDb?: unknown };
   try {
     body = JSON.parse(raw);
   } catch {
@@ -39,7 +48,9 @@ export async function POST(req: Request) {
   const limit = await checkLimits(ipHash);
   if (!limit.ok) return json({ error: limit.error }, limit.status);
 
-  const call = await createCall(body.sdp, sessionConfig(), ipHash);
+  const lang = parseLang(body.lang);
+  const device = parseDevice(body.device);
+  const call = await createCall(body.sdp, sessionConfig(lang, device), ipHash);
   if ("error" in call) {
     console.error("OpenAI createCall failed", call.status, call.error);
     return json({ error: "Could not start the voice session. Please try again in a minute." }, 502);
@@ -56,6 +67,14 @@ export async function POST(req: Request) {
     callId: call.callId ?? undefined,
     ipHash,
     model: config.model,
+    lang,
+    noise: {
+      device,
+      reduction: noiseReductionFor(device),
+      turnDetection: config.turnDetection,
+      mic: cleanMic(body.mic),
+      ambientDb: typeof body.ambientDb === "number" && Number.isFinite(body.ambientDb) ? Math.round(body.ambientDb) : undefined,
+    },
     transcript: [],
   };
   try {

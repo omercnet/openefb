@@ -115,6 +115,7 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
                         appState.gpsAvailable = true
                         appState.gpsFailure = nil
                         appState.gpsStationary = isStationary
+                        appState.updateActiveRouteProgress()
 
                         if !appState.firstLocationReceived {
                             appState.firstLocationReceived = true

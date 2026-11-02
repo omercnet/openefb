@@ -275,6 +275,84 @@ struct IsraelChartFeaturesTests {
         #expect(feature.mark == mark)
     }
 
+    // MARK: Closure conditions (NOTAM-2)
+
+    private static func conditional(
+        chain: [String] = ["GALIM", "DAROM"], kinds: [String]? = nil, closed: [IsraelAltitudeLimit]? = nil,
+        available: [IsraelAvailableAltitude]? = nil, exceptions: [String]? = nil, partial: Bool? = nil,
+        parsed: Bool? = nil, raw: String? = nil, id: String = "C1/26"
+    ) -> IsraelRouteClosure {
+        IsraelRouteClosure(
+            notamId: id, routeKind: kinds?.first ?? "CVFR", routeName: nil, chain: chain,
+            validFrom: now.addingTimeInterval(-3600), validTo: nil, schedule: nil,
+            routeKinds: kinds, closedAltitudes: closed, availableAltitudes: available,
+            exceptions: exceptions, partial: partial, parsed: parsed, raw: raw
+        )
+    }
+
+    private static let closedAt2500 = IsraelAltitudeLimit(op: "AT", lowerFt: 2500, upperFt: 2500, ref: "AMSL")
+    private static let openAt3000 = IsraelAvailableAltitude(op: "AT", lowerFt: 3000, upperFt: 3000, ref: "AMSL", direction: "BIDIRECTIONAL")
+
+    @Test func partialClosureIsAmberAndLabelledWithItsAltitudes() throws {
+        let closure = Self.conditional(closed: [Self.closedAt2500], available: [Self.openAt3000], partial: true, parsed: true)
+        let set = IsraelChartFeatureBuilder.closures(
+            from: Self.report(closures: [closure], scrapedAgo: 60), network: Self.network, now: Self.now
+        )
+        let mark = try #require(set.marks[10])
+        #expect(mark.severity == .partial)
+        #expect(mark.text == "CLSD 2500 \u{00B7} AVBL 3000")
+    }
+
+    @Test func exceptionsAloneReadClsdExcAndTheExceptionTextGoesToTheTapSheet() throws {
+        let closure = Self.conditional(exceptions: ["PPR FLT FM IAF"], partial: true, parsed: true)
+        let set = IsraelChartFeatureBuilder.closures(
+            from: Self.report(closures: [closure], scrapedAgo: 60), network: Self.network, now: Self.now
+        )
+        let mark = try #require(set.marks[10])
+        #expect(mark.text == "CLSD EXC")
+        #expect(mark.notes == ["EXC PPR FLT FM IAF"])
+        let detail = IsraelChartDetails.point(Self.point(2, "DAROM"), segments: [Self.segment(10, "GALIM", "DAROM")], closures: [10: mark])
+        #expect(detail.rows.allSatisfy { $0.closureSeverity == .partial && $0.closureNotes == ["EXC PPR FLT FM IAF"] })
+    }
+
+    @Test func unreadClosureWithAChainIsAmberCheckNotamWithItsClause() throws {
+        let closure = Self.conditional(parsed: false, raw: "CVFR RTE CLSD AT 2,500 METRES ALFAB-BRAVO")
+        let set = IsraelChartFeatureBuilder.closures(
+            from: Self.report(closures: [closure], scrapedAgo: 60), network: Self.network, now: Self.now
+        )
+        let mark = try #require(set.marks[10])
+        #expect(mark.severity == .check)
+        #expect(mark.text == "CHECK NOTAM")
+        #expect(mark.notes.last == "CVFR RTE CLSD AT 2,500 METRES ALFAB-BRAVO")
+    }
+
+    @Test func aFullClosureOutranksPartialAndUnreadOnTheSameSegment() throws {
+        let partial = Self.conditional(closed: [Self.closedAt2500], partial: true, parsed: true, id: "C1/26")
+        let full = Self.conditional(id: "C2/26")
+        let unread = Self.conditional(parsed: false, id: "C3/26")
+        for order in [[partial, unread, full], [full, partial, unread], [unread, partial, full]] {
+            let set = IsraelChartFeatureBuilder.closures(
+                from: Self.report(closures: order, scrapedAgo: 60), network: Self.network, now: Self.now
+            )
+            #expect(set.marks[10]?.severity == .full)
+            #expect(set.marks[10]?.notamID == "C2/26")
+        }
+        // and an unread closure outranks a partial one
+        let set = IsraelChartFeatureBuilder.closures(
+            from: Self.report(closures: [partial, unread], scrapedAgo: 60), network: Self.network, now: Self.now
+        )
+        #expect(set.marks[10]?.severity == .check)
+    }
+
+    @Test func onlyClosuresThatCoverCVFRAffectTheChart() {
+        let both = Self.conditional(chain: ["GALIM", "DAROM"], kinds: ["HEL", "CVFR"])
+        let heliOnly = Self.conditional(chain: ["DAROM", "HOTRM"], kinds: ["ULTRALIGHT", "HEL"])
+        let set = IsraelChartFeatureBuilder.closures(
+            from: Self.report(closures: [both, heliOnly], scrapedAgo: 60), network: Self.network, now: Self.now
+        )
+        #expect(set.marks.keys.sorted() == [10])
+    }
+
     // MARK: Tap sheets
 
     @Test func pointSheetListsEverySegmentDirectionWithItsPublishedAltitude() {

@@ -98,6 +98,8 @@ final class AppState {
     var activePlanDeparture: String?     // ICAO of departure for summary card
     var activePlanDestination: String?   // ICAO of destination for summary card
     var activePlanFuelGallons: Double?   // Estimated fuel for summary card
+    /// Activated multi-leg route (Israel CVFR plan); nil for US direct plans and Direct-To.
+    var activeRoute: ActiveRoute?
 
     // MARK: - Profile State
 

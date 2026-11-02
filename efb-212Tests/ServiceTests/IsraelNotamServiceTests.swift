@@ -268,4 +268,59 @@ struct IsraelNotamServiceTests {
             validFrom: Date(timeIntervalSince1970: 1_000), validTo: nil, schedule: nil)
         #expect(closure.isValid(at: Date(timeIntervalSince1970: 9_999_999_999)))
     }
+
+    // MARK: - Closure conditions (relay NOTAM-2)
+
+    private static func closureJSON(_ extra: String) -> Data {
+        Data("""
+        {"notamId":"C2981/25","routeKind":"CVFR","routeName":null,"chain":["EIRON","ZMGID"],
+         "validFrom":"2026-11-01T06:00:00.000Z","validTo":null,"schedule":null\(extra)}
+        """.utf8)
+    }
+
+    @Test func decodesAltitudeConditionsExceptionsAndKinds() throws {
+        let json = Self.closureJSON("""
+        ,"routeKinds":["CVFR","HEL"],
+         "closedAltitudes":[{"op":"AT","lowerFt":2500,"upperFt":2500,"ref":"AMSL"}],
+         "availableAltitudes":[{"op":"AT","lowerFt":3000,"upperFt":3000,"ref":"AMSL","direction":"BIDIRECTIONAL"}],
+         "exceptions":["PPR FLT FM IAF"],"partial":true,"parsed":true,"raw":"CVFR RTE CLSD AT 2,500FT AMSL"
+        """)
+        let closure = try IsraelNotamService.decoder.decode(IsraelRouteClosure.self, from: json)
+        #expect(closure.kinds == ["CVFR", "HEL"])
+        #expect(closure.covers("cvfr") && closure.covers("HEL") && !closure.covers("ATS"))
+        #expect(closure.closedAltitudes?.map(\.chartText) == ["2500"])
+        #expect(closure.availableAltitudes?.first?.limit.chartText == "3000")
+        #expect(closure.availableAltitudes?.first?.direction == "BIDIRECTIONAL")
+        #expect(closure.exceptions == ["PPR FLT FM IAF"])
+        #expect(closure.severity == .partial)
+    }
+
+    @Test func aFeedFromAnOlderRelayReadsAsAFullClosureOfItsKind() throws {
+        let closure = try IsraelNotamService.decoder.decode(IsraelRouteClosure.self, from: Self.closureJSON(""))
+        #expect(closure.severity == .full)
+        #expect(closure.kinds == ["CVFR"])
+        #expect(closure.closedAltitudes == nil && closure.exceptions == nil)
+    }
+
+    @Test func unreadClosureIsCheckNotamAndAnUnreadableParsedFlagNeverMeansFullyRead() throws {
+        let unread = try IsraelNotamService.decoder.decode(IsraelRouteClosure.self, from: Self.closureJSON(#","parsed":false,"raw":"CVFR RTE CLSD""#))
+        #expect(unread.severity == .check)
+        let garbled = try IsraelNotamService.decoder.decode(IsraelRouteClosure.self, from: Self.closureJSON(#","parsed":"maybe""#))
+        #expect(garbled.severity == .check)
+    }
+
+    @Test func aMalformedConditionNeverCostsTheWholeClosure() throws {
+        let closure = try IsraelNotamService.decoder.decode(IsraelRouteClosure.self, from: Self.closureJSON(#","closedAltitudes":"nonsense","partial":true"#))
+        #expect(closure.chain == ["EIRON", "ZMGID"])
+        #expect(closure.closedAltitudes == nil)
+        #expect(closure.severity == .partial)
+    }
+
+    @Test func altitudeLimitsReadAsChartText() {
+        #expect(IsraelAltitudeLimit(op: "AT", lowerFt: 1200, upperFt: 1200, ref: "AMSL").chartText == "1200")
+        #expect(IsraelAltitudeLimit(op: "BLW", lowerFt: nil, upperFt: 1500, ref: "AMSL").chartText == "BLW 1500")
+        #expect(IsraelAltitudeLimit(op: "ABV", lowerFt: 10_000, upperFt: nil, ref: "FL").chartText == "ABV FL100")
+        #expect(IsraelAltitudeLimit(op: "BTN", lowerFt: 1000, upperFt: 2000, ref: "AMSL").chartText == "1000-2000")
+        #expect(IsraelAltitudeLimit(op: "AT", lowerFt: 800, upperFt: 800, ref: "AGL").chartText == "800 AGL")
+    }
 }

@@ -29,10 +29,11 @@ nonisolated struct IsraelAerodromeFlags: Equatable, Sendable {
 
 nonisolated enum IsraelAerodromeAdapter {
 
-    /// Fields NRST never offers: unmanned-aircraft strips (no manned landings without CAAI approval) and
+    /// Fields NRST never offers: unmanned-aircraft strips (no manned landings without CAAI approval),
+    /// ultralight-only strips (LLRS Rishon LeZion, LLEV Ein Vered: not for conventional GA aircraft) and
     /// fields outside Israel. Heliports are dropped by `LandableAirportFilter`; fields with no runway
     /// data (agricultural strips) and military fields with unpublished surfaces fall out of it as well.
-    static let notLandableUses: Set<IsraelAerodromeUse> = [.uas, .foreign]
+    static let notLandableUses: Set<IsraelAerodromeUse> = [.uas, .ultralight, .foreign]
 
     static func airport(_ aerodrome: IsraelAerodrome) -> Airport {
         Airport(
@@ -65,7 +66,8 @@ nonisolated enum IsraelAerodromeAdapter {
     }
 
     static func surface(_ text: String) -> SurfaceType {
-        switch text {
+        // Composite surfaces as published ("concrete+asphalt", "asphalt/concrete") map to their first part.
+        switch text.split(whereSeparator: { $0 == "+" || $0 == "/" }).first.map(String.init) ?? text {
         case "asphalt": return .asphalt
         case "concrete": return .concrete
         case "grass": return .turf

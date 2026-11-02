@@ -58,7 +58,52 @@
    "language": "en",
    "scale": "bar only",
    "source": "https://e-aip.azurefd.net/2026-08-06-AIRAC/graphics/eAIP/LL_AD_2_LLHA_ADC_V1_en.pdf",
-   "rotationDegrees": 0
+   "rotationDegrees": 0,
+   "maskRects": [
+    [
+     56.7,
+     683.9,
+     187.9,
+     72.9
+    ],
+    [
+     453.6,
+     730.9,
+     113.4,
+     25.9
+    ],
+    [
+     74.5,
+     293.5,
+     132,
+     62.4
+    ],
+    [
+     71.3,
+     222.3,
+     188,
+     62.4
+    ],
+    [
+     56.7,
+     28.0,
+     510,
+     180
+    ],
+    [
+     490,
+     582.7,
+     77,
+     125.5
+    ]
+   ],
+   "note": "maskRects: RWY/THR table, notes, legend, scale bar, north arrow/variation text and the marking/lighting inset (hand-picked, page points)",
+   "clipRect": [
+    56.7,
+    208.0,
+    510.0,
+    548.85
+   ]
   },
   {
    "icao": "LLER",

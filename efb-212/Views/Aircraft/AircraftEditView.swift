@@ -25,6 +25,8 @@ struct AircraftEditView: View {
 
     @State private var nNumber: String = ""
     @State private var aircraftType: String = ""
+    @State private var icaoType: String = ""
+    @State private var personsOnBoard: String = ""
     @State private var fuelCapacity: String = ""
     @State private var fuelBurn: String = ""
     @State private var cruiseSpeed: String = ""
@@ -65,6 +67,15 @@ struct AircraftEditView: View {
                     TextField("Aircraft type (e.g., Cessna 172SP)", text: $aircraftType)
                         .autocorrectionDisabled()
                         .accessibilityLabel("Aircraft type")
+
+                    TextField("ICAO type (e.g., C172)", text: $icaoType)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .accessibilityLabel("ICAO type designator")
+
+                    TextField("Persons on board (flight plans)", text: $personsOnBoard)
+                        .keyboardType(.numberPad)
+                        .accessibilityLabel("Persons on board")
                 }
 
                 // MARK: - Performance
@@ -147,6 +158,8 @@ struct AircraftEditView: View {
         fuelCapacity = profile.fuelCapacityGallons.map { String($0) } ?? ""
         fuelBurn = profile.fuelBurnGPH.map { String($0) } ?? ""
         cruiseSpeed = profile.cruiseSpeedKts.map { String($0) } ?? ""
+        icaoType = profile.icaoTypeDesignator ?? ""
+        personsOnBoard = profile.personsOnBoard.map { String($0) } ?? ""
 
         if let vSpeeds = profile.vSpeeds {
             showVSpeeds = true
@@ -187,6 +200,8 @@ struct AircraftEditView: View {
             profile.fuelCapacityGallons = Double(fuelCapacity)
             profile.fuelBurnGPH = Double(fuelBurn)
             profile.cruiseSpeedKts = Double(cruiseSpeed)
+            profile.icaoTypeDesignator = icaoType.trimmingCharacters(in: .whitespaces).isEmpty ? nil : icaoType.trimmingCharacters(in: .whitespaces).uppercased()
+            profile.personsOnBoard = Int(personsOnBoard)
             profile.annualDue = hasAnnualDue ? annualDue : nil
             profile.transponderDue = hasTransponderDue ? transponderDue : nil
 

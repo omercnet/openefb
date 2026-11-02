@@ -22,7 +22,9 @@ struct FlightPlanView: View {
     var body: some View {
         // Plans section of the Flights tab; the tab's NavigationStack owns the bar (T22).
         Group {
-            if let viewModel {
+            if appState.region == .israel {
+                IsraelFlightPlanView()
+            } else if let viewModel {
                 flightPlanContent(viewModel: viewModel)
             } else {
                 ProgressView("Loading...")

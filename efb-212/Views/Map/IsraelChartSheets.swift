@@ -90,9 +90,15 @@ private struct IsraelPointDetailView: View {
                                 .font(TypeRole.caption)
                                 .foregroundStyle(Palette.secondaryText)
                             if let closure = row.closure {
-                                Label(closure, systemImage: "exclamationmark.octagon.fill")
+                                let isFull = row.closureSeverity != .partial && row.closureSeverity != .check
+                                Label(closure, systemImage: isFull ? "exclamationmark.octagon.fill" : "exclamationmark.triangle.fill")
                                     .font(TypeRole.caption.weight(.semibold))
-                                    .foregroundStyle(Palette.warning)
+                                    .foregroundStyle(isFull ? Palette.warning : Palette.caution)
+                                ForEach(row.closureNotes, id: \.self) { note in
+                                    Text(note)
+                                        .font(TypeRole.caption)
+                                        .foregroundStyle(Palette.secondaryText)
+                                }
                             }
                         }
                         .frame(minHeight: 44, alignment: .leading)

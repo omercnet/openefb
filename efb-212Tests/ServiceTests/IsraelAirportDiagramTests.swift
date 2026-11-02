@@ -45,7 +45,7 @@ struct IsraelAirportDiagramTests {
 
     private static func index(edition: String = "2026-08", _ records: [String: IsraelDiagramIndex.Record]) -> IsraelDiagramIndex {
         IsraelDiagramIndex(product: "il-diagrams", edition: edition, editionLabel: "AIRAC AMDT 001/2026 (06 AUG 2026)",
-                           aipDate: "2026-08-06", aerodromes: records)
+                           aipDate: "2026-08-06", accuracyFeet: 100, aerodromes: records)
     }
 
     private static func tempDirectory(files: [String]) throws -> URL {
@@ -135,13 +135,19 @@ struct IsraelAirportDiagramTests {
     @Test("Index JSON written by tools/caai-apd decodes")
     func decodesIndex() throws {
         let json = """
-        {"product":"il-diagrams","edition":"2026-08","editionLabel":"AIRAC AMDT 001/2026 (06 AUG 2026)","aipDate":"2026-08-06",
+        {"product":"il-diagrams","edition":"2026-08","editionLabel":"AIRAC AMDT 001/2026 (06 AUG 2026)","aipDate":"2026-08-06","accuracyFeet":100,
          "aerodromes":{"LLHA":{"chart":"AD 2 LLHA ADC","language":"en","scale":"bar only","georeferenced":false,
          "reason":"1 runway in the database","sheet":"LLHA.pdf"}}}
         """
         let index = try IsraelDiagramPack.decodeIndex(Data(json.utf8))
         #expect(index.aerodromes["LLHA"]?.image == nil)
         #expect(index.aerodromes["LLHA"]?.georeferenced == false)
+    }
+
+    @Test("The badge shows the edition and the accuracy the diagrams were gated to")
+    func badgeShowsAccuracy() throws {
+        let pack = try Self.pack(Self.index([:]), files: [])
+        #expect(pack.badgeText == "CAAI aerodrome diagrams AIRAC AMDT 001/2026 (06 AUG 2026) ±100 ft")
     }
 
     // MARK: - Edition gating

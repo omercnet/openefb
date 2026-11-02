@@ -311,6 +311,8 @@ Sizes: S ≤ 2 days, M ≤ 1 week, L > 1 week. "Owner" = product owner decision.
 | IL-11 | **Debrief for CVFR (J4).** Per-leg altitude adherence, reporting-point passage times, Hebrew transcription vocabulary (point names, "דיווח", squawk). | M | IL-7, existing SFR work |
 | IL-12 | **Review with an Israeli CFI.** Walk through rules in §2 against the app; fix symbology/wording. | S | IL-3, IL-7, IL-8 |
 
+> **Shipped (IL-PLAN, T15):** `IsraelRoutePlanner` (Dijkstra over the open CVFR network: published direction only, by-request and military excluded unless overridden and then not fileable, NOTAM closures for the departure window, via points, return flight), `IsraelFlightPlanMessage` (ICAO FPL text in the A-11 layout, ZZZZ with DEP/ and DEST/ for non-ICAO strips, `4X` prefix, Hebrew summary, filing validator) and the Israel branch of the Plans tab (`IsraelFlightPlanView`). The FPL is shared or e-mailed by the pilot; the app never sends it. Activation feeds `AppState.activeRoute` (next point, leg altitude, DTG/ETE). The LSA network is not imported: efb-14e.
+
 Critical path: IL-0/IL-1 → IL-3 → IL-7 → IL-8; IL-6 in parallel after IL-1.
 
 ## 11. Open questions for the owner

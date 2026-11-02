@@ -1,5 +1,6 @@
 import { PARSER_VERSION, scrape, type DetailCacheFile } from "./build.js";
 import { httpFetcher, type TextFetcher } from "./fetch.js";
+import { recordHistory } from "./history.js";
 import { getJson, type Store } from "./storage.js";
 
 export const FEED_FILE = "notams.json";
@@ -9,8 +10,8 @@ const META_FILE = "meta.json";
 /** The IAA is scraped at most once per 15 minutes (a minute of slack for cron jitter). */
 export const MIN_INTERVAL_MS = 14 * 60_000;
 export const DETAIL_DELAY_MS = 400;
-/** Workers free plan allows 50 subrequests per invocation: 1 list + 40 details leaves room for the KV calls. */
-export const MAX_DETAIL_REQUESTS = 40;
+/** Workers free plan allows 50 subrequests per invocation (KV calls count): 1 list + 36 details leaves room for the 5 to 9 KV calls. */
+export const MAX_DETAIL_REQUESTS = 36;
 
 export interface JobMeta {
   lastAttemptAt: string | null;
@@ -54,6 +55,13 @@ export async function runScrapeJob(store: Store, opts: JobOptions = {}): Promise
       log: (m) => console.warn(m),
     });
     await store.put(FEED_FILE, JSON.stringify(result.feed));
+    try {
+      const added = await recordHistory(store, result.feed.items, now);
+      if (added > 0) console.warn(`history: recorded ${added} new NOTAM(s)`);
+    } catch (err) {
+      // The corpus is a convenience: never fail (or delay) publishing the feed because of it.
+      console.warn(`history write failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
     // The cache only changes when a detail page was fetched, a row left the list, or the parser version moved.
     const cacheChanged =
       !file || file.parserVersion !== PARSER_VERSION || result.stats.fetched > 0 || Object.keys(result.cache).length !== Object.keys(file.entries).length;

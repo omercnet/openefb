@@ -75,10 +75,55 @@ nonisolated struct IsraelNotamGeometry: Codable, Equatable, Sendable {
     let circle: IsraelNotamCircle?
 }
 
+/// One altitude limit, in feet, from a NOTAM closure clause: "AT 2,500FT AMSL", "BLW 1,500FT", "BTN 1,000 AND 2,000FT".
+nonisolated struct IsraelAltitudeLimit: Codable, Equatable, Hashable, Sendable {
+    /// AT, BLW, ABV or BTN (a String so a future op can never fail the whole feed's decoding).
+    let op: String
+    let lowerFt: Int?  // feet; nil = unbounded below
+    let upperFt: Int?  // feet; nil = unbounded above
+    /// AMSL, AGL, or FL when written as a flight level (already converted to feet).
+    let ref: String?
+
+    /// Chart text: "2500", "BLW 1500", "ABV FL100", "1000-2000", "800 AGL".
+    var chartText: String {
+        func value(_ feet: Int) -> String { ref == "FL" ? "FL\(feet / 100)" : String(feet) }
+        let suffix = ref == "AGL" ? " AGL" : ""
+        switch (op, lowerFt, upperFt) {
+        case ("BTN", let lo?, let hi?): return "\(value(lo))-\(value(hi))\(suffix)"
+        case ("BLW", _, let hi?): return "BLW \(value(hi))\(suffix)"
+        case ("ABV", let lo?, _): return "ABV \(value(lo))\(suffix)"
+        case (_, let lo?, _): return value(lo) + suffix
+        case (_, _, let hi?): return value(hi) + suffix
+        default: return op
+        }
+    }
+}
+
+/// "AVBL BIDIRECTIONAL AT 3,000FT AMSL": an altitude at which the chain stays open. Same fields as the limit plus the direction.
+nonisolated struct IsraelAvailableAltitude: Codable, Equatable, Hashable, Sendable {
+    let op: String
+    let lowerFt: Int?  // feet
+    let upperFt: Int?  // feet
+    let ref: String?
+    /// BIDIRECTIONAL when written, otherwise nil.
+    let direction: String?
+
+    var limit: IsraelAltitudeLimit { IsraelAltitudeLimit(op: op, lowerFt: lowerFt, upperFt: upperFt, ref: ref) }
+}
+
+/// How a closure is drawn: red = closed, amber = closed only at some altitudes or with exceptions, amber "check NOTAM" = not read in full.
+nonisolated enum IsraelClosureSeverity: String, Sendable {
+    case full
+    case partial
+    case check
+}
+
 /// One ordered chain of published point codes closed by a NOTAM ("CVFR RTE CLSD GALIM-DAROM-HOTRM").
+/// The fields after `schedule` come from relay builds that read closure conditions; they are nil in older feeds,
+/// which then read as full closures (what those feeds meant).
 nonisolated struct IsraelRouteClosure: Codable, Equatable, Hashable, Sendable {
     let notamId: String
-    /// CVFR, HEL, ULTRALIGHT, ATS, ... as written before "RTE CLSD".
+    /// CVFR, HEL, ULTRALIGHT, ATS, ... as written before "RTE CLSD". CVFR when the clause covers CVFR.
     let routeKind: String
     /// ATS route designator ("P68 BTN A-B"), otherwise nil.
     let routeName: String?
@@ -89,6 +134,25 @@ nonisolated struct IsraelRouteClosure: Codable, Equatable, Hashable, Sendable {
     let validTo: Date?  // UTC
     /// D) text: the closure applies only at these times within the validity window.
     let schedule: String?
+    /// Every kind of the clause ("CVFR AND HEL RTE CLSD" -> CVFR, HEL).
+    var routeKinds: [String]? = nil
+    /// Altitudes at which the chain is closed; empty = closed at all altitudes.
+    var closedAltitudes: [IsraelAltitudeLimit]? = nil
+    /// Altitudes at which the chain stays open.
+    var availableAltitudes: [IsraelAvailableAltitude]? = nil
+    /// Raw exception text ("PPR FLT FM IAF"): the closure does not apply to these flights.
+    var exceptions: [String]? = nil
+    /// Closed only at some altitudes, or with exceptions.
+    var partial: Bool? = nil
+    /// false: looks like a closure but the relay could not read it in full. Show "check NOTAM".
+    var parsed: Bool? = nil
+    /// The clause text the relay read this closure from.
+    var raw: String? = nil
+
+    enum CodingKeys: String, CodingKey {
+        case notamId, routeKind, routeName, chain, validFrom, validTo, schedule
+        case routeKinds, closedAltitudes, availableAltitudes, exceptions, partial, parsed, raw
+    }
 
     /// Inside the validity window (ignores `schedule`; check `hasSchedule`).
     func isValid(at date: Date) -> Bool {
@@ -102,6 +166,41 @@ nonisolated struct IsraelRouteClosure: Codable, Equatable, Hashable, Sendable {
     /// Consecutive point pairs along the chain.
     var legs: [(from: String, to: String)] {
         zip(chain, chain.dropFirst()).map { (from: $0, to: $1) }
+    }
+
+    /// Kinds this closure applies to, upper-cased; falls back to `routeKind` for feeds without `routeKinds`.
+    var kinds: [String] {
+        let listed = (routeKinds ?? []).map { $0.uppercased() }
+        return listed.isEmpty ? [routeKind.uppercased()] : listed
+    }
+
+    func covers(_ kind: String) -> Bool { kinds.contains(kind.uppercased()) }
+
+    var severity: IsraelClosureSeverity {
+        if parsed == false { return .check }
+        return partial == true ? .partial : .full
+    }
+}
+
+extension IsraelRouteClosure {
+    /// The conditions are decoded leniently: a malformed optional field must never cost the pilot the whole feed.
+    nonisolated init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        notamId = try c.decode(String.self, forKey: .notamId)
+        routeKind = try c.decode(String.self, forKey: .routeKind)
+        routeName = try c.decodeIfPresent(String.self, forKey: .routeName)
+        chain = try c.decode([String].self, forKey: .chain)
+        validFrom = try c.decodeIfPresent(Date.self, forKey: .validFrom)
+        validTo = try c.decodeIfPresent(Date.self, forKey: .validTo)
+        schedule = try c.decodeIfPresent(String.self, forKey: .schedule)
+        routeKinds = try? c.decodeIfPresent([String].self, forKey: .routeKinds)
+        closedAltitudes = try? c.decodeIfPresent([IsraelAltitudeLimit].self, forKey: .closedAltitudes)
+        availableAltitudes = try? c.decodeIfPresent([IsraelAvailableAltitude].self, forKey: .availableAltitudes)
+        exceptions = try? c.decodeIfPresent([String].self, forKey: .exceptions)
+        partial = try? c.decodeIfPresent(Bool.self, forKey: .partial)
+        // A `parsed` we cannot read must not turn into "fully read": treat it as unread.
+        if c.contains(.parsed) { parsed = (try? c.decode(Bool.self, forKey: .parsed)) ?? false }
+        raw = try? c.decodeIfPresent(String.self, forKey: .raw)
     }
 }
 

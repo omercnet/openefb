@@ -144,6 +144,7 @@ final class IsraelChartOverlay {
         static let airspaceLabelsOther = "il-as-labels-other"
         static let runways = "il-runway-lines"
         static let closureCasing = "il-closure-casing"
+        static let closureCautionCasing = "il-closure-caution-casing"
         static let closureLabels = "il-closure-label-symbols"
         static let aerodromesSource = "il-aerodromes"
         static let aerodromeIcons = "il-aerodrome-icons"
@@ -156,7 +157,7 @@ final class IsraelChartOverlay {
             .cvfrAirspace: [airspaceFillCivil, airspaceLineCivil, airspaceFillRestricted, airspaceLineRestricted,
                             airspaceLabelsTMA, airspaceLabelsOther],
             .cvfrRunways: [runways],
-            .cvfrClosures: [closureCasing, closureLabels]
+            .cvfrClosures: [closureCasing, closureCautionCasing, closureLabels]
         ]
     }
 
@@ -498,15 +499,19 @@ final class IsraelChartOverlay {
         style.addSource(labelSource)
         closureLabelSource = labelSource
 
-        // Red hatch over the closed leg: a wide dashed casing reads as "struck through" even at country zoom.
-        let casing = MLNLineStyleLayer(identifier: ID.closureCasing, source: source)
-        casing.lineWidth = NSExpression(
-            format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)",
-            [6: 4, 9: 6, 13: 9] as [Int: Double]
-        )
-        casing.lineCap = NSExpression(forConstantValue: "butt")
-        casing.lineDashPattern = NSExpression(forConstantValue: [1.2, 1.0])
-        place(casing, in: style)
+        // Red hatch over a fully closed leg: a wide dashed casing reads as "struck through" even at country zoom.
+        // Partial and unread closures use the same hatch in amber (second layer, filtered on the feature's `sev`).
+        for (id, isFull) in [(ID.closureCasing, true), (ID.closureCautionCasing, false)] {
+            let casing = MLNLineStyleLayer(identifier: id, source: source)
+            casing.predicate = NSPredicate(format: isFull ? "sev == 'full'" : "sev != 'full'")
+            casing.lineWidth = NSExpression(
+                format: "mgl_interpolate:withCurveType:parameters:stops:($zoomLevel, 'linear', nil, %@)",
+                [6: 4, 9: 6, 13: 9] as [Int: Double]
+            )
+            casing.lineCap = NSExpression(forConstantValue: "butt")
+            casing.lineDashPattern = NSExpression(forConstantValue: [1.2, 1.0])
+            place(casing, in: style)
+        }
 
         let label = MLNSymbolStyleLayer(identifier: ID.closureLabels, source: labelSource)
         label.iconImageName = NSExpression(forKeyPath: "icon")
@@ -529,7 +534,7 @@ final class IsraelChartOverlay {
         } else {
             closureStatus = .noFeed
         }
-        let key = set.marks.mapValues(\.text)
+        let key = set.marks.mapValues { $0.severity.rawValue + $0.text }
         guard force || key != appliedClosureKey else { return }
         appliedClosureKey = key
 
@@ -538,10 +543,13 @@ final class IsraelChartOverlay {
         var labels: [MLNShape] = []
         for feature in features {
             var coords = feature.polyline
-            lines.append(MLNPolylineFeature(coordinates: &coords, count: UInt(coords.count)))
+            let line = MLNPolylineFeature(coordinates: &coords, count: UInt(coords.count))
+            line.attributes = ["sev": feature.mark.severity.rawValue]
+            lines.append(line)
             let point = MLNPointFeature()
             point.coordinate = feature.labelCoordinate
-            point.attributes = ["icon": sprite(.closure, feature.mark.text), "rot": feature.rotationDegrees]
+            let kind: IsraelChartLabelKind = feature.mark.severity == .full ? .closure : .closureCaution
+            point.attributes = ["icon": sprite(kind, feature.mark.text), "rot": feature.rotationDegrees]
             labels.append(point)
         }
         closureSource?.shape = MLNShapeCollectionFeature(shapes: lines)
@@ -681,7 +689,9 @@ final class IsraelChartOverlay {
         fill(ID.airspaceFillRestricted)?.fillColor = NSExpression(forConstantValue: p.restricted)
         fill(ID.airspaceFillRestricted)?.fillOpacity = NSExpression(forConstantValue: p.airspaceFillOpacity + 0.05)
         line(ID.runways)?.lineColor = NSExpression(forConstantValue: p.runway)
+        // Red only for a full closure; partial closures and "check NOTAM" are amber (COMMON.md: red = warning, amber = caution).
         line(ID.closureCasing)?.lineColor = NSExpression(forConstantValue: p.closure)
+        line(ID.closureCautionCasing)?.lineColor = NSExpression(forConstantValue: p.restricted)
         applyOfficial()
     }
 

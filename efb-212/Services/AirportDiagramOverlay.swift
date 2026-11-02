@@ -65,6 +65,8 @@ final class AirportDiagramOverlay {
 
     /// ICAO idents of the airports whose diagram is currently drawn (for tests and the layer panel).
     private(set) var shownAirports: [String] = []
+    /// True while at least one diagram is on screen (enabled, zoomed in far enough); drives the Israel badge.
+    private(set) var isShowing = false
 
     private weak var mapView: MLNMapView?
     private weak var style: MLNStyle?
@@ -133,6 +135,7 @@ final class AirportDiagramOverlay {
     /// Re-evaluates on camera changes. Cheap: three property reads per tick.
     private func pollCamera() {
         guard let mapView else { return }
+        if region == .israel, !entries.isEmpty { raiseAboveIsraelFills() }  // IL-3 may re-add its fills at any time
         let center = mapView.centerCoordinate
         let camera = (center.latitude, center.longitude, mapView.zoomLevel)
         if let last = lastCamera,
@@ -150,6 +153,7 @@ final class AirportDiagramOverlay {
         guard let mapView, style != nil else { return }
         let zoomedIn = mapView.zoomLevel >= Self.minimumZoom - 0.5  // start loading slightly before 14
         let visible = isEnabled && mapView.zoomLevel >= Self.minimumZoom
+        isShowing = visible && !entries.isEmpty
         for entry in entries.values {
             style?.layer(withIdentifier: entry.layerID)?.isVisible = visible
             style?.layer(withIdentifier: entry.backingLayerID)?.isVisible = visible
@@ -230,6 +234,7 @@ final class AirportDiagramOverlay {
     /// Aerodromes near the camera whose diagram is georeferenced in the installed pack, nearest first.
     /// Nothing is drawn without an installed, servable edition.
     private func refreshIsrael(mapView: MLNMapView) {
+        raiseAboveIsraelFills()
         guard let pack = IsraelDiagramStore.shared.pack else { return }
         let center = mapView.centerCoordinate
         let wanted = Self.georeferencedAerodromes(pack: pack, near: center, limit: Self.maximumAirports)
@@ -336,16 +341,30 @@ final class AirportDiagramOverlay {
         let backingSourceID = "apd-backing-source-\(icao)", backingLayerID = "apd-backing-\(icao)"
         let visible = isEnabled && (mapView?.zoomLevel ?? 0) >= Self.minimumZoom
 
-        var ring = corners.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
-        let backingSource = MLNShapeSource(identifier: backingSourceID, shape: MLNPolygon(coordinates: &ring, count: UInt(ring.count)), options: nil)
-        style.addSource(backingSource)
-        let backing = MLNFillStyleLayer(identifier: backingLayerID, source: backingSource)
-        backing.fillOpacity = NSExpression(
-            forMLNInterpolating: .zoomLevelVariable, curveType: .linear, parameters: nil,
-            stops: NSExpression(forConstantValue: Self.backingOpacityByZoom)
-        )
-        backing.minimumZoomLevel = Float(Self.minimumZoom)
-        backing.isVisible = visible
+        let backing: MLNStyleLayer
+        if region == .israel {
+            // A solid-colour raster, not a fill polygon: the fill was not rendered where IL-3's airspace fills
+            // are drawn, while rasters follow the style order. Opaque.
+            let backingSource = MLNImageSource(identifier: backingSourceID, coordinateQuad: quad, image: Self.solidImage(isNight ? Self.nightBackingColor : Self.dayBackingColor))
+            style.addSource(backingSource)
+            let solid = MLNRasterStyleLayer(identifier: backingLayerID, source: backingSource)
+            solid.rasterOpacity = NSExpression(forConstantValue: 1.0)
+            solid.minimumZoomLevel = Float(Self.minimumZoom)
+            solid.isVisible = visible
+            backing = solid
+        } else {
+            var ring = corners.map { CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude) }
+            let backingSource = MLNShapeSource(identifier: backingSourceID, shape: MLNPolygon(coordinates: &ring, count: UInt(ring.count)), options: nil)
+            style.addSource(backingSource)
+            let fill = MLNFillStyleLayer(identifier: backingLayerID, source: backingSource)
+            fill.fillOpacity = NSExpression(
+                forMLNInterpolating: .zoomLevelVariable, curveType: .linear, parameters: nil,
+                stops: NSExpression(forConstantValue: Self.backingOpacityByZoom)
+            )
+            fill.minimumZoomLevel = Float(Self.minimumZoom)
+            fill.isVisible = visible
+            backing = fill
+        }
 
         let source = MLNImageSource(identifier: sourceID, coordinateQuad: quad, image: image)
         style.addSource(source)
@@ -370,12 +389,66 @@ final class AirportDiagramOverlay {
             backingSourceID: backingSourceID, backingLayerID: backingLayerID, georeference: georeference
         )
         shownAirports = entries.keys.sorted()
+        if region == .israel {
+            // IL-3 adds its airspace fills below ownship as its data loads, which can land them above the diagram.
+            raiseAboveIsraelFills()
+            Task { [weak self] in
+                for seconds in [2, 3] {
+                    try? await Task.sleep(for: .seconds(seconds))
+                    self?.raiseAboveIsraelFills()
+                }
+            }
+        }
         logger.notice("APD \(icao, privacy: .public) drawn: \(georeference.diagnostics.method.rawValue, privacy: .public), \(georeference.diagnostics.feetPerPoint, format: .fixed(precision: 1), privacy: .public) ft/pt")
     }
 
+    /// IL-3 airspace fills (`il-as-fill-*`) must sit below the diagram (a CTR tint over a diagram hides it) and
+    /// the diagram below ownship. Re-inserts each diagram's backing and raster directly above the topmost fill
+    /// when they are out of that order.
+    private func raiseAboveIsraelFills() {
+        guard region == .israel, let style else { return }
+        let fills = ["il-as-fill-civil", "il-as-fill-restricted"]
+        func index(_ id: String) -> Int? { style.layers.firstIndex { $0.identifier == id } }
+        for entry in entries.values {
+            guard let topFill = style.layers.last(where: { fills.contains($0.identifier) }),
+                  let fillIndex = index(topFill.identifier),
+                  let backingIndex = index(entry.backingLayerID), let rasterIndex = index(entry.layerID) else { continue }
+            let ownshipIndex = index("ownship-symbol")
+            let belowFill = min(backingIndex, rasterIndex) < fillIndex
+            let aboveOwnship = ownshipIndex.map { max(backingIndex, rasterIndex) > $0 } ?? false
+            guard belowFill || aboveOwnship else { continue }
+            guard let backing = style.layer(withIdentifier: entry.backingLayerID),
+                  let raster = style.layer(withIdentifier: entry.layerID) else { continue }
+            style.removeLayer(backing)
+            style.removeLayer(raster)
+            style.insertLayer(backing, above: topFill)
+            style.insertLayer(raster, above: backing)
+        }
+        // MapService's airspace tint (`airspace-fill`) sits above ownship in the style; a CTR tint over a diagram
+        // washes it out (at night the dark backing turns mid-grey). Put it below the lowest diagram.
+        if let lowest = entries.values.compactMap({ index($0.backingLayerID) }).min(),
+           let tintIndex = index("airspace-fill"), tintIndex > lowest,
+           let tint = style.layer(withIdentifier: "airspace-fill") {
+            let anchor = style.layers[lowest]
+            style.removeLayer(tint)
+            style.insertLayer(tint, below: anchor)
+        }
+    }
+
+    /// A 4 x 4 image of one colour (the Israel backing, stretched over the diagram quad).
+    private static func solidImage(_ color: UIColor) -> UIImage {
+        let size = CGSize(width: 4, height: 4)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            color.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+
     /// Day: black ink on a white backing. Night: dark backing, ink lifted to light grey (no white slab).
-    private static func style(backing: MLNFillStyleLayer, diagram: MLNRasterStyleLayer, night: Bool) {
-        backing.fillColor = NSExpression(forConstantValue: night ? nightBackingColor : dayBackingColor)
+    private static func style(backing: MLNStyleLayer, diagram: MLNRasterStyleLayer, night: Bool) {
+        if let fill = backing as? MLNFillStyleLayer {
+            fill.fillColor = NSExpression(forConstantValue: night ? nightBackingColor : dayBackingColor)
+        }
         diagram.minimumRasterBrightness = NSExpression(forConstantValue: night ? nightInkBrightnessMin : 0.0)
         diagram.maximumRasterBrightness = NSExpression(forConstantValue: night ? nightInkBrightnessMax : 1.0)
     }
@@ -385,9 +458,12 @@ final class AirportDiagramOverlay {
         isNight = night
         guard let style else { return }
         for entry in entries.values {
-            guard let backing = style.layer(withIdentifier: entry.backingLayerID) as? MLNFillStyleLayer,
+            guard let backing = style.layer(withIdentifier: entry.backingLayerID),
                   let diagram = style.layer(withIdentifier: entry.layerID) as? MLNRasterStyleLayer else { continue }
             Self.style(backing: backing, diagram: diagram, night: night)
+            if let solid = style.source(withIdentifier: entry.backingSourceID) as? MLNImageSource {
+                solid.image = Self.solidImage(night ? Self.nightBackingColor : Self.dayBackingColor)
+            }
         }
     }
 

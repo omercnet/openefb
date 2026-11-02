@@ -47,6 +47,7 @@ struct IsraelNearestAndSearchTests {
             aerodrome("LLRS", he: "ראשון לציון", lat: 31.9675, lon: 34.7536, ppr: .yes, runways: [runway("18/36", length: 660, width: 9)]),
             aerodrome("ICHILOV", lat: 32.08, lon: 34.79, type: .heliport, use: .hospital, runways: [runway("08/26", length: 28, surface: "concrete")]),
             aerodrome("LLES", lat: 32.44, lon: 35.00, use: .uas),
+            aerodrome("ULTRA", lat: 32.18, lon: 34.83, use: .ultralight),   // closest field of all, ultralight only
             aerodrome("GVULT", lat: 31.2275, lon: 34.4603, use: .agricultural, ppr: .yes, runways: []),
             aerodrome("LLEK", lat: 31.84, lon: 34.82, use: .military, runways: [runway("?", length: 2450, surface: "unknown")]),
             aerodrome("LLBG", he: "בן גוריון", lat: 32.0094, lon: 34.8856, runways: [runway("08/26", length: 4062, width: 45)]),
@@ -97,6 +98,29 @@ struct IsraelNearestAndSearchTests {
         let distances = vm.nearestAirports.map(\.distance)   // nautical miles
         #expect(distances == distances.sorted())
         #expect(abs(distances[0] - 0.1) < 0.2)
+    }
+
+    /// Adjudication rule 4: an ultralight-only strip (LLRS, LLEV) is never offered to conventional GA aircraft,
+    /// even when it is the closest field with a runway.
+    @Test func nrstExcludesUltralightOnlyStrips() {
+        let (vm, _) = Self.viewModel()
+        vm.updateNearest(from: Self.here)
+        #expect(!vm.nearestAirports.map(\.airport.icao).contains("ULTRA"))
+        #expect(vm.nearestAirport?.icao == "LLHZ")
+        #expect(IsraelAerodromeAdapter.notLandableUses.contains(.ultralight))
+    }
+
+    @Test func theBundledUltralightStripsAreMarkedUltralightAndSkippedByNrst() throws {
+        let db = try IsraelAviationDatabase.bundled()
+        let rishon = try #require(try db.aerodrome(code: "LLRS"))
+        let einVered = try #require(try db.aerodrome(code: "LLEV"))
+        #expect(rishon.use == .ultralight && einVered.use == .ultralight)
+        let vm = NearestAirportViewModel(appState: { let s = AppState(); s.region = .israel; return s }(),
+                                         databaseService: MockDatabaseManager(), israelDatabaseProvider: { db })
+        vm.updateNearest(from: CLLocation(latitude: 31.9675, longitude: 34.7536))   // on the LLRS reference point
+        #expect(!vm.nearestAirports.map(\.airport.icao).contains("LLRS"))
+        #expect(!vm.nearestAirports.map(\.airport.icao).contains("LLEV"))
+        #expect(!vm.nearestAirports.isEmpty)
     }
 
     @Test func nrstFlagsPPRFromTheAIPAndNothingElse() {

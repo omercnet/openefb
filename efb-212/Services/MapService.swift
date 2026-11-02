@@ -507,6 +507,25 @@ final class MapService {
         routeSource?.shape = polyline
     }
 
+    /// Draw a routed path along its own vertices (Israel CVFR route).
+    func updateRoute(path: [CLLocationCoordinate2D]) {
+        guard path.count >= 2 else { return }
+        var coords = path
+        routeSource?.shape = MLNPolylineFeature(coordinates: &coords, count: UInt(coords.count))
+        raiseRouteLayer()
+    }
+
+    /// The Israel chart's route lines are added after the route layer and would hide it; put it back on top (below ownship).
+    private func raiseRouteLayer() {
+        guard let style = mapView?.style, let layer = style.layer(withIdentifier: "route-line-layer") else { return }
+        style.removeLayer(layer)
+        if let ownship = style.layer(withIdentifier: "ownship-symbol") {
+            style.insertLayer(layer, below: ownship)
+        } else {
+            style.addLayer(layer)
+        }
+    }
+
     /// Clear the route line from the map.
     func clearRoute() {
         routeSource?.shape = MLNShapeCollectionFeature(shapes: [])
@@ -712,7 +731,9 @@ final class MapService {
         case .advisories: return ["advisory-fill", "advisory-border"]
         case .ownship: return ["ownship-symbol"]
         case .sectional: return []  // the sectional is a base-style.json layer driven by `setMapStyle`
-        case .route: return ["route-line-layer"]
+        // The route line is shown by having a route in its source, never hidden by the layer sync:
+        // `.route` is not in `visibleLayers`, so the sync would hide a drawn route on its next pass.
+        case .route: return []
         case .cvfrRoutes, .cvfrPoints, .cvfrAirspace, .cvfrRunways, .cvfrClosures: return []  // drawn by `israelChart`
         }
     }

@@ -14,7 +14,7 @@ export const SUMMARY_FIELDS: { key: string; label: string }[] = [
   { key: "hypotheses", label: "Does this confirm or contradict CUSTOMER.md?" },
 ];
 
-const INSTRUCTIONS = `You turn a customer-discovery interview transcript into notes. Return ONLY a JSON object with string values for exactly these keys: ${SUMMARY_FIELDS.map((f) => f.key).join(", ")}.
+const INSTRUCTIONS = `You turn a customer-discovery interview transcript into notes (the transcript may be in Hebrew: write the notes in English, but keep "quotes" verbatim in the original language). Return ONLY a JSON object with string values for exactly these keys: ${SUMMARY_FIELDS.map((f) => f.key).join(", ")}.
 Rules: use only what the pilot actually said about real past events; no speculation. Keep each value short (bullet-ish sentences separated by "; "). "quotes" = 2-4 verbatim pilot quotes in quotation marks. "hypotheses" = for each of J1 in-flight awareness is the anchor job / trust is the worst-served dimension / Little Hire (failure on any single flight) / panel GPS is a key alternative, say confirms, contradicts or no evidence, with one phrase of evidence. Write "-" when the transcript has nothing for a field.`;
 
 export async function summarize(id: string): Promise<void> {

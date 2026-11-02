@@ -34,6 +34,12 @@ extension SchemaV1 {
         /// Cruise true airspeed -- knots.
         var cruiseSpeedKts: Double?
 
+        /// ICAO type designator for flight plans (e.g., "C172"). nil = filed as ZZZZ with TYP/.
+        var icaoTypeDesignator: String?
+
+        /// Usual persons on board, for the flight plan (P/). nil = ask.
+        var personsOnBoard: Int?
+
         /// JSON-encoded VSpeeds struct (optional).
         var vSpeedsData: Data?
 

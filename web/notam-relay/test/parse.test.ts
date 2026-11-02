@@ -192,6 +192,8 @@ describe("route closures", () => {
     expect(item.closures.map((c) => [c.routeKind, c.routeName, c.chain.join("-")])).toEqual([
       ["ATS", "P68", "GALIM-MERVA"],
       ["ATS", "Q17", "ATLIT-ZAHAV"],
+      ["ATS", "J15", "NAT-ATLIT"],
+      ["ATS", "Q28", "GALIM-ATLIT"],
     ]);
   });
 
@@ -221,7 +223,8 @@ describe("route closures", () => {
   it("flags a closure sentence it could not read as parsed: false, keeping the raw text", () => {
     const raw = "(C0009/26 NOTAMN\nQ) LLLL/QARLC/IV/NBO/E /000/050/3200N03500E005\nA) LLLL B) 2601010000 C) 2601020000\nE) CVFR RTE CLSD BETWEEN THE TWO LAKES.)";
     const item = parse(raw);
-    expect(item.closures).toEqual([]);
+    // never dropped: emitted unread, with the clause text, so the app can say "possible closure, read NOTAM"
+    expect(item.closures).toMatchObject([{ parsed: false, chain: [], routeKinds: ["CVFR"], raw: "CVFR RTE CLSD BETWEEN THE TWO LAKES" }]);
     expect(item.parsed).toBe(false);
     expect(item.raw).toBe(raw);
   });

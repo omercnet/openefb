@@ -53,6 +53,7 @@ struct Result: Codable {
     let worstLengthErrorPercent: Double?
     let feetPerPoint: Double?
     let files: [String]
+    var arpErrorFeet: Double? = nil   // printed ARP symbol vs AIP ARP, feet
 }
 
 // MARK: - Arguments
@@ -141,38 +142,120 @@ func refit(_ fit: G.SimilarityFit, matches: [G.RunwayMatch]) -> G.SimilarityFit?
     return G.SimilarityFit(scale: x[0], rotationDegrees: fit.rotationDegrees, translation: CGPoint(x: x[1], y: x[2]))
 }
 
-func georeference(_ entry: Control.Entry, pdfData: Data) throws -> (AirportDiagramGeoreference, [G.RunwayMatch]) {
+/// Israeli gate (owner decision Q6, B): 100 ft on runway ends and midpoints. The US stays at 50 ft.
+let israelRunwayGateFeet = 100.0
+/// The AIP gives the ARP to whole arc-seconds: 1" is about 31 m north-south and 26 m east-west at 31-33 N.
+let arpRoundingNorthMetres = 31.0   // metres
+let arpRoundingEastMetres = 26.0    // metres
+
+/// The printed ARP symbol: the small circle nearest an "ARP" label (page points), or nil.
+func arpSymbol(document: PDFDocument, page: PDFPage, vectors: PDFVectorScanner.Result) -> CGPoint? {
+    let labels = document.findString("ARP", withOptions: []).map { $0.bounds(for: page) }
+    guard !labels.isEmpty else { return nil }
+    // The ARP symbol is a small circle with a cross through its centre.
+    func hasCross(_ b: CGRect) -> Bool {
+        let centre = CGPoint(x: b.midX, y: b.midY), box = b.insetBy(dx: -1.5, dy: -1.5)
+        let through = vectors.segments.filter { s in
+            let length = hypot(s.1.x - s.0.x, s.1.y - s.0.y)
+            guard length >= 0.6 * b.width, box.contains(s.0), box.contains(s.1) else { return false }
+            let distance = abs((s.1.x - s.0.x) * (s.0.y - centre.y) - (s.0.x - centre.x) * (s.1.y - s.0.y)) / length
+            return distance < 1.5
+        }
+        return through.count >= 2
+    }
+    let circles = vectors.polygons.filter { polygon in
+        let b = polygon.bounds
+        return polygon.curves >= 4 && (3...16).contains(b.width) && (3...16).contains(b.height) && abs(b.width - b.height) < 2 && hasCross(b)
+    }.map { CGPoint(x: $0.bounds.midX, y: $0.bounds.midY) }
+    var best: (point: CGPoint, gap: CGFloat)?
+    for label in labels {
+        for c in circles {
+            let gap = hypot(max(label.minX - c.x, 0, c.x - label.maxX), max(label.minY - c.y, 0, c.y - label.maxY))
+            if gap < 45, gap < (best?.gap ?? .greatestFiniteMagnitude) { best = (c, gap) }
+        }
+    }
+    if inspect { print("    ARP labels \(labels.count), circles \(circles.count), pick \(String(describing: best))") }
+    return best?.point
+}
+
+struct Outcome {
+    let georeference: AirportDiagramGeoreference
+    let matches: [G.RunwayMatch]
+    let arpErrorFeet: Double?   // printed ARP vs AIP ARP, feet
+}
+
+func georeference(_ entry: Control.Entry, pdfData: Data) throws -> Outcome {
     guard let ref = reference(entry.icao) else { throw Reject.message("aerodrome not in israel-aviation.sqlite") }
     let dbRunways = runways(entry.icao).filter(\.hasCoordinates)
-    guard dbRunways.count >= 2 else {
-        throw Reject.message("\(dbRunways.count) runway in the database: a single runway cannot give an independent position check (sheet only)")
-    }
+    guard !dbRunways.isEmpty else { throw Reject.message("no runway with coordinates in the database") }
     guard let document = PDFDocument(data: pdfData), let page = document.page(at: 0), let cgPage = page.pageRef else {
         throw Reject.message("unreadable PDF")
     }
     let pageBox = page.bounds(for: .mediaBox)
     let vectors = PDFVectorScanner.scan(page: cgPage)
     let drawn = vectors.runwayShapes()
-    guard drawn.count >= 2 else { throw Reject.message("\(drawn.count) runway polygons found in the vector stream") }
+    guard !drawn.isEmpty else { throw Reject.message("no runway polygon found in the vector stream (apron or parking sheet)") }
     let metres = AirportDiagramGeoreference.metresPerDegree(latitude: ref.latitude)
     let local: (Double, Double) -> CGPoint = { lat, lon in
         CGPoint(x: (lon - ref.longitude) * metres.lon, y: (lat - ref.latitude) * metres.lat)
     }
-    let solution: G.FitSolution
-    do { solution = try G.fit(labels: [], drawn: drawn, database: dbRunways, local: local) }
-    catch { throw Reject.message("no runway hypothesis: \(error)") }
-    var current = solution.fit
-    if let forced = entry.rotationDegrees, forced != current.rotationDegrees {
-        throw Reject.message("fit rotation \(current.rotationDegrees) disagrees with north arrow \(forced)")
-    }
-    var matches = solution.matches
-    // Two refit passes: matches can change once the translation moves.
-    for _ in 0..<2 {
-        guard let better = refit(current, matches: matches) else {
-            throw Reject.message("only \(matches.count) runway(s) matched the drawn polygons")
+    var affine = CGAffineTransform.identity
+    var rotationDiagnostic = 0   // degrees the page is rotated against true north
+    let tolerances = G.Tolerances(runwayFeet: devToleranceFeet ?? israelRunwayGateFeet)
+    var current: G.SimilarityFit
+    var matches: [G.RunwayMatch]
+    if dbRunways.count >= 2 {
+        guard drawn.count >= 2 else { throw Reject.message("\(drawn.count) runway polygons found for \(dbRunways.count) runways") }
+        let solution: G.FitSolution
+        do { solution = try G.fit(labels: [], drawn: drawn, database: dbRunways, local: local) }
+        catch { throw Reject.message("no runway hypothesis: \(error)") }
+        current = solution.fit
+        if let forced = entry.rotationDegrees, forced != current.rotationDegrees {
+            throw Reject.message("fit rotation \(current.rotationDegrees) disagrees with north arrow \(forced)")
         }
-        current = better
-        matches = G.matchRunways(fit: current, drawn: drawn, database: dbRunways, local: local)
+        matches = solution.matches
+        // Two refit passes: matches can change once the translation moves.
+        for _ in 0..<2 {
+            guard let better = refit(current, matches: matches) else {
+                throw Reject.message("only \(matches.count) runway(s) matched the drawn polygons")
+            }
+            current = better
+            matches = G.matchRunways(fit: current, drawn: drawn, database: dbRunways, local: local)
+        }
+        guard matches.count >= 2 else { throw Reject.message("only \(matches.count) runway(s) matched after refit") }
+        affine = current.transform
+        rotationDiagnostic = current.rotationDegrees
+    } else {
+        // One runway: scale from the GIS length, position from the runway midpoint, rotation from the GIS runway
+        // bearing (accepted only within 10 degrees of north-up: charts are north-up or drawn to magnetic north,
+        // variation about 5 E). Nothing left over validates that, so the printed ARP is the independent check.
+        let runway = dbRunways[0]
+        let maximumOffNorth = 10.0 * Double.pi / 180
+        let base = local(runway.baseLatitude, runway.baseLongitude), recip = local(runway.reciprocalLatitude, runway.reciprocalLongitude)
+        let groundAngle = atan2(recip.y - base.y, recip.x - base.x)
+        let groundMid = CGPoint(x: (base.x + recip.x) / 2, y: (base.y + recip.y) / 2)
+        func offset(_ s: G.RunwayShape) -> Double {   // radians in (-pi/2, pi/2]: page rotation that aligns the drawn axis
+            var d = groundAngle - atan2(Double(s.end.y - s.start.y), Double(s.end.x - s.start.x))
+            while d > .pi / 2 { d -= .pi }
+            while d <= -.pi / 2 { d += .pi }
+            return d
+        }
+        guard let shape = drawn.filter({ abs(offset($0)) < maximumOffNorth }).max(by: { $0.length < $1.length }) else {
+            let detail = drawn.map { "len \(Int($0.length)) pt, page rotation \(Int(offset($0) * 180 / .pi)) deg" }.joined(separator: "; ")
+            throw Reject.message("no drawn runway within 10 degrees of north-up alignment with the GIS runway: \(detail)")
+        }
+        let delta = offset(shape)
+        let scale = runway.lengthFeet / G.feetPerMetre / Double(shape.length)
+        let turn = CGAffineTransform(a: scale * cos(delta), b: scale * sin(delta), c: -scale * sin(delta), d: scale * cos(delta), tx: 0, ty: 0)
+        let placed = shape.midpoint.applying(turn)
+        affine = CGAffineTransform(a: turn.a, b: turn.b, c: turn.c, d: turn.d, tx: groundMid.x - placed.x, ty: groundMid.y - placed.y)
+        rotationDiagnostic = Int((delta * 180 / .pi).rounded())
+        current = G.SimilarityFit(scale: scale, rotationDegrees: 0, translation: .zero)   // only the scale is read afterwards
+        let s0 = shape.start.applying(affine), e0 = shape.end.applying(affine)
+        let ends = min(max(G.distance(s0, base), G.distance(e0, recip)), max(G.distance(s0, recip), G.distance(e0, base)))
+        // Fitted from this runway, so its centreline and midpoint agree by construction; the ends are recorded.
+        matches = [G.RunwayMatch(runway: runway, shape: shape, groundMidpoint: groundMid, residualFeet: 0, lengthError: 0, midpointFeet: 0,
+                                 crossTrackFeet: 0, endFeet: ends * G.feetPerMetre, bearingErrorDegrees: abs(delta) * 180 / .pi)]
     }
     if inspect {
         print("  \(entry.icao): rotation \(current.rotationDegrees) scale \(current.scale) m/pt, \(drawn.count) drawn, \(matches.count) matched")
@@ -180,8 +263,6 @@ func georeference(_ entry: Control.Entry, pdfData: Data) throws -> (AirportDiagr
             print("    \(m.runway.identifier): residual \(Int(m.residualFeet)) ft, midpoint \(Int(m.midpointFeet)) ft, cross-track \(Int(m.crossTrackFeet)) ft, length \(String(format: "%.1f", m.lengthError * 100))%")
         }
     }
-    guard matches.count >= 2 else { throw Reject.message("only \(matches.count) runway(s) matched after refit") }
-    let tolerances = devToleranceFeet.map { G.Tolerances(runwayFeet: $0) } ?? G.Tolerances.standard
     if let worst = matches.map(\.residualFeet).max(), worst > tolerances.runwayFeet {
         throw Reject.message("runway cross-check failed: worst runway error \(Int(worst)) ft (gate \(Int(tolerances.runwayFeet)) ft)")
     }
@@ -194,22 +275,39 @@ func georeference(_ entry: Control.Entry, pdfData: Data) throws -> (AirportDiagr
     let feetPerPoint = current.scale * G.feetPerMetre
     guard G.feetPerPointRange.contains(feetPerPoint) else { throw Reject.message("implausible scale \(feetPerPoint) ft/pt") }
 
+    // ARP check: printed symbol vs AIP coordinate, after the fit. Required with one runway; recorded otherwise.
+    var arpError: Double?
+    if let symbol = arpSymbol(document: document, page: page, vectors: vectors) {
+        let ground = symbol.applying(affine)
+        let aip = local(ref.latitude, ref.longitude)
+        let dNorth = Double(ground.y - aip.y), dEast = Double(ground.x - aip.x)
+        arpError = hypot(dNorth, dEast) * G.feetPerMetre
+        if inspect { print("    ARP: north \(Int(dNorth)) m, east \(Int(dEast)) m") }
+        let allowedNorth = israelRunwayGateFeet / G.feetPerMetre + arpRoundingNorthMetres
+        let allowedEast = israelRunwayGateFeet / G.feetPerMetre + arpRoundingEastMetres
+        if dbRunways.count == 1, abs(dNorth) > allowedNorth || abs(dEast) > allowedEast {
+            throw Reject.message("ARP check failed: printed ARP is \(Int(abs(dNorth))) m N-S and \(Int(abs(dEast))) m E-W from the AIP ARP (allowed \(Int(allowedNorth)) and \(Int(allowedEast)) m)")
+        }
+    } else if dbRunways.count == 1 {
+        throw Reject.message("no printed ARP symbol found: a single runway has no independent position check (sheet only)")
+    }
+
     let clip = entry.clipRect.map { CGRect(x: $0[0], y: $0[1], width: $0[2], height: $0[3]) }
         ?? vectors.neatline(pageBox: pageBox, gridLines: vectors.gridLines())
-    let t = current.transform
+    let t = affine
     let g = AirportDiagramGeoreference(
         a: Double(t.a), b: Double(t.b), c: Double(t.c), d: Double(t.d), tx: Double(t.tx), ty: Double(t.ty),
         reference: .init(pageBox), referenceLatitude: ref.latitude, referenceLongitude: ref.longitude,
         pageBox: .init(pageBox), clipBox: .init(clip), masks: [],
         diagnostics: .init(
             method: .runway, labelSource: .none, latitudeLabels: 0, longitudeLabels: 0,
-            rotationDegrees: current.rotationDegrees, feetPerPoint: feetPerPoint, scaleRatio: nil,
+            rotationDegrees: rotationDiagnostic, feetPerPoint: feetPerPoint, scaleRatio: nil,
             runwaysMatched: matches.count, runwayResidualFeet: matches.map(\.residualFeet).max(),
             runwayMidpointFeet: matches.map(\.midpointFeet).max(), runwayEndFeet: matches.map(\.endFeet).max(),
             runwayBestMidpointFeet: matches.map(\.midpointFeet).min(),
             runwayMedianMidpointFeet: G.median(matches.map(\.midpointFeet)),
             maskedInsets: entry.maskRects?.count ?? 0))
-    return (g, matches)
+    return Outcome(georeference: g, matches: matches, arpErrorFeet: arpError)
 }
 
 /// Renders the clip box with the core, then clears the hand-picked table and inset rectangles.
@@ -251,7 +349,8 @@ for entry in control.entries where only.isEmpty || only.contains(entry.icao) {
     try pdfData.write(to: outDir.appendingPathComponent("\(entry.icao).pdf"))
     manifestFiles.append(["name": "\(entry.icao).pdf", "bytes": pdfData.count, "sha256": sha256(pdfData)])
     do {
-        let (g, matches) = try georeference(entry, pdfData: pdfData)
+        let outcome = try georeference(entry, pdfData: pdfData)
+        let g = outcome.georeference, matches = outcome.matches
         guard let png = render(entry, pdfData: pdfData, georeference: g, scale: 3) else { throw Reject.message("render failed") }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -265,7 +364,7 @@ for entry in control.entries where only.isEmpty || only.contains(entry.icao) {
         worstOverall = max(worstOverall, worst)
         results.append(Result(icao: entry.icao, chart: entry.chartTitle, georeferenced: true, reason: "accepted", runwaysMatched: matches.count,
                               worstResidualFeet: worst, worstLengthErrorPercent: (matches.map(\.lengthError).max() ?? 0) * 100,
-                              feetPerPoint: g.diagnostics.feetPerPoint, files: ["\(entry.icao).png", "\(entry.icao).json"]))
+                              feetPerPoint: g.diagnostics.feetPerPoint, files: ["\(entry.icao).png", "\(entry.icao).json"], arpErrorFeet: outcome.arpErrorFeet))
         print("\(entry.icao): georeferenced, \(matches.count) runways, worst \(Int(worst)) ft")
     } catch {
         results.append(Result(icao: entry.icao, chart: entry.chartTitle, georeferenced: false, reason: "\(error)", runwaysMatched: 0, worstResidualFeet: nil, worstLengthErrorPercent: nil, feetPerPoint: nil, files: []))
@@ -293,6 +392,7 @@ struct Index: Codable {
     let edition: String
     let editionLabel: String
     let aipDate: String
+    let accuracyFeet: Int   // gate the placed diagrams passed (runway ends and ARP): shown on the badge as +/- this many feet
     let aerodromes: [String: IndexRecord]
 }
 var records: [String: IndexRecord] = [:]
@@ -302,7 +402,7 @@ for entry in control.entries {
         chart: entry.chartTitle, language: entry.language, scale: entry.scale, georeferenced: r.georeferenced, reason: r.reason,
         sheet: "\(entry.icao).pdf", image: r.georeferenced ? "\(entry.icao).png" : nil, georeference: r.georeferenced ? "\(entry.icao).json" : nil)
 }
-let indexData = try encoder.encode(Index(product: "il-diagrams", edition: control.edition, editionLabel: control.editionLabel, aipDate: control.aipDate, aerodromes: records))
+let indexData = try encoder.encode(Index(product: "il-diagrams", edition: control.edition, editionLabel: control.editionLabel, aipDate: control.aipDate, accuracyFeet: Int(israelRunwayGateFeet), aerodromes: records))
 try indexData.write(to: outDir.appendingPathComponent("index.json"))
 manifestFiles.append(["name": "index.json", "bytes": indexData.count, "sha256": sha256(indexData)])
 

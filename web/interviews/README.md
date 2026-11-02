@@ -53,9 +53,42 @@ silent. Microphone access works on `localhost` and HTTPS only.
 | `REALTIME_MODEL` | no | Default `gpt-realtime-2.1` (`gpt-realtime` is deprecated). |
 | `REALTIME_VOICE` | no | Default `marin`. |
 | `TRANSCRIBE_MODEL` | no | Default `gpt-4o-mini-transcribe`. |
+| `REALTIME_VOICE_HE`, `TRANSCRIBE_MODEL_HE` | no | Hebrew-only overrides of the voice and transcription model (default to the English values). |
+| `NOISE_REDUCTION` | no | `auto` (default: the pilot's device choice picks it), `near_field`, `far_field` or `off`. See "Languages and noise". |
+| `NOISE_REDUCTION_STRENGTH` | no | 0..1, default 1. |
+| `TURN_DETECTION` | no | `semantic_vad` (default) or `server_vad`. |
+| `VAD_EAGERNESS` | no | `semantic_vad` only: `low` (default), `medium`, `high`, `auto`. |
+| `VAD_THRESHOLD`, `VAD_SILENCE_MS`, `VAD_PREFIX_MS` | no | `server_vad` only: defaults 0.7, 1000, 300 (API defaults 0.5, 500, 300). |
+| `VAD_INTERRUPT_RESPONSE` | no | Default `true`; `false` stops detected speech from cutting off the interviewer. |
 | `SUMMARY_MODEL` | no | e.g. `gpt-4.1-mini`. If set, each finished interview is auto-summarised into the notes template. |
 | `CRON_SECRET` | prod | Random string; Vercel Cron sends it as a Bearer token to `/api/cron/reap`. |
 | `INTERVIEWER_NAME`, `CONTACT_EMAIL` | recommended | Shown on the consent screen (who is asking; where to send deletion requests). |
+
+## Languages and noise
+
+**Hebrew.** The landing page has an English / עברית switch (remembered for the browser session), and links can pick the
+language: `/?lang=he` or `/?lang=he&c=<INVITE_CODE>`. Hebrew renders the whole UI right-to-left (`dir="rtl"`, Latin terms
+such as VFR or an email stay left-to-right), the interviewer speaks Israeli Hebrew with English aviation terms
+(`src/lib/interviewer.ts`, kit in `docs/pilot-interview-kit-he.md`), and transcription is pinned to `language: "he"` with
+a prompt listing the aviation terms. Voices: the Realtime API documents no per-language voice list; `marin` and `cedar`
+are its recommended voices, so Hebrew defaults to `REALTIME_VOICE_HE` or `REALTIME_VOICE` (`marin`). Audition `cedar` and
+others with a real Hebrew call before relying on one. `/admin` shows the language per interview and renders Hebrew
+transcripts right-to-left; the exported `.md` marks Hebrew lines with a leading RLM.
+
+**Noise.** Three layers, all applied per call:
+1. *Browser*: `getUserMedia` asks for `echoCancellation`, `noiseSuppression`, `autoGainControl`, mono and 48 kHz. These
+   are requests; the applied values are read back from `track.getSettings()`, logged to the console (`[mic]`), warned about
+   if not applied, and stored on the interview (admin shows `mic NS/EC/AGC`).
+2. *Server*: Realtime `audio.input.noise_reduction` (`near_field` for headphones or a phone near the face, `far_field` for a
+   laptop/iPad on a table; the pilot chooses on the consent screen, phones default to near) with `strength`.
+   `NOISE_REDUCTION` can force one or `off`.
+3. *Turn detection*: `semantic_vad` with `eagerness: low` by default. For very noisy callers try `TURN_DETECTION=server_vad`
+   with `VAD_THRESHOLD=0.7-0.8` and `VAD_SILENCE_MS=1000-1200`, and `VAD_INTERRUPT_RESPONSE=false` so noise cannot cut the
+   interviewer off. `semantic_vad` has no threshold knob.
+
+An optional **noise check** button on the consent screen measures 3 s of ambient power (AGC and suppression off) and
+suggests headphones or a quieter spot above -45 dBFS. The threshold is a heuristic constant in `Interview.tsx`; tune it
+with real calls. The measured value is stored with the interview.
 
 ## Deploy to Vercel
 

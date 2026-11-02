@@ -322,8 +322,9 @@ struct MapContainerView: View {
                     Spacer()
                     HStack {
                         FlightPlanSummaryCard(
-                            distanceNM: distance,
-                            ete: formatETE(appState.estimatedTimeEnroute),
+                            // A multi-leg route shows the whole remaining route; DTG on the strip stays "to next point".
+                            distanceNM: appState.routeSummaryDistanceNM ?? distance,
+                            ete: formatETE(appState.activeRoute == nil ? appState.estimatedTimeEnroute : appState.routeSummaryETE),
                             fuelGallons: appState.activePlanFuelGallons,
                             departure: departure,
                             destination: destination

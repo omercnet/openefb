@@ -94,7 +94,9 @@ class CuratedFile(unittest.TestCase):
     def test_real_file_counts_and_status(self):
         aerodromes, runways, frequencies = ic.load_curated(CURATED)
         self.assertEqual(len(aerodromes), len({a["code"] for a in aerodromes}))
-        self.assertEqual({a["review_status"] for a in aerodromes}, {"unreviewed"})
+        self.assertEqual({a["code"] for a in aerodromes if a["review_status"] == "unreviewed"}, set())
+        self.assertEqual(sum(1 for a in aerodromes if a["review_status"] == "reviewed"), 49)
+        self.assertEqual({a["code"] for a in aerodromes if a["use"] == "ultralight"}, {"LLRS", "LLEV"})
         herzliya = next(a for a in aerodromes if a["code"] == "LLHZ")
         self.assertEqual(herzliya["elevation_ft"], 121)
         self.assertEqual([r["designator"] for r in runways if r["aerodrome"] == "LLHZ"], ["10/28"])
@@ -103,6 +105,17 @@ class CuratedFile(unittest.TestCase):
     def test_negative_elevation_survives(self):
         aerodromes, _, _ = ic.load_curated(CURATED)
         self.assertEqual(next(a for a in aerodromes if a["code"] == "LLMZ")["elevation_ft"], -1233)
+
+    def test_reviewed_rows_need_a_reviewer_and_unreviewed_rows_none(self):
+        def bad(rows):
+            next(r for r in rows if r["code"] == "LLHZ")["reviewed_by"] = ""
+        with self.assertRaises(ic.ImportFailure):
+            self.load(bad)
+
+    def test_composite_surface_parses(self):
+        _, runways, _ = ic.load_curated(CURATED)
+        pad = next(r for r in runways if r["aerodrome"] == "HADASSAH-EK" and r["designator"] == "13/35")
+        self.assertEqual(pad["surface"], "concrete+asphalt")
 
     def test_duplicate_code_rejected(self):
         def dup(rows):

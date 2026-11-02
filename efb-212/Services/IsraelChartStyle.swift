@@ -73,6 +73,7 @@ nonisolated enum IsraelChartLabelKind: String, Sendable {
     case airspace
     case airspaceRestricted
     case closure
+    case closureCaution
 
     func color(in palette: IsraelChartPalette) -> UIColor {
         switch self {
@@ -82,6 +83,7 @@ nonisolated enum IsraelChartLabelKind: String, Sendable {
         case .airspace: return palette.airspace
         case .airspaceRestricted: return palette.restricted
         case .closure: return palette.closureText
+        case .closureCaution: return palette.restricted  // amber: partial closures and "check NOTAM"
         }
     }
 
@@ -89,7 +91,7 @@ nonisolated enum IsraelChartLabelKind: String, Sendable {
     var fontSize: CGFloat {
         switch self {
         case .altitude, .altitudeMilitary: return 12
-        case .closure: return 12
+        case .closure, .closureCaution: return 12
         case .pointCode: return 11
         case .airspace, .airspaceRestricted: return 10.5
         }

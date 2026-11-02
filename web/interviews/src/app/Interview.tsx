@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { dirOf, type Device, type Lang } from "@/lib/lang";
 import { CONSENT_VERSION, type Outcome, type TranscriptEntry } from "@/lib/types";
+import { STRINGS, type Strings } from "./strings";
 
 type Phase = "consent" | "starting" | "live" | "ending" | "done";
 type Activity = "listening" | "hearing" | "thinking" | "speaking";
@@ -15,13 +17,37 @@ interface Entry extends TranscriptEntry {
 
 const PART_BYTES = 150_000; // upload audio in small parts (Vercel request bodies are capped at 4.5 MB)
 
-function micMessage(e: unknown): string {
+/**
+ * Browser-side cleanup before audio leaves the device. Mono (speech), 48 kHz (what WebRTC/Opus runs at). These are
+ * requests: browsers may ignore them, so the applied values are read back from track.getSettings() and logged.
+ */
+const MIC_CONSTRAINTS: MediaTrackConstraints = {
+  echoCancellation: true,
+  noiseSuppression: true,
+  autoGainControl: true,
+  channelCount: { ideal: 1 },
+  sampleRate: { ideal: 48_000 },
+};
+const NOISE_CHECK_MS = 3000;
+const NOISY_DBFS = -45; // mean ambient power above this (raw mic, no AGC/NS) is "noisy"; heuristic, tune with real calls
+const SILENT_DBFS = -90;
+
+type ErrKey = "errMicBlocked" | "errMicNone" | "errMicOther" | "errConsent" | "errLink" | "errLimit" | "errBusy" | "errGeneric";
+
+function micErrorKey(e: unknown): ErrKey {
   const name = e instanceof DOMException ? e.name : "";
-  if (name === "NotAllowedError" || name === "SecurityError") {
-    return "Microphone access was blocked. Allow the microphone for this site (on iPhone: the aA menu in Safari > Website Settings > Microphone, or Settings > Safari > Microphone), then tap Start again.";
-  }
-  if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone was found on this device.";
-  return "Couldn't open the microphone. Check that no other app is using it, then try again.";
+  if (name === "NotAllowedError" || name === "SecurityError") return "errMicBlocked";
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "errMicNone";
+  return "errMicOther";
+}
+
+/** Server errors are English; map by HTTP status so the pilot sees them in their own language. */
+function sessionErrorKey(status: number): ErrKey {
+  if (status === 400) return "errConsent";
+  if (status === 403) return "errLink";
+  if (status === 429) return "errLimit";
+  if (status >= 500) return "errBusy";
+  return "errGeneric";
 }
 
 function fmt(s: number): string {
@@ -33,6 +59,9 @@ export default function Interview(props: {
   contactEmail: string;
   code: string;
   maxMinutes: number;
+  initialLang: Lang;
+  /** true when ?lang= was in the link; otherwise the session's remembered choice may override */
+  langExplicit: boolean;
 }) {
   const [phase, setPhase] = useState<Phase>("consent");
   const [agreed, setAgreed] = useState(false);
@@ -41,6 +70,12 @@ export default function Interview(props: {
   const [activity, setActivity] = useState<Activity>("listening");
   const [elapsed, setElapsed] = useState(0);
   const [endedAs, setEndedAs] = useState<EndStatus>("completed");
+  const [lang, setLang] = useState<Lang>(props.initialLang);
+  const [device, setDevice] = useState<Device>("far");
+  const [noise, setNoise] = useState<{ state: "idle" | "checking" | "done"; db?: number }>({ state: "idle" });
+  const ambientRef = useRef<number | undefined>(undefined);
+  const micSettingsRef = useRef<MediaTrackSettings | undefined>(undefined);
+  const t: Strings = STRINGS[lang];
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -272,13 +307,19 @@ export default function Interview(props: {
 
     let mic: MediaStream;
     try {
-      mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      mic = await navigator.mediaDevices.getUserMedia({ audio: MIC_CONSTRAINTS });
     } catch (e) {
-      setError(micMessage(e));
+      setError(t[micErrorKey(e)]);
       ctxRef.current?.close().catch(() => {});
       return;
     }
     micRef.current = mic;
+    const applied = mic.getAudioTracks()[0]?.getSettings();
+    micSettingsRef.current = applied;
+    console.info("[mic] applied settings", applied);
+    for (const k of ["noiseSuppression", "echoCancellation", "autoGainControl"] as const) {
+      if (applied?.[k] !== true) console.warn(`[mic] ${k} was not applied by this browser/device:`, applied?.[k]);
+    }
     setPhase("starting");
     endingRef.current = false;
 
@@ -320,10 +361,19 @@ export default function Interview(props: {
       const r = await fetch("/api/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sdp: offer.sdp, consent: true, consentVersion: CONSENT_VERSION, code: props.code }),
+        body: JSON.stringify({
+          sdp: offer.sdp,
+          consent: true,
+          consentVersion: CONSENT_VERSION,
+          code: props.code,
+          lang,
+          device,
+          mic: micSettingsRef.current,
+          ambientDb: ambientRef.current,
+        }),
       });
       const data = (await r.json().catch(() => ({}))) as { id?: string; sdp?: string; maxSeconds?: number; error?: string };
-      if (!r.ok || !data.id || !data.sdp) throw new Error(data.error || "Could not start the interview.");
+      if (!r.ok || !data.id || !data.sdp) throw new Error(sessionErrorKey(r.status));
       idRef.current = data.id;
       if (data.maxSeconds) maxSecRef.current = data.maxSeconds;
       await pc.setRemoteDescription({ type: "answer", sdp: data.sdp });
@@ -337,7 +387,8 @@ export default function Interview(props: {
         void endCall("dropped");
       } else {
         setPhase("consent");
-        setError(e instanceof Error ? e.message : "Could not start the interview.");
+        const key = e instanceof Error && e.message.startsWith("err") ? (e.message as ErrKey) : "errGeneric";
+        setError(t[key]);
       }
     }
   }
@@ -376,113 +427,216 @@ export default function Interview(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ---- language ----
+  useEffect(() => {
+    if (props.langExplicit) return;
+    try {
+      const s = sessionStorage.getItem("lang");
+      if (s === "he" || s === "en") setLang(s);
+    } catch {
+      /* storage blocked: stay with the default */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = dirOf(lang);
+  }, [lang]);
+  // phone held near the face vs laptop/iPad on a table: a coarse pointer on a narrow screen is a phone
+  useEffect(() => {
+    if (window.matchMedia("(pointer: coarse)").matches && window.innerWidth < 600) setDevice("near");
+  }, []);
+
+  function pickLang(next: Lang) {
+    setLang(next);
+    setError(null);
+    try {
+      sessionStorage.setItem("lang", next);
+    } catch {
+      /* ignore */
+    }
+    const u = new URL(window.location.href);
+    u.searchParams.set("lang", next);
+    window.history.replaceState(null, "", u);
+  }
+
+  /** Measures ambient power for NOISE_CHECK_MS with AGC/NS off (they would hide the noise we want to see). */
+  async function runNoiseCheck() {
+    if (noise.state === "checking") return;
+    const AC = window.AudioContext;
+    if (!AC) return;
+    setError(null);
+    setNoise({ state: "checking" });
+    const ctx = new AC();
+    ctx.resume().catch(() => {});
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: { ideal: 1 } },
+      });
+      const an = ctx.createAnalyser();
+      an.fftSize = 2048;
+      ctx.createMediaStreamSource(stream).connect(an);
+      const buf = new Float32Array(an.fftSize);
+      let power = 0;
+      let frames = 0;
+      const end = Date.now() + NOISE_CHECK_MS;
+      while (Date.now() < end) {
+        await new Promise((r) => setTimeout(r, 100));
+        an.getFloatTimeDomainData(buf);
+        let s = 0;
+        for (const v of buf) s += v * v;
+        power += s / buf.length;
+        frames++;
+      }
+      const db = Math.round(10 * Math.log10(Math.max(power / Math.max(frames, 1), 1e-12)));
+      ambientRef.current = db;
+      setNoise({ state: "done", db });
+    } catch (e) {
+      setNoise({ state: "idle" });
+      setError(t[micErrorKey(e)]);
+    } finally {
+      stream?.getTracks().forEach((tr) => tr.stop());
+      ctx.close().catch(() => {});
+    }
+  }
+
+  // dir on a display:contents wrapper: inherited by everything below, no layout box of its own
+  const wrap = (n: ReactNode) => (
+    <div dir={dirOf(lang)} lang={lang} style={{ display: "contents" }}>
+      {n}
+    </div>
+  );
+  const ctx = { interviewer: props.interviewer, contactEmail: props.contactEmail, maxMinutes: props.maxMinutes };
+  const emailNode = props.contactEmail ? (
+    <a href={`mailto:${props.contactEmail}`} dir="ltr">
+      {props.contactEmail}
+    </a>
+  ) : (
+    t.deleteNoEmail
+  );
+
   // ---- UI ----
   if (phase === "consent") {
-    return (
+    const noiseMsg =
+      noise.state === "checking"
+        ? t.noiseChecking
+        : noise.state === "done" && noise.db !== undefined
+          ? noise.db < SILENT_DBFS
+            ? t.noiseSilent
+            : noise.db > NOISY_DBFS
+              ? t.noiseLoud(noise.db)
+              : t.noiseQuiet(noise.db)
+          : null;
+    const noiseCls = noise.state === "done" && noise.db !== undefined && noise.db >= SILENT_DBFS && noise.db <= NOISY_DBFS ? "notice good" : "notice";
+    return wrap(
       <>
-        <h1>A 20-minute chat about flying with your iPad</h1>
-        <p className="muted">
-          For VFR pilots. No sales pitch: {props.interviewer} just wants to hear about your last few flights.
-        </p>
+        <div role="group" aria-label="Language / שפה" className="row" style={{ marginBottom: 8 }}>
+          <button type="button" className={lang === "en" ? "" : "secondary"} aria-pressed={lang === "en"} lang="en" dir="ltr" onClick={() => pickLang("en")}>
+            English
+          </button>
+          <button type="button" className={lang === "he" ? "" : "secondary"} aria-pressed={lang === "he"} lang="he" dir="rtl" onClick={() => pickLang("he")}>
+            עברית
+          </button>
+        </div>
+
+        <h1>{t.pageTitle}</h1>
+        <p className="muted">{t.intro(ctx)}</p>
 
         <div className="card">
-          <strong>Before we start, please read this</strong>
+          <strong>{t.readFirst}</strong>
           <ul>
-            <li>
-              <b>Who&apos;s asking:</b> {props.interviewer}. You&apos;ll talk with an <b>AI voice interviewer</b> (not a person), running on OpenAI&apos;s speech technology, so your voice is processed by OpenAI.
-            </li>
-            <li>
-              <b>What&apos;s recorded:</b> the conversation is <b>audio-recorded and transcribed</b>. If you choose to share an email at the end, that is stored too.
-            </li>
-            <li>
-              <b>How it&apos;s used:</b> to study how pilots use iPads in the cockpit. Only {props.interviewer} can see it. Short quotes may be used in notes without your name.
-            </li>
-            <li>
-              <b>Delete or stop:</b> you can end any time with the End button. To have your interview deleted, email{" "}
-              {props.contactEmail ? <a href={`mailto:${props.contactEmail}`}>{props.contactEmail}</a> : "the person who sent you this link"}
-              .
-            </li>
-            <li>
-              Takes about 20 minutes (stops at {props.maxMinutes}). Please don&apos;t do this while flying. Headphones and a quiet spot help.
-            </li>
+            {t.rules.map((rule, i) => (
+              <li key={i}>{rule(ctx)}</li>
+            ))}
           </ul>
         </div>
 
+        <fieldset className="card" style={{ border: "1px solid var(--line)" }}>
+          <legend>{t.deviceLabel}</legend>
+          <label className="check" style={{ margin: "6px 0" }}>
+            <input type="radio" name="device" checked={device === "near"} onChange={() => setDevice("near")} />
+            <span>{t.deviceNear}</span>
+          </label>
+          <label className="check" style={{ margin: "6px 0" }}>
+            <input type="radio" name="device" checked={device === "far"} onChange={() => setDevice("far")} />
+            <span>{t.deviceFar}</span>
+          </label>
+          <button type="button" className="secondary" disabled={noise.state === "checking"} onClick={() => void runNoiseCheck()}>
+            {t.noiseCheck}
+          </button>
+          {noiseMsg && <div className={noiseCls} role="status">{noiseMsg}</div>}
+        </fieldset>
+
         <label className="check">
           <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />
-          <span>I&apos;m 18 or older, and I agree to be recorded and transcribed as described above.</span>
+          <span>{t.agree}</span>
         </label>
 
         {error && <div className="notice bad">{error}</div>}
 
-        <button className="big" disabled={!agreed} onClick={() => void start()}>
-          Start interview
+        <button className="big" disabled={!agreed || noise.state === "checking"} onClick={() => void start()}>
+          {t.start}
         </button>
         <p className="muted" style={{ fontSize: ".9rem" }}>
-          Your browser will ask to use the microphone. Nothing is recorded until you tap Start.
+          {t.micNote}
         </p>
-      </>
+      </>,
     );
   }
 
   if (phase === "starting") {
-    return (
+    return wrap(
       <div className="live" style={{ display: "flex", flexDirection: "column" }}>
         <div className="orb" />
-        <div className="status">Connecting…</div>
-      </div>
+        <div className="status">{t.connecting}</div>
+      </div>,
     );
   }
 
   if (phase === "live") {
-    const label = muted
-      ? "Muted"
-      : { listening: "Listening", hearing: "Hearing you", thinking: "Thinking", speaking: "Interviewer speaking" }[activity];
+    const label = muted ? t.muted : { listening: t.listening, hearing: t.hearing, thinking: t.thinking, speaking: t.speaking }[activity];
     const cls = muted ? "muted" : activity;
-    return (
+    return wrap(
       <div className="live" style={{ display: "flex", flexDirection: "column" }}>
         <div>
           <div className={`orb ${cls}`} aria-hidden />
           <div className="status" role="status" aria-live="polite">
             {label}
           </div>
-          <div className="timer">
+          <div className="timer" dir="ltr">
             {fmt(elapsed)} / {fmt(maxSecRef.current)}
           </div>
         </div>
         <div className="row" style={{ width: "100%" }}>
           <button className="secondary" onClick={toggleMute}>
-            {muted ? "Unmute" : "Mute"}
+            {muted ? t.unmute : t.mute}
           </button>
           <button className="danger" onClick={() => void endCall("completed")}>
-            End interview
+            {t.end}
           </button>
         </div>
-      </div>
+      </div>,
     );
   }
 
   if (phase === "ending") {
-    return (
+    return wrap(
       <div className="live" style={{ display: "flex", flexDirection: "column" }}>
         <div className="orb" />
-        <div className="status">Saving your interview…</div>
-        <p className="muted">Please keep this page open for a moment.</p>
-      </div>
+        <div className="status">{t.saving}</div>
+        <p className="muted">{t.keepOpen}</p>
+      </div>,
     );
   }
 
-  return (
+  return wrap(
     <>
-      <h1>{endedAs === "completed" ? "Thank you!" : "Interview ended"}</h1>
-      {endedAs === "dropped" && (
-        <div className="notice">The connection dropped. What we captured so far has been saved, so you don&apos;t need to do anything.</div>
-      )}
-      {endedAs === "capped" && <div className="notice">We reached the time limit. What we captured has been saved.</div>}
-      <p>Your interview has been saved. You can close this page.</p>
-      <p className="muted">
-        To have it deleted, email {props.contactEmail ? <a href={`mailto:${props.contactEmail}`}>{props.contactEmail}</a> : "the person who sent you this link"}.
-      </p>
-    </>
+      <h1>{endedAs === "completed" ? t.thanks : t.ended}</h1>
+      {endedAs === "dropped" && <div className="notice">{t.dropped}</div>}
+      {endedAs === "capped" && <div className="notice">{t.capped}</div>}
+      <p>{t.saved}</p>
+      <p className="muted">{t.deleteTo(emailNode)}</p>
+    </>,
   );
 }

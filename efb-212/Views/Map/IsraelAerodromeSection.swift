@@ -108,11 +108,12 @@ struct IsraelAerodromeSection: View {
     static func useNote(_ use: IsraelAerodromeUse) -> String? {
         switch use {
         case .civil: return nil
-        case .military: return "Military field: emergency use only"
+        case .military: return "Military field: operation needs CAAI authorization"
         case .uas: return "Unmanned-aircraft strip: no manned landings without CAAI approval"
         case .agricultural: return "Agricultural strip: coordinate with the operator"
         case .hospital: return "Hospital helipad: coordinate with the hospital"
         case .foreign: return "Outside Israel: shown for orientation only"
+        case .ultralight: return "Ultralight strip: not for conventional GA aircraft"
         }
     }
 

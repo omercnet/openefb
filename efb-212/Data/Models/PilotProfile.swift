@@ -25,6 +25,12 @@ extension SchemaV1 {
         /// FAA certificate number.
         var certificateNumber: String?
 
+        /// Mobile number for the flight plan remarks (CELL).
+        var phone: String?
+
+        /// E-mail address, used for the pilot's own copy of a flight plan.
+        var email: String?
+
         /// Certificate type raw value (maps to CertificateType enum).
         var certificateType: String?
 

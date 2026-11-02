@@ -32,6 +32,7 @@ nonisolated struct IsraelDiagramIndex: Codable, Equatable, Sendable {
     let edition: String              // file-safe id, e.g. "2026-08"
     let editionLabel: String         // as printed, e.g. "AIRAC AMDT 001/2026 (06 AUG 2026)"
     let aipDate: String              // yyyy-MM-dd effective date of the source charts
+    let accuracyFeet: Int            // feet: the gate placed diagrams passed (runway ends, and the printed ARP for one-runway fields)
     let aerodromes: [String: Record] // ICAO -> record
 }
 
@@ -79,7 +80,7 @@ nonisolated struct IsraelDiagramPack: Sendable {
     }
 
     /// Badge copy: edition and date of the chart on screen. Never implies currency the app cannot prove.
-    var badgeText: String { "CAAI aerodrome diagrams \(index.editionLabel)" }
+    var badgeText: String { "CAAI aerodrome diagrams \(index.editionLabel) ±\(index.accuracyFeet) ft" }
 
     /// Decodes a georeference JSON from the pack: the same decode the FAA overlay uses for its cache.
     static func decodeGeoreference(_ data: Data) throws -> AirportDiagramGeoreference {

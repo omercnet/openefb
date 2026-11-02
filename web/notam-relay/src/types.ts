@@ -33,11 +33,42 @@ export interface Geometry {
   circle: { centre: LatLon; radiusNM: number } | null;
 }
 
+/** One altitude limit in feet. AT x: lower = upper = x. BLW x: upper only. ABV x: lower only. BTN x y: both. */
+export interface AltitudeLimit {
+  op: "AT" | "BLW" | "ABV" | "BTN";
+  /** feet; null when unbounded below */
+  lowerFt: number | null;
+  /** feet; null when unbounded above */
+  upperFt: number | null;
+  /** AMSL / AGL as written, FL when given as a flight level (converted to feet), null when not written */
+  ref: "AMSL" | "AGL" | "FL" | null;
+}
+
+/** "AVBL BIDIRECTIONAL AT 800FT AMSL": an altitude at which the chain stays usable. */
+export interface AvailableAltitude extends AltitudeLimit {
+  /** BIDIRECTIONAL when written, otherwise null */
+  direction: string | null;
+}
+
 export interface RouteClosure {
+  /** CVFR when the clause covers CVFR, else the first kind. Kept for builds that read only this field. */
+  routeKind: string;
+  /** every kind of the clause: "CVFR AND HEL RTE CLSD" -> ["CVFR", "HEL"] */
+  routeKinds: string[];
+  /** altitudes at which the chain is closed ("CLSD AT 2,500FT AMSL"); empty = closed at all altitudes */
+  closedAltitudes: AltitudeLimit[];
+  /** altitudes at which the chain stays open ("AVBL BIDIRECTIONAL AT 3,000FT AMSL") */
+  availableAltitudes: AvailableAltitude[];
+  /** raw exception text, e.g. "PPR FLT FM IAF"; the closure does not apply to these flights */
+  exceptions: string[];
+  /** closed only at some altitudes, or with exceptions: not a full closure */
+  partial: boolean;
+  /** false: this looks like a closure but could not be read in full (no chain, or an altitude condition left unread) */
+  parsed: boolean;
+  /** the clause text this closure came from, verbatim */
+  raw: string;
   /** NOTAM number this chain came from, e.g. C2267/26 */
   notamId: string;
-  /** CVFR, HEL, ULTRALIGHT, ATS, ... as written before "RTE CLSD" */
-  routeKind: string;
   /** optional ATS route designator, e.g. P68 ("P68 BTN GALIM-MERVA") */
   routeName: string | null;
   /** ordered chain of 5-letter point codes */

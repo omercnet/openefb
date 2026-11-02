@@ -20,6 +20,8 @@ struct PilotEditView: View {
 
     @State private var name: String = ""
     @State private var certificateNumber: String = ""
+    @State private var phone: String = ""
+    @State private var email: String = ""
     @State private var certificateType: CertificateType? = nil
     @State private var medicalClass: MedicalClass? = nil
     @State private var medicalExpiry: Date = Date()
@@ -41,6 +43,18 @@ struct PilotEditView: View {
                     TextField("Certificate Number", text: $certificateNumber)
                         .autocorrectionDisabled()
                         .accessibilityLabel("Certificate number")
+
+                    TextField("Phone (for flight plans)", text: $phone)
+                        .textContentType(.telephoneNumber)
+                        .keyboardType(.phonePad)
+                        .accessibilityLabel("Phone number")
+
+                    TextField("Email", text: $email)
+                        .textContentType(.emailAddress)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .accessibilityLabel("Email")
                 }
 
                 // MARK: - Certificate
@@ -111,6 +125,8 @@ struct PilotEditView: View {
 
         name = profile.name
         certificateNumber = profile.certificateNumber ?? ""
+        phone = profile.phone ?? ""
+        email = profile.email ?? ""
         certificateType = profile.certificateTypeEnum
         medicalClass = profile.medicalClassEnum
 
@@ -134,6 +150,8 @@ struct PilotEditView: View {
 
         profile.name = name
         profile.certificateNumber = certificateNumber.isEmpty ? nil : certificateNumber
+        profile.phone = phone.isEmpty ? nil : phone
+        profile.email = email.isEmpty ? nil : email
         profile.certificateTypeEnum = certificateType
         profile.medicalClassEnum = medicalClass
         profile.medicalExpiry = hasMedicalExpiry ? medicalExpiry : nil

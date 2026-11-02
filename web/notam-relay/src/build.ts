@@ -4,7 +4,7 @@ import { applyCancellations, parseNotamText } from "./parse-notam.js";
 import type { NotamItem, NotamsFeed } from "./types.js";
 
 /** Bump when the parser's output changes: cached items are then re-parsed from their stored raw text (once, not every run). */
-export const PARSER_VERSION = 1;
+export const PARSER_VERSION = 2;
 
 /**
  * Detail cache entry. Keyed by IAA row id; reused only while the list page still shows the same NOTAM

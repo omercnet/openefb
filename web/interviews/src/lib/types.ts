@@ -35,6 +35,18 @@ export interface Interview {
   callId?: string;
   ipHash: string;
   model: string;
+  /** interview language; missing on older records means "en" */
+  lang?: "en" | "he";
+  /** noise handling used for this call, for diagnosing bad transcripts */
+  noise?: {
+    device: "near" | "far" | null;
+    reduction: "near_field" | "far_field" | "off";
+    turnDetection: string;
+    /** what the browser actually applied (track.getSettings()), as reported by the client */
+    mic?: { noiseSuppression?: boolean; echoCancellation?: boolean; autoGainControl?: boolean; channelCount?: number; sampleRate?: number };
+    /** ambient level from the optional pre-start noise check, dBFS */
+    ambientDb?: number;
+  };
   transcript: TranscriptEntry[];
   outcome?: Outcome;
   /** notes-template fields produced by the optional summary model */
