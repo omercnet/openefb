@@ -59,8 +59,7 @@ struct ProfileModelTests {
 
         let readBack = profile.nightLandingEntries
         #expect(readBack.count == 1)
-        let firstCount = readBack.first?.count
-        #expect(firstCount == 3)
+        #expect(readBack.first?.count == 3)
     }
 
     @Test func pilotMedicalClassEnumRoundTrip() {

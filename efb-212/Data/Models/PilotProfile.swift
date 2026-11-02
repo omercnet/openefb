@@ -96,7 +96,7 @@ extension SchemaV1 {
     // MARK: - NightLandingEntry
 
     /// A single night landing entry for FAR 61.57 currency tracking.
-    struct NightLandingEntry: Codable, Equatable, Sendable {
+    nonisolated struct NightLandingEntry: Codable, Equatable, Sendable {
         /// Date of the night landing(s).
         var date: Date
 
