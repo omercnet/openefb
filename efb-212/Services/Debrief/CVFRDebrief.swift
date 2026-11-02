@@ -101,6 +101,7 @@ nonisolated enum CVFRDebriefBuilder {
     static let tightBandFeet = 200.0
     static let wideBandFeet = 300.0
     /// A transcript segment counts as a position report within this window of the closest approach -- seconds.
+    /// The built-in value; `RemoteParameter.cvfrReportWindowSeconds` can move it inside its range.
     static let reportWindowSeconds: TimeInterval = 120
     /// Gaps between samples longer than this are not credited to the earlier sample -- seconds.
     static let maxSampleWeightSeconds: TimeInterval = 10
@@ -111,12 +112,14 @@ nonisolated enum CVFRDebriefBuilder {
 
     /// Full debrief. `plannedLegs` are the activated plan's legs when the flight had one; otherwise the
     /// track is matched to `segments` (the whole network). `points` resolves the reporting points by code.
+    /// `reportWindow` is the position-report window -- seconds.
     static func build(
         trackPoints: [TrackPointRecord],
         transcript: [TranscriptSegmentRecord],
         plannedLegs: [CVFRRouteLeg]?,
         segments: [IsraelRouteSegment],
-        points: [String: IsraelReportingPoint]
+        points: [String: IsraelReportingPoint],
+        reportWindow: TimeInterval = reportWindowSeconds
     ) -> CVFRDebrief {
         let matched: [CVFRMatchedLeg]
         if let plannedLegs, !plannedLegs.isEmpty {
@@ -129,7 +132,7 @@ nonisolated enum CVFRDebriefBuilder {
         let routeCodes = routePointCodes(of: matched.map(\.leg))
         let passages = routeCodes.compactMap { code -> CVFRPointPassage? in
             guard let point = points[code] else { return nil }
-            return passage(of: point, trackPoints: trackPoints, transcript: transcript)
+            return passage(of: point, trackPoints: trackPoints, transcript: transcript, reportWindow: reportWindow)
         }
 
         return CVFRDebrief(
@@ -317,7 +320,8 @@ nonisolated enum CVFRDebriefBuilder {
     static func passage(
         of point: IsraelReportingPoint,
         trackPoints: [TrackPointRecord],
-        transcript: [TranscriptSegmentRecord]
+        transcript: [TranscriptSegmentRecord],
+        reportWindow: TimeInterval = reportWindowSeconds
     ) -> CVFRPointPassage? {
         var closest: (time: Date, distance: Double)?
         for sample in trackPoints {
@@ -327,7 +331,7 @@ nonisolated enum CVFRDebriefBuilder {
         }
         guard let closest else { return nil }
         let reported = transcript.contains { segment in
-            abs(segment.timestamp.timeIntervalSince(closest.time)) <= reportWindowSeconds
+            abs(segment.timestamp.timeIntervalSince(closest.time)) <= reportWindow
                 && TranscriptTextMatcher.mentions(point: point, in: segment.text)
         }
         return CVFRPointPassage(

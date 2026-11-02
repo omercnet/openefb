@@ -13,16 +13,20 @@ import CoreLocation
 nonisolated enum CVFRDebriefLoader {
 
     /// The CVFR debrief with the bundled Israel database; nil when it is unavailable or the flight is not an Israel flight.
-    static func loadBundled(flightID: UUID, recordingDB: RecordingDatabase) -> CVFRDebrief? {
+    /// `reportWindow` is the position-report window -- seconds.
+    static func loadBundled(
+        flightID: UUID, recordingDB: RecordingDatabase, reportWindow: TimeInterval = CVFRDebriefBuilder.reportWindowSeconds
+    ) -> CVFRDebrief? {
         guard let israelDB = try? IsraelAviationDatabase.bundled() else { return nil }
-        return try? load(flightID: flightID, recordingDB: recordingDB, israelDB: israelDB)
+        return try? load(flightID: flightID, recordingDB: recordingDB, israelDB: israelDB, reportWindow: reportWindow)
     }
 
     /// The CVFR debrief for `flightID`, or nil when the flight was not flown on the Israel network.
     static func load(
         flightID: UUID,
         recordingDB: RecordingDatabase,
-        israelDB: any IsraelAviationDatabaseProtocol
+        israelDB: any IsraelAviationDatabaseProtocol,
+        reportWindow: TimeInterval = CVFRDebriefBuilder.reportWindowSeconds
     ) throws -> CVFRDebrief? {
         let track = try recordingDB.trackPoints(forFlight: flightID)
         guard let first = track.first,
@@ -43,7 +47,8 @@ nonisolated enum CVFRDebriefLoader {
             transcript: transcript,
             plannedLegs: planned,
             segments: segments,
-            points: pointsByCode
+            points: pointsByCode,
+            reportWindow: reportWindow
         )
         return debrief.isEmpty ? nil : debrief
     }

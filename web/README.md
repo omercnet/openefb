@@ -15,7 +15,7 @@ Vercel (Hobby, personal non-commercial use only) and Cloudflare (free; R2 needs 
 
 | Piece | Where | State |
 |---|---|---|
-| `notam-relay/` | `https://openefb-notam-relay.omerc.workers.dev` (`/notams.json`, `/health`, `POST /run`) | Live. KV namespace `NOTAM_KV` is bound in `wrangler.toml`; the `*/15` Cron Trigger runs; `/health` returned 200 with 125 rows. The app's built-in default feed URL is this one (`IsraelNotamService.defaultFeedURL`); the `israelNotamFeedURL` default overrides it. |
+| `notam-relay/` | `https://openefb-notam-relay.omerc.workers.dev` (`/notams.json`, `/health`, `/config.json`, `POST /run`) | Live. KV namespace `NOTAM_KV` is bound in `wrangler.toml`; the `*/15` Cron Trigger runs; `/health` returned 200 with 125 rows. `/config.json` (remote app config, serial 1) deployed 2026-11-02, version `63635dff`. The app's built-in default feed URL is this one (`IsraelNotamService.defaultFeedURL`); the `israelNotamFeedURL` default overrides it. |
 | `charts/` | R2 bucket `openefb-charts`, public dev URL `https://pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev` | Live, with CORS from `cors.json`. Published: `israel-cvfr` (latest edition 2025-02) and `il-diagrams` (latest 2026-08b). The app's built-in base URL is this one (`IsraelChartConfig.defaultBaseURL`); the `israelChartBaseURL` default overrides it. The dev URL is rate-limited: attach a custom domain before pilots depend on it. |
 | `interviews/` | Vercel project `openefb-interviews`, `https://openefb-interviews.vercel.app` | Live. Git-connected to `omercnet/openefb` (production branch `main`) with Root Directory `web/interviews`, so a push to `main` deploys it. |
 

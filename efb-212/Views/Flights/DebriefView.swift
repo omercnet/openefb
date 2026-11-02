@@ -268,8 +268,9 @@ struct DebriefView: View {
         Task {
             do {
                 let id = flightID, db = recordingDB
+                let window = RemoteConfigStore.shared.value(for: .cvfrReportWindowSeconds)  // seconds
                 let facts = await Task.detached {
-                    CVFRDebriefLoader.loadBundled(flightID: id, recordingDB: db).flatMap(CVFRDebriefBuilder.promptFacts)
+                    CVFRDebriefLoader.loadBundled(flightID: id, recordingDB: db, reportWindow: window).flatMap(CVFRDebriefBuilder.promptFacts)
                 }.value
                 let prompt = try FlightSummaryBuilder.buildPrompt(
                     flightID: flightID,

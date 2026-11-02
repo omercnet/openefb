@@ -226,6 +226,19 @@ struct CVFRDebriefTests {
         #expect(elsewhere.reported == false)
     }
 
+    @Test func reportWindowIsAParameterAndDefaultsToTwoMinutes() throws {
+        let point = Self.reportingPoint(code: "TAVOR", en: "Tavor", he: "תבור", lon: 35.0)
+        let track = (0...120).map { Self.point(lon: 34.94 + Double($0) * 0.001, second: Double($0)) }   // closest at 60 s
+        let report = [Self.transcript("Tavor, Cessna four x-ray", at: 60 + 200)]   // 200 s after the passage
+        let builtIn = try #require(CVFRDebriefBuilder.passage(of: point, trackPoints: track, transcript: report))
+        #expect(builtIn.reported == false)
+        let widened = try #require(CVFRDebriefBuilder.passage(of: point, trackPoints: track, transcript: report, reportWindow: 300))
+        #expect(widened.reported)
+        let narrowed = try #require(CVFRDebriefBuilder.passage(
+            of: point, trackPoints: track, transcript: [Self.transcript("Tavor, Cessna four x-ray", at: 60 + 100)], reportWindow: 30))
+        #expect(narrowed.reported == false)
+    }
+
     // MARK: Hebrew and English text
 
     @Test func hebrewMatchingIgnoresNiqqudAndFinalLetterForms() {

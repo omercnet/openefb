@@ -59,7 +59,8 @@ struct FlightDetailView: View {
         .task(id: flightRecord.id) {
             guard let recordingDB = appState.getOrCreateRecordingDatabase() else { return }
             let id = flightRecord.id
-            cvfrDebrief = await Task.detached { CVFRDebriefLoader.loadBundled(flightID: id, recordingDB: recordingDB) }.value
+            let window = RemoteConfigStore.shared.value(for: .cvfrReportWindowSeconds)  // seconds
+            cvfrDebrief = await Task.detached { CVFRDebriefLoader.loadBundled(flightID: id, recordingDB: recordingDB, reportWindow: window) }.value
         }
         .onAppear {
             debriefEngine.checkAvailability()

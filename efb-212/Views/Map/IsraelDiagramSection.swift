@@ -13,6 +13,7 @@ import PDFKit
 struct IsraelDiagramSection: View {
     let icao: String
     @State private var store = IsraelDiagramStore.shared
+    @State private var remoteConfig = RemoteConfigStore.shared
     @State private var showingSheet = false
 
     var body: some View {
@@ -32,9 +33,17 @@ struct IsraelDiagramSection: View {
     private var content: some View {
         switch store.availability(for: icao) {
         case .georeferenced(let record):
-            Text("On the map at zoom 14 and closer, placed to about ±\(store.pack?.index.accuracyFeet ?? 100) ft. \(record.chart), \(editionText).")
-                .font(.subheadline)
-                .foregroundStyle(Palette.secondaryText)
+            if let message = remoteConfig.disabledMessage(for: .israelDiagramOverlay) {
+                // Switched off by the remote config: say so, with the file's own words, instead of promising an overlay.
+                Text("Not drawn on the map right now. \(message) \(record.chart), \(editionText).")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.secondaryText)
+                    .accessibilityIdentifier("israel-diagram-remote-off")
+            } else {
+                Text("On the map at zoom 14 and closer, placed to about ±\(store.pack?.index.accuracyFeet ?? 100) ft. \(record.chart), \(editionText).")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.secondaryText)
+            }
             sheetButton("View chart sheet")
         case .sheetOnly(let record):
             Text("Sheet only, not placed on the map: it could not be checked against the runway positions. \(record.chart), \(editionText).")
