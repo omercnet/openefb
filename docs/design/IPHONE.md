@@ -42,6 +42,13 @@ Severity: 0 fine, 1 cosmetic, 2 awkward, 3 a core flow is hard or a number is tr
 | Logbook list | Empty state fine; entry editor not exercised (no entries) | ? | ? (left over) |
 | History, Replay, Debrief, recording start/stop, Aircraft & Pilot profiles | Not exercised: needs a recorded flight / profile data on the simulator | ? | ? (left over) |
 
+Before and after on iPhone 17 Pro (iPhone portrait, dark and light):
+
+| Before | After |
+|---|---|
+| <img src="screenshots/IPHONE/before-nrst-hud-truncated-direct-to.png" width="260" alt="iPhone map before the fix: the nearest-airport readout is truncated to KP... 0.0... 30... and the control column is crowded"><br>NRST readout truncated, 7 stacked controls | <img src="screenshots/IPHONE/pro-us-04b-direct-to.png" width="260" alt="iPhone map after the fix: readout shows KPAO 0.0 NM 300 degrees, a Direct KPAO bar and a two-row instrument strip"><br>Readout fits, "..." menu, two-row strip with DTG and ETE |
+| | <img src="screenshots/IPHONE/pro-il-01-map.png" width="260" alt="iPhone Israel map over Ben Gurion with the compact instrument strip, icon-only recenter button and tab bar"><br>Israel map, same compact layout |
+
 ## What changed (files)
 
 - `Views/Map/InstrumentStripView.swift`: `InstrumentStripLayout.fields(compact:routeActive:)`, compact two-row strip, compact `InstrumentCell`.

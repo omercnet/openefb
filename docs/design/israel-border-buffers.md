@@ -37,3 +37,7 @@ The Jordan border has no buffer (flight up to it is allowed) and is not in the f
 - Amber: within 1 NM of a buffer, or the 2-minute projected position (ground speed × 2 min on the current track)
   is inside it. Projection needs at least 20 kt ground speed.
 - 33°00'N is amber only (permitted with the equipment): position or 2-minute projection north of the line.
+
+Simulated position near Eilat, inside the 3 km Egypt buffer (red), with the restricted-area and CTR cautions below it (amber); the alert text carries the "about 1 km accurate" caveat:
+
+<img src="screenshots/IL-ALERTS/4-border-warning.png" width="420" alt="Map near Eilat with a red Inside Egypt border buffer (3 km) alert and two amber cautions for restricted area LLR27 and the Eilat CTR above the route bar">

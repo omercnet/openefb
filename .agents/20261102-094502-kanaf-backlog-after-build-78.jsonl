@@ -13,3 +13,10 @@
 {"v":1,"ts":"2026-11-02T09:45:17.573Z","by":"8f3a9816-96e1-48f8-97de-803d0ca24b76","type":"ticket.add","id":"T12","title":"Ticket 12: External TestFlight: public link for pilots after Apple's beta review","estimateMin":60,"source":{"path":"dist-prep/TESTFLIGHT.md"}}
 {"v":1,"ts":"2026-11-02T09:45:18.144Z","by":"8f3a9816-96e1-48f8-97de-803d0ca24b76","type":"ticket.add","id":"T13","title":"Ticket 13: Code style: decide on a swift-format pass before making that hook blocking","estimateMin":120,"source":{"path":"tools/hooks/README.md"}}
 {"v":1,"ts":"2026-11-02T09:45:18.600Z","by":"8f3a9816-96e1-48f8-97de-803d0ca24b76","type":"ticket.add","id":"T14","title":"Ticket 14: Optional: rename the GitHub repo to omercnet/kanaf","estimateMin":30}
+{"v":1,"ts":"2026-11-02T09:58:29.340Z","by":"8f3a9816-96e1-48f8-97de-803d0ca24b76","type":"ticket.add","id":"T15","title":"Ticket 15: Screenshots from the dashboard deliverables in the README and docs","estimateMin":90,"status":"working","source":{"path":"docs/handoff/SCREENSHOTS.md"}}
+{"v":1,"ts":"2026-11-02T09:58:29.849Z","by":"8f3a9816-96e1-48f8-97de-803d0ca24b76","type":"ticket.update","id":"T15","stage":"Build"}
+{"v":1,"ts":"2026-11-02T09:58:54.548Z","by":"647728d0-9793-4525-a5dc-4383847ce0a1","type":"ticket.update","id":"T15","stage":"Build"}
+{"v":1,"ts":"2026-11-02T10:00:46.901Z","by":"647728d0-9793-4525-a5dc-4383847ce0a1","type":"ticker.set","text":"Making resized README JPEGs"}
+{"v":1,"ts":"2026-11-02T10:02:11.914Z","by":"647728d0-9793-4525-a5dc-4383847ce0a1","type":"ticket.update","id":"T15","stage":"Verify"}
+{"v":1,"ts":"2026-11-02T10:03:22.497Z","by":"647728d0-9793-4525-a5dc-4383847ce0a1","type":"ticker.set","text":"T15 done: screenshots in README and docs"}
+{"v":1,"ts":"2026-11-02T10:03:58.598Z","by":"8f3a9816-96e1-48f8-97de-803d0ca24b76","type":"ticket.update","id":"T15","status":"done","stage":"","note":"README gallery (14 shots) + images in 5 docs"}

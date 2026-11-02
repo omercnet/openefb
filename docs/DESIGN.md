@@ -210,6 +210,13 @@ Skills: `ux-heuristics` (Nielsen 10, Krug), then `ios-hig-design`, through the E
 | IL16 | Plan / debrief | "800/1600" altitude unexplained; debrief says 100% overall with a 0% leg | H2 | 1 | efb-aac.29 |
 | IL17 | Layers panel | Six "Not available in Israel yet" rows | H8 | 1 | efb-aac.30 |
 
+Before and after for IL5, IL6 and IL7 (iPad, Israel mode, simulated LLHZ -> LLIB flight; no CAAI artwork in these shots):
+
+| Before | After |
+|---|---|
+| <img src="design/screenshots/UX-IL/before-06b-debrief-heard-0-of-11-red.png" width="360" alt="CVFR debrief before the fix: heard at 0 of 11 reporting points and a red 0% leg"><br>IL5, IL6 before: "heard at 0 of 11" with no transcript, 0% in red | <img src="design/screenshots/UX-IL/after-06b-debrief-not-checked-amber.png" width="360" alt="CVFR debrief after the fix: no cockpit audio was transcribed, so position reports could not be checked; the 0% leg is amber with a triangle"><br>IL5, IL6 after: "could not be checked", 0% leg amber with a triangle |
+| <img src="design/screenshots/UX-IL/before-05c-plan-keyboard-over-legs.png" width="360" alt="Plan screen before the fix: the keyboard stays up over the legs table after choosing the destination"><br>IL7 before: keyboard left up over the legs table | <img src="design/screenshots/UX-IL/05c-plan-llhz-llib.png" width="360" alt="Plan screen after the fix: keyboard dismissed, the full legs table of the LLHZ to LLIB route visible"><br>IL7 after: keyboard dismissed, legs visible |
+
 ### Checked and passing
 - **History** (`UX-IL/06a-history-damaged-recovered.png`): "Track damaged" and "Recovered" are amber with a triangle glyph, and the orphaned recording was rebuilt at launch ("Recovered", 120 points). Seeded with a throwaway test against the real stores.
 - **Route bar** (T18 / IL-ALERTS, measured by XCUITest `frame`): Prev 68.0×60.0, Next 69.5×60.0, Clear 74.0×60.0, NRST 282×64, briefing 60×60. The route line is magenta over the official chart and stays legible; the red dashed closure line and its rotated label cross it (`UX-IL-CAAI/05k-map-active-route.png`). A closed leg ahead raised a red "Route closed ahead: TAVOR → DESHE" banner above the amber CTR line.

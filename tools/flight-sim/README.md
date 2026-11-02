@@ -45,3 +45,12 @@ This launches the app with `-OpenEFBScenario <name or path>`, `-OpenEFBScenarioS
 Fix timestamps are wall clock (the GPS-lost rule is 5 real seconds); route following and the alerts use the scenario clock,
 which runs `speed` times faster. A GPS loss shows as "no position" only if it lasts longer than 5 x speed seconds.
 The scenario code is compiled only in DEBUG (`#if DEBUG`); `ScenarioHooks` in a Release build returns the production values.
+
+## What the scenarios show
+
+Frames from the simulator scenarios on an iPad simulator (the status bar says OpenEFB, the name before the rebrand; the screens are unchanged):
+
+| | |
+|---|---|
+| <img src="../../docs/design/screenshots/SIM-IL/01-route-bar-nominal.png" width="360" alt="Map with the route bar for the DEROR to SHARO leg at 1500 ft and GPS OK"><br>Nominal: route bar, leg altitude, GPS OK | <img src="../../docs/design/screenshots/SIM-IL/02-altitude-caution.png" width="360" alt="Map with an amber 400 FT HIGH, FLY 3000 caution on the route bar and a prohibited area alert"><br>Altitude deviation: amber "400 FT HIGH - FLY 3000" |
+| <img src="../../docs/design/screenshots/SIM-IL/03-closure-alert.png" width="360" alt="Map with a red Route closed ahead alert and an amber partly closed alert above the route bar"><br>Closure alert from the fixture NOTAM feed | <img src="../../docs/design/screenshots/SIM-IL/04-gps-loss.png" width="360" alt="Map with a No position source notice and an amber ALERTS OFF: NO GPS POSITION banner"><br>GPS loss: alerts switch off and say so |

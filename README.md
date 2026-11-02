@@ -8,6 +8,41 @@ Kanaf (Hebrew: כנף, "wing") is a free, open-source VFR Electronic Flight Bag 
 
 **Status: TestFlight beta (version 1.0, build 1).** See [Limitations](#limitations).
 
+## Screenshots
+
+iPad Pro 13-inch and iPhone 17 Pro simulators, beta build. The Israel shots show Kanaf's own vector CVFR overlay on the Street base map; the official CAAI chart raster is not shown here.
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/images/readme/us-moving-map.jpg" width="300" alt="iPad moving map on the FAA sectional near Palo Alto, recording in progress, with the nearest-airport readout and the instrument strip"><br>US: moving map on the FAA sectional, recording, NRST readout and instrument strip</td>
+    <td align="center"><img src="docs/images/readme/us-airport-sheet-metar.jpg" width="300" alt="Airport sheet for KOAK with a 9 minute METAR age badge, decoded weather, TAF and frequencies"><br>US: airport sheet with the METAR, its age badge, TAF and frequencies</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/readme/us-tfr-old.jpg" width="300" alt="Map with a stale TFR drawn faded and dashed and a TFR OLD 44 min badge"><br>US: a stale TFR is faded, dashed and badged OLD; expired data is not drawn</td>
+    <td align="center"><img src="docs/images/readme/il-cvfr-overlay-route.jpg" width="300" alt="Israel map with the CVFR route network, airspace and a planned LLHZ to LLIB route drawn in red"><br>Israel: CVFR overlay with a planned LLHZ -> LLIB route</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/readme/il-plan-routed.jpg" width="300" alt="Flight plan screen with an auto-routed LLHZ to LLIB CVFR route: 12 legs with altitudes, distances and times"><br>Israel: auto-routed CVFR plan with leg altitudes and times</td>
+    <td align="center"><img src="docs/images/readme/il-fpl-preview.jpg" width="300" alt="FPL message sheet with the ICAO flight plan text, a Hebrew summary and Share and E-mail buttons"><br>Israel: ICAO FPL message for the pilot to send to AIS (the app files nothing)</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/readme/il-notam-closures.jpg" width="300" alt="Map near Haifa with route segments marked closed in red, partly closed in amber and check NOTAM in brown"><br>Israel: NOTAM route closures on the map (full, partial, check NOTAM)</td>
+    <td align="center"><img src="docs/images/readme/il-route-bar-alert.jpg" width="300" alt="In-flight map with the route bar showing the DEROR to SHARO leg and a red Route closed ahead alert"><br>Israel: route bar in flight with a red closed-leg alert</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/readme/il-cvfr-debrief.jpg" width="300" alt="Flight details with the CVFR route debrief: altitude adherence per leg and reporting points heard"><br>Israel: CVFR debrief, per-leg altitude adherence and position reports</td>
+    <td align="center"><img src="docs/images/readme/il-lsa-route.jpg" width="300" alt="Flight plan screen with the LSA sport aviation network selected and a holiday LLBS to LLRS route"><br>Israel: LSA (sport aviation) route with the weekend and holiday rule</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/readme/iphone-map.jpg" width="200" alt="iPhone map over Ben Gurion with the compact instrument strip and the Map, Flights and Settings tab bar"><br>iPhone: compact map layout</td>
+    <td align="center"><img src="docs/images/readme/iphone-direct-to.jpg" width="200" alt="iPhone map with a Direct LLBG bar and distance and time to go in the strip"><br>iPhone: Direct-To with distance and time to go</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/images/readme/recording-hud-error.jpg" width="300" alt="Map with a red Recording failed banner saying the file could not be saved because there is not enough space"><br>Recording: a failed recording is reported on the map, not hidden</td>
+    <td align="center"><img src="docs/images/readme/home-screen-icon.jpg" width="300" alt="iPad home screen with the Kanaf app icon"><br>The Kanaf icon on the home screen</td>
+  </tr>
+</table>
+
 ## The Problem
 
 ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional charts, NOAA weather -- is **free and public domain**, and Israel's CAAI publishes its CVFR data too. Android pilots have Avare (free, open-source). iOS pilots have had nothing free. Kanaf fills that gap.

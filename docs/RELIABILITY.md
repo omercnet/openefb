@@ -163,4 +163,12 @@ App-side findings are beads under `efb-zfm`. REL-FIX (T31) fixed them; statuses 
 | efb-bgb (P2) | Error and Retry hidden with a stale METAR | Fixed | see efb-zfm.14 |
 | efb-8d4 (P3) | TAF never EXPIRED | Fixed | `TAFValidity` reads the valid period from the TAF text; the age backstop is 30 h; one characterization test flipped |
 
+What the pilot sees after REL-FIX (iPad, simulator; efb-zfm.11, efb-zfm.10, efb-8lm):
+
+| | |
+|---|---|
+| <img src="design/screenshots/REL-FIX/tfr-current.png" width="360" alt="Map with a current TFR drawn as a solid red box over Palo Alto"><br>A current TFR, for comparison | <img src="design/screenshots/REL-FIX/stale-tfr-old.png" width="360" alt="The same map with the TFR faded and dashed and a TFR OLD 44 min badge"><br>A stale TFR: faded, dashed, "OLD 44 min" |
+| <img src="design/screenshots/REL-FIX/stale-tfr-expired-hidden.png" width="360" alt="The same map with no TFR drawn and a red TFR EXPIRED not shown badge"><br>An expired TFR is not drawn; the badge says so | <img src="design/screenshots/REL-FIX/airspace-check-unavailable.png" width="360" alt="Map with amber No position source and Airspace check unavailable banners"><br>Airspace check unavailable (amber banner) |
+| <img src="design/screenshots/REL-FIX/chart-download-error-retry.png" width="360" alt="Offline Maps screen with an Israel CVFR chart download error and a Retry button"><br>Chart pack download error with Retry | |
+
 Still open: stale advisories use the fetch time of the whole snapshot, not each advisory's issue time; the relay KV read budget (O5); map dots swallow a failed refresh (the age badge still ages).
