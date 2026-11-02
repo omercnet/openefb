@@ -34,8 +34,8 @@ struct NearestAirportHUD: View {
                 if appState.region.hasAirportData, let entry {
                     VStack(alignment: .leading, spacing: 2) {
                         if horizontalSizeClass == .compact {
-                            // iPhone: ICAO + distance on the first line, bearing + runway on the second,
-                            // so no number is truncated next to the NRST badge.
+                            // iPhone: ICAO + distance on the first line, bearing + runway on the second, caution
+                            // tags on a third (only when one applies), so no number is truncated next to the NRST badge.
                             HStack(spacing: 8) {
                                 Text(entry.airport.icao)
                                     .font(.title3.weight(.bold).monospaced())
@@ -51,10 +51,14 @@ struct NearestAirportHUD: View {
                                     .foregroundStyle(.secondary)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.8)
-                                if entry.isPrivateUse { PrivateUseTag() }
-                                if entry.isMilitary { MilitaryUseTag() }
-                                if entry.requiresPPR { PprTag() }
-                                if entry.isClosedByNotam { NotamClosedTag() }
+                            }
+                            if entry.isPrivateUse || entry.isMilitary || entry.requiresPPR || entry.isClosedByNotam {
+                                HStack(spacing: 6) {
+                                    if entry.isPrivateUse { PrivateUseTag() }
+                                    if entry.isMilitary { MilitaryUseTag() }
+                                    if entry.requiresPPR { PprTag() }
+                                    if entry.isClosedByNotam { NotamClosedTag() }
+                                }
                             }
                         } else {
                             HStack(spacing: 10) {
