@@ -43,8 +43,6 @@ enum MapMode: String, CaseIterable, Sendable {
 enum MapStyle: String, CaseIterable, Sendable {
     case vfrSectional   // FAA VFR sectional chart raster overlay
     case street         // Street map base layer
-    case satellite      // Satellite imagery
-    case terrain        // Terrain/topographic
 }
 
 enum MapLayer: String, CaseIterable, Sendable {

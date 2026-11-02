@@ -298,7 +298,7 @@ struct SettingsView: View {
     }
 
     private var feedbackURL: URL {
-        URL(string: "mailto:feedback@quartermint.com?subject=Kanaf%20Beta%20Feedback")!
+        URL(string: "mailto:kanaf@omer.io?subject=Kanaf%20Beta%20Feedback")!
     }
 
     // MARK: - Region (IL-2)

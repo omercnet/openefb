@@ -131,7 +131,6 @@ struct RegionTests {
     @Test func switchingToIsraelRecentersAndDropsUSOnlyLayers() {
         let appState = AppState()
         appState.visibleLayers = [.sectional, .airports, .ownship, .tfrs, .advisories, .navaids]
-        appState.mapStyle = .satellite
 
         appState.region = .israel
 

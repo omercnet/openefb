@@ -1,0 +1,27 @@
+{"v":1,"ts":"2026-11-02T11:10:21.009Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"run.start","title":"Kanaf external TestFlight prep","subtitle":"Review fixes, feedback address, privacy policy, drop Satellite/Terrain"}
+{"v":1,"ts":"2026-11-02T11:10:21.440Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.add","id":"T01","title":"Ticket 01: Fix review docs (Israel default, iPhone, build number)","estimateMin":15,"status":"done"}
+{"v":1,"ts":"2026-11-02T11:10:21.880Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.add","id":"T02","title":"Ticket 02: Feedback address kanaf@omer.io","estimateMin":10,"status":"working"}
+{"v":1,"ts":"2026-11-02T11:10:22.306Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.add","id":"T03","title":"Ticket 03: Remove Satellite and Terrain base maps","estimateMin":45,"waitsFor":"T02"}
+{"v":1,"ts":"2026-11-02T11:10:22.731Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.add","id":"T04","title":"Ticket 04: Write privacy policy (PRIVACY.md)","estimateMin":20,"waitsFor":"T03"}
+{"v":1,"ts":"2026-11-02T11:10:23.174Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.add","id":"T05","title":"Ticket 05: Verify build, tests, smoke run","estimateMin":30,"waitsFor":"T04"}
+{"v":1,"ts":"2026-11-02T11:10:23.596Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T02","stage":"Build"}
+{"v":1,"ts":"2026-11-02T11:10:24.030Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"activity.add","id":"A1","text":"Corrected iPad-only, US-default and build-number claims across dist-prep docs","ticket":"T01"}
+{"v":1,"ts":"2026-11-02T11:10:24.460Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticker.set","text":"Switching feedback address to kanaf@omer.io"}
+{"v":1,"ts":"2026-11-02T11:10:28.117Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T02","status":"done"}
+{"v":1,"ts":"2026-11-02T11:10:28.554Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T03","status":"working","stage":"Build"}
+{"v":1,"ts":"2026-11-02T11:10:28.990Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticker.set","text":"Removing Satellite and Terrain base maps"}
+{"v":1,"ts":"2026-11-02T11:11:22.331Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"activity.add","id":"A2","text":"Satellite and Terrain removed from style, code, tests, docs and privacy label","ticket":"T03"}
+{"v":1,"ts":"2026-11-02T11:11:22.764Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T03","stage":"Verify"}
+{"v":1,"ts":"2026-11-02T11:11:23.176Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticker.set","text":"Building and running tests"}
+{"v":1,"ts":"2026-11-02T11:11:29.943Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T03","status":"done"}
+{"v":1,"ts":"2026-11-02T11:11:30.377Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T04","status":"working","stage":"Build"}
+{"v":1,"ts":"2026-11-02T11:11:30.829Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticker.set","text":"Writing PRIVACY.md"}
+{"v":1,"ts":"2026-11-02T11:11:52.917Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"deliverable.add","id":"D1","title":"Privacy policy","path":"PRIVACY.md","ticket":"T04","kind":"file"}
+{"v":1,"ts":"2026-11-02T11:11:53.417Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T04","status":"done"}
+{"v":1,"ts":"2026-11-02T11:11:53.957Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T05","status":"working","stage":"Verify"}
+{"v":1,"ts":"2026-11-02T11:11:54.442Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticker.set","text":"Waiting for build, then running unit tests"}
+{"v":1,"ts":"2026-11-02T11:14:11.195Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"activity.add","id":"A3","text":"Full unit suite passed (1095 test cases, 0 failed); Street map and CVFR overlay render in the simulator after the base-map removal","ticket":"T05"}
+{"v":1,"ts":"2026-11-02T11:14:12.054Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"deliverable.add","id":"D2","title":"Smoke screenshot after removing Satellite/Terrain","path":"/tmp/kanaf-smoke2.png","ticket":"T05","kind":"screenshot"}
+{"v":1,"ts":"2026-11-02T11:14:12.877Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticket.update","id":"T05","status":"done"}
+{"v":1,"ts":"2026-11-02T11:14:13.642Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"ticker.clear"}
+{"v":1,"ts":"2026-11-02T11:14:14.392Z","by":"d61298bb-1fc4-4b53-899f-21176677a96a","type":"run.finish","outcome":"Feedback address set, Satellite/Terrain removed, privacy policy written, review docs corrected; tests pass"}

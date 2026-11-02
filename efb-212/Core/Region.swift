@@ -193,12 +193,7 @@ nonisolated enum Region: String, Codable, CaseIterable, Sendable, Identifiable {
     var hasAirportData: Bool { isAvailable(.airports) || isAvailable(.aerodromes) }
 
     /// Base map styles that make sense here. The FAA sectional is a separate layer.
-    var availableMapStyles: [MapStyle] {
-        switch self {
-        case .us: return [.street, .satellite, .terrain]
-        case .israel: return [.street]
-        }
-    }
+    var availableMapStyles: [MapStyle] { [.street] }
 
     /// Attribution shown in Settings > About when the data source has no metadata of its own.
     var fallbackDataAttribution: String {

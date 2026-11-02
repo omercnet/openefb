@@ -8,24 +8,6 @@
       "url": "https://tiles.openfreemap.org/planet",
       "attribution": "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors"
     },
-    "satellite": {
-      "type": "raster",
-      "tiles": ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-      "tileSize": 256,
-      "maxzoom": 19,
-      "attribution": "Imagery © Esri, Maxar, Earthstar Geographics"
-    },
-    "terrain": {
-      "type": "raster",
-      "tiles": [
-        "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
-        "https://b.tile.opentopomap.org/{z}/{x}/{y}.png",
-        "https://c.tile.opentopomap.org/{z}/{x}/{y}.png"
-      ],
-      "tileSize": 256,
-      "maxzoom": 17,
-      "attribution": "© OpenTopoMap (CC-BY-SA) © OpenStreetMap contributors"
-    },
     "vfr-sectional": {
       "type": "raster",
       "tiles": ["https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer/tile/{z}/{y}/{x}"],
@@ -138,18 +120,6 @@
         "text-size": ["match", ["get", "class"], "city", 14, 11]
       },
       "paint": { "text-color": "#555555", "text-halo-color": "#FFFFFF", "text-halo-width": 1.2 }
-    },
-    {
-      "id": "base-satellite",
-      "type": "raster",
-      "source": "satellite",
-      "layout": { "visibility": "none" }
-    },
-    {
-      "id": "base-terrain",
-      "type": "raster",
-      "source": "terrain",
-      "layout": { "visibility": "none" }
     },
     {
       "id": "base-vfr-sectional",

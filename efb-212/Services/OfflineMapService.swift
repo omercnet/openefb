@@ -96,9 +96,6 @@ nonisolated enum OfflineLayer: String, CaseIterable, Codable, Sendable, Identifi
         }
     }
 
-    // Satellite (Esri) and Terrain (OpenTopoMap) are not downloadable: their terms forbid
-    // bulk/offline use (docs/TILE-SOURCES.md). They remain online base maps (efb-zfm.8).
-
     /// base-style.json source ids this layer needs.
     var styleSources: [String] {
         switch self {
@@ -332,8 +329,6 @@ nonisolated enum OfflineStatusResolver {
         switch style {
         case .vfrSectional: return [.sectional, .street]
         case .street: return [.street]
-        // Satellite and Terrain are online-only base maps: their tile providers forbid bulk download.
-        case .satellite, .terrain: return []
         }
     }
 
