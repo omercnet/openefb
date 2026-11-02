@@ -17,6 +17,7 @@ cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
 ENV_FILE="$HOME/.appstoreconnect/openefb.env"
+# shellcheck disable=SC1090 # the env file is per-machine (ASC key id / issuer id); it isn't in the repo
 [ -f "$ENV_FILE" ] && . "$ENV_FILE"
 : "${ASC_KEY_ID:?set ASC_KEY_ID (see $ENV_FILE)}"
 : "${ASC_ISSUER_ID:?set ASC_ISSUER_ID (see $ENV_FILE)}"
@@ -25,8 +26,10 @@ KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
 AUTH=(-authenticationKeyPath "$KEY_PATH" -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID")
 
 PROFILE_NAME="io.omer.efb AppStore"
+# Xcode 27 installs profiles under ~/Library/Developer/Xcode/UserData; older Xcode used ~/Library/MobileDevice.
 if ! security find-identity -v -p codesigning | grep -q "Apple Distribution" \
-   || ! grep -rlq "$PROFILE_NAME" "$HOME/Library/MobileDevice/Provisioning Profiles" 2>/dev/null; then
+   || ! grep -rlqa "$PROFILE_NAME" "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" \
+        "$HOME/Library/MobileDevice/Provisioning Profiles" 2>/dev/null; then
   command -v fastlane >/dev/null || { echo "error: fastlane is needed to create signing assets (brew install fastlane)" >&2; exit 2; }
   JSON="$(mktemp)"; trap 'rm -f "$JSON"' EXIT
   python3 - "$ASC_KEY_ID" "$ASC_ISSUER_ID" "$KEY_PATH" "$JSON" <<'PY'

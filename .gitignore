@@ -61,3 +61,16 @@ docs/design/screenshots/IL-9/
 docs/design/screenshots/IL-13/
 # UX-IL review screenshots that show CAAI chart/diagram artwork (same rule as IL-9, IL-13)
 docs/design/screenshots/UX-IL-CAAI/
+
+# Secrets and signing material (never commit; enforced by .gitleaks.toml and lefthook)
+*.p8
+.env*
+!.env.example
+fastlane_api_key.json
+.vercel
+.wrangler
+*.mobileprovision
+
+# Python bytecode
+__pycache__/
+*.pyc

@@ -32,6 +32,7 @@ Paseo scripts (`paseo.json`; run from the Paseo app or `paseo script start <name
 | `test` | Full unit suite on the worktree simulator. |
 | `build` | Compile app + tests (no simulator). |
 | `ready` | `bd ready`: unblocked work. |
+| `check` | `tools/check.sh`: the pre-commit checks (gitleaks, forbidden files, plist/JSON/shell/Python lint, swift-format report, web tests) over the whole tree, plus a full-history gitleaks scan. See "Hooks". |
 
 Worktree setup resolves SwiftPM packages and creates the worktree's simulator; teardown deletes it.
 
@@ -217,6 +218,16 @@ Network services (free, no key unless noted): NOAA Aviation Weather (METAR, TAF,
 - Weather for Israel reads the same NOAA API with the Israel station list; products an aerodrome doesn't publish aren't requested.
 **Server side (`web/`):** `web/notam-relay` (Cloudflare Worker + KV, live at `https://openefb-notam-relay.omerc.workers.dev`; `/health` reported 200 on 2026-11-02), `web/charts` (R2 publish tooling; the R2 bucket is live with both products published), `web/interviews` (Next.js pilot-interview app on Vercel Hobby, live at `https://openefb-interviews.vercel.app`, git-connected to omercnet/openefb with Root Directory `web/interviews`). The iPad app uses the first two; the interviews site is not part of the app. See `web/README.md`.
 **Next:** TestFlight upload (`dist-prep/`), then the public-release items under Known Issues.
+
+## Hooks
+
+lefthook (`lefthook.yml`) runs on each clone after `mise use -g lefthook@latest && lefthook install` (details in `tools/hooks/README.md`).
+
+- **pre-commit** (staged files only): gitleaks (`.gitleaks.toml`), forbidden files (`*.p8`, `.env*`, `*.mobileprovision`, `*.xcarchive`, `*TmpTests.swift`, CAAI artwork and inputs, new files over 5 MB), `plutil -lint`, JSON, shellcheck, Python syntax, web tests/lint for the changed package. swift-format lint is report-only: the tree has about 4,400 findings and this ticket doesn't reformat it.
+- **pre-push:** gitleaks over the pushed range, `tools/sim-test.sh build -quiet`, web tests for changed packages. The full unit suite (about 4 minutes) is not run: `tools/sim-test.sh test -only-testing:efb-212Tests`.
+- **commit-msg:** subject not empty, at most 100 characters. **post-checkout / post-merge:** reminder to run `npm ci` when a `web/*/package-lock.json` changed.
+- Skip: `git commit --no-verify`, or `LEFTHOOK_EXCLUDE=<job>,<job>`.
+- The integrator commits with `git commit-tree`, which bypasses hooks: run `tools/check.sh` first (`--staged` for staged files only, `--quick` to skip the history scan).
 
 ## Issue Tracking (beads)
 

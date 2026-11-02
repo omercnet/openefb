@@ -78,6 +78,12 @@ task owns. Check with `npm ci && npm test` (relay, charts) or `npm ci && npm run
 deploy, publish or approve an edition yourself: `wrangler deploy`, `web/charts/publish.sh --remote` and `vercel --prod` are
 the owner's or integrator's calls. See `web/README.md` for what is live.
 
+## Hooks and checks
+Git hooks (lefthook, `lefthook.yml`) block secrets, forbidden files and broken plist/JSON/shell/Python on commit. Don't commit
+(see ground rules), but never bypass them either. The integrator's `git commit-tree` skips hooks, so run `tools/check.sh`
+(whole tree + history secret scan) before it; `tools/check.sh --staged` checks only staged files. Never put a secret, a `.p8`,
+a `.env*` file or a `*TmpTests.swift` in a tree that will be committed. Details: `tools/hooks/README.md`.
+
 ## Tracking
 - beads: `bd update <issue> --claim` at start. Record notable decisions with `bd update <issue> --notes "..."`.
   For a follow-up you discover but don't own: `bd create "<title>" -t bug|task -p 2 --deps discovered-from:<issue> -d "..."`.

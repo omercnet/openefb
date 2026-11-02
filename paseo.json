@@ -25,6 +25,9 @@
     },
     "ready": {
       "command": "bd ready"
+    },
+    "check": {
+      "command": "tools/check.sh"
     }
   }
 }

@@ -1,0 +1,49 @@
+# gitleaks config for Kanaf. Default rules plus the secrets this project handles.
+# Scan history: `gitleaks git --no-banner .`; staged: `gitleaks git --pre-commit --staged --no-banner`.
+title = "Kanaf gitleaks"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "appstoreconnect-p8-private-key"
+description = "App Store Connect API key (.p8) or any PKCS#8 private key"
+regex = '''-----BEGIN (?:EC |RSA )?PRIVATE KEY-----'''
+keywords = ["begin private key", "begin ec private key", "begin rsa private key"]
+
+[[rules]]
+id = "cloudflare-api-token"
+description = "Cloudflare API token or global key assigned to a Cloudflare variable"
+regex = '''(?i)(?:cloudflare|cf)[_-]?(?:api)?[_-]?(?:token|key)["'\s:=]{1,5}[A-Za-z0-9_-]{37,40}\b'''
+keywords = ["cloudflare", "cf_api", "cf-api", "cf_token"]
+
+[[rules]]
+id = "vercel-token"
+description = "Vercel access token"
+regex = '''(?i)(?:vercel[_-]?token["'\s:=]{1,5}[A-Za-z0-9]{24}\b|\bvcp_[A-Za-z0-9]{40,}\b)'''
+keywords = ["vercel", "vcp_"]
+
+[[rules]]
+id = "openai-api-key"
+description = "OpenAI API key (sk-..., sk-proj-...)"
+regex = '''\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}'''
+keywords = ["sk-"]
+
+[[rules]]
+id = "faa-notam-client-secret"
+description = "FAA NOTAM API client secret / id (the pilot's own key; it lives in Keychain, never in the repo)"
+regex = '''(?i)(?:faa|notam)[_-]?(?:api)?[_-]?client[_-]?(?:secret|id)["'\s:=]{1,5}[A-Za-z0-9_-]{16,}'''
+keywords = ["client_secret", "client-secret", "clientsecret", "client_id", "client-id", "clientid"]
+
+[allowlist]
+description = "Known false positives (keep narrow; one-off historical hits go in .gitleaksignore by fingerprint)"
+# 1Password references are pointers, not secrets.
+# The public R2 dev URL (pub-<hash>.r2.dev) is a hostname, not a credential.
+regexes = [
+  '''op://[A-Za-z0-9_./ -]+''',
+  '''pub-cdfb51548498487fa9fdb9794192c8ef\.r2\.dev''',
+]
+# Saved IAA NOTAM pages used by the relay tests: public text, no credentials.
+paths = [
+  '''web/notam-relay/test/.*''',
+]

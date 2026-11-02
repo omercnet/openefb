@@ -1,0 +1,88 @@
+# lefthook hooks for Kanaf. Install: `mise use -g lefthook@latest && lefthook install` (see tools/hooks/README.md).
+# Same pre-commit checks without git: tools/check.sh (the integrator's commit-tree bypasses hooks).
+# Skip jobs:   LEFTHOOK_EXCLUDE=swift-format,web-relay git commit ...      Skip all: git commit --no-verify
+min_version: 1.10.0
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: gitleaks
+      # Blocks. In --all-files mode (tools/check.sh) there is no staged diff, so scan the working tree's tracked files.
+      run: gitleaks git --pre-commit --staged --no-banner --redact=100
+
+    - name: forbidden-files
+      run: tools/hooks/forbidden-files.sh {staged_files}
+
+    - name: plist
+      glob: "*.{plist,xcprivacy,entitlements,pbxproj}"
+      run: plutil -lint {staged_files}
+
+    - name: json
+      glob: "*.json"
+      exclude: [".agents/skills/**", ".claude/skills/**"]
+      run: |
+        rc=0
+        for f in {staged_files}; do
+          python3 -m json.tool "$f" >/dev/null || { echo "invalid JSON: $f" >&2; rc=1; }
+        done
+        exit $rc
+
+    - name: shellcheck
+      glob: "*.sh"
+      exclude: [".agents/skills/**", ".claude/skills/**"]
+      run: shellcheck {staged_files}
+
+    - name: python
+      glob: "*.py"
+      exclude: [".agents/skills/**", ".claude/skills/**"]
+      # compile() in memory: `py_compile` would rewrite the tracked __pycache__/*.pyc files.
+      run: |
+        python3 -c 'import sys
+        for f in sys.argv[1:]: compile(open(f, "rb").read(), f, "exec")' {staged_files}
+
+    - name: swift-format
+      # NON-BLOCKING: the tree has ~4,400 swift-format findings (see tools/hooks/README.md). Reports only.
+      glob: "*.swift"
+      exclude: [".agents/skills/**", ".claude/skills/**"]
+      run: xcrun swift-format lint --configuration .swift-format {staged_files} || true
+
+    - name: web-interviews
+      root: web/interviews/
+      glob: "web/interviews/**/*"
+      run: npm run lint
+
+    - name: web-relay
+      root: web/notam-relay/
+      glob: "web/notam-relay/**/*"
+      run: npm test
+
+    - name: web-charts
+      root: web/charts/
+      glob: "web/charts/**/*"
+      run: npm test
+
+pre-push:
+  # Heavier. Skip: LEFTHOOK_EXCLUDE=pre-push-gitleaks,pre-push-build,pre-push-web git push   (or --no-verify)
+  # The full unit suite (about 4 minutes) is not run here: `tools/sim-test.sh test -only-testing:efb-212Tests`.
+  jobs:
+    - name: pre-push-gitleaks
+      run: tools/hooks/pre-push.sh gitleaks
+    - name: pre-push-build
+      run: tools/hooks/pre-push.sh build
+    - name: pre-push-web
+      run: tools/hooks/pre-push.sh web
+
+commit-msg:
+  jobs:
+    - name: subject
+      run: tools/hooks/commit-msg.sh {1}
+
+post-checkout:
+  jobs:
+    - name: npm-ci-reminder
+      run: tools/hooks/lockfile-reminder.sh {1} {2}
+
+post-merge:
+  jobs:
+    - name: npm-ci-reminder
+      run: tools/hooks/lockfile-reminder.sh ORIG_HEAD HEAD
