@@ -75,6 +75,4 @@ fastlane_api_key.json
 __pycache__/
 *.pyc
 
-# Paseo Progress run logs
-.agents/*.jsonl
 .beads.gate.lock
