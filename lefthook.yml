@@ -62,9 +62,11 @@ pre-commit:
       run: npm test
 
 pre-push:
-  # Heavier. Skip: LEFTHOOK_EXCLUDE=pre-push-gitleaks,pre-push-build,pre-push-web git push   (or --no-verify)
+  # Heavier. Skip: LEFTHOOK_EXCLUDE=pre-push-commits,pre-push-gitleaks,pre-push-build,pre-push-web git push   (or --no-verify)
   # The full unit suite (about 4 minutes) is not run here: `tools/sim-test.sh test -only-testing:efb-212Tests`.
   jobs:
+    - name: pre-push-commits
+      run: tools/hooks/pre-push.sh commits
     - name: pre-push-gitleaks
       run: tools/hooks/pre-push.sh gitleaks
     - name: pre-push-build
@@ -74,7 +76,7 @@ pre-push:
 
 commit-msg:
   jobs:
-    - name: subject
+    - name: conventional-commit
       run: tools/hooks/commit-msg.sh {1}
 
 post-checkout:

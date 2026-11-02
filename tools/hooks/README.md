@@ -23,8 +23,8 @@ gitleaks and shellcheck come from mise too (`mise use -g gitleaks shellcheck`); 
 | | Python syntax (compiled in memory, so tracked `.pyc` files stay untouched) | yes |
 | | `swift-format lint` with `.swift-format` | **no, report only** |
 | | `npm run lint` (web/interviews), `npm test` (web/notam-relay, web/charts) when those folders have staged files | yes |
-| pre-push | gitleaks over the pushed range; `tools/sim-test.sh build -quiet` (skipped without `xcodebuild`); web tests for changed packages | yes |
-| commit-msg | subject not empty, at most 100 characters | yes |
+| pre-push | Conventional Commits for every pushed commit (catches `git commit-tree` commits); gitleaks over the pushed range; `tools/sim-test.sh build -quiet` (skipped without `xcodebuild`); web tests for changed packages | yes |
+| commit-msg | Conventional Commits: `<type>(<scope>)!: <description>`, type `feat fix docs style refactor perf test build ci chore revert`, subject at most 100 characters (`Merge`, `fixup!`, `squash!`, `amend!` pass) | yes |
 | post-checkout, post-merge | prints an `npm ci` reminder when `web/*/package-lock.json` changed | no |
 
 `.agents/skills/**` and `.claude/skills/**` are excluded from the JSON, shellcheck, Python and swift-format jobs.

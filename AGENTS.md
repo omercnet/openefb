@@ -224,10 +224,10 @@ Network services (free, no key unless noted): NOAA Aviation Weather (METAR, TAF,
 lefthook (`lefthook.yml`) runs on each clone after `mise use -g lefthook@latest && lefthook install` (details in `tools/hooks/README.md`).
 
 - **pre-commit** (staged files only): gitleaks (`.gitleaks.toml`), forbidden files (`*.p8`, `.env*`, `*.mobileprovision`, `*.xcarchive`, `*TmpTests.swift`, CAAI artwork and inputs, new files over 5 MB), `plutil -lint`, JSON, shellcheck, Python syntax, web tests/lint for the changed package. swift-format lint is report-only: the tree has about 4,400 findings and this ticket doesn't reformat it.
-- **pre-push:** gitleaks over the pushed range, `tools/sim-test.sh build -quiet`, web tests for changed packages. The full unit suite (about 4 minutes) is not run: `tools/sim-test.sh test -only-testing:efb-212Tests`.
-- **commit-msg:** subject not empty, at most 100 characters. **post-checkout / post-merge:** reminder to run `npm ci` when a `web/*/package-lock.json` changed.
+- **pre-push:** Conventional Commits for every pushed commit, gitleaks over the pushed range, `tools/sim-test.sh build -quiet`, web tests for changed packages. The full unit suite (about 4 minutes) is not run: `tools/sim-test.sh test -only-testing:efb-212Tests`.
+- **commit-msg:** [Conventional Commits](https://www.conventionalcommits.org): `<type>(<scope>)!: <description>`, type one of `feat fix docs style refactor perf test build ci chore revert`, subject at most 100 characters. Check a range by hand with `tools/hooks/commit-msg.sh --range origin/main..HEAD`. **post-checkout / post-merge:** reminder to run `npm ci` when a `web/*/package-lock.json` changed.
 - Skip: `git commit --no-verify`, or `LEFTHOOK_EXCLUDE=<job>,<job>`.
-- The integrator commits with `git commit-tree`, which bypasses hooks: run `tools/check.sh` first (`--staged` for staged files only, `--quick` to skip the history scan).
+- The integrator commits with `git commit-tree`, which bypasses hooks: run `tools/check.sh` first (`--staged` for staged files only, `--quick` to skip the history scan) and write a Conventional Commit message; pre-push rejects any pushed commit that isn't one. Scopes in use: `israel`, `iphone`, `recording`, `map`, `release`, `hooks`, `interviews`, `relay`, `charts`, `skills`, `progress`.
 
 ## Issue Tracking (Paseo Progress)
 
