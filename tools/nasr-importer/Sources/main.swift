@@ -1,6 +1,6 @@
 //
 //  NASR Importer
-//  Generates the bundled aviation.sqlite database for OpenEFB.
+//  Generates the bundled aviation.sqlite database for Kanaf.
 //
 //  Primary source: FAA NASR 28-day subscription CSVs (APT_BASE, APT_RWY, APT_RWY_END, FRQ, AWOS,
 //  NAV_BASE) from https://nfdc.faa.gov/webContent/28DaySub/extra/<DD_Mon_YYYY>_CSV.zip.
@@ -28,7 +28,7 @@ import ArgumentParser
 struct NASRImporter: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "nasr-importer",
-        abstract: "Generate aviation.sqlite from FAA NASR CSV data for OpenEFB."
+        abstract: "Generate aviation.sqlite from FAA NASR CSV data for Kanaf."
     )
 
     @Flag(name: .long, help: "Download the current NASR CSV zip and the Class B/C/D airspace polygons")
@@ -50,7 +50,7 @@ struct NASRImporter: ParsableCommand {
     var output: String = "aviation.sqlite"
 
     func run() throws {
-        print("NASR Importer - OpenEFB Aviation Database Generator")
+        print("NASR Importer - Kanaf Aviation Database Generator")
         print("Output: \(output)")
 
         var csvDir = nasrDir
@@ -163,7 +163,7 @@ func downloadNASR(cycleEffective: Date, into dir: URL) async throws -> DownloadR
     print("Downloading \(zipURL.absoluteString)...")
     var request = URLRequest(url: zipURL)
     // nfdc.faa.gov answers 503 to curl's default user agent.
-    request.setValue("Mozilla/5.0 (Macintosh) OpenEFB-nasr-importer", forHTTPHeaderField: "User-Agent")
+    request.setValue("Mozilla/5.0 (Macintosh) Kanaf-nasr-importer", forHTTPHeaderField: "User-Agent")
     let (zipData, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
         throw NSError(domain: "NASRImporter", code: 1, userInfo: [NSLocalizedDescriptionKey: "NASR download failed for \(stamp)"])

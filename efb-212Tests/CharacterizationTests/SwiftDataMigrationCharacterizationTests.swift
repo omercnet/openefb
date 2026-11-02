@@ -66,6 +66,7 @@ struct SwiftDataMigrationCharacterizationTests {
 
         let settings = SchemaV1.UserSettings()
         settings.activeAircraftID = aircraftID.uuidString
+        settings.region = .us                      // an existing install's stored choice survives the Israel default
         context.insert(settings)
 
         let aircraft = SchemaV1.AircraftProfile(nNumber: "N12345")
@@ -185,14 +186,14 @@ struct SwiftDataMigrationCharacterizationTests {
         #expect(settings.activeAircraftID == nil)
         #expect(settings.activePilotID == nil)
         #expect(settings.lastFlightPlanID == nil)
-        #expect(settings.regionRaw == "us")
-        #expect(settings.region == .us)
+        #expect(settings.regionRaw == "israel")             // IL-DEFAULT: a fresh record starts in Israel
+        #expect(settings.region == .israel)
     }
 
-    @Test func userSettingsUnknownRegionRawReadsAsUSAndSetterWritesRaw() {
+    @Test func userSettingsUnknownRegionRawReadsAsDefaultAndSetterWritesRaw() {
         let settings = SchemaV1.UserSettings()
         settings.regionRaw = "atlantis"
-        #expect(settings.region == .us)
+        #expect(settings.region == Region.defaultRegion)
         #expect(settings.regionRaw == "atlantis")   // the getter does not repair the stored value
         settings.region = .israel
         #expect(settings.regionRaw == "israel")

@@ -21,6 +21,7 @@ struct MapControlsView: View {
     let mapViewModel: MapViewModel
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         // 12pt between groups: the translucent 60pt controls read as one blob at 8pt over a busy map.
@@ -78,60 +79,104 @@ struct MapControlsView: View {
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
 
-            // Layer toggle button
-            Button {
-                Haptics.light()
-                appState.isPresentingLayerControls.toggle()
-            } label: {
-                Image(systemName: "square.3.layers.3d")
-                    .font(.title2)
-                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
-            }
-            .buttonStyle(PressableButtonStyle())
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
-            .accessibilityLabel("Toggle map layers")
-            .accessibilityValue(appState.isPresentingLayerControls ? "Open" : "Closed")
-
-            // Israel NOTAM briefing (IL-BRIEF)
-            if appState.region == .israel {
-                Button {
-                    Haptics.light()
-                    appState.isPresentingIsraelBriefing = true
+            if horizontalSizeClass == .compact {
+                // iPhone: layers, briefing and night mode share one 60pt menu so the column
+                // stays short enough to leave the ownship visible.
+                Menu {
+                    Button {
+                        Haptics.light()
+                        appState.isPresentingLayerControls.toggle()
+                    } label: {
+                        Label("Map layers", systemImage: "square.3.layers.3d")
+                    }
+                    if appState.region == .israel {
+                        Button {
+                            Haptics.light()
+                            appState.isPresentingIsraelBriefing = true
+                        } label: {
+                            Label("NOTAM briefing", systemImage: "doc.text.magnifyingglass")
+                        }
+                    }
+                    Button {
+                        Haptics.light()
+                        appState.displayMode = colorScheme == .dark ? .day : .night
+                    } label: {
+                        Label(colorScheme == .dark ? "Day display" : "Night display",
+                              systemImage: colorScheme == .dark ? "sun.max.fill" : "moon.fill")
+                    }
                 } label: {
-                    Image(systemName: "doc.text.magnifyingglass")
+                    Image(systemName: "ellipsis")
                         .font(.title2)
                         .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(PressableButtonStyle())
                 .background(.ultraThinMaterial)
                 .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
-                .accessibilityLabel("NOTAM briefing")
-                .accessibilityIdentifier("israel-briefing-button")
+                .accessibilityIdentifier("map-more-menu")
+                .accessibilityLabel("Map options")
+                .accessibilityHint("Layers, briefing and display mode")
+            } else {
+                layerAndDisplayButtons
             }
-
-            // Night mode quick toggle: day <-> night (Settings can return to Auto)
-            Button {
-                Haptics.light()
-                appState.displayMode = colorScheme == .dark ? .day : .night
-            } label: {
-                Image(systemName: colorScheme == .dark ? "sun.max.fill" : "moon.fill")
-                    .font(.title2)
-                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
-            }
-            .buttonStyle(PressableButtonStyle())
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
-            .accessibilityIdentifier("Toggle night mode")
-            .accessibilityLabel("Night mode")
-            .accessibilityValue(colorScheme == .dark ? "On, \(appState.displayMode.title)" : "Off, \(appState.displayMode.title)")
-            .accessibilityHint(colorScheme == .dark ? "Switch to day display" : "Switch to night display")
 
             // North indicator: only while the map is rotated (track-up or rotate gesture)
             if abs(mapViewModel.mapDirection) > 0.5 {
                 NorthIndicator(mapDirection: mapViewModel.mapDirection)
             }
         }
+    }
+
+    /// Regular width (iPad): the original separate layers, briefing and night-mode buttons.
+    @ViewBuilder
+    private var layerAndDisplayButtons: some View {
+        // Layer toggle button
+        Button {
+            Haptics.light()
+            appState.isPresentingLayerControls.toggle()
+        } label: {
+            Image(systemName: "square.3.layers.3d")
+                .font(.title2)
+                .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+        }
+        .buttonStyle(PressableButtonStyle())
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .accessibilityLabel("Toggle map layers")
+        .accessibilityValue(appState.isPresentingLayerControls ? "Open" : "Closed")
+
+        // Israel NOTAM briefing (IL-BRIEF)
+        if appState.region == .israel {
+            Button {
+                Haptics.light()
+                appState.isPresentingIsraelBriefing = true
+            } label: {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.title2)
+                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+            }
+            .buttonStyle(PressableButtonStyle())
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+            .accessibilityLabel("NOTAM briefing")
+            .accessibilityIdentifier("israel-briefing-button")
+        }
+
+        // Night mode quick toggle: day <-> night (Settings can return to Auto)
+        Button {
+            Haptics.light()
+            appState.displayMode = colorScheme == .dark ? .day : .night
+        } label: {
+            Image(systemName: colorScheme == .dark ? "sun.max.fill" : "moon.fill")
+                .font(.title2)
+                .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+        }
+        .buttonStyle(PressableButtonStyle())
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .accessibilityIdentifier("Toggle night mode")
+        .accessibilityLabel("Night mode")
+        .accessibilityValue(colorScheme == .dark ? "On, \(appState.displayMode.title)" : "Off, \(appState.displayMode.title)")
+        .accessibilityHint(colorScheme == .dark ? "Switch to day display" : "Switch to night display")
     }
 }
 
@@ -168,17 +213,27 @@ struct NorthIndicator: View {
 /// aircraft at the current zoom and re-engages follow (F3).
 struct RecenterButton: View {
     let action: () -> Void
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
+            if horizontalSizeClass == .compact {
+                // iPhone: icon only, 60pt, so the NRST readout keeps the width it needs.
                 Image(systemName: "location.fill")
-                    .font(.title3.weight(.semibold))
-                Text("Recenter")
-                    .font(.title3.weight(.bold))
+                    .font(.title2.weight(.semibold))
+                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size + 4)
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "location.fill")
+                        .font(.title3.weight(.semibold))
+                    Text("Recenter")
+                        .font(.title3.weight(.bold))
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .padding(.horizontal, 20)
+                .frame(height: MapControlMetrics.size + 4)
             }
-            .padding(.horizontal, 20)
-            .frame(height: MapControlMetrics.size + 4)
         }
         .buttonStyle(.borderedProminent)
         .tint(Palette.accent)

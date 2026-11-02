@@ -26,7 +26,7 @@ struct OnboardingView: View {
                         .foregroundStyle(Palette.accentText)
                         .accessibilityHidden(true)
 
-                    Text("OpenEFB")
+                    Text("Kanaf")
                         .font(.largeTitle.bold())
                         .accessibilityAddTraits(.isHeader)
 

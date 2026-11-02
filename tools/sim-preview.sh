@@ -1,5 +1,5 @@
 #!/bin/bash
-# Paseo "simulator" service: build OpenEFB, run it on this worktree's simulator, and stream the
+# Paseo "simulator" service: build Kanaf, run it on this worktree's simulator, and stream the
 # simulator into the browser (serve-sim) on the port Paseo assigns. Open the service URL in Paseo.
 #
 # Env: PASEO_PORT (from Paseo; default 3200), LOCATION=lat,lon (default KPAO).
@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 
-echo "Building OpenEFB for the simulator…"
+echo "Building Kanaf for the simulator…"
 APP="${DD:-/tmp/efb-dd-$(basename "$PWD")}/Build/Products/Debug-iphonesimulator/efb-212.app"
 if ! tools/sim-test.sh build -quiet; then
   # Agents edit this worktree concurrently, so a mid-edit tree may not compile. Show the last

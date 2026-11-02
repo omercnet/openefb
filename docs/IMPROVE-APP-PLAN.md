@@ -1,7 +1,7 @@
 # Improve App Plan
 
 ## Context
-Started 2026-10-31. OpenEFB, a free open-source iPad VFR EFB (SwiftUI, MapLibre).
+Started 2026-10-31. Kanaf, a free open-source iPad VFR EFB (SwiftUI, MapLibre).
 
 Intake:
 - **Users:** weekend VFR pilots (PRD.md §3). Primary job: J1, in-flight awareness (docs/CUSTOMER.md).

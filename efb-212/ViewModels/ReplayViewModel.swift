@@ -50,7 +50,7 @@ final class ReplayViewModel {
         loadError = nil
 
         guard let recordingDB = appState.getOrCreateRecordingDatabase() else {
-            loadError = "The recording database could not be opened. Reinstall OpenEFB."
+            loadError = "The recording database could not be opened. Reinstall Kanaf."
             isLoading = false
             return
         }

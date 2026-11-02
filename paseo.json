@@ -14,6 +14,9 @@
     "fly": {
       "command": "tools/fly.sh"
     },
+    "fly-israel": {
+      "command": "tools/fly.sh israel il-cvfr-llhz-llib-nominal --speed 4"
+    },
     "test": {
       "command": "RESULT=/tmp/efb-tests-$(basename \"$PWD\").xcresult tools/sim-test.sh test -only-testing:efb-212Tests"
     },

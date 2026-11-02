@@ -1,4 +1,4 @@
-# Reliability and security of OpenEFB's network dependencies (CQ-7, ticket T27)
+# Reliability and security of Kanaf's network dependencies (CQ-7, ticket T27)
 
 Audit date 2026-11-02. Method: the `release-it` skill (integration points, stability patterns, Quick Diagnostic) plus a
 security review of the three web services. Web findings were fixed in this pass; app findings were read-only and are filed

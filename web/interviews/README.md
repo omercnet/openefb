@@ -2,11 +2,11 @@
 
 A tiny Next.js app on Vercel. A pilot opens a shareable link, agrees to be recorded, and an AI voice interviewer
 (OpenAI Realtime, `gpt-realtime-2.1`) runs the customer-discovery interview from `docs/pilot-interview-kit.md` using
-The Mom Test: past behaviour only, no pitch, the pilot talks ~80% of the time. OpenEFB is first named at the closing ask
+The Mom Test: past behaviour only, no pitch, the pilot talks ~80% of the time. Kanaf is first named at the closing ask
 (TestFlight build + 10-minute follow-up). Transcript (both sides, timestamped) and audio are stored per interview;
 `/admin` lets the owner read, play, and export them in the kit's notes template for `docs/CUSTOMER.md`.
 
-Lives in the OpenEFB repo under `web/interviews/`, copied from the standalone `~/dev/pilot-interviews` repo at commit
+Lives in the Kanaf repo under `web/interviews/`, copied from the standalone `~/dev/pilot-interviews` repo at commit
 `0af81df2b331cbd1d93258c6f3d42e5eb241c2f9` (2026-11-01); that repo is retired. Live at `https://openefb-interviews.vercel.app`
 on the Vercel Hobby plan. The only cron is daily (`vercel.json`, 06:00 UTC), which is the Hobby limit. This site is not part of the
 iPad app and the app never calls it. See `web/README.md`.

@@ -1,6 +1,6 @@
 # App icon
 
-`render.swift` draws the OpenEFB icon with CoreGraphics (the app's own ownship chevron over a compass ring and a faint
+`render.swift` draws the Kanaf icon with CoreGraphics (the app's own ownship chevron over a compass ring and a faint
 airspace arc; no text, no third-party marks) and writes the three 1024x1024 PNGs the asset catalog needs. `icon.svg` is
 the default variant with the same geometry, written by the same script.
 

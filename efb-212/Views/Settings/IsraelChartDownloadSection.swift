@@ -14,7 +14,7 @@ struct IsraelChartDownloadSection: View {
     var body: some View {
         Section {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Israel CVFR chart")
+                Text("Official CAAI CVFR chart")
                     .font(.body)
                 Text(detailLine)
                     .font(.footnote)
@@ -65,9 +65,9 @@ struct IsraelChartDownloadSection: View {
             .padding(.vertical, 4)
             .accessibilityIdentifier("israel-chart-row")
         } header: {
-            Text("Israel official chart")
+            Text("Official CAAI CVFR chart")
         } footer: {
-            Text("The official CAAI CVFR low-level routes chart, converted and checked by OpenEFB before release. "
+            Text("The official CAAI CVFR low-level routes chart, converted and checked by Kanaf before release. "
                  + "Chart \u{00A9} CAAI; base map \u{00A9} Mapa Ltd. Supplemental reference only.")
         }
         .task { await store.refresh() }

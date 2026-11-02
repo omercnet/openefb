@@ -40,7 +40,7 @@ nonisolated enum IsraelNotamError: LocalizedError, Equatable {
         case .badStatus(let code):
             return "The Israel NOTAM relay answered HTTP \(code)."
         case .undecodable:
-            return "The Israel NOTAM relay sent data this version of OpenEFB can't read."
+            return "The Israel NOTAM relay sent data this version of Kanaf can't read."
         }
     }
 }

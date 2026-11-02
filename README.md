@@ -1,16 +1,16 @@
-# OpenEFB
+# Kanaf (כנף)
 
 [![Swift 6](https://img.shields.io/badge/Swift-6.0-FA7343?logo=swift&logoColor=white)](https://swift.org)
 [![iOS 26](https://img.shields.io/badge/iOS-26-000000?logo=apple&logoColor=white)](https://developer.apple.com)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 
-A free, open-source iPad VFR Electronic Flight Bag: a moving map on the FAA sectional (and, for Israel, the CVFR network), airport and weather information, flight recording, and an on-device post-flight debrief.
+Kanaf (Hebrew: כנף, "wing") is a free, open-source VFR Electronic Flight Bag for iPad and iPhone, for the US and Israel (CVFR): a moving map on the FAA sectional or the Israeli CVFR network, airport and weather information, flight recording, and an on-device post-flight debrief. The App Store name is "Kanaf EFB". Internal identifiers still say openefb/efb-212 (repo name, Xcode target, bundle ID `io.omer.efb`, server names).
 
 **Status: TestFlight beta (version 1.0, build 1).** See [Limitations](#limitations).
 
 ## The Problem
 
-ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional charts, NOAA weather -- is **free and public domain**. Android pilots have Avare (free, open-source). iOS pilots have nothing. OpenEFB fills that gap.
+ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional charts, NOAA weather -- is **free and public domain**, and Israel's CAAI publishes its CVFR data too. Android pilots have Avare (free, open-source). iOS pilots have had nothing free. Kanaf fills that gap.
 
 ## What Makes It Different
 
@@ -31,7 +31,7 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 
 **Airports and charts**
 - Airport sheet: runways, frequencies, METAR and TAF, PIREPs, winds aloft
-- NOTAMs, using the pilot's own free FAA API key (entered in Settings; OpenEFB doesn't provide one)
+- NOTAMs, using the pilot's own free FAA API key (entered in Settings; Kanaf doesn't provide one)
 - FAA terminal charts (approach procedures, airport diagram) downloaded as PDFs from FAA d-TPP
 - Georeferenced airport diagram overlay on the map (advisory: verify against the FAA diagram)
 
@@ -62,13 +62,13 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 ## Limitations
 
 - **TestFlight beta.** It has not been used in a cockpit by pilots yet, and hasn't been tried on a physical iPad in flight.
-- **Not FAA-approved.** OpenEFB has not been tested, approved, or certified by the FAA or any other aviation authority. It is a supplemental reference, not a primary means of navigation. iPad GPS isn't TSO-certified, and Wi-Fi-only iPads have no GPS.
+- **Not FAA-approved.** Kanaf has not been tested, approved, or certified by the FAA or any other aviation authority. It is a supplemental reference, not a primary means of navigation. iPad GPS isn't TSO-certified, and Wi-Fi-only iPads have no GPS.
 - **Airport diagrams:** 820 of the 925 FAA airport diagrams (88.6%, cycle 2611) pass the automatic georeferencing checks and can be overlaid on the map. The rest are viewable only as the FAA PDF. Charts and diagrams are downloaded on demand, not bundled.
 - **Satellite and Terrain are online only.** Offline downloads cover the sectional and Street maps. Satellite and Terrain tiles come from third-party hosts and are slated for removal before a public release.
 - **Needs the internet:** weather, TFRs, AIRMET/SIGMET, PIREPs, winds aloft, NOTAMs, FAA charts and any map area you haven't downloaded. Works offline: the airport database, downloaded map regions and charts you have already opened.
 - **Debrief** needs a device that supports Apple Foundation Models.
 - **NOTAMs** need your own free FAA API key.
-- iPad only, iOS 26 or later. No IFR procedures, ADS-B traffic, weight and balance, or cloud sync.
+- iOS 26 or later; iPad is the primary device, iPhone is supported in portrait. No IFR procedures, ADS-B traffic, weight and balance, or cloud sync.
 
 **Israel mode**
 
@@ -85,7 +85,7 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 
 | Component | Technology |
 |-----------|-----------|
-| Platform | iPad, iOS 26.0 |
+| Platform | iPad and iPhone, iOS 26.0 |
 | Language | Swift 6.0 language mode, SwiftUI |
 | Architecture | MVVM with the Observation framework (`@Observable`); one root `AppState` |
 | Map Engine | MapLibre Native iOS (open-source, no API fees) |
@@ -103,7 +103,7 @@ Swift packages: MapLibre Native iOS and GRDB.swift. Nothing else.
 Requires Xcode with the iOS 26 SDK.
 
 ```bash
-git clone https://github.com/quartermint/openefb.git
+git clone https://github.com/omercnet/openefb.git
 cd openefb
 open efb-212.xcodeproj    # SwiftPM resolves MapLibre and GRDB on first open
 
@@ -185,7 +185,7 @@ Open work is tracked in beads (`bd ready`).
 
 ## Contributing
 
-This project is in early development. Contribution guidelines coming soon. In the meantime, open an issue or start a discussion.
+This project is in early development. Open an issue or start a discussion.
 
 1. Fork the repository
 2. Create a feature branch
@@ -194,8 +194,12 @@ This project is in early development. Contribution guidelines coming soon. In th
 
 ## License
 
-[MPL-2.0](LICENSE) -- file-level copyleft. Use it, fork it, improve it, contribute back.
+[MPL-2.0](LICENSE) -- file-level copyleft. Kanaf is a modified version of OpenEFB by Ryan Stern, MPL-2.0; see `NOTICE`. New documentation: © 2026 Omer Cohen and contributors.
+
+## Thanks
+
+Kanaf began as a fork of **OpenEFB** by **Ryan Stern** ([sternryan/openefb](https://github.com/sternryan/openefb)). His product requirements, architecture and the first working app are the foundation this project grew from, and his decision to make it open-source under MPL-2.0 is the reason it exists. Thank you, Ryan. Thanks also to CAAI for approving use of its data and charts, and to the FAA, NOAA, OpenStreetMap and OpenFreeMap communities.
 
 ## Disclaimer
 
-OpenEFB is a supplemental reference tool. It is **not** intended as a primary means of navigation. Pilots are responsible for maintaining situational awareness through all available means including current paper charts, ATC communication, and visual references. This software has not been tested, approved, or certified by the FAA or any other aviation authority.
+Kanaf is a supplemental reference tool. It is **not** intended as a primary means of navigation. Pilots are responsible for maintaining situational awareness through all available means including current paper charts, ATC communication, and visual references. This software has not been tested, approved, or certified by the FAA or any other aviation authority.

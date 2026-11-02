@@ -1,4 +1,4 @@
-/** Wire format of notams.json, consumed by the OpenEFB iPad app (IsraelNotamService.swift). */
+/** Wire format of notams.json, consumed by the Kanaf iPad app (IsraelNotamService.swift). */
 
 export interface LatLon {
   /** degrees, WGS-84, north positive */

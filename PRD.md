@@ -1,6 +1,6 @@
 # Product Requirements Document: Open-Source iPad VFR EFB
 
-**Project:** OpenEFB (working title)
+**Project:** Kanaf (originally "OpenEFB", working title; this PRD is Ryan Stern's original plan, kept as written)
 **Author:** Ryan Stern
 **Date:** February 12, 2026
 **Version:** 2.0

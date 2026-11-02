@@ -13,8 +13,22 @@
 
 import SwiftUI
 
+/// Which readouts the strip shows. Pure so the size-class rule is testable.
+nonisolated enum InstrumentStripLayout {
+    enum Field: String, Equatable, Sendable { case gs = "GS", alt = "ALT", vs = "VS", trk = "TRK", dtg = "DTG", ete = "ETE" }
+
+    /// Regular width (iPad): GS, ALT, VS, TRK, plus DTG and ETE with an active route.
+    /// Compact width (iPhone portrait): only the key fields GS, ALT, TRK, plus DTG and ETE with a route,
+    /// so the numbers keep their size instead of shrinking.
+    static func fields(compact: Bool, routeActive: Bool) -> [Field] {
+        let base: [Field] = compact ? [.gs, .alt, .trk] : [.gs, .alt, .vs, .trk]
+        return routeActive ? base + [.dtg, .ete] : base
+    }
+}
+
 struct InstrumentStripView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     /// Position quality from MapViewModel's 1 Hz clock.
     var gpsStatus: GPSStatus = .lost(ageSeconds: nil)
@@ -22,33 +36,65 @@ struct InstrumentStripView: View {
     /// Values are shown dimmed when the fix is stale or lost.
     private var isStale: Bool { gpsStatus.isStale }
 
-    var body: some View {
-        HStack(spacing: 0) {
-            GPSStatusChip(status: gpsStatus)
-                .padding(.trailing, 8)
-            Divider().frame(height: 44)
-            InstrumentCell(label: "GS", value: gsValue, unit: "KT", dimmed: isStale)
-            Divider().frame(height: 44)
-            InstrumentCell(label: "ALT", value: altValue, unit: "FT", dimmed: isStale || !hasAltitude)
-            Divider().frame(height: 44)
-            InstrumentCell(label: "VS", value: vsValue, unit: "FPM", dimmed: isStale || !hasAltitude)
-            Divider().frame(height: 44)
-            InstrumentCell(label: "TRK", value: trkValue, unit: "\u{00B0}", dimmed: isStale)
+    private var isCompact: Bool { horizontalSizeClass == .compact }
+    private var routeActive: Bool { appState.activeFlightPlan || appState.directToAirport != nil }
 
-            if appState.activeFlightPlan || appState.directToAirport != nil {
-                Divider().frame(height: 44)
-                InstrumentCell(label: "DTG", value: dtgValue, unit: "NM", dimmed: isStale)
-                Divider().frame(height: 44)
-                InstrumentCell(label: "ETE", value: eteValue, unit: "", dimmed: isStale)
+    var body: some View {
+        let fields = InstrumentStripLayout.fields(compact: isCompact, routeActive: routeActive)
+        Group {
+            if isCompact {
+                // iPhone: chip + GS/ALT/TRK on one row, DTG/ETE on a second row while a route is active.
+                let primary = fields.filter { $0 != .dtg && $0 != .ete }
+                let route = fields.filter { $0 == .dtg || $0 == .ete }
+                VStack(spacing: 4) {
+                    HStack(spacing: 0) {
+                        GPSStatusChip(status: gpsStatus)
+                            .padding(.trailing, 4)
+                        ForEach(primary, id: \.self) { field in
+                            Divider().frame(height: 44)
+                            cell(for: field)
+                        }
+                    }
+                    if !route.isEmpty {
+                        Divider()
+                        HStack(spacing: 0) {
+                            ForEach(route, id: \.self) { field in
+                                cell(for: field)
+                            }
+                        }
+                    }
+                }
+            } else {
+                HStack(spacing: 0) {
+                    GPSStatusChip(status: gpsStatus)
+                        .padding(.trailing, 8)
+                    ForEach(fields, id: \.self) { field in
+                        Divider().frame(height: 44)
+                        cell(for: field)
+                    }
+                }
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, isCompact ? 8 : 16)
         .padding(.vertical, 8)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Instruments")
         .accessibilityIdentifier("Instrument strip")
+    }
+
+    @ViewBuilder
+    private func cell(for field: InstrumentStripLayout.Field) -> some View {
+        let compact = isCompact
+        switch field {
+        case .gs: InstrumentCell(label: "GS", value: gsValue, unit: "KT", dimmed: isStale, compact: compact)
+        case .alt: InstrumentCell(label: "ALT", value: altValue, unit: "FT", dimmed: isStale || !hasAltitude, compact: compact)
+        case .vs: InstrumentCell(label: "VS", value: vsValue, unit: "FPM", dimmed: isStale || !hasAltitude, compact: compact)
+        case .trk: InstrumentCell(label: "TRK", value: trkValue, unit: "\u{00B0}", dimmed: isStale, compact: compact)
+        case .dtg: InstrumentCell(label: "DTG", value: dtgValue, unit: "NM", dimmed: isStale, compact: compact)
+        case .ete: InstrumentCell(label: "ETE", value: eteValue, unit: "", dimmed: isStale, compact: compact)
+        }
     }
 
     // MARK: - Computed Values
@@ -154,6 +200,8 @@ struct InstrumentCell: View {
     let value: String
     let unit: String
     var dimmed: Bool = false
+    /// iPhone: no minimum width, cell shares the row; the unit moves up next to the label.
+    var compact: Bool = false
     @Environment(\.colorScheme) private var colorScheme
     // Instrument readouts keep exact point sizes but scale with Dynamic Type.
     @ScaledMetric(relativeTo: .caption) private var labelSize: CGFloat = 13
@@ -180,23 +228,26 @@ struct InstrumentCell: View {
 
     var body: some View {
         VStack(spacing: 2) {
-            Text(label)
+            Text(compact && !unit.isEmpty ? "\(label) \(unit)" : label)
                 .font(.system(size: labelSize, weight: .semibold))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
             HStack(alignment: .lastTextBaseline, spacing: 3) {
                 Text(value)
                     .font(.system(size: valueSize, weight: .semibold, design: .monospaced))
                     .foregroundStyle(valueStyle)
+                    .lineLimit(1)
+                    .minimumScaleFactor(compact ? 0.85 : 1)
                     // Stale values are grey and announced; no extra fade (kept >= 4.5:1)
-                if !unit.isEmpty {
+                if !unit.isEmpty && !compact {
                     Text(unit)
                         .font(.system(size: labelSize, weight: .medium))
                         .foregroundStyle(.secondary)
                 }
             }
         }
-        .frame(minWidth: 84)
-        .padding(.horizontal, 6)
+        .frame(minWidth: compact ? 0 : 84, maxWidth: compact ? .infinity : nil)
+        .padding(.horizontal, compact ? 2 : 6)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken.name)
         .accessibilityValue("\(value) \(spoken.unit)\(dimmed ? ", stale" : "")")

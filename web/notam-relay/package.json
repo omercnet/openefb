@@ -2,7 +2,7 @@
   "name": "notam-relay",
   "version": "0.2.0",
   "private": true,
-  "description": "Cloudflare Worker: scrapes the IAA NOTAM page every 15 minutes and serves notams.json for OpenEFB",
+  "description": "Cloudflare Worker: scrapes the IAA NOTAM page every 15 minutes and serves notams.json for Kanaf",
   "type": "module",
   "scripts": {
     "test": "vitest run",

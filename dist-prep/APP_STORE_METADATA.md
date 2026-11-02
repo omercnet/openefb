@@ -3,7 +3,7 @@
 Plain claims, no bravado. Review and trim before submitting. Character limits noted.
 
 ## Name (30 max)
-`OpenEFB` (7)
+`Kanaf EFB` (9). Plain "Kanaf" is taken on the App Store; "Kanaf EFB" is claimed for app 6829641724. The home-screen name stays `Kanaf`.
 
 ## Subtitle (30 max)
 `VFR moving map and debrief` (26)
@@ -16,7 +16,7 @@ Primary **Navigation**. Secondary **Utilities** (alt: Travel).
 
 ## Description (4000 max)
 ```
-OpenEFB is a free, open-source VFR electronic flight bag for iPad.
+Kanaf is a free, open-source VFR electronic flight bag for iPad.
 
 MOVING MAP
 - FAA VFR sectional chart with your position and track
@@ -30,7 +30,7 @@ AIRPORTS AND CHARTS
 - FAA airport diagrams and terminal procedure charts
 - Airport diagram overlaid on the map where the diagram can be placed automatically (advisory: verify against the FAA diagram; the rest open as the FAA PDF)
 - PIREPs and winds aloft near the airport
-- NOTAMs, using your own free FAA API key (add it in Settings; OpenEFB does not provide one)
+- NOTAMs, using your own free FAA API key (add it in Settings; Kanaf does not provide one)
 
 WEATHER AND ADVISORIES
 - TFRs and AIRMET/SIGMET on the map, shown for awareness only
@@ -58,7 +58,7 @@ NEEDS THE INTERNET: weather, TFRs, NOTAMs, PIREPs and any map area you have not 
 database, downloaded map regions and FAA charts you have already opened.
 
 IMPORTANT
-OpenEFB is provided as a supplemental reference tool. It is NOT intended to be used as a primary means of navigation.
+Kanaf is provided as a supplemental reference tool. It is NOT intended to be used as a primary means of navigation.
 Pilots are responsible for maintaining situational awareness through all available means including current paper
 charts, ATC communication, and visual references.
 
@@ -73,7 +73,7 @@ official weather briefing from 1800wxbrief.com or FSS before flight.
 iPad GPS accuracy varies by model and conditions. WiFi-only iPads do not have GPS hardware. Cellular iPad GPS is not
 TSO-certified. Do not rely on iPad GPS as a sole means of position awareness.
 
-OpenEFB has not been tested, approved, or certified by the FAA or any other aviation authority. Use at your own risk.
+Kanaf has not been tested, approved, or certified by the FAA or any other aviation authority. Use at your own risk.
 
 DATA SOURCES
 FAA (charts, airport data, TFRs, NOTAMs, terminal procedures), NOAA Aviation Weather Center (METAR, TAF, PIREP,
@@ -87,7 +87,7 @@ Authority through a relay run by the developer.
 `efb,vfr,aviation,pilot,flight,moving map,sectional,metar,taf,tfr,notam,airport diagram,logbook,chart` (100)
 
 ## URLs
-- Support: `https://github.com/quartermint/openefb` (matches the link in Settings; confirm it is public)
+- Support: `https://github.com/omercnet/openefb` (matches the link in Settings; confirm it is public)
 - Marketing: blank or the same repo
 
 ## Copyright
@@ -99,7 +99,7 @@ Not created here.
 
 ## App Review notes (private)
 ```
-OpenEFB is a VFR electronic flight bag. No login is needed.
+Kanaf is a VFR electronic flight bag. No login is needed.
 - Location (While Using): centres the moving map on the device position. Background location keeps a recorded
   flight track running with the screen off.
 - Microphone and Speech Recognition: used only to record and transcribe cockpit audio on the device during a flight
@@ -125,7 +125,7 @@ landscape equivalents. Captured at 2064x2752.
 
 ## To confirm before submitting
 - Public repo URL, privacy policy URL.
-- Display name: `OpenEFB` is set as the home-screen name (`INFOPLIST_KEY_CFBundleDisplayName`, T30).
+- Display name: `Kanaf` is set as the home-screen name (`INFOPLIST_KEY_CFBundleDisplayName`, T30).
 - Public release only: remove Satellite and Terrain, then delete the Esri and OpenTopoMap lines from the data sources
   paragraph (efb-zfm.8).
 - Owner decision: whether the listing names Israel (see `README.md`, "Pending owner decision"). The description above names no Israeli feature and is otherwise US-only; only its privacy, data-source and data-accuracy lines, and the review notes, cover Israel mode.

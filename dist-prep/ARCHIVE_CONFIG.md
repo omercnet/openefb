@@ -15,14 +15,14 @@ Read from `efb-212.xcodeproj/project.pbxproj` and from the Info.plist of the arc
 | SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD | `NO` | no Mac listing |
 | ITSAppUsesNonExemptEncryption | `NO` | standard HTTPS only; no per-upload export question |
 | PRODUCT_NAME | `efb-212` | file/bundle name only |
-| INFOPLIST_KEY_CFBundleDisplayName | `OpenEFB` | home-screen name (set by T30) |
+| INFOPLIST_KEY_CFBundleDisplayName | `Kanaf` | home-screen name (set by T30) |
 | Info.plist category | `public.app-category.productivity` | metadata doc proposes Navigation as primary category in App Store Connect (separate setting) |
 
 ## Usage strings (present)
-- `NSMicrophoneUsageDescription`: "OpenEFB records cockpit audio during flights for transcription and debrief."
-- `NSSpeechRecognitionUsageDescription`: "OpenEFB transcribes cockpit audio in real-time to create flight transcripts."
-- `NSLocationWhenInUseUsageDescription`: "OpenEFB uses your location to show your position on the aviation map and provide navigation guidance."
-- `NSLocationAlwaysAndWhenInUseUsageDescription`: "OpenEFB uses your location in the background to continue tracking your flight when the screen is off."
+- `NSMicrophoneUsageDescription`: "Kanaf records cockpit audio during flights for transcription and debrief."
+- `NSSpeechRecognitionUsageDescription`: "Kanaf transcribes cockpit audio in real-time to create flight transcripts."
+- `NSLocationWhenInUseUsageDescription`: "Kanaf uses your location to show your position on the aviation map and provide navigation guidance."
+- `NSLocationAlwaysAndWhenInUseUsageDescription`: "Kanaf uses your location in the background to continue tracking your flight when the screen is off."
 - `UIBackgroundModes` includes `location`.
 
 ## Release archive check (run 2026-10-31)

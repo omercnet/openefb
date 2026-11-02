@@ -16,7 +16,7 @@ struct DatabaseUnavailableBanner: View {
     /// Fixed pilot-facing copy. The EFBError itself stays in AppState.databaseError for
     /// diagnostics; its generic text is not shown because it would not help the pilot here.
     static let title = "Airport database could not be opened"
-    static let detail = "No airports, airspace or navaids will show. Reinstall OpenEFB."
+    static let detail = "No airports, airspace or navaids will show. Reinstall Kanaf."
 
     var body: some View {
         if appState.databaseError != nil {

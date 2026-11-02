@@ -1,10 +1,12 @@
-# OpenEFB — Open-Source iPad VFR Electronic Flight Bag
+# Kanaf (כנף) — Open-Source iPad VFR Electronic Flight Bag
+
+> Kanaf began as a fork of OpenEFB by Ryan Stern. Internal identifiers (repo `omercnet/openefb`, Xcode target `efb-212`, bundle ID `io.omer.efb`, R2 bucket, Worker, Vercel project) still say openefb/efb-212; user-facing text says Kanaf.
 
 ## Project Overview
 
-- **Product:** Free, open-source VFR EFB for iPad — moving-map navigation + flight recording + AI debrief
+- **Product:** Kanaf — free, open-source VFR EFB for iPad and iPhone (US + Israel CVFR): moving-map navigation + flight recording + AI debrief. App Store Connect name: "Kanaf EFB"
 - **Bundle ID:** io.omer.efb (tests: quartermint.efb-212Tests)
-- **Target:** iPad only, iOS 26.0, Swift 6.0 language mode, SwiftUI
+- **Target:** iPad primary, iPhone supported (portrait, compact-width layouts), iOS 26.0, Swift 6.0 language mode, SwiftUI
 - **License:** MPL-2.0
 - **Full product specification:** See `PRD.md` in this directory (source of truth for ALL product decisions)
 
@@ -26,6 +28,7 @@ Paseo scripts (`paseo.json`; run from the Paseo app or `paseo script start <name
 |---|---|
 | `simulator` (service) | Builds the app, runs it on this worktree's simulator at KPAO, and streams the simulator to the service URL (serve-sim). If the tree doesn't compile mid-edit, shows the last good build. |
 | `fly` | Feeds a simulated VFR route (KPAO → KSQL → KOAK → KSFO) to the simulator. `tools/fly.sh stop` stops it. |
+| `fly-israel` | Flies the Israel CVFR scenario `il-cvfr-llhz-llib-nominal` at 4x through the DEBUG scenario player (`tools/fly.sh israel <scenario> [--speed N] [--start S] [--notams FILE] [--sim udid\|tag]`; `tools/fly.sh list` shows the scenarios in `tools/flight-sim/`). |
 | `test` | Full unit suite on the worktree simulator. |
 | `build` | Compile app + tests (no simulator). |
 | `ready` | `bd ready`: unblocked work. |
@@ -34,6 +37,8 @@ Worktree setup resolves SwiftPM packages and creates the worktree's simulator; t
 
 From a shell, all simulator work goes through `tools/sim-test.sh` (test, build, demo, id, claim, release, teardown). Agents
 claim a reusable simulator with `export SIM_TAG=$(tools/sim-test.sh claim <ticket>)` and release it when done; see docs/handoff/COMMON.md.
+`SIM_DEVICE` picks the model (default iPad Pro 13-inch; `SIM_DEVICE="iPhone 17 Pro" tools/sim-test.sh claim <ticket>` claims an iPhone
+simulator, `"iPhone 17e"` the narrowest). Layouts switch on `horizontalSizeClass`, never on the device.
 
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
@@ -231,7 +236,7 @@ Open work is tracked in beads (`bd ready`, `bd list`). Notable open items as of 
 - **Israeli aerodrome diagrams:** 5 of 13 charts place on the map (LLBG, LLHA, LLIB, LLBS, LLEY) at the ±100 ft gate; the other 8 are sheet-only until CAAI supplies surveyed thresholds and ARPs (efb-aac.17, `docs/design/caai-apd-report.md`, `docs/research/israel-caai-data-fixes.md`).
 - **Israel mode, from the UX review (T28):** 10 open sev 1-2 findings, efb-aac.21 to efb-aac.30 (chart edition shown without an age, slow "Checking for the latest edition" against an unreachable host, red tint on the closure layer toggle, "Age EXPIRED" on the Weather layer row, diagram pack reachable only from the airport sheet, 125-row briefing without a plan, FPL message as the plan's primary action, route network read from the plan only, unexplained "800/1600" leg altitude and a 100% debrief summary over a 0% leg, six "Not available in Israel yet" layer rows). Two more are in progress: efb-aac.19 (CVFR debrief position-report count) and efb-aac.20 (other-network closures in the briefing).
 - **Israel mode is unreviewed by an Israeli CFI** (efb-aac.13); 49 curated aerodromes carry `review_status = unreviewed` and the airport sheet shows an amber "Unreviewed data" note until the owner marks a field reviewed in `tools/caai-importer/curated/aerodromes-il.csv`.
-- **Home-screen name** is still `efb-212`; set `INFOPLIST_KEY_CFBundleDisplayName` to `OpenEFB` before the public release (`dist-prep/README.md`).
+- **Home-screen name** is `Kanaf` (`INFOPLIST_KEY_CFBundleDisplayName`); the App Store Connect name is "Kanaf EFB" (app 6829641724). Internal identifiers keep the old names (`efb-212`, `io.omer.efb`).
 - **Debrief** needs a device that supports Apple Foundation Models; elsewhere the app says the debrief is unavailable. The CVFR debrief numbers show without it.
 - **Unvalidated with pilots:** the cut list and fix list from the design pass rest on documented assumptions (efb-77r.34); a real-device VoiceOver and Increase Contrast walkthrough is pending (efb-77r.35).
 - **Recorded flight status** (damaged/recovered) is stored as marker text in notes, so a pilot edit can erase it (efb-zfm.19).

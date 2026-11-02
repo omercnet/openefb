@@ -1,4 +1,4 @@
-# OpenEFB: TestFlight submission prep
+# Kanaf: TestFlight submission prep
 
 Refreshed 2026-10-31 (T13, beads efb-zfm.6); test count, screenshots and claims re-checked against the code 2026-11-01 (T15,
 efb-zfm.7); Israel mode, network list and test count re-checked 2026-11-02 (T29, efb-v6i). Everything here is a draft for the
@@ -29,6 +29,7 @@ owner to review. Nothing has been uploaded and nothing was changed in App Store 
   using Apple Foundation Models when the device supports it.
 - Flight planning, instrument strip, aircraft and pilot profiles with currency tracking.
 - Israel region (Settings > Region): CVFR routes, points and airspace, 49 curated aerodromes, NOTAM route closures from the project's relay, CVFR and sport-aviation route planning with FPL text, downloadable official CVFR chart and aerodrome diagrams, CVFR debrief. **Not in the current listing text: see the pending decision below.** It is unreviewed by an Israeli pilot.
+- **Default region is Israel (IL-DEFAULT, before the first TestFlight build).** A fresh install starts in the Israel region; an existing install keeps the region it chose. The store screenshots in `dist-prep/` were taken in the US region and are not recaptured; switch Settings > Region to United States to reproduce them. The official CAAI chart and aerodrome diagrams are downloaded from Settings > Region (a one-time hint on the map points there).
 
 ## Do-this-first checklist
 1. Open `efb-212.xcodeproj`, scheme `efb-212`, Any iOS Device (arm64), Product > Archive. Team `6F8N897928`.
@@ -43,10 +44,10 @@ owner to review. Nothing has been uploaded and nothing was changed in App Store 
 ## Before the public release (not blocking TestFlight)
 - Remove Satellite and Terrain base maps unless licensed hosting replaces them (beads efb-zfm.8). See
   `docs/TILE-SOURCES.md`. Decision Q1 = A: all four base maps stay for TestFlight.
-- Home-screen name: set to `OpenEFB` (`INFOPLIST_KEY_CFBundleDisplayName`, T30). `PRODUCT_NAME` stays `efb-212`
+- Home-screen name: set to `Kanaf` (`INFOPLIST_KEY_CFBundleDisplayName`, T30). `PRODUCT_NAME` stays `efb-212`
   (file name only). Re-capture screenshots if the status bar still shows the old name.
 - TestFlight text, reviewer notes and tester plan: `TESTFLIGHT.md`.
-- Confirm the public repository URL (Settings links `https://github.com/quartermint/openefb`).
+- Confirm the public repository URL (Settings links `https://github.com/omercnet/openefb`).
 - Re-check the privacy answers if any analytics SDK, CloudKit sync or an AI service is added.
 - **Pending owner decision: Israel in the listing.** The App Store description, subtitle, keywords and screenshots describe
   the US app only, and Israel is not named in them. The Israel mode ships in the same build (Settings > Region, epic

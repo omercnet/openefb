@@ -44,9 +44,23 @@ struct RegionTests {
 
     // MARK: - Persistence
 
-    @Test func defaultsToUSWhenNothingIsSaved() throws {
+    @Test func freshStoreDefaultsToIsrael() throws {
         let context = try makeContext()
+        #expect(RegionStore.load(from: context) == .israel)
+        #expect(SchemaV1.UserSettings().region == .israel)
+    }
+
+    @Test func aStoredUSChoiceIsKept() throws {
+        let context = try makeContext()
+        try RegionStore.save(.us, to: context)
         #expect(RegionStore.load(from: context) == .us)
+    }
+
+    @Test func firstLaunchHintShowsOnlyInIsraelWithoutChartUntilDismissed() {
+        #expect(IsraelChartHint.shouldShow(region: .israel, chartInstalled: false, dismissed: false))
+        #expect(!IsraelChartHint.shouldShow(region: .israel, chartInstalled: false, dismissed: true))
+        #expect(!IsraelChartHint.shouldShow(region: .israel, chartInstalled: true, dismissed: false))
+        #expect(!IsraelChartHint.shouldShow(region: .us, chartInstalled: false, dismissed: false))
     }
 
     @Test func regionRoundTripsThroughUserSettings() throws {
@@ -61,13 +75,13 @@ struct RegionTests {
         #expect(count == 1)
     }
 
-    @Test func unknownStoredValueReadsAsUS() throws {
+    @Test func unknownStoredValueReadsAsTheDefaultRegion() throws {
         let context = try makeContext()
         let settings = SchemaV1.UserSettings()
         settings.regionRaw = "atlantis"
         context.insert(settings)
         try context.save()
-        #expect(RegionStore.load(from: context) == .us)
+        #expect(RegionStore.load(from: context) == Region.defaultRegion)
     }
 
     // MARK: - Configuration

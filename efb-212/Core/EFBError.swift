@@ -102,7 +102,7 @@ enum EFBError: LocalizedError, Identifiable {
     var errorDescription: String? {
         switch self {
         case .gpsUnavailable:
-            return "No GPS position. Turn on Location for OpenEFB in Settings › Privacy & Security › Location Services."
+            return "No GPS position. Turn on Location for Kanaf in Settings › Privacy & Security › Location Services."
 
         case .chartExpired(let date):
             let formatter = DateFormatter()
@@ -132,13 +132,13 @@ enum EFBError: LocalizedError, Identifiable {
             return "Speech recognition is not available on this iPad. The flight records without a transcript."
 
         case .microphonePermissionDenied:
-            return "Microphone is off, so no cockpit audio is recorded. Turn it on in Settings › OpenEFB › Microphone."
+            return "Microphone is off, so no cockpit audio is recorded. Turn it on in Settings › Kanaf › Microphone."
 
         case .databaseCorrupted:
-            return "The airport database could not be opened. Reinstall OpenEFB."
+            return "The airport database could not be opened. Reinstall Kanaf."
 
         case .databaseMigrationFailed(let underlying):
-            return "The flight database could not be updated: \(underlying.localizedDescription). Reinstall OpenEFB."
+            return "The flight database could not be updated: \(underlying.localizedDescription). Reinstall Kanaf."
 
         case .nasrImportFailed(let underlying):
             return "FAA airport data import failed: \(underlying.localizedDescription). Try again with a fresh NASR download."

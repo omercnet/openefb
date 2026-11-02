@@ -234,25 +234,14 @@ struct IsraelBriefingView: View {
                         .foregroundStyle(Palette.secondaryText)
                         .textSelection(.enabled)
                 }
-                HStack(spacing: Space.m) {
-                    if canShowOnMap(notam) {
-                        Button { showOnMap(row) } label: {
-                            Label("Show on map", systemImage: "map").frame(minHeight: 44)
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("briefing-show-on-map")
+                // One row when it fits (iPad); on a narrow iPhone the buttons wrap onto two rows
+                // instead of squeezing "Show on map" into three lines.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: Space.m) { actionButtons(row: row, notam: notam, isExpanded: isExpanded, read: read, spacer: true) }
+                    VStack(alignment: .leading, spacing: Space.s) {
+                        HStack(spacing: Space.m) { actionButtons(row: row, notam: notam, isExpanded: isExpanded, read: read, spacer: false, readButton: false) }
+                        HStack(spacing: Space.m) { readButton(notam: notam, read: read) }
                     }
-                    Button(isExpanded ? "Hide raw" : "Raw") {
-                        if isExpanded { expanded.remove(row.id) } else { expanded.insert(row.id) }
-                    }
-                    .buttonStyle(.bordered)
-                    .frame(minHeight: 44)
-                    Spacer()
-                    Button(read ? "Mark unread" : "Mark read") {
-                        if read { viewModel.markUnread(notam) } else { viewModel.markRead(notam) }
-                    }
-                    .buttonStyle(.bordered)
-                    .frame(minHeight: 44)
                 }
             }
         }
@@ -261,6 +250,35 @@ struct IsraelBriefingView: View {
         .onTapGesture { viewModel.markRead(notam) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(notam.id), \(notam.location), \(read ? "read" : "unread")")
+    }
+
+    @ViewBuilder
+    private func actionButtons(row: BriefingRow, notam: IsraelNotam, isExpanded: Bool, read: Bool,
+                               spacer: Bool, readButton includeRead: Bool = true) -> some View {
+        if canShowOnMap(notam) {
+            Button { showOnMap(row) } label: {
+                Label("Show on map", systemImage: "map").labelStyle(.titleAndIcon).lineLimit(1).fixedSize().frame(minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+            .accessibilityIdentifier("briefing-show-on-map")
+        }
+        Button(isExpanded ? "Hide raw" : "Raw") {
+            if isExpanded { expanded.remove(row.id) } else { expanded.insert(row.id) }
+        }
+        .buttonStyle(.bordered)
+        .lineLimit(1).fixedSize()
+        .frame(minHeight: 44)
+        if spacer { Spacer() }
+        if includeRead { readButton(notam: notam, read: read) }
+    }
+
+    private func readButton(notam: IsraelNotam, read: Bool) -> some View {
+        Button(read ? "Mark unread" : "Mark read") {
+            if read { viewModel.markUnread(notam) } else { viewModel.markRead(notam) }
+        }
+        .buttonStyle(.bordered)
+        .lineLimit(1).fixedSize()
+        .frame(minHeight: 44)
     }
 
     @ViewBuilder

@@ -10,7 +10,7 @@ import SwiftData
 
 enum RegionStore {
 
-    /// The saved region; `.us` when no settings record exists yet.
+    /// The saved region; `Region.defaultRegion` when no settings record exists yet.
     @MainActor
     static func load(from context: ModelContext) -> Region {
         settings(in: context)?.region ?? Region.defaultRegion

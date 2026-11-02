@@ -1,0 +1,8 @@
+{"generatedAt":"2026-11-04T05:30:00.000Z","items":[],"closures":[
+ {"notamId":"C9001/26","routeKind":"CVFR","routeName":null,"chain":["DEROR","SHARO"],
+  "validFrom":"2026-11-04T00:00:00.000Z","validTo":"2026-11-04T23:59:00.000Z","schedule":null,
+  "partial":false,"parsed":true,"raw":"CVFR ROUTE DEROR-SHARO CLSD"},
+ {"notamId":"C9002/26","routeKind":"CVFR","routeName":null,"chain":["ZMGID","AFULA"],
+  "validFrom":"2026-11-04T00:00:00.000Z","validTo":"2026-11-04T23:59:00.000Z","schedule":null,
+  "partial":true,"parsed":true,"exceptions":["PPR FLT FM IAF"],"raw":"CVFR ROUTE ZMGID-AFULA CLSD EXC PPR FLT"}
+]}

@@ -13,6 +13,7 @@ struct AirportInfoSheet: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     let databaseService: any DatabaseServiceProtocol
     let weatherService: any WeatherServiceProtocol
@@ -190,10 +191,11 @@ struct AirportInfoSheet: View {
         .clipShape(Capsule())
     }
 
-    /// Two columns side by side; stacked vertically at accessibility text sizes so nothing truncates.
+    /// Two columns side by side; stacked vertically at accessibility text sizes and on compact width
+    /// (iPhone) so nothing truncates.
     @ViewBuilder
     private func sideBySide<Content: View>(spacing: CGFloat, @ViewBuilder content: () -> Content) -> some View {
-        let layout = typeSize.isAccessibilitySize
+        let layout = (typeSize.isAccessibilitySize || horizontalSizeClass == .compact)
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
             : AnyLayout(HStackLayout(alignment: .top, spacing: spacing))
         layout(content)

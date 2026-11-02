@@ -2,7 +2,7 @@ export const LIST_URL = "https://brin.iaa.gov.il/aeroinfo/AeroInfo.aspx?msgType=
 export const DETAIL_URL_TEMPLATE = "https://brin.iaa.gov.il/MobileAeroinfo/maiDetails.aspx?rowID={rowId}&scrpos=0&mode=notam";
 
 /** Honest identification of the scraper; the IAA can contact us through the URL. */
-export const USER_AGENT = "OpenEFB-NOTAM-Relay/0.1 (+https://github.com/quartermint/openefb; open-source EFB; scrapes the public NOTAM page at most every 15 min)";
+export const USER_AGENT = "Kanaf-NOTAM-relay/1.0 (+https://github.com/omercnet/openefb; open-source EFB; scrapes the public NOTAM page at most every 15 min)";
 
 export type TextFetcher = (url: string) => Promise<string>;
 

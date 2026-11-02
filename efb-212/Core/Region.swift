@@ -4,7 +4,8 @@
 //
 //  Operating region (IL-2). Every data source used to assume the US; the app now reads the
 //  region's configuration (map home, altimeter unit, weather stations, which data layers
-//  exist) instead of hard-coding FAA/NOAA sources. Persisted in UserSettings; default US.
+//  exist) instead of hard-coding FAA/NOAA sources. Persisted in UserSettings; a fresh install
+//  starts in Israel (IL-DEFAULT); a stored choice is never overridden.
 //
 
 import Foundation
@@ -86,8 +87,9 @@ nonisolated enum Region: String, Codable, CaseIterable, Sendable, Identifiable {
 
     var id: String { rawValue }
 
-    /// UserSettings/UserDefaults key and the value stored when nothing was ever chosen.
-    static let defaultRegion: Region = .us
+    /// The region a fresh install starts in (IL-DEFAULT: Israel). A stored choice always wins;
+    /// this only applies when no settings record was ever written.
+    static let defaultRegion: Region = .israel
 
     var displayName: String {
         switch self {

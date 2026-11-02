@@ -7,7 +7,7 @@ interview's transcript (and audio, if feasible) is recorded so the owner can rev
 spread the link to pilots.
 
 ## Context
-- OpenEFB is a free, open-source iPad VFR EFB (separate repo, ~/dev/openefb). Its product assumptions are in
+- Kanaf is a free, open-source iPad VFR EFB (separate repo, ~/dev/openefb). Its product assumptions are in
   docs/openefb-customer-hypotheses.md:
   - the anchor job is in-flight awareness;
   - trust is the worst-served dimension;
@@ -16,7 +16,7 @@ spread the link to pilots.
   These are unvalidated. The interviews exist to confirm or kill them.
 - docs/pilot-interview-kit.md is the source of truth for the interview: recruiting post, opening, 12 questions grouped by
   theme, deflection rules, the closing ask, and a per-interview notes template.
-- Method: "The Mom Test". Ask about the pilot's real past flights, never pitch OpenEFB, never ask hypotheticals ("would you
+- Method: "The Mom Test". Ask about the pilot's real past flights, never pitch Kanaf, never ask hypotheticals ("would you
   use…"), dig for specifics ("tell me about the last time…"), and let the pilot talk ~80% of the time.
 
 ## Decisions (made by the owner/orchestrator; keep unless you find a hard blocker)
@@ -44,7 +44,7 @@ spread the link to pilots.
 - Owner review: a password-protected `/admin` (password from env) listing interviews with:
   - date, duration, pilot profile answers and the commitment (yes/no);
   - transcript view, and audio playback if stored;
-  - export of each interview as markdown in the kit's notes-template format, so results can be pasted into OpenEFB's
+  - export of each interview as markdown in the kit's notes-template format, so results can be pasted into Kanaf's
     docs/CUSTOMER.md. An optional automatic summary into that template with an OpenAI text model after each interview is a
     nice-to-have.
 - Mobile-first UI (most pilots open links on phones). One big "Start interview" button, a live "listening / speaking"
@@ -64,7 +64,7 @@ spread the link to pilots.
 
 ## Constraints
 - Never expose the OpenAI API key client-side. No secrets in git.
-- Don't pitch OpenEFB in the interview. The pilot may learn what it's for only at the closing ask.
+- Don't pitch Kanaf in the interview. The pilot may learn what it's for only at the closing ask.
 - Keep it tiny: no auth system for pilots, no CMS. One repo, this directory.
 - The Vercel CLI isn't installed globally; use `npx vercel`. The owner must authenticate Vercel and supply OPENAI_API_KEY.
   Don't guess or reuse credentials from elsewhere on the machine.

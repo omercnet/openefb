@@ -1,7 +1,7 @@
-# OpenEFB agent brief (shared by all implementers)
+# Kanaf agent brief (shared by all implementers)
 
 Worktree: /Users/omer/.paseo/worktrees/2njag5y3/glorious-narwhal (branch review-project-health).
-App: OpenEFB, a free open-source iPad VFR EFB (SwiftUI, MapLibre, GRDB). Read AGENTS.md and the
+App: Kanaf, a free open-source iPad VFR EFB (SwiftUI, MapLibre, GRDB). Read AGENTS.md and the
 docs/ folder first (docs/CUSTOMER.md, docs/IMPROVE-APP-PLAN.md, docs/DESIGN.md when it exists).
 
 ## Ground rules
@@ -40,6 +40,10 @@ tools/sim-test.sh demo                       # install + launch the built app at
 tools/sim-test.sh id                         # your sim UDID, for `simctl io <id> screenshot` etc.
 tools/sim-test.sh release                    # when you are completely done (do NOT delete the sim)
 ```
+iPhone checks: `SIM_DEVICE="iPhone 17 Pro" tools/sim-test.sh claim <ticket>` claims an iPhone simulator (tags look like
+`iphone17pro-pool1`; use `SIM_DEVICE="iPhone 17e"` for the narrowest width). `claim` only reuses a simulator of the same model,
+and the default stays the iPad Pro 13-inch. Then `export SIM_TAG=<printed tag>` as usual; the tag implies the model. Layouts
+switch on `horizontalSizeClass` (iPhone portrait is compact), never on the device; the iPad layouts must stay as they are.
 NEVER touch simulators that aren't yours (no `simctl shutdown all`, `delete all` or `erase`).
 A claim older than 8 hours (`CLAIM_TTL_MIN`, default 480) counts as abandoned and can be reused by the next `claim`.
 `delete` and `teardown` exist for the integrator; agents never run them. Without `SIM_TAG`, everyone shares the worktree

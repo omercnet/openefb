@@ -119,6 +119,8 @@ struct NearestAirportRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(String(format: "%.1f NM", entry.distance))
                     .font(.headline.monospaced())
+                    .lineLimit(1)
+                    .fixedSize()
                 Text(String(format: "%03.0f\u{00B0}", entry.bearing))
                     .font(.callout.weight(.medium).monospaced())
                     .foregroundStyle(Palette.secondaryText)
@@ -132,8 +134,10 @@ struct NearestAirportRow: View {
                         .font(.body.weight(.bold))
                     Text("Direct")
                         .font(.body.weight(.bold))
+                        .lineLimit(1)
+                        .fixedSize()
                 }
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 12)
                 .frame(height: MapControlMetrics.size)
             }
             .buttonStyle(.borderedProminent)
@@ -141,6 +145,7 @@ struct NearestAirportRow: View {
             .foregroundStyle(Palette.onAccent)
             .accessibilityIdentifier("Direct \(entry.airport.icao)")
             .accessibilityLabel("Direct to \(entry.airport.icao)")
+            .layoutPriority(1)
         }
         .frame(minHeight: MapControlMetrics.size + 8)
     }

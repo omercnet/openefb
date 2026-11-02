@@ -179,7 +179,7 @@ struct RecordingOverlayView: View {
             Label("Microphone is off", systemImage: "mic.slash.fill")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Palette.caution)
-            Text("The GPS track still records. For cockpit audio, turn the microphone on in Settings \u{203A} OpenEFB \u{203A} Microphone.")
+            Text("The GPS track still records. For cockpit audio, turn the microphone on in Settings \u{203A} Kanaf \u{203A} Microphone.")
                 .font(TypeRole.caption)
                 .foregroundStyle(Palette.secondaryText)
             Button {

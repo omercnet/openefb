@@ -1,4 +1,4 @@
-# notam-relay: Israel NOTAM relay for OpenEFB (Cloudflare Worker)
+# notam-relay: Israel NOTAM relay for Kanaf (Cloudflare Worker)
 
 Scrapes the Israel Airports Authority (IAA) NOTAM page every 15 minutes and serves `notams.json`. The iPad app downloads
 that file; it never contacts the IAA site. Background: `docs/research/israel-cvfr.md` section 6.
@@ -28,7 +28,7 @@ you -> POST /run          (Bearer RUN_SECRET; manual scrape, e.g. the first run 
 - List: `https://brin.iaa.gov.il/aeroinfo/AeroInfo.aspx?msgType=Notam` (one request, windows-1255).
 - Detail: `https://brin.iaa.gov.il/MobileAeroinfo/maiDetails.aspx?rowID=<n>&scrpos=0&mode=notam`, one per new NOTAM.
 - Polite: at most one run per 15 min (`MIN_INTERVAL_MS` = 14 min), sequential requests 400 ms apart, honest `User-Agent`
-  naming OpenEFB with a URL.
+  naming Kanaf with a URL.
 - A failed scrape never replaces the last good `notams.json`; the error goes to `meta.json` and `/health`.
 - Nothing is dropped: a NOTAM that doesn't parse, or whose detail wasn't fetched yet, is published with `parsed: false`.
 - Bump `PARSER_VERSION` in `src/build.ts` when parser output changes; cached items are then re-parsed once from stored text.

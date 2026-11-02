@@ -2,7 +2,7 @@
 
 Goal: replace the assumptions in docs/CUSTOMER.md with evidence. Five 20-minute conversations with
 weekend VFR pilots. Method: The Mom Test, which means asking about their last real flights, never
-pitching OpenEFB, and letting them talk 80% of the time.
+pitching Kanaf, and letting them talk 80% of the time.
 
 ## Who to recruit
 - Private or Sport certificate, VFR, flew in the last 30 days.
@@ -47,7 +47,7 @@ I'm not selling anything. Can you walk me through your last flight?"
 - Generics ("I always…") → "Tell me about the most recent time."
 
 ## Close (the ask)
-"We're building a free, open-source iPad app for VFR pilots called OpenEFB. Would you be open to us sending you a TestFlight build to try on one real flight, then a 10-minute call after? Thank you for your time either way."
+"We're building a free, open-source iPad app for VFR pilots called Kanaf. Would you be open to us sending you a TestFlight build to try on one real flight, then a 10-minute call after? Thank you for your time either way."
 Record yes/no. Yes plus an actual flight is the commitment we're looking for.
 
 ## Notes template (one per interview)

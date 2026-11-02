@@ -68,7 +68,7 @@ const en: Strings = {
   rules: [
     () => (
       <>
-        <b>Who&apos;s asking:</b> we&apos;re the small team behind OpenEFB, a free, open-source iPad app for VFR pilots. You&apos;ll talk with an <b>AI voice interviewer</b> (not a person) that speaks on our behalf, running on OpenAI&apos;s speech technology, so your voice is processed by OpenAI.
+        <b>Who&apos;s asking:</b> we&apos;re the small team behind Kanaf, a free, open-source iPad app for VFR pilots. You&apos;ll talk with an <b>AI voice interviewer</b> (not a person) that speaks on our behalf, running on OpenAI&apos;s speech technology, so your voice is processed by OpenAI.
       </>
     ),
     () => (
@@ -142,7 +142,7 @@ const he: Strings = {
   rules: [
     () => (
       <>
-        <b>מי שואל:</b> אנחנו הצוות הקטן מאחורי <B>OpenEFB</B>, אפליקציית iPad חופשית ופתוחה לטייסי VFR. השיחה היא עם <b>מראיין קולי מבוסס בינה מלאכותית</b> (לא בן אדם) שמדבר בשמנו, ורץ על טכנולוגיית הדיבור של <B>OpenAI</B>, ולכן הקול מעובד אצל OpenAI.
+        <b>מי שואל:</b> אנחנו הצוות הקטן מאחורי <B>Kanaf / כנף</B>, אפליקציית iPad חופשית ופתוחה לטייסי VFR. השיחה היא עם <b>מראיין קולי מבוסס בינה מלאכותית</b> (לא בן אדם) שמדבר בשמנו, ורץ על טכנולוגיית הדיבור של <B>OpenAI</B>, ולכן הקול מעובד אצל OpenAI.
       </>
     ),
     () => (

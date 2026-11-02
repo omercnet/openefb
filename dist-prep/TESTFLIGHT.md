@@ -7,12 +7,12 @@ external group with a public link after Beta App Review); Q12 = A (CAAI approved
 see `NOTICE`); Q13 = B (privacy label declares Coarse Location only, `PRIVACY_NUTRITION_LABELS.md`).
 
 ## Build
-`io.omer.efb`, version 1.0, iPad only, iOS 26.0 or later. Display name `OpenEFB`. Build numbers must increase on every
+`io.omer.efb`, version 1.0, iPad only, iOS 26.0 or later. Display name `Kanaf`. Build numbers must increase on every
 upload; `upload-testflight.sh` sets `CURRENT_PROJECT_VERSION` from `git rev-list --count HEAD` (or `BUILD_NUMBER`).
 
 ## Upload (Q9; the integrator runs it after the app record exists)
 Prerequisites: Xcode on this Mac is signed in to the owner's Apple ID for team 6F8N897928 (Xcode > Settings > Accounts),
-and the App Store Connect app record for bundle `io.omer.efb` exists (My Apps > + > New App: iPad, name OpenEFB, SKU
+and the App Store Connect app record for bundle `io.omer.efb` exists (app 6829641724; My Apps > + > New App: iPad, name Kanaf EFB, SKU
 any, bundle `io.omer.efb`). Then:
 ```
 dist-prep/upload-testflight.sh
@@ -25,7 +25,7 @@ which uploads to App Store Connect. Fallback: if `ASC_KEY_ID` and `ASC_ISSUER_ID
 secrets. Nothing has been uploaded.
 
 ## Beta App Description
-OpenEFB is a free, open-source VFR electronic flight bag for iPad: a moving map with the FAA VFR sectional, airport
+Kanaf is a free, open-source VFR electronic flight bag for iPad: a moving map with the FAA VFR sectional, airport
 information (METAR/TAF, frequencies, runways, charts), flight planning, flight recording with on-device transcription,
 replay, a logbook, and an on-device debrief. Region coverage: United States (default) and Israel (Settings > Region:
 CVFR and sport-aviation routes, NOTAM closures, curated aerodromes). It is a supplemental reference, not FAA-approved,

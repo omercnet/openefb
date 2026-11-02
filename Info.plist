@@ -10,8 +10,8 @@
 		<string>audio</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>OpenEFB records cockpit audio during flights for transcription and debrief.</string>
+	<string>Kanaf records cockpit audio during flights for transcription and debrief.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>OpenEFB transcribes cockpit audio in real-time to create flight transcripts.</string>
+	<string>Kanaf transcribes cockpit audio in real-time to create flight transcripts.</string>
 </dict>
 </plist>

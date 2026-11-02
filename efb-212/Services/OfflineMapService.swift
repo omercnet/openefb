@@ -402,7 +402,7 @@ nonisolated enum OfflinePackStyle {
         if layer != .street {
             style.removeValue(forKey: "glyphs")  // no symbol layers: no font downloads
         }
-        style["name"] = "OpenEFB offline \(layer.rawValue)"
+        style["name"] = "Kanaf offline \(layer.rawValue)"
         return try JSONSerialization.data(withJSONObject: style, options: [.sortedKeys])
     }
 }

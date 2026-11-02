@@ -55,6 +55,7 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
     private var previousAltitudeTime: Date?
     private var restartAttempt = 0
     private let restartBaseDelay: Duration
+    private let clock: @Sendable () -> Date
 
     // MARK: - Init
 
@@ -63,16 +64,19 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
     ///   - updates: Source of location updates; defaults to `CLLocationUpdate.liveUpdates`. Tests inject a stream.
     ///   - noFixGrace: Time with no fix before `GPSFailureReason.noFixYet` is raised.
     ///   - restartBaseDelay: First wait before re-requesting updates after the stream throws; doubles per failure, max 30 s.
+    ///   - clock: The instant route following sees as "now"; scenario playback and tests accelerate it.
     nonisolated init(
         appState: AppState,
         updates: @escaping @Sendable () -> AsyncThrowingStream<LocationUpdateSnapshot, Error> = LocationService.liveUpdates,
         noFixGrace: Duration = .seconds(GPSFailureReason.noFixGraceSeconds),
-        restartBaseDelay: Duration = .seconds(1)
+        restartBaseDelay: Duration = .seconds(1),
+        clock: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.appState = appState
         self.makeUpdates = updates
         self.noFixGrace = noFixGrace
         self.restartBaseDelay = restartBaseDelay
+        self.clock = clock
     }
 
     /// Production source: CoreLocation live updates, mapped to snapshots.
@@ -216,7 +220,7 @@ final class LocationService: LocationServiceProtocol, @unchecked Sendable {
                 appState.gpsAvailable = true
                 appState.gpsFailure = nil
                 appState.gpsStationary = isStationary
-                appState.updateActiveRouteProgress()
+                appState.updateActiveRouteProgress(now: self?.clock() ?? Date())
 
                 if !appState.firstLocationReceived {
                     appState.firstLocationReceived = true

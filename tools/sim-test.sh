@@ -16,6 +16,9 @@
 #   tools/sim-test.sh teardown                                            # delete every simulator of this worktree
 # Extra args are passed to xcodebuild. Set DD=<path> for a private derived-data dir
 # (default /tmp/efb-dd-<worktree>). Result bundles: RESULT=<path.xcresult>.
+# SIM_DEVICE=<device type name> picks the simulator model (default "iPad Pro 13-inch (M5)"; e.g.
+# "iPhone 17 Pro" or "iPhone 17e"). `claim` only reuses simulators of that model and names new ones
+# after it ("iphone17pro-pool1"), so a SIM_TAG implies its model.
 set -euo pipefail
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
 
@@ -28,20 +31,33 @@ SIM_NAME="OpenEFB · $NAME$SUFFIX"
 DD=${DD:-/tmp/efb-dd-$NAME${SIM_TAG:+-$SIM_TAG}}
 LOCK=/tmp/efb-sim-lock-$NAME${SIM_TAG:+-$SIM_TAG}
 RUNTIME=$(xcrun simctl list runtimes | grep -oE 'com\.apple\.CoreSimulator\.SimRuntime\.iOS-[0-9]+-[0-9]+' | sort -Vu | tail -1)
+SIM_DEVICE=${SIM_DEVICE:-iPad Pro 13-inch (M5)}
+DEFAULT_DEVICE="iPad Pro 13-inch (M5)"
+DEVICE_TYPE=$(xcrun simctl list devicetypes | grep -F "$SIM_DEVICE (" | grep -oE 'com\.apple\.CoreSimulator\.SimDeviceType\.[A-Za-z0-9-]+' | head -1 || true)
+[ -n "$DEVICE_TYPE" ] || { echo "sim-test: unknown SIM_DEVICE '$SIM_DEVICE' (see xcrun simctl list devicetypes)" >&2; exit 2; }
+# Pool tags are prefixed by the model, except the default iPad ("pool1", "iphone17pro-pool1").
+if [ "$SIM_DEVICE" = "$DEFAULT_DEVICE" ]; then TAG_PREFIX=""; else TAG_PREFIX="$(echo "$SIM_DEVICE" | tr -d ' ()' | tr '[:upper:]' '[:lower:]')-"; fi
 
 CLAIMS=/tmp/efb-sim-claims-$NAME
 CLAIM_TTL_MIN=${CLAIM_TTL_MIN:-480}   # a claim older than this is treated as abandoned
 
-# Tags of existing agent simulators in this worktree ("OpenEFB · <worktree> · <tag>").
+# Tags of existing agent simulators of this model in this worktree ("OpenEFB · <worktree> · <tag>").
 pool_tags() {
-  xcrun simctl list devices | grep -F "OpenEFB · $NAME · " | sed -E "s/.*OpenEFB · $NAME · ([^ ]+) \(.*/\1/" | sort -u
+  xcrun simctl list devices -j | python3 -c '
+import json, sys
+prefix, dtype = sys.argv[1], sys.argv[2]
+for devs in json.load(sys.stdin)["devices"].values():
+    for d in devs:
+        if d["name"].startswith(prefix) and d.get("deviceTypeIdentifier") == dtype and d.get("isAvailable", True):
+            print(d["name"][len(prefix):])
+' "OpenEFB · $NAME · " "$DEVICE_TYPE" | sort -u
 }
 
 sim_id() {
   local id
   id=$(xcrun simctl list devices | grep -F "$SIM_NAME (" | grep -oE '[0-9A-F-]{36}' | head -1 || true)
   if [ -z "$id" ]; then
-    id=$(xcrun simctl create "$SIM_NAME" "iPad Pro 13-inch (M5)" "$RUNTIME")
+    id=$(xcrun simctl create "$SIM_NAME" "$DEVICE_TYPE" "$RUNTIME")
   fi
   echo "$id"
 }
@@ -83,7 +99,7 @@ case "$cmd" in
     xcrun simctl install "$SIM" "$DD/Build/Products/Debug-iphonesimulator/efb-212.app"
     xcrun simctl privacy "$SIM" grant location-always "$BUNDLE" || true
     xcrun simctl spawn "$SIM" defaults write "$BUNDLE" hasSeenOnboarding -bool YES
-    xcrun simctl location "$SIM" set "${1:-37.4611,-122.1150}"
+    xcrun simctl location "$SIM" set "${1:-32.0114,34.8867}"   # LLBG: a fresh install starts in Israel; pass 37.4611,-122.1150 for KPAO
     xcrun simctl terminate "$SIM" "$BUNDLE" 2>/dev/null || true
     xcrun simctl launch "$SIM" "$BUNDLE"
     open -g /Applications/Xcode.app/Contents/Applications/DeviceHub.app 2>/dev/null || true ;;
@@ -97,7 +113,7 @@ case "$cmd" in
       f="$CLAIMS/$t"
       if [ ! -f "$f" ] || [ -n "$(find "$f" -mmin +"$CLAIM_TTL_MIN" 2>/dev/null)" ]; then tag=$t; break; fi
     done
-    if [ -z "$tag" ]; then n=1; while pool_tags | grep -qx "pool$n"; do n=$((n + 1)); done; tag="pool$n"; fi
+    if [ -z "$tag" ]; then n=1; while pool_tags | grep -qx "${TAG_PREFIX}pool$n"; do n=$((n + 1)); done; tag="${TAG_PREFIX}pool$n"; fi
     echo "$owner $(date -u +%FT%TZ)" > "$CLAIMS/$tag"
     SIM_NAME="OpenEFB · $NAME · $tag"; sim_id >/dev/null
     echo "$tag" ;;

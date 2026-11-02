@@ -155,7 +155,7 @@ nonisolated enum GPSFailureReason: Equatable, Sendable {
     var message: String {
         switch self {
         case .authorizationDenied:
-            return "The moving map, NRST and recording need your position. Allow Location for OpenEFB in Settings \u{203A} Privacy & Security \u{203A} Location Services."
+            return "The moving map, NRST and recording need your position. Allow Location for Kanaf in Settings \u{203A} Privacy & Security \u{203A} Location Services."
         case .authorizationRestricted:
             return "Location is blocked by a restriction on this iPad (Screen Time or device management)."
         case .locationUnavailable:
@@ -163,7 +163,7 @@ nonisolated enum GPSFailureReason: Equatable, Sendable {
         case .noFixYet:
             return "No position yet. Outdoors a fix takes under a minute; a Wi-Fi-only iPad has no GPS and needs an external receiver."
         case .streamFailed:
-            return "Position updates ended unexpectedly. Relaunch OpenEFB; if it repeats, check Location in Settings."
+            return "Position updates ended unexpectedly. Relaunch Kanaf; if it repeats, check Location in Settings."
         }
     }
 

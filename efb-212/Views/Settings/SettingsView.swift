@@ -98,6 +98,18 @@ struct SettingsView: View {
                     Text("Switching recenters the map and reloads that region's data sources. Layers with no source in a region are shown as unavailable.")
                 }
 
+                // Israel: official chart and aerodrome diagram editions, with their download actions (IL-DEFAULT)
+                if appState.region == .israel {
+                    IsraelChartDownloadSection()
+                    IsraelDiagramDownloadSection()
+                    Section {
+                        NavigationLink("Offline Maps") { OfflineMapsView() }
+                            .accessibilityIdentifier("region-offline-maps-link")
+                    } footer: {
+                        Text("Street map packs for use without internet. Data \u{00A9} CAAI; see About.")
+                    }
+                }
+
                 // Display: day / night / auto (F16)
                 Section {
                     Picker("Display mode", selection: displayModeBinding) {
@@ -112,9 +124,10 @@ struct SettingsView: View {
                     Text("Night uses a dim palette that protects night vision. Auto follows the sun at your position.")
                 }
 
-                // Section 3: Charts
-                Section("Charts") {
-                    if appState.region.isAvailable(.sectional) {
+                // Section 3: Charts (FAA sectional + aviation data cycle). Regions without a sectional have no rows
+                // here; their chart downloads and the single Offline Maps link sit under Region.
+                if appState.region.isAvailable(.sectional) {
+                    Section("Charts") {
                         LabeledContent("Sectional cycle", value: "valid to \(OfflineMapsView.dateString(SectionalCycle.current().expires))")
                         aviationDataRow
                         NavigationLink("Offline Maps") { OfflineMapsView() }
@@ -122,14 +135,6 @@ struct SettingsView: View {
                         Text("Sectionals change every 56 days. What works offline is listed under Offline Maps.")
                             .font(.caption)
                             .foregroundStyle(Palette.secondaryText)
-                    } else {
-                        NavigationLink("Offline Maps") { OfflineMapsView() }
-                            .accessibilityIdentifier("offline-maps-link")
-                        Text("FAA charts are not available in \(appState.region.displayName). "
-                             + "Offline Maps downloads the official CVFR chart.")
-                            .font(.caption)
-                            .foregroundStyle(Palette.secondaryText)
-                            .accessibilityIdentifier("charts-unavailable-text")
                     }
                 }
 
@@ -142,7 +147,7 @@ struct SettingsView: View {
                 Section("Legal") {
                     NavigationLink("Disclaimers") { DisclaimersView() }
                     LabeledContent("License", value: "MPL-2.0")
-                    Link("Source Code", destination: URL(string: "https://github.com/quartermint/openefb")!)
+                    Link("Source Code", destination: URL(string: "https://github.com/omercnet/openefb")!)
                 }
             }
             .navigationTitle("Settings")
@@ -222,7 +227,7 @@ struct SettingsView: View {
         } header: {
             Text("NOTAM API")
         } footer: {
-            Text("The FAA NOTAM API needs a free client ID and secret from the FAA developer portal. OpenEFB keeps them in the iPad Keychain.")
+            Text("The FAA NOTAM API needs a free client ID and secret from the FAA developer portal. Kanaf keeps them in the iPad Keychain.")
         }
     }
 
@@ -293,7 +298,7 @@ struct SettingsView: View {
     }
 
     private var feedbackURL: URL {
-        URL(string: "mailto:feedback@quartermint.com?subject=OpenEFB%20Beta%20Feedback")!
+        URL(string: "mailto:feedback@quartermint.com?subject=Kanaf%20Beta%20Feedback")!
     }
 
     // MARK: - Region (IL-2)

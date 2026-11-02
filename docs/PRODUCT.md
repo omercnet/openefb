@@ -27,7 +27,7 @@ The tab bar is **Map / Flights / Settings** (was Map / Flights / Logbook / Aircr
 - Aircraft & Pilot is a row under Settings > Profiles. Non-current currency (medical, flight review, night) shows as an amber "n to renew" on that row, replacing the old tab badge.
 - Beta banner: Map tab only; once dismissed, only the line under Settings > About remains (efb-77r.18).
 
-### Design Review: OpenEFB (T14 final cut, 2026-11-01)
+### Design Review: Kanaf (T14 final cut, 2026-11-01)
 Evidence: the app walked cold on the iPad Pro 13-inch simulator (iOS 27, KPAO, `tools/fly.sh` route). Screenshots: `docs/design/screenshots/T14/`. **This review rests on documented assumptions: no pilot has used a build** (CUSTOMER.md evidence status). It has not been tried on a physical iPad or in a cockpit.
 
 **Verdict:** NOT DONE (score 6/10 after the T14 fixes; 3/10 before)
@@ -73,7 +73,7 @@ Score: 2/7 = 3/10 before; 4/7 = 6/10 after. To reach 9+: a physical-iPad flight 
 **Back of the fence:** see `docs/DESIGN.md` `## Back-of-the-fence audit (T14)`.
 
 ## Opportunity Solution Tree Notes
-Outcome: pilots keep OpenEFB on the yoke for the whole flight (no switch back to ForeFlight mid-flight).
+Outcome: pilots keep Kanaf on the yoke for the whole flight (no switch back to ForeFlight mid-flight).
 - Opportunity: "I can't tell what still works offline" -> offline status lines, per-region packs (exists); next: one "offline ready" indicator on the map.
 - Opportunity: "I can't tell if the position is real" -> GPS chip, stale grey chevron, no placeholder ownship (done); next: location-denied notice.
 - Opportunity: "I need the nearest field now" -> NRST + Direct (exists); next: clear Direct-To.

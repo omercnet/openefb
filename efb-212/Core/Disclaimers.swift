@@ -18,11 +18,11 @@ nonisolated enum Disclaimers {
 
     /// Short form for the onboarding page. The full text is `primaryNavigation`.
     static let onboardingSummary =
-        "OpenEFB is a supplemental reference. Fly with current charts, ATC and what you see outside. iPad GPS is not certified, and this app is not FAA-approved."
+        "Kanaf is a supplemental reference. Fly with current charts, ATC and what you see outside. iPad GPS is not certified, and this app is not FAA-approved."
 
     static let primaryNavigation = Item(
         title: "Not for primary navigation",
-        text: "OpenEFB is provided as a supplemental reference tool. It is NOT intended to be used as a primary means of navigation. Pilots are responsible for maintaining situational awareness through all available means including current paper charts, ATC communication, and visual references."
+        text: "Kanaf is provided as a supplemental reference tool. It is NOT intended to be used as a primary means of navigation. Pilots are responsible for maintaining situational awareness through all available means including current paper charts, ATC communication, and visual references."
     )
 
     static let dataCurrency = Item(
@@ -42,7 +42,7 @@ nonisolated enum Disclaimers {
 
     static let notFAAApproved = Item(
         title: "Not FAA-approved",
-        text: "OpenEFB has not been tested, approved, or certified by the FAA or any other aviation authority. Use at your own risk."
+        text: "Kanaf has not been tested, approved, or certified by the FAA or any other aviation authority. Use at your own risk."
     )
 
     static let all: [Item] = [primaryNavigation, dataCurrency, weather, gps, notFAAApproved]

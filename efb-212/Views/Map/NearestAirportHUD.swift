@@ -12,16 +12,19 @@ import SwiftUI
 
 struct NearestAirportHUD: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     /// Closest landable airport, nil until the first fix or when none is in range.
     let entry: NearestAirportEntry?
 
     var body: some View {
         Button(action: { appState.isPresentingNearestList = true }) {
-            HStack(spacing: 12) {
+            HStack(spacing: horizontalSizeClass == .compact ? 8 : 12) {
                 // Fixed label: always reads "NRST"
                 Text("NRST")
                     .font(.title3.weight(.heavy))
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(Palette.onAccent)
                     .padding(.horizontal, 10)
                     .frame(minHeight: 44)
@@ -29,29 +32,56 @@ struct NearestAirportHUD: View {
 
                 if appState.region.hasAirportData, let entry {
                     VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 10) {
-                            Text(entry.airport.icao)
-                                .font(.title3.weight(.bold).monospaced())
-                            Text(String(format: "%.1f NM", entry.distance))
-                                .font(.headline.monospaced())
-                            Text(String(format: "%03.0f\u{00B0}", entry.bearing))
-                                .font(.headline.monospaced())
-                        }
-                        HStack(spacing: 8) {
-                            Text(entry.runwaySummary ?? "no runway data")
-                                .font(.subheadline.weight(.medium).monospaced())
-                                .foregroundStyle(.secondary)
-                            if entry.isPrivateUse {
-                                PrivateUseTag()
+                        if horizontalSizeClass == .compact {
+                            // iPhone: ICAO + distance on the first line, bearing + runway on the second,
+                            // so no number is truncated next to the NRST badge.
+                            HStack(spacing: 8) {
+                                Text(entry.airport.icao)
+                                    .font(.title3.weight(.bold).monospaced())
+                                Text(String(format: "%.1f NM", entry.distance))
+                                    .font(.headline.monospaced())
                             }
-                            if entry.isMilitary {
-                                MilitaryUseTag()
+                            .lineLimit(1)
+                            HStack(spacing: 6) {
+                                Text(String(format: "%03.0f\u{00B0}", entry.bearing))
+                                    .font(.subheadline.weight(.semibold).monospaced())
+                                Text(entry.runwaySummary ?? "no runway data")
+                                    .font(.subheadline.weight(.medium).monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                if entry.isPrivateUse { PrivateUseTag() }
+                                if entry.isMilitary { MilitaryUseTag() }
+                                if entry.requiresPPR { PprTag() }
+                                if entry.isClosedByNotam { NotamClosedTag() }
                             }
-                            if entry.requiresPPR {
-                                PprTag()
+                        } else {
+                            HStack(spacing: 10) {
+                                Text(entry.airport.icao)
+                                    .font(.title3.weight(.bold).monospaced())
+                                Text(String(format: "%.1f NM", entry.distance))
+                                    .font(.headline.monospaced())
+                                Text(String(format: "%03.0f\u{00B0}", entry.bearing))
+                                    .font(.headline.monospaced())
                             }
-                            if entry.isClosedByNotam {
-                                NotamClosedTag()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                            HStack(spacing: 8) {
+                                Text(entry.runwaySummary ?? "no runway data")
+                                    .font(.subheadline.weight(.medium).monospaced())
+                                    .foregroundStyle(.secondary)
+                                if entry.isPrivateUse {
+                                    PrivateUseTag()
+                                }
+                                if entry.isMilitary {
+                                    MilitaryUseTag()
+                                }
+                                if entry.requiresPPR {
+                                    PprTag()
+                                }
+                                if entry.isClosedByNotam {
+                                    NotamClosedTag()
+                                }
                             }
                         }
                     }
@@ -60,6 +90,7 @@ struct NearestAirportHUD: View {
                          : appState.gpsAvailable ? "no landable airport in range" : "waiting for GPS")
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(.secondary)
+                        .lineLimit(2)
                 }
             }
             .padding(.horizontal, 10)

@@ -59,6 +59,7 @@ struct MapContainerView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     // MARK: - Services (created once in onAppear)
 
@@ -93,6 +94,15 @@ struct MapContainerView: View {
     // MARK: - Local UI State
 
     @State private var showingSearch: Bool = false
+    @AppStorage(IsraelChartHint.dismissedKey) private var israelChartHintDismissed = false
+
+    private var showIsraelChartHint: Bool {
+        IsraelChartHint.shouldShow(region: appState.region,
+                                   chartInstalled: IsraelChartStore.shared.status.isPresent,
+                                   dismissed: israelChartHintDismissed)
+    }
+
+    private func dismissIsraelChartHint() { israelChartHintDismissed = true }
 
     var body: some View {
         @Bindable var appState = appState
@@ -205,9 +215,9 @@ struct MapContainerView: View {
                             OverlayStalenessBadges(viewModel: viewModel)
                         }
 
-                        // Official CAAI data sources (IL-9 chart edition, IL-13 diagrams): one compact, expandable stack
-                        if appState.region == .israel {
-                            IsraelSourceBadgeStack(overlay: mapViewModel?.mapService.airportDiagramOverlay)
+                        // First Israel launch: where to get the official chart (once per install)
+                        if appState.region == .israel, showIsraelChartHint {
+                            IsraelChartHintBanner { dismissIsraelChartHint() }
                         }
                     }
                     .padding(.leading, 16)
@@ -322,10 +332,12 @@ struct MapContainerView: View {
             if appState.isPresentingLayerControls, let viewModel = mapViewModel {
                 VStack {
                     LayerControlsView(mapViewModel: viewModel)
-                        // Sit left of the map controls column (16 edge + 60 button + 12 gap)
-                        // so the layers button stays tappable to close the panel.
-                        .padding(.trailing, 88)
-                        .padding(.top, 140)
+                        // iPad: sit left of the map controls column (16 edge + 60 button + 12 gap)
+                        // so the layers button stays tappable to close the panel. iPhone: the panel
+                        // covers the column (it has its own close button) and stops above the strip.
+                        .padding(.trailing, horizontalSizeClass == .compact ? 16 : 88)
+                        .padding(.top, horizontalSizeClass == .compact ? 130 : 140)
+                        .padding(.bottom, horizontalSizeClass == .compact ? 120 : 0)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -447,7 +459,7 @@ struct MapContainerView: View {
             israelAlertService?.update(
                 region: appState.region, route: appState.activeRoute, position: position,
                 altitudeFeet: position.verticalAccuracy >= 0 ? appState.altitude : nil,  // feet MSL
-                trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed
+                trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed, now: ScenarioHooks.now
             )
 
             // First GPS fix: animate from the home view to the user position (only inside the region)
@@ -489,6 +501,7 @@ struct MapContainerView: View {
 
         // Saved operating region (before any view model or map reads it)
         appState.region = RegionStore.load(from: modelContext)
+        ScenarioHooks.prepare(appState)  // DEBUG scenario playback only; a no-op otherwise
 
         // Database service (single shared instance, created once by AppState)
         let databaseService = appState.getOrCreateDatabaseService()
@@ -513,7 +526,7 @@ struct MapContainerView: View {
         proximityAlertService = proxService
 
         // Israel in-flight alerts (IL-ALERTS): one haptic per newly raised alert
-        let israelAlerts = IsraelAlertService()
+        let israelAlerts = ScenarioHooks.makeIsraelAlertService()
         israelAlerts.onRaised = { _ in Haptics.warning() }
         israelAlertService = israelAlerts
 
@@ -521,7 +534,7 @@ struct MapContainerView: View {
         appState.sharedMapService = mapService
 
         // LocationService -- starts GPS tracking
-        let locService = LocationService(appState: appState)
+        let locService = ScenarioHooks.makeLocationService(appState: appState)
         locationService = locService
         Task { await locService.startTracking() }
 

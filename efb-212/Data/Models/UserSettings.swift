@@ -37,10 +37,11 @@ enum SchemaV1: VersionedSchema {
         /// UUID string of last used flight plan (for auto-load on launch).
         var lastFlightPlanID: String?
 
-        /// Operating region (`Region.rawValue`). Defaults to "us"; read through `Region`.
-        var regionRaw: String = "us"
+        /// Operating region (`Region.rawValue`). A fresh record stores `Region.defaultRegion`
+        /// (Israel, IL-DEFAULT); read through `Region`.
+        var regionRaw: String = "israel"
 
-        /// The stored region; an unknown raw value reads as the US default.
+        /// The stored region; an unknown raw value reads as the default region.
         var region: Region {
             get { Region(rawValue: regionRaw) ?? Region.defaultRegion }
             set { regionRaw = newValue.rawValue }
