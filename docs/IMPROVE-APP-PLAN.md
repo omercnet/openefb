@@ -27,13 +27,14 @@ Work items live in beads (epic `efb-77r`). This file holds phase status and deci
 | 1 | jobs-to-be-done | done (assumption-based; validate via efb-77r.7) | CUSTOMER.md | efb-77r.1 | 2026-10-31 |
 | 2 | ux-heuristics | done (18 findings, 4 sev-4 / 8 sev-3) | DESIGN.md | efb-77r.2 | 2026-10-31 |
 | 3 | design-everyday-things | done (gulf analysis merged into findings) | DESIGN.md | efb-77r.2 | 2026-10-31 |
-| 3b | ios-hig-design (optional, added) | pending | DESIGN.md | efb-77r.3 | |
-| 4 | refactoring-ui | pending | DESIGN.md, EXPERIMENTS.md | efb-77r.4 | |
-| 5 | microinteractions | pending | DESIGN.md, EXPERIMENTS.md | efb-77r.5 | |
-| 6 | made-to-stick | pending | POSITIONING.md, EXPERIMENTS.md | efb-77r.8 | |
+| 3b | ios-hig-design (optional, added) | done (T10, 9/10; night palette, Dynamic Type, 60 pt controls) | DESIGN.md | efb-77r.3 | 2026-10-31 |
+| 4 | refactoring-ui | done (T07; airport sheet and freshness component) | DESIGN.md, EXPERIMENTS.md | efb-77r.4 | 2026-11-01 |
+| 5 | microinteractions | done (T08; record, REC pill, pressed states, haptics) | DESIGN.md, EXPERIMENTS.md | efb-77r.5 | 2026-11-01 |
+| 6 | made-to-stick | done (T09; positioning copy) | POSITIONING.md, EXPERIMENTS.md | efb-77r.8 | 2026-11-01 |
 | 7 | influence-psychology | skipped: no in-app upsell surfaces | | | 2026-10-31 |
 | 8 | high-perf-browser | skipped: native app, no browser surface | | | 2026-10-31 |
 | 9 | steve-jobs-design-review | in-progress: review and first cuts done on assumptions (T14); awaiting pilot interviews to confirm the Recommend items | PRODUCT.md, DESIGN.md | efb-77r.6 | 2026-11-01 |
+| 10 | ux-heuristics + ios-hig-design on the Israel mode | done (T28: 17 findings; 5 sev-3 and 2 sev-2 fixed in the tree, 10 sev 1-2 filed as efb-aac.21-30; HIG 8/10) | DESIGN.md "Israel mode review" | efb-5em | 2026-11-02 |
 
 Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reason> · skipped: <reason>
 
@@ -49,3 +50,6 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-31 | 1 | Phase 1 rests on assumptions; run discovery interviews before the cut pass | No user evidence yet |
 | 2026-10-31 | 2-3 | Fix every severity 3-4 finding now; severity 1-2 go into phases 4-6 | Safety tool: no in-flight trust defects backlogged |
 | 2026-11-01 | 9 | One-page onboarding; TFR layer on by default; no placeholder ownship | J1 trust: fewest steps to the map, hazards on, no fake position |
+| 2026-11-02 | 10 | Israel mode: severity 3-4 fixed in the review pass; severity 1-2 filed under efb-aac | Same rule as phases 2-3: no in-flight trust defects backlogged |
+| 2026-11-02 | 10 | Alerts that depend on position are suspended, and say so, when the fix is stale | Stale alerts presented as current are a trust defect; silence would read as "nothing ahead" |
+| 2026-11-02 | 10 | A route closure counts only for the pilot's own network (CVFR or LSA) in the briefing | The chart and planner already do; red is for what closes this pilot's route |

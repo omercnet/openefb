@@ -69,7 +69,7 @@ struct IsraelFlightPlanViewModelTests {
     }
 
     /// A view model whose aircraft and pilot profiles carry what filing needs. The container must outlive the model.
-    private static func fileableViewModel() throws -> (IsraelFlightPlanViewModel, AppState, ModelContainer) {
+    private static func fileableViewModel(report: IsraelNotamReport? = nil) throws -> (IsraelFlightPlanViewModel, AppState, ModelContainer) {
         let container = try ModelContainer(
             for: SchemaV1.AircraftProfile.self, SchemaV1.PilotProfile.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
@@ -81,7 +81,7 @@ struct IsraelFlightPlanViewModelTests {
         pilot.isActive = true
         container.mainContext.insert(aircraft)
         container.mainContext.insert(pilot)
-        let (vm, state) = viewModel()
+        let (vm, state) = viewModel(report: report)
         vm.configure(mapService: nil, modelContext: container.mainContext)
         return (vm, state, container)
     }
@@ -123,6 +123,20 @@ struct IsraelFlightPlanViewModelTests {
         try await Self.pick(vm)
         #expect(vm.plan == nil)
         #expect(vm.routeError == .noRoute(from: "LLHZ", to: "LLIB", reason: .closed))
+        #expect(!vm.canFile)
+    }
+
+    @Test func closureNamingAnUnknownPointBlocksFilingWithAnUnresolvedIssue() async throws {
+        let now = Date()
+        let unknown = IsraelRouteClosure(notamId: "C5/26", routeKind: "CVFR", routeName: nil, chain: ["MIDAA", "ZZZZZ"],
+                                         validFrom: nil, validTo: nil, schedule: nil)
+        let report = IsraelNotamReport(feed: IsraelNotamFeed(generatedAt: now, items: [], closures: [unknown]),
+                                       fetchedAt: now, refreshFailed: false)
+        let (vm, _, container) = try Self.fileableViewModel(report: report)
+        defer { withExtendedLifetime(container) {} }
+        try await Self.pick(vm)
+        #expect(vm.plan != nil)
+        #expect(vm.issues.contains { $0.kind == .unresolvedClosure("C5/26") && $0.blocksFiling })
         #expect(!vm.canFile)
     }
 

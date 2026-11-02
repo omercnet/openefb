@@ -42,6 +42,16 @@ SIM_TAG=T07 tools/sim-test.sh test -only-testing:efb-212Tests/MapQueryRegionTest
 open efb-212.xcodeproj                                     # Xcode (Cmd+R / Cmd+U)
 ```
 
+`web/` has its own `package.json` and lockfile per folder (no workspace tooling); each folder's README has the details:
+
+```bash
+cd web/notam-relay && npm ci && npm test      # Vitest on saved IAA samples; npm run dev = wrangler dev --test-scheduled
+cd web/charts && npm ci && npm test           # manifest rules (node --test)
+cd web/interviews && npm ci && npm run build  # Next.js build; npm run lint = tsc --noEmit
+```
+
+Deploys: the Worker with `npx wrangler deploy` from `web/notam-relay` (owner login required); packs with `web/charts/publish.sh` (see its README; `--approve` is the owner's go-ahead). `web/interviews` deploys from git pushes on the Vercel project `openefb-interviews`.
+
 ## File Organization
 
 ```
@@ -51,6 +61,7 @@ efb-212/
 ├── Views/
 │   ├── Map/                       # Moving map, controls, instrument strip, airport sheet and sections, layers
 │   ├── Planning/                  # Flight plan creation, summary card
+│   ├── Briefing/                  # Israel pre-flight NOTAM briefing (filters, read/unread, show on map, IMS link)
 │   ├── Flights/                   # Flight history, detail, replay, transcript, debrief
 │   ├── Logbook/                   # Logbook list and entry editing (shown in the Flights tab)
 │   ├── Aircraft/                  # Aircraft + pilot profiles (reached from Settings > Profiles)
@@ -58,7 +69,8 @@ efb-212/
 │   ├── Onboarding/                # First-run onboarding
 │   └── Components/                # Reusable UI components (badges, dots, search, banners)
 ├── ViewModels/                    # @Observable @MainActor view models
-├── Services/                      # API clients, location, map, offline maps, currency
+├── Services/                      # API clients, location, map, offline maps, currency; Israel* files = Israel mode
+│   ├── Israel*.swift              # chart packs (IsraelChartService/Store/Manifest), diagrams (IsraelDiagramPack/Store), NOTAMs (IsraelNotamService, IsraelNotamClosureMapper), routing (IsraelRoutePlanner, IsraelFlightPlanMessage, IsraelRouteFollowing), alerts, overlays, LSA rules
 │   ├── Recording/                 # RecordingCoordinator, TrackRecorder, AudioRecorder, TranscriptionService
 │   ├── Replay/                    # ReplayEngine
 │   └── Debrief/                   # DebriefEngine (Apple Foundation Models), FlightSummaryBuilder
@@ -66,20 +78,23 @@ efb-212/
 │   ├── AviationDatabase.swift     # GRDB — airports, runways, frequencies, navaids, airspace (bundled aviation.sqlite)
 │   ├── RecordingDatabase.swift    # GRDB — track points, transcript segments, phase markers, debrief results
 │   ├── DatabaseManager.swift      # DatabaseManager (DatabaseServiceProtocol) + UnavailableDatabaseService fallback
+│   ├── IsraelAviationDatabase.swift  # GRDB — Israel points, route segments, airspace, runways, curated aerodromes (bundled israel-aviation.sqlite)
 │   └── Models/                    # SwiftData @Model classes (SchemaV1: profiles, flight records, plans, logbook, settings)
 ├── Core/
 │   ├── AppState.swift             # Root state (@Observable, one flat class)
 │   ├── Types.swift, AviationModels.swift, Protocols.swift
 │   ├── EFBError.swift             # Centralized error types
 │   ├── DesignTokens.swift, DisplayMode.swift, Disclaimers.swift, DataFreshness.swift
-│   └── Extensions/                # Swift extensions
-├── Resources/                     # aviation.sqlite, base-style.json
+│   ├── Extensions/                # Swift extensions
+│   └── Region.swift, RegionStore.swift, ActiveRoute.swift, DataRefreshScheduler.swift, OverlayStaleness.swift, TileFailureTracker.swift
+├── Resources/                     # aviation.sqlite, israel-aviation.sqlite, israel-border-lines.json, base-style.json
 └── Assets.xcassets/
 efb-212Tests/                      # Swift Testing suites (ServiceTests, ViewModelTests, DataTests, IntegrationTests, Mocks)
 efb-212UITests/                    # Xcode template stubs
-tools/                             # sim-test.sh, fly.sh, sim-preview.sh, nasr-importer/, apd-georef/
+tools/                             # sim-test.sh, fly.sh, sim-preview.sh, nasr-importer/, apd-georef/ (FAA diagrams), caai-importer/ (Israel GIS + aerodromes), caai-chart/ (official CVFR chart pack), caai-apd/ (Israeli diagrams)
 dist-prep/                         # TestFlight / App Store prep
 docs/                              # design, product, handoff briefs
+web/                               # Server side, not in the app: notam-relay/ (Cloudflare Worker), charts/ (R2 publish), interviews/ (Next.js on Vercel)
 ```
 
 ## Naming Conventions
@@ -105,7 +120,7 @@ Two remote SwiftPM packages, both in the Xcode project (versions pinned in `efb-
 
 Not dependencies: SwiftNASR (NASR is parsed offline by `tools/nasr-importer`, which uses GRDB and swift-argument-parser), SFR packages. Apple frameworks used: SwiftData, FoundationModels, Speech, CoreLocation, AVFoundation, PDFKit.
 
-Network services (free, no key unless noted): NOAA Aviation Weather (METAR, TAF, PIREP, AIRMET/SIGMET, winds aloft), FAA TFR, FAA d-TPP charts, FAA NOTAM API (the pilot's own key, stored in Keychain), tile hosts OpenFreeMap, ArcGIS (FAA sectional), Esri and OpenTopoMap.
+Network services (free, no key unless noted): NOAA Aviation Weather (METAR, TAF, PIREP, AIRMET/SIGMET, winds aloft), FAA TFR, FAA d-TPP charts, FAA NOTAM API (the pilot's own key, stored in Keychain), tile hosts OpenFreeMap, ArcGIS (FAA sectional), Esri and OpenTopoMap. Israel adds two services the project runs itself: the NOTAM relay (`openefb-notam-relay.omerc.workers.dev`, Cloudflare Workers free plan; it scrapes the IAA site, the app doesn't) and the chart and diagram packs on Cloudflare R2 (`pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev`, rate-limited dev URL). Vercel hosts only the pilot-interviews site, which the app doesn't call. The relay URL and the R2 base URL are overridable through the `israelNotamFeedURL` and `israelChartBaseURL` defaults.
 
 ## Development Standards
 
@@ -173,18 +188,29 @@ Network services (free, no key unless noted): NOAA Aviation Weather (METAR, TAF,
 4. New SPM dependencies require updating the Xcode project file
 5. Visual verification (Section 19) is required before any slice is "done"
 
-## Current State (as of 2026-11-01)
+## Current State (as of 2026-11-02)
 
 **Status:** TestFlight beta preparation (version 1.0, build 1). Not FAA-approved; supplemental reference only.
-**Built:** 112 app Swift files, 63 test files. Last full unit run (`tools/sim-test.sh test -only-testing:efb-212Tests`, 2026-11-01): **555 test cases, 0 failed**. The UI test target holds only Xcode template stubs.
-**UI:** three tabs, Map / Flights / Settings (`ContentView.swift`). Flights holds a History / Logbook / Plans picker; Aircraft & Pilot profiles are under Settings > Profiles. Onboarding runs once.
-**Shipped:**
+**Built:** 166 app Swift files, 102 test files, 2 UI-test template stubs. Last full unit run (`tools/sim-test.sh test -only-testing:efb-212Tests`, 2026-11-02): **1065 tests, 0 failed** (1078 counting parameterized arguments). The UI test target holds only Xcode template stubs.
+**UI:** three tabs, Map / Flights / Settings (`ContentView.swift`). Flights holds a History / Logbook / Plans picker; Aircraft & Pilot profiles are under Settings > Profiles. Onboarding runs once. Settings > Region switches between US and Israel (`Core/Region.swift`, `RegionStore`); the region decides which data layers, weather stations, units (hPa in Israel) and NOTAM provider the app uses.
+**Shipped (US):**
 - Moving map: FAA VFR sectional (zoom 8-12) plus Street, Satellite and Terrain base maps, ownship, track-up/north-up, instrument strip, nearest-airport HUD and list with Direct-To, airspace from NASR, day/night/auto display mode.
 - Airport sheet: METAR/TAF, frequencies, runways, PIREPs, winds aloft, NOTAMs (the pilot's own free FAA API key), FAA d-TPP charts and diagram PDFs, georeferenced diagram overlay on the map.
 - Layers: TFRs, AIRMET/SIGMET with data-age badges. Offline map regions (sectional and Street).
 - Flight planning and active navigation bar; aircraft and pilot profiles with currency tracking.
 - Flight recording (GPS track, cockpit audio, on-device transcription with `SpeechAnalyzer` and an `SFSpeechRecognizer` fallback), auto-start above 15 kt, phase detection, replay, digital logbook, and an on-device debrief with Apple Foundation Models.
 - Data: bundled `aviation.sqlite` built from FAA NASR cycle 2026-10-29 (19,134 airports, 1,287 airspaces, 1,468 navaids) by `tools/nasr-importer`.
+**Shipped (Israel, epic efb-aac):**
+- Bundled `israel-aviation.sqlite` (CAAI GIS layers, data of 25 Oct 2026, imported 2026-11-01, no AIP amendment recorded) built by `tools/caai-importer`: 198 CVFR points and 275 route segments, 221 LSA points and 229 LSA routes, CTR/ATZ/CTA, TMA, FIR, P/R/D areas, runways, and 49 curated aerodromes (`tools/caai-importer/curated/aerodromes-il.csv`, searchable in Hebrew and English, `review_status` unreviewed until the owner reviews). Read through `Data/IsraelAviationDatabase.swift`; the aerodromes reach the app through `Services/IsraelAerodromeAdapter.swift`.
+- CVFR overlay drawn from the vectors (`Services/IsraelChartOverlay.swift`, `IsraelChartFeatures.swift`, `IsraelChartStyle.swift`); official CAAI CVFR chart raster from a downloaded pack (`IsraelOfficialChartLayer.swift`).
+- Chart and diagram packs: `Services/IsraelChartService.swift` (`ChartPackService`) downloads a published, validated edition from Cloudflare R2 (public dev URL `https://pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev`, bucket `openefb-charts`), checks each file's SHA-256 and installs it. Two products are live: `israel-cvfr` (edition 2025-02, 15 MB MBTiles) and `il-diagrams` (edition 2026-08b). The app installs an edition only when it is published and its validation gate passed (`isServable`).
+- Aerodrome diagrams (`IsraelDiagramPack.swift`, `IsraelDiagramStore.swift`, `Views/Map/IsraelDiagramSection.swift`): 5 of 13 CAAI charts are georeferenced at the ±100 ft gate, the rest open as sheet-only PDFs.
+- NOTAMs: `Services/IsraelNotamService.swift` reads `https://openefb-notam-relay.omerc.workers.dev/notams.json`, the feed of `web/notam-relay` (a Cloudflare Worker that scrapes the Israel Airports Authority NOTAM pages every 15 minutes). The app never contacts the IAA. `IsraelNotamClosureMapper` maps route closures onto route segments; the briefing (`Views/Briefing/IsraelBriefingView.swift`, `IsraelBriefingFilter`) and map alerts (`IsraelAlertService`, `IsraelAlertEvaluator`, `IsraelAlertBanner`) use them.
+- Routing and filing: `Services/IsraelRoutePlanner.swift` plans a CVFR or LSA route between aerodromes; `IsraelFlightPlanMessage.swift` builds the ICAO FPL text for the pilot to send to ais@iaa.gov.il (the app sends nothing); route following with leg altitude and next-point cautions (`IsraelRouteFollowing.swift`, `Views/Map/IsraelRouteFollowingBar.swift`).
+- Israel CVFR debrief (`Services/Debrief/CVFRDebrief.swift`, `CVFRDebriefLoader`; `Views/Flights/CVFRDebriefContent.swift`): matches the recorded track to the activated plan's legs (stored in `RecordingDatabase.flight_route_legs`) or to the nearest route segments, then reports per-leg altitude adherence (±200/±300 ft, aerodrome zones excluded) and reporting-point passage with Hebrew/English position-report matching. Numbers come from code; the AI debrief only receives them as facts. Shown without Apple Intelligence.
+- Israel sport-aviation (LSA) routes (`Services/IsraelRoutePlanner.swift`, `IsraelLSATimeRules.swift`, `IsraelLSAOverlay.swift`): a CVFR / LSA choice per plan (the aircraft's usual network, kept in `IsraelAircraftNetworkPreference`, preselects it), weekend-only routes left out on weekdays and checked per leg, closures naming LSA / ULTRALIGHT / SPORT, the LSA network on the map in purple. A NOTAM closure the planner cannot place on the network blocks filing ("Unresolved closure: check NOTAM <id>").
+- Weather for Israel reads the same NOAA API with the Israel station list; products an aerodrome doesn't publish aren't requested.
+**Server side (`web/`):** `web/notam-relay` (Cloudflare Worker + KV, live at `https://openefb-notam-relay.omerc.workers.dev`; `/health` reported 200 on 2026-11-02), `web/charts` (R2 publish tooling; the R2 bucket is live with both products published), `web/interviews` (Next.js pilot-interview app on Vercel Hobby, live at `https://openefb-interviews.vercel.app`, git-connected to omercnet/openefb with Root Directory `web/interviews`). The iPad app uses the first two; the interviews site is not part of the app. See `web/README.md`.
 **Next:** TestFlight upload (`dist-prep/`), then the public-release items under Known Issues.
 
 ## Issue Tracking (beads)
@@ -198,15 +224,18 @@ This project uses bd (beads) for issue tracking. The database lives in the main 
 
 ## Known Issues
 
-Open work is tracked in beads (`bd ready`, `bd list`). Notable open items as of 2026-11-01:
+Open work is tracked in beads (`bd ready`, `bd list`). Notable open items as of 2026-11-02:
 
 - **Satellite and Terrain base maps** use Esri World Imagery and OpenTopoMap tiles whose terms don't allow a public release; remove them before the public release (efb-zfm.8, `docs/TILE-SOURCES.md`). Both are online-only; offline downloads cover the sectional and Street only.
-- **Airport diagrams:** 820 of the 925 FAA airport diagrams (88.6%, cycle 2611) pass the georeferencing gates; the rest show only as PDFs (`docs/design/apd-georef-report.md`).
-- **Private-use flag:** `airports.ownership` is not populated, so the NRST private-use flag can't fire (efb-23t).
+- **FAA airport diagrams:** 820 of the 925 (88.6%, cycle 2611) pass the georeferencing gates; the rest show only as PDFs (`docs/design/apd-georef-report.md`).
+- **Israeli aerodrome diagrams:** 5 of 13 charts place on the map (LLBG, LLHA, LLIB, LLBS, LLEY) at the ±100 ft gate; the other 8 are sheet-only until CAAI supplies surveyed thresholds and ARPs (efb-aac.17, `docs/design/caai-apd-report.md`, `docs/research/israel-caai-data-fixes.md`).
+- **Israel mode, from the UX review (T28):** 10 open sev 1-2 findings, efb-aac.21 to efb-aac.30 (chart edition shown without an age, slow "Checking for the latest edition" against an unreachable host, red tint on the closure layer toggle, "Age EXPIRED" on the Weather layer row, diagram pack reachable only from the airport sheet, 125-row briefing without a plan, FPL message as the plan's primary action, route network read from the plan only, unexplained "800/1600" leg altitude and a 100% debrief summary over a 0% leg, six "Not available in Israel yet" layer rows). Two more are in progress: efb-aac.19 (CVFR debrief position-report count) and efb-aac.20 (other-network closures in the briefing).
+- **Israel mode is unreviewed by an Israeli CFI** (efb-aac.13); 49 curated aerodromes carry `review_status = unreviewed` and the airport sheet shows an amber "Unreviewed data" note until the owner marks a field reviewed in `tools/caai-importer/curated/aerodromes-il.csv`.
 - **Home-screen name** is still `efb-212`; set `INFOPLIST_KEY_CFBundleDisplayName` to `OpenEFB` before the public release (`dist-prep/README.md`).
-- **Debrief** needs a device that supports Apple Foundation Models; elsewhere the app says the debrief is unavailable.
-- **Unvalidated with pilots:** the cut list and fix list from the design pass rest on documented assumptions (efb-77r.34).
-- `EFBError.databaseCorrupted` copy mentions a Settings re-import that doesn't exist (efb-yxv).
+- **Debrief** needs a device that supports Apple Foundation Models; elsewhere the app says the debrief is unavailable. The CVFR debrief numbers show without it.
+- **Unvalidated with pilots:** the cut list and fix list from the design pass rest on documented assumptions (efb-77r.34); a real-device VoiceOver and Increase Contrast walkthrough is pending (efb-77r.35).
+- **Recorded flight status** (damaged/recovered) is stored as marker text in notes, so a pilot edit can erase it (efb-zfm.19).
+- **r2.dev rate limits:** the chart packs are served from the R2 dev URL; attach a custom domain before pilots depend on it (`docs/RELIABILITY.md`).
 
 ## Ecosystem Role
 

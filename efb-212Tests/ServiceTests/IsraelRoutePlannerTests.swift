@@ -206,22 +206,63 @@ struct IsraelRoutePlannerTests {
         let now = Date()
         let report = Self.report(generated: now, closures: [Self.closure(validFrom: now.addingTimeInterval(3600), validTo: nil)])
         let marks = IsraelRoutePlanner.closures(from: report, network: Self.network(), departure: now, window: 7200, now: now)
-        #expect(marks[2] == .full(notamID: "C9/26"))
+        #expect(marks.segments[2] == .full(notamID: "C9/26"))
+        #expect(marks.unresolved.isEmpty)
     }
 
     @Test func closureThatStartsAfterTheWindowOrEndedBeforeIsIgnored() {
         let now = Date()
         let later = Self.report(generated: now, closures: [Self.closure(validFrom: now.addingTimeInterval(4 * 3600), validTo: nil)])
         let earlier = Self.report(generated: now, closures: [Self.closure(validFrom: nil, validTo: now.addingTimeInterval(-60))])
-        #expect(IsraelRoutePlanner.closures(from: later, network: Self.network(), departure: now, window: 7200, now: now).isEmpty)
-        #expect(IsraelRoutePlanner.closures(from: earlier, network: Self.network(), departure: now, window: 7200, now: now).isEmpty)
+        #expect(IsraelRoutePlanner.closures(from: later, network: Self.network(), departure: now, window: 7200, now: now) == IsraelClosureMarks())
+        #expect(IsraelRoutePlanner.closures(from: earlier, network: Self.network(), departure: now, window: 7200, now: now) == IsraelClosureMarks())
     }
 
     @Test func staleOrMissingFeedYieldsNoClosureMarks() {
         let now = Date()
         let stale = Self.report(generated: now.addingTimeInterval(-24 * 3600), closures: [Self.closure(validFrom: nil, validTo: nil)])
-        #expect(IsraelRoutePlanner.closures(from: stale, network: Self.network(), departure: now, window: 7200, now: now).isEmpty)
-        #expect(IsraelRoutePlanner.closures(from: nil, network: Self.network(), departure: now, window: 7200, now: now).isEmpty)
+        #expect(IsraelRoutePlanner.closures(from: stale, network: Self.network(), departure: now, window: 7200, now: now) == IsraelClosureMarks())
+        #expect(IsraelRoutePlanner.closures(from: nil, network: Self.network(), departure: now, window: 7200, now: now) == IsraelClosureMarks())
+    }
+
+    // MARK: Unresolved closures never fail open (efb-qpk)
+
+    private static func chainClosure(_ id: String, _ chain: [String]) -> IsraelRouteClosure {
+        IsraelRouteClosure(notamId: id, routeKind: "CVFR", routeName: nil, chain: chain,
+                           validFrom: nil, validTo: nil, schedule: nil, partial: nil)
+    }
+
+    @Test func closureWithAnUnknownCodeIsReportedAsUnresolved() {
+        let now = Date()
+        let report = Self.report(generated: now, closures: [Self.chainClosure("C7/26", ["B", "NOWHERE"])])
+        let marks = IsraelRoutePlanner.closures(from: report, network: Self.network(), departure: now, window: 7200, now: now)
+        #expect(marks.segments.isEmpty)
+        #expect(marks.unresolved == [IsraelUnresolvedClosure(notamID: "C7/26", unknownCodes: ["NOWHERE"], unmatchedLegs: [])])
+    }
+
+    @Test func closureLegWithNoPublishedSegmentIsReportedAsUnresolved() {
+        let now = Date()
+        // B and D are both on the network but no segment joins them.
+        let report = Self.report(generated: now, closures: [Self.chainClosure("C8/26", ["B", "D"])])
+        let marks = IsraelRoutePlanner.closures(from: report, network: Self.network(), departure: now, window: 7200, now: now)
+        #expect(marks.unresolved == [IsraelUnresolvedClosure(notamID: "C8/26", unknownCodes: [], unmatchedLegs: [IsraelClosureLeg(from: "B", to: "D")])])
+    }
+
+    @Test func partlyPlacedClosureStillClosesWhatItCanAndStaysUnresolved() {
+        let now = Date()
+        let report = Self.report(generated: now, closures: [Self.chainClosure("C6/26", ["A", "B", "NOWHERE"])])
+        let marks = IsraelRoutePlanner.closures(from: report, network: Self.network(), departure: now, window: 7200, now: now)
+        #expect(marks.segments[1] == .full(notamID: "C6/26"))
+        #expect(marks.unresolved.map(\.notamID) == ["C6/26"])
+    }
+
+    @Test func unresolvedClosureBlocksFilingEvenWhenTheRouteIsOtherwiseClean() throws {
+        let plan = try Self.planner(Self.diamond).route(from: "A", to: "C", cruiseSpeedKnots: 90)
+        let unresolved = [IsraelUnresolvedClosure(notamID: "C7/26", unknownCodes: ["NOWHERE"], unmatchedLegs: [])]
+        let issues = IsraelFlightPlanValidator.validate(plan: plan, unresolved: unresolved)
+        #expect(issues.map(\.kind) == [.unresolvedClosure("C7/26")])
+        #expect(issues.first?.message.hasPrefix("Unresolved closure: check NOTAM C7/26") == true)
+        #expect(!IsraelFlightPlanValidator.canFile(issues))
     }
 
     // MARK: Bundled network

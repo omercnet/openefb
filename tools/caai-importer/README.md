@@ -14,6 +14,7 @@ and save as these names in `tools/caai-importer/input/` (git-ignored):
 | `CVFR2026.zip` | `CVFR2026.zip` (נתיבי תובלה נמוכים CVFR) | `F_CVFR_POINTS2026`, `F_CVFR_ROUTES2026` |
 | `FIR-TMA-ACC-CTR.zip` | `שכבות FIR, TMA, ACC, CTR.zip` | `FIR`, `TMA`, `RUNWAYS` (and a second `CTR` copy) |
 | `PRD-CTR.zip` | `אסורים לטיסה וCTRים.zip` | `F_Limited` (P/R/D), `CTR` |
+| `Sportiv 2026.zip` | `Sportiv 2026.zip` (נתיבי גובה נמוך לתעופה ספורטיבית, sport aviation / LSA) | `SPORTIVE_POINTS2026`, `SPORTIVE_ROUTES2026` |
 
 The importer unpacks the nested zips itself. When CAAI publishes a new year, the file names carry the year ("2027");
 rename the downloads to the names above and pass `--amendment` / `--effective-date`.
@@ -40,7 +41,7 @@ JSON written with sorted keys. The same zips and the same `--import-date` give a
 
 ## Validation (the run aborts with `IMPORT FAILED` and writes nothing)
 
-- Counts must equal the AIP: 198 points, 275 route segments, 39 CTR/ATZ/CTA, 113 P/R/D, 9 TMA, 1 FIR, 42 runways.
+- Counts must equal the AIP: 198 points, 275 route segments, 39 CTR/ATZ/CTA, 113 P/R/D, 9 TMA, 1 FIR, 42 runways; LSA: 215 points, 229 routes.
 - Curated aerodromes (see below): every ARP point and every GIS runway row must resolve to an aerodrome row; every
   value group needs a source; the CSV must parse. Run `.venv/bin/python -m unittest test_aerodromes -v` for the checks.
 - Every segment endpoint code must be a point or ARP code.
@@ -55,8 +56,8 @@ comments in `import_caai.py`.
 
 | Table | Rows | Notes |
 |---|---|---|
-| `reporting_points` | 198 | `kind` compulsory / onRequest / arp; Hebrew and English names |
-| `route_segments` | 275 | polyline from → to, bearing, civil/military/by-request, altitude per direction |
+| `reporting_points` | 198 CVFR + 221 LSA | `network` cvfr / lsa; `kind` compulsory / onRequest / arp (LSA also unlisted); Hebrew and English names (LSA: Hebrew only) |
+| `route_segments` | 275 CVFR + 229 LSA | `network`; polyline from → to, bearing, civil/military/by-request, altitude per direction; LSA: `activity`, `activity_source`, `small_only` |
 | `airspaces` | 162 | CTR, ATZ, CTA, TMA, P, R, D, FIR; floor/ceiling with reference; polygons |
 | `runways` | 42 | designators and heading where the layer has them (23 rows); ends from the line |
 | `metadata` | | amendment, effective date, source URLs and zip SHA-256, attribution, import date, corrections |
@@ -88,7 +89,7 @@ drops its "Unreviewed data" note for that field.
   The drawn line of 67 segments runs second → first, and the `BEARING` field follows the drawn line, so the importer
   orients every polyline by its codes, computes the from → to bearing itself, and derives `alt_forward_*`
   (from → to) and `alt_reverse_*` from the axis the leg mostly follows. The raw four fields are kept.
-- **Two-number altitudes** (`2500/3500`, 10 segments) are kept as text and have no numeric altitude; the app shows
+- **Two-number altitudes** (`2500/3500`, 10 CVFR segments) are kept as text and have no numeric altitude; the app shows
   the text. Airspace limits written that way use the larger volume (lowest floor, highest ceiling) and keep the text.
 - **Altitude reference.** The layers carry none. The AIP gives P/R/D and CTR limits as "ALT" (above mean sea level)
   with 0 = ground, so a floor of 0 is `SFC`, a ceiling of 99000 is `UNL` (unlimited) and everything else is `MSL`.
@@ -100,6 +101,24 @@ drops its "Unreviewed data" note for that field.
   in the layers). The About line reads "…(CAAI), data of 25 Oct 2026", with ", AIP amendment N" appended only when known.
 - **P/R/D type** is taken from the designator prefix (LLP/LLR/LLD) when the `Type` column is empty or says `LLD`
   (8 rows); the importer prints each reconciliation.
+
+### Sport-aviation (LSA) network
+
+`Sportiv 2026.zip` is stored in the same two tables with `network = 'lsa'` (CVFR rows keep their ids; unique indexes are per network).
+Counts must equal 215 points and 229 routes, plus six route ends the points layer does not list (`BKRML BSARN BSARS
+BSHAN BSVTA MACHR`), which are placed at the end of the route line that names them (`kind = 'unlisted'`; an end that two
+routes place more than 1 km apart aborts the import). Decisions:
+
+- **Altitude direction.** `ALT` is read as the altitude flying first → second and `REV_ALT` as second → first; the layer
+  does not say. The 21 one-way routes (`ONEWAY = V`, reverse `0` or `X`) are all drawn first → second, so they agree. On the 56 two-way
+  routes drawn second → first the reading is an assumption: ask CAAI.
+- **When a route is in use.** `activity` is the layer's `localType` mapped without interpretation: `AllWeek` → `all_week`
+  (96), `Weekend` → `weekend` (92), `מיוחד` → `special` (39); `C` and `AllWeek/Weekend` (one each) → `unspecified`, verbatim in
+  `activity_source`. The definition of weekend days is domestic AIP B-08 section 1 item ז (PDF page 147) and is stored as text
+  in `metadata.lsa_weekend_rule` with the bubble-specific Friday starts (12:00 / 14:00). The layer does not say which start
+  belongs to which route and has no holiday calendar; the planner treats only what the text proves (see `IsraelLSATimeRules`).
+- **Not used:** `DUCH` (unknown meaning; 21 one-way routes have `DUCH = V` too), `BACKAZ`, `MAG`, `unit1`, `שם_נתיב`.
+  `קטנות_בלבד` (16 routes) is stored as `small_only`.
 
 ### Source defects
 

@@ -19,7 +19,7 @@ nonisolated final class IsraelAviationDatabase: IsraelAviationDatabaseProtocol, 
     /// Bundled file name, without extension.
     static let resourceName = "israel-aviation"
     /// Schema version this code reads (`metadata.schema_version`).
-    static let supportedSchemaVersion = 2
+    static let supportedSchemaVersion = 3
 
     typealias Segment = IsraelRouteSegment
 
@@ -78,74 +78,75 @@ nonisolated final class IsraelAviationDatabase: IsraelAviationDatabaseProtocol, 
             let attribution = text("attribution")
         else { throw EFBError.databaseCorrupted }
         let urls = text("source_urls").flatMap { try? JSONDecoder().decode([String].self, from: Data($0.utf8)) } ?? []
+        let weekendRule = text("lsa_weekend_rule").flatMap { try? JSONDecoder().decode(IsraelLSAWeekendRule.self, from: Data($0.utf8)) }
         return IsraelAviationMetadata(
             schemaVersion: schema, source: source, sourceURLs: urls,
             aipAmendment: text("aip_amendment"), effectiveDate: text("effective_date"),
             sourceDataDate: sourceData, downloadDate: download, dataLastModified: modified,
-            importDate: imported, attribution: attribution
+            importDate: imported, attribution: attribution, lsaWeekendRule: weekendRule
         )
     }
 
     // MARK: - Reporting points
 
-    func reportingPoint(code: String) throws -> IsraelReportingPoint? {
+    func reportingPoint(code: String, network: IsraelRouteNetwork) throws -> IsraelReportingPoint? {
         try dbQueue.read { db in
             let row = try Row.fetchOne(db, sql: """
                 SELECT p.* FROM reporting_points p
-                WHERE p.code = ?
+                WHERE p.network = ? AND p.code = ?
                 ORDER BY EXISTS (SELECT 1 FROM route_segments s WHERE s.from_point_id = p.id OR s.to_point_id = p.id) DESC, p.id
                 LIMIT 1
-                """, arguments: [code.uppercased()])
+                """, arguments: [network.rawValue, code.uppercased()])
             return row.map(Self.point)
         }
     }
 
-    func reportingPoints(in bounds: IsraelGeoBounds) throws -> [IsraelReportingPoint] {
+    func reportingPoints(in bounds: IsraelGeoBounds, network: IsraelRouteNetwork) throws -> [IsraelReportingPoint] {
         try dbQueue.read { db in
             try Row.fetchAll(db, sql: """
                 SELECT p.* FROM reporting_points p
                 JOIN reporting_points_rtree r ON r.rowid = p.id
-                WHERE r.min_lat <= ? AND r.max_lat >= ? AND r.min_lon <= ? AND r.max_lon >= ?
+                WHERE p.network = ? AND r.min_lat <= ? AND r.max_lat >= ? AND r.min_lon <= ? AND r.max_lon >= ?
                 ORDER BY p.id
-                """, arguments: Self.boxArguments(bounds)).map(Self.point)
+                """, arguments: StatementArguments([network.rawValue]) + Self.boxArguments(bounds)).map(Self.point)
         }
     }
 
     // MARK: - Route segments
 
-    func routeSegments(in bounds: IsraelGeoBounds) throws -> [IsraelRouteSegment] {
+    func routeSegments(in bounds: IsraelGeoBounds, network: IsraelRouteNetwork) throws -> [IsraelRouteSegment] {
         try dbQueue.read { db in
             try Row.fetchAll(db, sql: """
                 SELECT s.* FROM route_segments s
                 JOIN route_segments_rtree r ON r.rowid = s.id
-                WHERE r.min_lat <= ? AND r.max_lat >= ? AND r.min_lon <= ? AND r.max_lon >= ?
+                WHERE s.network = ? AND r.min_lat <= ? AND r.max_lat >= ? AND r.min_lon <= ? AND r.max_lon >= ?
                 ORDER BY s.id
-                """, arguments: Self.boxArguments(bounds)).map(Self.segment)
+                """, arguments: StatementArguments([network.rawValue]) + Self.boxArguments(bounds)).map(Self.segment)
         }
     }
 
-    func routeSegment(from: String, to: String) throws -> IsraelRouteSegment? {
+    func routeSegment(from: String, to: String, network: IsraelRouteNetwork) throws -> IsraelRouteSegment? {
         try dbQueue.read { db in
             try Row.fetchOne(
                 db,
-                sql: "SELECT * FROM route_segments WHERE from_code = ? AND to_code = ?",
-                arguments: [from.uppercased(), to.uppercased()]
+                sql: "SELECT * FROM route_segments WHERE network = ? AND from_code = ? AND to_code = ?",
+                arguments: [network.rawValue, from.uppercased(), to.uppercased()]
             ).map(Self.segment)
         }
     }
 
-    // MARK: - IsraelRouteSegmentLookup
+    // MARK: - IsraelRouteSegmentLookup (CVFR; the LSA planner builds an `IsraelChartNetwork` from its own points)
 
     /// A lookup failure answers "unknown"; the closure mapper reports unknown codes to the pilot.
     func knowsPoint(_ code: String) -> Bool {
         let found = try? dbQueue.read { db in
-            try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM reporting_points WHERE code = ?)", arguments: [code.uppercased()])
+            try Bool.fetchOne(db, sql: "SELECT EXISTS (SELECT 1 FROM reporting_points WHERE network = 'cvfr' AND code = ?)", arguments: [code.uppercased()])
         }
         return found ?? false
     }
 
     func segment(from: String, to: String) -> IsraelRouteSegment? {
-        (try? routeSegment(from: from, to: to)) ?? nil
+        (try? routeSegment(from: from, to: to, network: .cvfr)) ?? nil
     }
 
     // MARK: - Airspace
@@ -327,7 +328,8 @@ nonisolated final class IsraelAviationDatabase: IsraelAviationDatabaseProtocol, 
         IsraelReportingPoint(
             id: row["id"], code: row["code"], nameEnglish: row["name_en"], nameHebrew: row["name_he"],
             kind: IsraelPointKind(rawValue: row["kind"]) ?? .onRequest,
-            latitude: row["lat"], longitude: row["lon"]
+            latitude: row["lat"], longitude: row["lon"],
+            network: IsraelRouteNetwork(rawValue: row["network"]) ?? .cvfr
         )
     }
 
@@ -342,7 +344,11 @@ nonisolated final class IsraelAviationDatabase: IsraelAviationDatabaseProtocol, 
             altitudeForward: routeAltitude(text: row["alt_forward_text"], feet: row["alt_forward_ft"]),
             altitudeReverse: routeAltitude(text: row["alt_reverse_text"], feet: row["alt_reverse_ft"]),
             lowerAltitudeFeet: row["lower_alt_ft"], mapSheet: row["map_sheet"],
-            polyline: polyline.compactMap(coordinate)
+            polyline: polyline.compactMap(coordinate),
+            network: IsraelRouteNetwork(rawValue: row["network"]) ?? .cvfr,
+            activity: (row["activity"] as String?).flatMap(IsraelRouteActivity.init(rawValue:)) ?? .unspecified,
+            activitySource: row["activity_source"],
+            smallOnly: ((row["small_only"] as Int?) ?? 0) != 0
         )
     }
 

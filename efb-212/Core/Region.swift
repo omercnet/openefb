@@ -177,6 +177,7 @@ nonisolated enum Region: String, Codable, CaseIterable, Sendable, Identifiable {
         case .cvfrAirspace: return isAvailable(.cvfrAirspace)
         case .cvfrRunways: return isAvailable(.cvfrRunways)
         case .cvfrClosures: return isAvailable(.cvfrClosures)
+        case .lsaRoutes: return isAvailable(.cvfrRoutes)  // the LSA network ships in the same Israel database
         case .weatherDots, .route, .ownship: return true
         }
     }

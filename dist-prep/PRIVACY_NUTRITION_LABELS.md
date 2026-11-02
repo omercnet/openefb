@@ -19,6 +19,22 @@ Audited from the code 2026-10-31 (grep of every `https://` endpoint, `URLSession
 GPS position is never put in a request. Tile requests reveal the map area on screen (and the device IP) to the tile
 host, as every map app does. There is no analytics, crash, advertising or tracking SDK in the project.
 
+Added 2026-11-02 (T29): Israel mode (Settings > Region, default US) makes two more kinds of request, both to infrastructure
+the developer runs on Cloudflare. Neither carries a position, an account, or credentials. Cloudflare sees the device IP
+and the file requested, like any host, under its own terms. The relay's code reads no client header except the owner's
+`/run` authorization and stores no client data; the R2 bucket is plain file hosting. Whether the Cloudflare dashboard's
+own analytics count as the developer "collecting" an IP address is the owner's call when answering App Store Connect; the
+conservative choice is the same as for the tile hosts (see "Answers to enter").
+
+| Destination | What it carries | Personal data? |
+|---|---|---|
+| `openefb-notam-relay.omerc.workers.dev` (Cloudflare Worker) | `GET /notams.json`: the whole-country NOTAM feed, no query parameters, `Accept: application/json` | IP address only |
+| `pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev` (Cloudflare R2) | `GET` of `<product>/manifest.json` for update checks; pack and diagram files when the user taps Download (with `Range` to resume) | IP address only |
+
+The NOTAM relay itself scrapes the Israel Airports Authority site; the app never contacts the IAA. The interviews site
+(`openefb-interviews.vercel.app`) is not part of the app and the app never calls it. Source of this list: a grep of every
+`https://` string in `efb-212/Services`, `Core`, `Data` and `Resources` on 2026-11-02.
+
 ## On-device only
 - Location: moving map, nearest airports, track recording. Stored in the local database.
 - Audio and transcripts: `AVAudioEngine` recording; transcription uses `SpeechAnalyzer`, with `SFSpeechRecognizer`
@@ -34,7 +50,7 @@ host, as every map app does. There is no analytics, crash, advertising or tracki
   pins these entries, so they stay.
 - Required-reason API: `UserDefaults` with `CA92.1`. The audit found no other required-reason API use in app code
   (no file timestamp, boot time or disk-space calls; the only `attributesOfItem` call reads a file **size**).
-- `PrivacyManifestTests` passes (included in the 555-case run of 2026-11-01).
+- `PrivacyManifestTests` passes (included in the 1065-test run of 2026-11-02).
 
 ## Answers to enter in App Store Connect
 Apple counts data as "collected" when it is transmitted off the device and kept by the developer or partners in a
@@ -50,3 +66,4 @@ way that can be read. The developer receives nothing.
 2. An analytics or crash SDK is added.
 3. A remote AI service replaces or supplements Foundation Models.
 4. Tile hosts change (for example the public-release removal of Satellite and Terrain, efb-zfm.8).
+5. The Israel relay or the R2 bucket moves, or either starts to receive anything beyond a plain file request.

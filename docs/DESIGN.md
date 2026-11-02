@@ -185,3 +185,50 @@ Before T14: 2/7 = 3/10. After: 4/7 = 6/10. Verdict NOT DONE. Full table in `docs
 - **T23's claim was wrong** for three buttons. Measured before (XCUITest `frame`, pt, iPad): microphone "Open Settings" 149.0x50.5, GPS "Open Settings" 149.0x50.5, recording-not-saved "Dismiss" 99.5x50.5. Fixed in `RecordingOverlayView.swift` and `GPSFailureNotice.swift`; after: 149.0x90.0, 149.0x90.0, 100.0x90.0. The `.bordered` / `.controlSize(.large)` chrome adds about 30pt to the 60pt label, the same as T24's error-notice "Dismiss", so the pills are taller than the minimum.
 - **Sweep of in-flight Map overlays**, unchanged and already ≥ 60pt (measured): Direct-To Clear 74.0x60.0, NRST HUD 282.0x64.0, NRST list "Direct" 125.0x74.0. The currency-warning dismiss already has its frame and `contentShape` inside the label (not measured: needs an expired-currency profile). Record, zoom, layer, orientation and night buttons are 60pt circles from T23.
 - **Not swept:** non-overlay sheet buttons ("Retry", "Done") stay at 44pt (async-state rule above).
+
+## Israel mode review (T28, efb-5em)
+Skills: `ux-heuristics` (Nielsen 10, Krug), then `ios-hig-design`, through the EFB lens (glanceable in sunlight, in-flight controls ≥ 60 pt, red = warning / amber = caution, standard abbreviations, never stale as current, no animation). Anchor job J1. Walked cold on the iPad Pro 13" simulator, Israel region, 2026-11-02, with a moving `simctl location` feed along LLHZ → LLIB (87 kt) and a fresh copy of the real relay NOTAM feed (`IsraelChartDebugNotamsPath`). Screenshots: `docs/design/screenshots/UX-IL/` (committed) and `docs/design/screenshots/UX-IL-CAAI/` (gitignored: they show CAAI chart or diagram artwork). Severity 0-4 as above; every severity 3-4 finding is fixed in the tree.
+
+### Findings
+| # | Surface | Finding (evidence) | Heuristic | Sev | Fix / status |
+|---|---|---|---|---|---|
+| IL1 | Airport sheet, LLHZ | Amber "Weather not loaded: The data couldn't be read because it isn't in the correct format" with a Retry that can never work. LLHZ publishes a TAF only, the app asked AWC for a METAR anyway, and the TAF it had was hidden behind the error. (`UX-IL-CAAI/before-03f-sheet-LLHZ-weather-error.png`) | H9, H1 | 3 | Fixed: `WeatherViewModel` skips products the Israel station list says are not published; sheet says "No METAR is published for this aerodrome. The forecast (TAF) is below." and always shows the TAF (`tafView()`). Tests `WeatherRefreshFailureTests` (3). After: `UX-IL-CAAI/03f-sheet-LLHZ-top.png` |
+| IL2 | Map alert banner | With the fix lost ("GPS LOST 100s") the banner still read "In Herzliya CTR: contact TWR 122.2" as if current: alerts were evaluated only on a position change, so a lost fix froze them (and any red closed-leg alert) forever. (`UX-IL-CAAI/before-03a-map-gps-lost-alert-stale.png`) | H1, stale as current | 3 | Fixed: `IsraelAlertService.suspend()` clears shown and held alerts when the fix is stale; the banner area shows amber "ALERTS OFF: NO GPS POSITION". Test `IsraelAlertTests.suspendingForALostFix...` |
+| IL3 | NOTAM briefing | HEL, ultralight and ATS route closures sat at the top of Closures as red CLOSED for a CVFR pilot (A0689 ATS Q30, C2235 ULTRALIGHT, C2252 HEL), burying the CVFR ones; the chart and planner already filtered by kind. (`UX-IL-CAAI/before-04b-...`) | H2, H5 | 3 | Fixed (efb-aac.20): closures rank for the plan's network only (`BriefingQuery.network`, `closureClass(of:network:)`); other kinds show a neutral "HEL ROUTE CLSD" label in Other NOTAMs. After: `UX-IL-CAAI/after-04a-briefing-cvfr-only-closures.png`. Tests `IsraelBriefingFilterTests` (3) |
+| IL4 | Briefing, Show on map | A route closure drew its ~60 NM Q-line scope circle as a red filled disc over the whole country: "this area is closed". (`UX-IL-CAAI/before-04d-show-on-map-red-disc.png`) | H2 | 3 | Fixed: a closure with a chain draws the chain only; area NOTAMs keep their circle. Test `aRouteClosureDrawsItsChain...`. After: `UX-IL-CAAI/04d-briefing-show-on-map.png` |
+| IL5 | CVFR debrief | "Position reports were heard at 0 of 11 reporting points; none heard near ..." with 0 transcript segments, every row "No": "not transcribed" read as "not heard" (efb-aac.19). (`UX-IL/before-06b-debrief-heard-0-of-11-red.png`) | H1, H9 | 3 | Fixed: `CVFRDebrief.transcriptAvailable`; observation "No cockpit audio was transcribed, so position reports could not be checked."; rows say "Not checked"; AI prompt facts say "not checked (no transcript)". Test `CVFRDebriefTests.aFlightWithNoTranscript...`. After: `UX-IL/after-06b-...`, `after-06d-...` |
+| IL6 | CVFR debrief | Poor leg adherence "0% / 0%" drawn red, colour only. Red is for warnings. | H4 | 2 | Fixed with IL5: amber (`Palette.caution`) plus a triangle glyph below 80% |
+| IL7 | Plan screen | After choosing the destination the keyboard stayed up over the summary and legs table. (`UX-IL/before-05c-plan-keyboard-over-legs.png`) | H7, H5 | 2 | Fixed: keyboard resigns on selection and on scroll. After: `UX-IL/05c-plan-llhz-llib.png` |
+| IL8 | Chart badge, Offline Maps | Official chart "Update 2/25 (October 2025)" shown with no age 13 months on | H1 | 2 | efb-aac.21 |
+| IL9 | Offline Maps | "Checking for the latest edition..." still shown 4 s after open with an unreachable host (`UX-IL/01c`, `01d`); the T31 error + Retry state was not reached in this walk | H1 | 2 | efb-aac.22 |
+| IL10 | Layers panel | Red toggle tint for NOTAM route closures | H4 | 2 | efb-aac.23 |
+| IL11 | Layers panel | Weather "Age EXPIRED" while the LLBG METAR is 9 min old | H1 | 2 | efb-aac.24 |
+| IL12 | Diagrams | Pack download lives only in the airport sheet (brief step 2 expected Offline Maps); DIAGRAMS row lists LLBG/LLBS/LLHA while zoomed on LLHZ | H6, H2 | 2 | efb-aac.25 |
+| IL13 | Briefing | 125-row list unscoped without a plan; UAS and "AN AREA ... CLSD TO ALL FLT" NOTAMs unmarked | H8 | 2 | efb-aac.26 |
+| IL14 | Plan screen | FPL message is the filled button, Activate is bordered | H8 | 2 | efb-aac.27 |
+| IL15 | Briefing | Network ranking needs the network on `ActiveRoute` for routes activated earlier | H4 | 2 | efb-aac.28 |
+| IL16 | Plan / debrief | "800/1600" altitude unexplained; debrief says 100% overall with a 0% leg | H2 | 1 | efb-aac.29 |
+| IL17 | Layers panel | Six "Not available in Israel yet" rows | H8 | 1 | efb-aac.30 |
+
+### Checked and passing
+- **History** (`UX-IL/06a-history-damaged-recovered.png`): "Track damaged" and "Recovered" are amber with a triangle glyph, and the orphaned recording was rebuilt at launch ("Recovered", 120 points). Seeded with a throwaway test against the real stores.
+- **Route bar** (T18 / IL-ALERTS, measured by XCUITest `frame`): Prev 68.0×60.0, Next 69.5×60.0, Clear 74.0×60.0, NRST 282×64, briefing 60×60. The route line is magenta over the official chart and stays legible; the red dashed closure line and its rotated label cross it (`UX-IL-CAAI/05k-map-active-route.png`). A closed leg ahead raised a red "Route closed ahead: TAVOR → DESHE" banner above the amber CTR line.
+- **Region switch, Offline Maps chart download** (15.3 MB, "Installed ... Checksum verified"), **NRST** (PPR chips amber), **LLBG sheet** (METAR age badge, TAF age badge, hPa), **FPL preview** (Hebrew summary right-to-left, Share sheet opens, missing license/phone are amber cautions), **return flight**.
+- **Night** (`-displayMode night`, `UX-IL-CAAI/09*`): chart dimmed, red/amber/white banners keep their contrast, plan and Flights tabs are dark. The Israel chart is a raster, so night is a dimmer chart, not a recoloured one.
+- **Not exercised in Israel mode:** stale TFR / AIRMET marking (those layers do not exist in Israel; the US marking was verified in T31), a Dynamic Type AX5 pass, VoiceOver on a device.
+
+### HIG checklist (ios-hig-design Quick Diagnostic)
+| Row | Result |
+|---|---|
+| Safe areas | Pass: chrome clears the floating tab bar and status bar on every screen walked |
+| Touch targets | Pass for in-flight controls (≥ 60 pt measured above). Settings/plan buttons are 44 pt, not in flight |
+| Dark mode | Pass (system dark and `-displayMode night`); Increase Contrast not checked |
+| Dynamic Type | Not checked in Israel mode (T10 covered the shared views at AX5) |
+| VoiceOver | Labels added for the new banner, the "Not checked" cells and the other-route label; no device pass |
+| Native navigation | Pass: tab bar, sheets, share sheet, DatePicker |
+Score 8/10 (rows 1-3 and 6 pass, +1 semantic colours, +1 system controls, +1 SF Symbols; no device VoiceOver or AX5 pass).
+
+### Method notes
+- Screenshots come from a throwaway XCUITest plus a throwaway unit test that seeded the simulator's own stores; both are deleted. The CAAI chart shots are in the gitignored `UX-IL-CAAI/` folder.
+- `xcodebuild test` clones the simulator unless `-parallel-testing-enabled NO` is passed; the clone has its own app container, so seeded data and the downloaded chart pack were invisible to later runs until the flag was added.
+- The plan screen reads the live relay (no debug-feed override), so the planned route in the walk ignored the fixture's closures while the map alerts honoured them.

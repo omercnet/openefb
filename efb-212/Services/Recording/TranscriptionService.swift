@@ -85,6 +85,14 @@ actor TranscriptionService: TranscriptionServiceProtocol {
         "altitude", "heading", "flight level", "maintain", "descend", "climb",
     ]
 
+    /// Region terms (Israel reporting-point names, Hebrew and English) that bias recognition. Empty for the US.
+    private var regionVocabulary: [String] = []
+
+    /// Set the region vocabulary before a recording starts (called from MapContainerView wiring).
+    func setRegionVocabulary(_ terms: [String]) {
+        regionVocabulary = terms
+    }
+
     private let logger = Logger(subsystem: "quartermint.efb-212", category: "TranscriptionService")
 
     // MARK: - Init
@@ -281,6 +289,11 @@ actor TranscriptionService: TranscriptionServiceProtocol {
         )
 
         let analyzer = SpeechAnalyzer(modules: [transcriber])
+        if !regionVocabulary.isEmpty {
+            let context = AnalysisContext()
+            context.contextualStrings[.general] = regionVocabulary
+            try? await analyzer.setContext(context)
+        }
 
         // Create buffer stream for feeding audio from AudioRecorder
         let (bufferStream, bufferContinuation) = AsyncStream<AudioBufferInput>.makeStream()
@@ -354,7 +367,7 @@ actor TranscriptionService: TranscriptionServiceProtocol {
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = true  // No time limit
-        request.contextualStrings = aviationContextualStrings
+        request.contextualStrings = aviationContextualStrings + regionVocabulary
         request.addsPunctuation = true
 
         self.sfRecognizer = recognizer

@@ -29,6 +29,9 @@ struct FlightSummaryBuilder {
     /// Maximum characters for flight metadata header (~300 tokens).
     static let metadataCharBudget = 1_260
 
+    /// Maximum characters for the CVFR facts block.
+    static let cvfrCharBudget = 1_800
+
     // MARK: - Build Prompt (Database-backed)
 
     /// Build a token-budgeted prompt from flight recording data stored in RecordingDatabase.
@@ -37,7 +40,8 @@ struct FlightSummaryBuilder {
     static func buildPrompt(
         flightID: UUID,
         recordingDB: RecordingDatabase,
-        metadata: FlightMetadata
+        metadata: FlightMetadata,
+        cvfrFacts: String? = nil
     ) throws -> String {
         let phaseMarkers = try recordingDB.phaseMarkers(forFlight: flightID)
         let trackPoints = try recordingDB.trackPoints(forFlight: flightID)
@@ -47,7 +51,8 @@ struct FlightSummaryBuilder {
             trackPoints: trackPoints,
             transcriptSegments: transcripts,
             phaseMarkers: phaseMarkers,
-            metadata: metadata
+            metadata: metadata,
+            cvfrFacts: cvfrFacts
         )
     }
 
@@ -59,7 +64,8 @@ struct FlightSummaryBuilder {
         trackPoints: [TrackPointRecord],
         transcriptSegments: [TranscriptSegmentRecord],
         phaseMarkers: [PhaseMarkerRecord],
-        metadata: FlightMetadata
+        metadata: FlightMetadata,
+        cvfrFacts: String? = nil
     ) -> String {
         // Build metadata header, truncate to budget
         var metadataHeader = metadata.description
@@ -86,8 +92,10 @@ struct FlightSummaryBuilder {
             phaseSummaries.append(summary)
         }
 
-        // Combine into prompt
-        var prompt = "Analyze this flight and provide a structured debrief.\n\nFlight: \(metadataHeader)\n\n\(phaseSummaries.joined(separator: "\n\n"))"
+        // CVFR facts (numbers computed in code) are kept whole; the phase summaries are trimmed to fit.
+        let cvfrBlock = cvfrFacts.map { "\n\n" + String($0.prefix(cvfrCharBudget)) } ?? ""
+        let instruction = cvfrFacts == nil ? "" : "\n\nThe CVFR ROUTE block holds measured facts; use its numbers as given and do not invent others."
+        var prompt = "Analyze this flight and provide a structured debrief.\n\nFlight: \(metadataHeader)\n\n\(phaseSummaries.joined(separator: "\n\n"))\(cvfrBlock)\(instruction)"
 
         // If total exceeds budget, proportionally trim phase summaries
         if prompt.count > maxSummaryChars {
@@ -115,7 +123,7 @@ struct FlightSummaryBuilder {
                 return summary
             }
 
-            prompt = "Analyze this flight and provide a structured debrief.\n\nFlight: \(metadataHeader)\n\n\(phaseSummaries.joined(separator: "\n\n"))"
+            prompt = "Analyze this flight and provide a structured debrief.\n\nFlight: \(metadataHeader)\n\n\(phaseSummaries.joined(separator: "\n\n"))\(cvfrBlock)\(instruction)"
         }
 
         return prompt

@@ -30,11 +30,22 @@ export async function handleFetch(request: Request, env: Env, now: Date = new Da
 
   if (pathname === "/notams.json" && (request.method === "GET" || request.method === "HEAD")) {
     const body = await store.get(FEED_FILE);
-    if (body === null) return new Response("no feed yet", { status: 503, headers: { "Cache-Control": "no-store" } });
-    // The scrape runs every 15 min; the app caches 5 min, the edge may too.
-    return new Response(request.method === "HEAD" ? null : body, {
-      headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=300, stale-while-revalidate=900", ...CORS },
-    });
+    if (body === null) return new Response("no feed yet", { status: 503, headers: { "Cache-Control": "no-store", ...CORS } });
+    // Tell the client (and the edge) how old the data is, so a stale feed is never mistaken for a current one.
+    const meta = await readMeta(store);
+    const ageSeconds = meta.lastSuccessAt ? Math.max(0, Math.round((now.getTime() - Date.parse(meta.lastSuccessAt)) / 1000)) : null;
+    const stale = ageSeconds === null || ageSeconds > MAX_AGE_SECONDS;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json; charset=utf-8",
+      // The scrape runs every 15 min; the app caches 5 min, the edge may too. A stale feed is not cached at the edge for long.
+      "Cache-Control": stale ? "public, max-age=60" : "public, max-age=300, stale-while-revalidate=900",
+      "X-Feed-Age-Seconds": ageSeconds === null ? "unknown" : String(ageSeconds),
+      "X-Content-Type-Options": "nosniff",
+      ...CORS,
+    };
+    if (meta.lastSuccessAt) headers["X-Feed-Last-Success"] = meta.lastSuccessAt;
+    if (stale) headers["Warning"] = '110 - "Response is stale"';
+    return new Response(request.method === "HEAD" ? null : body, { headers });
   }
 
   if (pathname === "/health" && request.method === "GET") {
@@ -42,14 +53,15 @@ export async function handleFetch(request: Request, env: Env, now: Date = new Da
     const ageSeconds = meta.lastSuccessAt ? Math.max(0, Math.round((now.getTime() - Date.parse(meta.lastSuccessAt)) / 1000)) : null;
     const ok = ageSeconds !== null && ageSeconds <= MAX_AGE_SECONDS;
     return Response.json(
-      { ok, lastSuccessAt: meta.lastSuccessAt, ageSeconds, lastAttemptAt: meta.lastAttemptAt, lastError: meta.lastError, lastStats: meta.lastStats },
-      { status: ok ? 200 : 503, headers: { "Cache-Control": "no-store", ...CORS } },
+      { ok, lastSuccessAt: meta.lastSuccessAt, ageSeconds, lastAttemptAt: meta.lastAttemptAt, lastError: meta.lastError, lastStats: meta.lastStats, consecutiveFailures: meta.consecutiveFailures ?? 0, nextAttemptAt: meta.nextAttemptAt ?? null },
+      { status: ok ? 200 : 503, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...CORS } },
     );
   }
 
   if (pathname === "/run" && request.method === "POST") {
-    if (!env.RUN_SECRET) return new Response("RUN_SECRET not set", { status: 503 });
-    if (!(await authorized(request.headers.get("authorization"), env.RUN_SECRET))) return new Response("unauthorized", { status: 401 });
+    if (!env.RUN_SECRET) return new Response("RUN_SECRET not set", { status: 503, headers: { "Cache-Control": "no-store" } });
+    if (!(await authorized(request.headers.get("authorization"), env.RUN_SECRET)))
+      return new Response("unauthorized", { status: 401, headers: { "Cache-Control": "no-store" } });
     const outcome = await runScrapeJob(store, { now });
     return Response.json(outcome, { status: outcome.status === "error" ? 502 : 200 });
   }

@@ -30,6 +30,7 @@ struct IsraelAirportDiagramTests {
             throw EFBError.chartCorrupted("stub")
         }
         func installed() -> ChartPackInstalled? { installedPack }
+        func verifyInstalled() async -> Bool { true }
         func fileURL(_ name: String) -> URL? {
             let url = directory.appendingPathComponent(name)
             return FileManager.default.fileExists(atPath: url.path) ? url : nil

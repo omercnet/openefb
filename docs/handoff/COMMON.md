@@ -8,6 +8,9 @@ docs/ folder first (docs/CUSTOMER.md, docs/IMPROVE-APP-PLAN.md, docs/DESIGN.md w
 - Several agents work in this worktree AT THE SAME TIME. Edit only the files your task owns. If you
   must touch a shared file (MapService.swift, MapContainerView.swift, AppState.swift, Types.swift,
   project.pbxproj), keep the edit minimal and re-read the file right before editing.
+- Your task brief names the files you own. Docs-only tasks edit only the docs named in the brief; code tasks don't edit docs
+  other than the ones named. Shared files are listed above; for `AGENTS.md` and `README.md`, report the change you need
+  instead of editing unless your brief owns them.
 - Do NOT git commit, stash, reset, checkout or rebase. Commit signing is unavailable, and the
   integrator snapshots the tree.
 - Project build settings: SWIFT_VERSION 6.0, strict concurrency complete, SWIFT_DEFAULT_ACTOR_ISOLATION=MainActor. Pure
@@ -19,7 +22,7 @@ docs/ folder first (docs/CUSTOMER.md, docs/IMPROVE-APP-PLAN.md, docs/DESIGN.md w
   errors; comment aviation units (`// feet MSL`, `// knots`). New files are picked up automatically
   (file-system synchronized groups), so don't edit project.pbxproj for them.
 - EFB lens for anything the pilot sees:
-  - Glanceable in sunlight; in-flight controls larger than 44pt.
+  - Glanceable in sunlight; in-flight controls at least 60pt (`MapControlMetrics.size`), other tappables at least 44pt.
   - Red = warning and amber = caution, only.
   - Keep standard aviation abbreviations.
   - Never show stale or unvalidated data as current.
@@ -38,6 +41,9 @@ tools/sim-test.sh id                         # your sim UDID, for `simctl io <id
 tools/sim-test.sh release                    # when you are completely done (do NOT delete the sim)
 ```
 NEVER touch simulators that aren't yours (no `simctl shutdown all`, `delete all` or `erase`).
+A claim older than 8 hours (`CLAIM_TTL_MIN`, default 480) counts as abandoned and can be reused by the next `claim`.
+`delete` and `teardown` exist for the integrator; agents never run them. Without `SIM_TAG`, everyone shares the worktree
+simulator, one run at a time (a lock serialises them).
 Before you finish, run the FULL unit suite once (`-only-testing:efb-212Tests`) and make sure it is
 green. If another agent's in-progress edit breaks the build in a file you don't own, wait a few
 minutes and retry. Don't fix their file.
@@ -49,6 +55,24 @@ UI changes need visual proof. Write a throwaway XCUITest in efb-212UITests/ (nam
 `xcrun xcresulttool export attachments`. Look at the screenshots. Delete the throwaway test when
 done. Accessibility labels in use: "Search airports", "Toggle map layers", "Close map layers",
 "Zoom in", "Zoom out"; the airport sheet close button has identifier "xmark.circle.fill".
+
+## Screenshots that show CAAI artwork stay out of git
+The official CAAI CVFR chart and aerodrome diagrams are (c) CAAI, base map (c) Mapa Ltd, and the project holds no recorded
+permission to publish them. A screenshot that shows that artwork goes under one of these gitignored folders and is never
+committed:
+- `docs/design/screenshots/IL-9/` (CVFR chart)
+- `docs/design/screenshots/IL-13/` (aerodrome diagrams)
+- `docs/design/screenshots/UX-IL-CAAI/` (Israel usability review shots that show either)
+Screenshots without that artwork (US map, FAA diagrams, Israel screens that show only our own vector overlay or text, such
+as `docs/design/screenshots/UX-IL/`) are committed. Raw CAAI inputs and built packs are gitignored too:
+`tools/caai-importer/input/`, `tools/caai-chart/input/` and `out/`, `tools/caai-apd/input/` and `out/`. Check with
+`git check-ignore -v <path>` before adding a file near them.
+
+## web/ (server side)
+`web/notam-relay`, `web/charts` and `web/interviews` each have their own `package.json` and README. Edit only the folder your
+task owns. Check with `npm ci && npm test` (relay, charts) or `npm ci && npm run build` (interviews) in that folder. Never
+deploy, publish or approve an edition yourself: `wrangler deploy`, `web/charts/publish.sh --remote` and `vercel --prod` are
+the owner's or integrator's calls. See `web/README.md` for what is live.
 
 ## Tracking
 - beads: `bd update <issue> --claim` at start. Record notable decisions with `bd update <issue> --notes "..."`.

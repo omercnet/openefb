@@ -77,7 +77,13 @@ struct MapContainerView: View {
     @State private var pirepService = PirepService()
     @State private var windsAloftService = WindsAloftService()
     @State private var proximityAlertService: ProximityAlertService?
+    @State private var israelAlertService: IsraelAlertService?
     @State private var reachabilityService = ReachabilityService()
+
+    /// Israel only: no fresh GPS fix, so position-based alerts (airspace, border, closures ahead) are not running.
+    private var israelAlertsSuspended: Bool {
+        appState.region == .israel && (mapViewModel?.gpsStatus ?? .lost(ageSeconds: nil)).isStale
+    }
 
     // Recording Services (Plan 03)
     @State private var recordingViewModel: RecordingViewModel?
@@ -194,10 +200,14 @@ struct MapContainerView: View {
                                 .hiddenWhenFresh()
                         }
 
-                        // Official CAAI chart edition (IL-9): which edition is shown, update, or not downloaded
+                        // Stale / hidden TFR and AIRMET-SIGMET data (efb-zfm.11)
+                        if let viewModel = mapViewModel {
+                            OverlayStalenessBadges(viewModel: viewModel)
+                        }
+
+                        // Official CAAI data sources (IL-9 chart edition, IL-13 diagrams): one compact, expandable stack
                         if appState.region == .israel {
-                            IsraelChartBadge()
-                            IsraelDiagramBadge(overlay: mapViewModel?.mapService.airportDiagramOverlay)
+                            IsraelSourceBadgeStack(overlay: mapViewModel?.mapService.airportDiagramOverlay)
                         }
                     }
                     .padding(.leading, 16)
@@ -239,8 +249,38 @@ struct MapContainerView: View {
                             .padding(.horizontal, 16)
                     }
 
+                    // The airspace proximity check cannot run: say so instead of showing nothing (efb-8lm)
+                    if proximityAlertService?.checkUnavailable == true {
+                        AirspaceCheckUnavailableBanner()
+                            .padding(.horizontal, 16)
+                    }
+
+                    // Israel alerts: one banner area, highest priority on top (red warning, amber caution).
+                    // Without a fresh fix they cannot be evaluated: say so instead of showing the last ones as current.
+                    if israelAlertsSuspended {
+                        IsraelAlertsSuspendedBanner()
+                            .padding(.horizontal, 16)
+                    } else if let alerts = israelAlertService?.alerts, !alerts.isEmpty {
+                        IsraelAlertBanner(alerts: alerts)
+                            .padding(.horizontal, 16)
+                    }
+
                     // Active Direct-To / route with a Clear button (wrong field picked).
-                    if let navTitle = ActiveNavigationBar.title(for: appState) {
+                    if appState.region == .israel, appState.activeFlightPlan, let route = appState.activeRoute {
+                        IsraelRouteFollowingBar(
+                            route: route,
+                            distanceToNext: appState.distanceToNext,
+                            remainingNM: appState.routeSummaryDistanceNM,
+                            remainingETE: appState.routeSummaryETE,
+                            onPrevious: { appState.sequenceActiveRoute(forward: false) },
+                            onNext: { appState.sequenceActiveRoute(forward: true) },
+                            onClear: {
+                                appState.clearActiveNavigation()
+                                mapService.clearRoute()
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                    } else if let navTitle = ActiveNavigationBar.title(for: appState) {
                         ActiveNavigationBar(title: navTitle) {
                             let hadRoute = appState.activePlanDestination != nil
                             appState.clearActiveNavigation()
@@ -314,7 +354,8 @@ struct MapContainerView: View {
 
             // MARK: Flight plan summary card overlay
 
-            if appState.activeFlightPlan,
+            // The Israel route bar carries these totals itself; the card would sit on top of its buttons.
+            if appState.activeFlightPlan, !(appState.region == .israel && appState.activeRoute != nil),
                let distance = appState.distanceToNext,
                let departure = appState.activePlanDeparture,
                let destination = appState.activePlanDestination {
@@ -358,6 +399,12 @@ struct MapContainerView: View {
             IsraelChartSheet(selection: selection)
         }
 
+        // MARK: - Israel NOTAM Briefing Sheet (IL-BRIEF)
+
+        .sheet(isPresented: $appState.isPresentingIsraelBriefing) {
+            IsraelBriefingView()
+        }
+
         // MARK: - Nearest Airport List Sheet
 
         .sheet(isPresented: $appState.isPresentingNearestList) {
@@ -376,6 +423,9 @@ struct MapContainerView: View {
         .onAppear {
             initializeServices()
         }
+        .onChange(of: israelAlertsSuspended) { _, suspended in
+            if suspended { israelAlertService?.suspend() }
+        }
 
         // MARK: - GPS Position Updates
 
@@ -392,6 +442,13 @@ struct MapContainerView: View {
 
             // Check proximity alerts (throttled internally to 10s)
             mapViewModel?.checkProximityAlerts()
+
+            // Israel alerts: closed legs ahead, P/R/D and CTR, border buffers, squawk (Israel only)
+            israelAlertService?.update(
+                region: appState.region, route: appState.activeRoute, position: position,
+                altitudeFeet: position.verticalAccuracy >= 0 ? appState.altitude : nil,  // feet MSL
+                trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed
+            )
 
             // First GPS fix: animate from the home view to the user position (only inside the region)
             if !appState.firstLocationReceived {
@@ -455,6 +512,11 @@ struct MapContainerView: View {
         mapViewModel = vm
         proximityAlertService = proxService
 
+        // Israel in-flight alerts (IL-ALERTS): one haptic per newly raised alert
+        let israelAlerts = IsraelAlertService()
+        israelAlerts.onRaised = { _ in Haptics.warning() }
+        israelAlertService = israelAlerts
+
         // Share the map service via AppState for other tabs (Flight Plans, etc.)
         appState.sharedMapService = mapService
 
@@ -491,6 +553,12 @@ struct MapContainerView: View {
             }
             let audioRecorder = AudioRecorder()
             let transcriptionService = TranscriptionService(recordingDB: recordingDB)
+            // Israel: bias recognition towards the CVFR reporting-point names (Hebrew and English).
+            if appState.region == .israel,
+               let points = try? IsraelAviationDatabase.bundled().reportingPoints(in: .wholeCountry) {
+                let terms = TranscriptTextMatcher.vocabulary(for: points)
+                Task { await transcriptionService.setRegionVocabulary(terms) }
+            }
 
             let coordinator = RecordingCoordinator(
                 recordingDB: recordingDB,
@@ -527,11 +595,20 @@ struct MapContainerView: View {
             recordingCoordinator = coordinator
             let recVM = RecordingViewModel(coordinator: coordinator, appState: appState)
             recVM.modelContext = modelContext
-            recVM.persistence = FlightPersistenceService(
+            let persistence = FlightPersistenceService(
                 recordingDB: recordingDB,
                 databaseService: appState.sharedDatabaseService
             )
+            recVM.persistence = persistence
             recordingViewModel = recVM
+
+            // Rebuild History rows for any recording a crash or kill left without a FlightRecord.
+            FlightRecoveryService(recordingDB: recordingDB, persistence: persistence).recoverOrphans(
+                modelContext: modelContext,
+                activeFlightID: appState.activeFlightRecordID,
+                aircraftProfileID: appState.activeAircraftProfileID,
+                pilotProfileID: appState.activePilotProfileID
+            )
 
             // Start auto-start monitoring
             Task { await coordinator.startAutoStartMonitoring(appState: appState) }

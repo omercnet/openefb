@@ -1172,7 +1172,9 @@ nonisolated enum PDFVectorScanner {
         let filled: Bool
         let stroked: Bool
         let darkFill: Bool
-        let lineWidth: CGFloat
+        let lineWidth: CGFloat        // as set by `w`, unscaled
+        let darkStroke: Bool
+        let strokeWidthPoints: CGFloat   // `w` scaled by the CTM: the painted width in page points
 
         var bounds: CGRect {
             guard let first = points.first else { return .null }
@@ -1208,6 +1210,26 @@ nonisolated enum PDFVectorScanner {
                 let area = abs(Self.area(polygon.points))
                 guard area >= 0.55 * Double(box.length * box.width) else { return nil }
                 return .init(start: box.start, end: box.end, widthPoints: box.width)
+            }
+        }
+
+        /// Runways drawn as one thick dark stroked line (CAAI domestic AIP charts), not a filled polygon:
+        /// an open path of 2 to 4 nearly collinear points, at least `minimumWidth` points wide as painted,
+        /// returned as its long axis with the painted width. Not used by the US pipeline.
+        func strokedRunwayShapes(minimumWidth: CGFloat = 3) -> [AirportDiagramGeoreferencer.RunwayShape] {
+            polygons.compactMap { polygon in
+                guard polygon.stroked, !polygon.filled, polygon.darkStroke, polygon.curves == 0,
+                      (2...4).contains(polygon.points.count), polygon.strokeWidthPoints >= minimumWidth,
+                      polygon.strokeWidthPoints <= 40 else { return nil }
+                guard let start = polygon.points.first, let end = polygon.points.last else { return nil }
+                let length = hypot(end.x - start.x, end.y - start.y)
+                guard length >= 40, length / polygon.strokeWidthPoints >= 5 else { return nil }
+                // Interior points must lie on the chord (a straight pavement, not a bent taxiway).
+                let off = polygon.points.dropFirst().dropLast().map {
+                    abs((end.x - start.x) * (start.y - $0.y) - (start.x - $0.x) * (end.y - start.y)) / length
+                }
+                guard off.allSatisfy({ $0 < 1 }) else { return nil }
+                return .init(start: start, end: end, widthPoints: polygon.strokeWidthPoints)
             }
         }
 
@@ -1295,8 +1317,13 @@ nonisolated enum PDFVectorScanner {
     nonisolated final class State {
         var ctm = CGAffineTransform.identity
         var stack: [CGAffineTransform] = []
+        /// When true, `q`/`Q` also save and restore line width and fill/stroke darkness, as the PDF graphics
+        /// state does. Off by default so US diagram results stay exactly as validated; the CAAI tool turns it on.
+        var restoresGraphicsState = false
+        var graphicsStack: [(lineWidth: CGFloat, fillDark: Bool, strokeDark: Bool)] = []
         var lineWidth: CGFloat = 1
         var fillDark = true          // default fill colour is black
+        var strokeDark = true        // default stroke colour is black
         var current: [CGPoint] = []
         var curvesInCurrent = 0
         var subpaths: [([CGPoint], Int)] = []
@@ -1350,7 +1377,9 @@ nonisolated enum PDFVectorScanner {
     static func paint(_ s: State, fill: Bool, stroke: Bool) {
         closeCurrent(s, implicit: true)
         for (points, curves) in s.subpaths {
-            s.polygons.append(Polygon(points: points, curves: curves, filled: fill, stroked: stroke, darkFill: s.fillDark, lineWidth: s.lineWidth))
+            let scale = sqrt(abs(s.ctm.a * s.ctm.d - s.ctm.b * s.ctm.c))
+            s.polygons.append(Polygon(points: points, curves: curves, filled: fill, stroked: stroke, darkFill: s.fillDark, lineWidth: s.lineWidth,
+                                      darkStroke: s.strokeDark, strokeWidthPoints: s.lineWidth * scale))
         }
         if fill || stroke { s.segments += s.pendingSegments }
         s.subpaths = []
@@ -1358,15 +1387,17 @@ nonisolated enum PDFVectorScanner {
         s.last = nil
     }
 
-    static func makeTable() -> CGPDFOperatorTableRef? {
+    static func makeTable(strokeColours: Bool = false) -> CGPDFOperatorTableRef? {
         guard let table = CGPDFOperatorTableCreate() else { return nil }
         CGPDFOperatorTableSetCallback(table, "q") { _, info in
             guard let s = PDFVectorScanner.state(info) else { return }
             s.stack.append(s.ctm)
+            if s.restoresGraphicsState { s.graphicsStack.append((s.lineWidth, s.fillDark, s.strokeDark)) }
         }
         CGPDFOperatorTableSetCallback(table, "Q") { _, info in
             guard let s = PDFVectorScanner.state(info) else { return }
             if let top = s.stack.popLast() { s.ctm = top }
+            if s.restoresGraphicsState, let g = s.graphicsStack.popLast() { (s.lineWidth, s.fillDark, s.strokeDark) = g }
         }
         CGPDFOperatorTableSetCallback(table, "cm") { scanner, info in
             guard let s = PDFVectorScanner.state(info) else { return }
@@ -1376,6 +1407,31 @@ nonisolated enum PDFVectorScanner {
         CGPDFOperatorTableSetCallback(table, "w") { scanner, info in
             guard let s = PDFVectorScanner.state(info) else { return }
             s.lineWidth = PDFVectorScanner.number(scanner)
+        }
+        if strokeColours {
+        CGPDFOperatorTableSetCallback(table, "G") { scanner, info in
+            guard let s = PDFVectorScanner.state(info) else { return }
+            s.strokeDark = PDFVectorScanner.number(scanner) < 0.4
+        }
+        CGPDFOperatorTableSetCallback(table, "RG") { scanner, info in
+            guard let s = PDFVectorScanner.state(info) else { return }
+            let b = PDFVectorScanner.number(scanner), g = PDFVectorScanner.number(scanner), r = PDFVectorScanner.number(scanner)
+            s.strokeDark = max(r, g, b) < 0.4
+        }
+        CGPDFOperatorTableSetCallback(table, "K") { scanner, info in
+            guard let s = PDFVectorScanner.state(info) else { return }
+            let k = PDFVectorScanner.number(scanner)
+            _ = PDFVectorScanner.number(scanner); _ = PDFVectorScanner.number(scanner); _ = PDFVectorScanner.number(scanner)
+            s.strokeDark = k > 0.6
+        }
+        CGPDFOperatorTableSetCallback(table, "SC") { scanner, info in
+            guard let s = PDFVectorScanner.state(info) else { return }
+            s.strokeDark = PDFVectorScanner.darkFromOperands(scanner)
+        }
+        CGPDFOperatorTableSetCallback(table, "SCN") { scanner, info in
+            guard let s = PDFVectorScanner.state(info) else { return }
+            s.strokeDark = PDFVectorScanner.darkFromOperands(scanner)
+        }
         }
         CGPDFOperatorTableSetCallback(table, "g") { scanner, info in
             guard let s = PDFVectorScanner.state(info) else { return }
@@ -1500,19 +1556,20 @@ nonisolated enum PDFVectorScanner {
                 for i in 0..<6 { var v: CGPDFReal = 0; CGPDFArrayGetNumber(array, i, &v); values[i] = CGFloat(v) }
                 matrix = CGAffineTransform(a: values[0], b: values[1], c: values[2], d: values[3], tx: values[4], ty: values[5])
             }
-            let saved = (s.ctm, s.stack, s.lineWidth, s.fillDark, s.contentStream)
+            let saved = (s.ctm, s.stack, s.lineWidth, s.fillDark, s.strokeDark, s.contentStream, s.graphicsStack)
             s.ctm = matrix.concatenating(s.ctm)
             s.stack = []
+            s.graphicsStack = []
             s.depth += 1
             let inner = CGPDFContentStreamCreateWithStream(xobject, dictionary, stream)
             s.contentStream = inner
-            if let table = PDFVectorScanner.makeTable(), let innerScanner = Optional(CGPDFScannerCreate(inner, table, info)) {
+            if let table = PDFVectorScanner.makeTable(strokeColours: s.restoresGraphicsState), let innerScanner = Optional(CGPDFScannerCreate(inner, table, info)) {
                 CGPDFScannerScan(innerScanner)
                 CGPDFScannerRelease(innerScanner)
                 CGPDFOperatorTableRelease(table)
             }
             s.depth -= 1
-            (s.ctm, s.stack, s.lineWidth, s.fillDark, s.contentStream) = saved
+            (s.ctm, s.stack, s.lineWidth, s.fillDark, s.strokeDark, s.contentStream, s.graphicsStack) = saved
         }
         return table
     }
@@ -1530,11 +1587,12 @@ nonisolated enum PDFVectorScanner {
         }
     }
 
-    static func scan(page: CGPDFPage) -> Result {
+    static func scan(page: CGPDFPage, restoresGraphicsState: Bool = false) -> Result {
         let s = State()
+        s.restoresGraphicsState = restoresGraphicsState
         let content = CGPDFContentStreamCreateWithPage(page)
         s.contentStream = content
-        guard let table = makeTable() else { return Result(segments: [], polygons: []) }
+        guard let table = makeTable(strokeColours: restoresGraphicsState) else { return Result(segments: [], polygons: []) }
         let scanner = CGPDFScannerCreate(content, table, Unmanaged.passUnretained(s).toOpaque())
         CGPDFScannerScan(scanner)
         CGPDFScannerRelease(scanner)

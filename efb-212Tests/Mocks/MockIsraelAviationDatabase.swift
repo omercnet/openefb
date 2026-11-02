@@ -20,22 +20,22 @@ nonisolated struct MockIsraelAviationDatabase: IsraelAviationDatabaseProtocol {
 
     func metadata() throws -> IsraelAviationMetadata { try metadataResult.get() }
 
-    func reportingPoint(code: String) throws -> IsraelReportingPoint? {
-        points.first { $0.code == code.uppercased() }
+    func reportingPoint(code: String, network: IsraelRouteNetwork) throws -> IsraelReportingPoint? {
+        points.first { $0.network == network && $0.code == code.uppercased() }
     }
 
-    func reportingPoints(in bounds: IsraelGeoBounds) throws -> [IsraelReportingPoint] {
-        points.filter { Self.contains(bounds, latitude: $0.latitude, longitude: $0.longitude) }
+    func reportingPoints(in bounds: IsraelGeoBounds, network: IsraelRouteNetwork) throws -> [IsraelReportingPoint] {
+        points.filter { $0.network == network && Self.contains(bounds, latitude: $0.latitude, longitude: $0.longitude) }
     }
 
-    func routeSegments(in bounds: IsraelGeoBounds) throws -> [IsraelRouteSegment] {
+    func routeSegments(in bounds: IsraelGeoBounds, network: IsraelRouteNetwork) throws -> [IsraelRouteSegment] {
         segments.filter { segment in
-            segment.polyline.contains { Self.contains(bounds, latitude: $0.latitude, longitude: $0.longitude) }
+            segment.network == network && segment.polyline.contains { Self.contains(bounds, latitude: $0.latitude, longitude: $0.longitude) }
         }
     }
 
-    func routeSegment(from: String, to: String) throws -> IsraelRouteSegment? {
-        segments.first { $0.fromCode == from.uppercased() && $0.toCode == to.uppercased() }
+    func routeSegment(from: String, to: String, network: IsraelRouteNetwork) throws -> IsraelRouteSegment? {
+        segments.first { $0.network == network && $0.fromCode == from.uppercased() && $0.toCode == to.uppercased() }
     }
 
     func airspaces(containing coordinate: CLLocationCoordinate2D, altitudeFeetMSL: Double?) throws -> [IsraelAirspace] {

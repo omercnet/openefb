@@ -121,17 +121,24 @@ nonisolated enum IsraelFlightPlanMessage {
         return lines.joined(separator: "\n")
     }
 
-    /// The Hebrew summary pilots paste next to the message. Times are local Israel time.
+    /// The Hebrew summary pilots paste next to the message, one fact per line. Times are local Israel time.
+    /// Right-to-left text: every Latin or numeric run (codes, dates, times) sits in a first-strong isolate
+    /// (FSI ... PDI) so it keeps its own order and does not reorder the Hebrew around it.
     static func hebrewSummary(plan: IsraelRoutePlan, input: IsraelFlightPlanInput) -> String {
         let points = plan.points
         guard let dep = points.first, let dest = points.last else { return "" }
         let eta = input.departure.addingTimeInterval(plan.totalETESeconds)
-        let route = points.map(\.code).joined(separator: " ")
-        return "תכנית טיסה בנתיבי התובלה הנמוכים, "
-            + "המראה מ\(hebrewName(dep)) ב-\(israelDate(input.departure)) בשעה \(israelTime(input.departure)) זמן מקומי, "
-            + "נתיב: \(route), "
-            + "נחיתה ב\(hebrewName(dest)) בשעה \(israelTime(eta)) זמן מקומי"
+        let route = points.map { isolated(hebrewName($0)) }.joined(separator: " - ")
+        return [
+            "תכנית טיסה ב\(plan.network.hebrewName)",
+            "המראה: \(isolated(hebrewName(dep))), \(isolated(israelDate(input.departure))) בשעה \(isolated(israelTime(input.departure))) זמן מקומי",
+            "נתיב: \(route)",
+            "נחיתה: \(isolated(hebrewName(dest))) בשעה \(isolated(israelTime(eta))) זמן מקומי"
+        ].joined(separator: "\n")
     }
+
+    /// Wraps text in FSI ... PDI so its direction is resolved on its own and cannot leak into neighbours.
+    static func isolated(_ text: String) -> String { "\u{2068}\(text)\u{2069}" }
 
     // MARK: Pieces
 
@@ -193,6 +200,10 @@ nonisolated struct IsraelFlightPlanIssue: Hashable, Sendable, Identifiable {
         case wrongWay(String)             // one-way segment flown against its published direction
         case closedSegment(String)        // fully closed by NOTAM; value is "FROM-TO (NOTAM id)"
         case checkNotam(String)
+        case unresolvedClosure(String)    // NOTAM id of a closure the planner could not place on the network
+        case weekendStartUnconfirmed(String)  // weekend-only LSA route flown Friday before 14:00; "FROM-TO"
+        case notInUse(String)             // weekend-only LSA route flown outside a weekend; "FROM-TO"
+        case specialConditions(String)    // LSA route whose conditions are on the chart notes; "FROM-TO"
         case closuresNotChecked
         case missingPilotField(String)    // "license", "phone", "name"
         case missingAircraftField(String) // "endurance", "persons on board", "registration"
@@ -211,6 +222,11 @@ nonisolated struct IsraelFlightPlanIssue: Hashable, Sendable, Identifiable {
         case .wrongWay(let s): return "\(s) is a one-way route flown against its published direction."
         case .closedSegment(let s): return "\(s) is closed by NOTAM."
         case .checkNotam(let id): return "NOTAM \(id) may close part of this route and could not be read in full. Read it before filing."
+        case .unresolvedClosure(let id): return "Unresolved closure: check NOTAM \(id). It could not be matched to the route network and may close this route."
+        case .weekendStartUnconfirmed(let s):
+            return "\(s) is a weekend-only sport-aviation route. The AIP starts the weekend on Friday at 06:00, but some areas start it as late as 14:00 and the route data does not say which. Fly it from 14:00, or check the chart notes."
+        case .notInUse(let s): return "\(s) is a weekend-only sport-aviation route and this leg is flown outside a weekend."
+        case .specialConditions(let s): return "\(s) has special conditions on the CAAI chart notes. Read them before flying."
         case .closuresNotChecked: return "NOTAM closures were not checked: the feed is missing or out of date."
         case .missingPilotField(let f): return "Pilot \(f) is missing from the pilot profile."
         case .missingAircraftField(let f): return "Aircraft \(f) is missing from the aircraft profile."
@@ -229,6 +245,7 @@ nonisolated enum IsraelFlightPlanValidator {
     static func validate(
         plan: IsraelRoutePlan,
         closures: [Int: IsraelSegmentClosure] = [:],
+        unresolved: [IsraelUnresolvedClosure] = [],
         closuresChecked: Bool = true,
         input: IsraelFlightPlanInput? = nil
     ) -> [IsraelFlightPlanIssue] {
@@ -247,7 +264,16 @@ nonisolated enum IsraelFlightPlanValidator {
             case .check(let id): add(.checkNotam(id), blocks: true)
             case .partial, .none: break
             }
+            for caution in leg.cautions {
+                switch caution {
+                case .weekendStartUnconfirmed: add(.weekendStartUnconfirmed(name), blocks: true)
+                case .notInUse: add(.notInUse(name), blocks: true)
+                case .specialConditions: add(.specialConditions(name), blocks: false)
+                case .byRequest, .military, .partialClosure, .checkNotam, .smallAircraftOnly: break
+                }
+            }
         }
+        for closure in unresolved { add(.unresolvedClosure(closure.notamID), blocks: true) }
         if !closuresChecked { add(.closuresNotChecked, blocks: false) }
         if let input {
             if IsraelFlightPlanMessage.registrationField(input.registration).isEmpty { add(.missingAircraftField("registration"), blocks: true) }

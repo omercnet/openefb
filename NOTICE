@@ -7,10 +7,54 @@ Third-party data bundled with the app
 Israel aviation data (efb-212/Resources/israel-aviation.sqlite)
   Aeronautical data: Civil Aviation Authority of Israel (CAAI), data of 25 Oct 2026
   GIS layers published with the Israeli domestic AIP (https://www.gov.il/he/pages/aip?chapterIndex=11),
-  redistributed with CAAI's approval: CVFR reporting points and routes, CTR/ATZ/CTA, TMA, FIR,
+  redistributed with CAAI's approval: CVFR and sport-aviation (LSA) reporting points and routes, CTR/ATZ/CTA, TMA, FIR,
   prohibited/restricted/danger areas, runways. Built by tools/caai-importer.
-  This approval covers the GIS layers only. The official CVFR chart is not licensed and is not included.
-  The data is for reference; the binding publications are CAAI's official AIP and NOTAMs.
+  The 49 curated aerodromes (tools/caai-importer/curated/aerodromes-il.csv) are transcribed from the Israeli domestic
+  AIP, the eAIP (AD 2) and the CAAI GIS layers, with the source of every value recorded in the file; values marked
+  unreviewed have not been checked by a person.
+  This approval covers the GIS layers only. The official CVFR chart and the aerodrome diagrams are not licensed to this
+  project (see "Downloaded charts" below). The data is for reference; the binding publications are CAAI's official AIP
+  and NOTAMs.
 
 US aviation data (efb-212/Resources/aviation.sqlite)
-  FAA National Airspace System Resources (NASR), built by tools/nasr-importer.
+  FAA National Airspace System Resources (NASR), cycle 2026-10-29, and FAA AIS class airspace, built by
+  tools/nasr-importer. Public domain.
+
+Israel border lines (efb-212/Resources/israel-border-lines.json)
+  Natural Earth country border lines (public domain, https://www.naturalearthdata.com), used with the CAAI prohibited
+  areas for proximity alerts; see docs/design/israel-border-buffers.md. Buffers are the AIP's (domestic AIP A-17 4b).
+
+Data the app downloads at run time
+----------------------------------
+
+FAA (public domain)
+  VFR sectional raster tiles (FAA AIS ArcGIS service "VFR_Sectional"), terminal procedure charts and airport diagrams
+  (FAA d-TPP, https://aeronav.faa.gov), temporary flight restrictions (https://tfr.faa.gov), and NOTAMs from the FAA
+  NOTAM API, which the pilot queries with their own free API key.
+
+NOAA Aviation Weather Center (public domain)
+  METAR, TAF, PIREP, AIRMET/SIGMET and winds aloft (https://aviationweather.gov/data/api/), for US and Israeli stations.
+
+Israel Airports Authority (IAA)
+  NOTAMs published at https://brin.iaa.gov.il, read by the project's relay (web/notam-relay, a Cloudflare Worker) every
+  15 minutes. The app reads the relay's notams.json and does not contact the IAA. The binding source is the IAA's own
+  NOTAM service; the relay's parsing is a convenience and can be wrong or late.
+
+Base maps
+  Street: map data (c) OpenStreetMap contributors (ODbL), via OpenFreeMap (https://openfreemap.org) and OpenMapTiles.
+  Satellite (to be removed before a public release): Imagery (c) Esri, Maxar, Earthstar Geographics.
+  Terrain (to be removed before a public release): (c) OpenTopoMap (CC-BY-SA), data (c) OpenStreetMap contributors.
+  See docs/TILE-SOURCES.md.
+
+Downloaded charts (hosted by the project on Cloudflare R2; not part of the MPL-licensed work)
+  Official CVFR chart ("מפת נתיבי תובלה נמוכים", domestic AIP B-03 appendix A): (c) CAAI. Geographic information
+  (base map): (c) Mapa Ltd. Converted and validated by tools/caai-chart; the app installs a published edition only.
+  Israeli aerodrome diagrams (eAIP AD 2 and domestic AIP chapters D and E): (c) CAAI. Georeferenced by tools/caai-apd.
+  These are not covered by CAAI's approval of the GIS layers; the project's right to host them is not recorded in
+  this repository.
+
+Software
+--------
+
+MapLibre Native iOS (BSD-2-Clause) and GRDB.swift (MIT), both Swift packages. Apple frameworks are used under Apple's
+terms. web/interviews is a separate Next.js app and is not part of the iPad app.

@@ -93,6 +93,23 @@ struct MapControlsView: View {
             .accessibilityLabel("Toggle map layers")
             .accessibilityValue(appState.isPresentingLayerControls ? "Open" : "Closed")
 
+            // Israel NOTAM briefing (IL-BRIEF)
+            if appState.region == .israel {
+                Button {
+                    Haptics.light()
+                    appState.isPresentingIsraelBriefing = true
+                } label: {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.title2)
+                        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+                }
+                .buttonStyle(PressableButtonStyle())
+                .background(.ultraThinMaterial)
+                .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+                .accessibilityLabel("NOTAM briefing")
+                .accessibilityIdentifier("israel-briefing-button")
+            }
+
             // Night mode quick toggle: day <-> night (Settings can return to Auto)
             Button {
                 Haptics.light()

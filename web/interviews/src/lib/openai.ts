@@ -15,15 +15,20 @@ export async function createCall(
   const fd = new FormData();
   fd.set("sdp", sdp);
   fd.set("session", JSON.stringify(session));
-  const r = await fetch(`${API}/realtime/calls`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key()}`, "OpenAI-Safety-Identifier": safetyId },
-    body: fd,
-  });
-  const body = await r.text();
-  if (!r.ok) return { error: body.slice(0, 500), status: r.status };
-  const loc = r.headers.get("location");
-  return { answer: body, callId: loc ? loc.split("/").filter(Boolean).pop()! : null };
+  try {
+    const r = await fetch(`${API}/realtime/calls`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key()}`, "OpenAI-Safety-Identifier": safetyId },
+      body: fd,
+      signal: AbortSignal.timeout(20_000),
+    });
+    const body = await r.text();
+    if (!r.ok) return { error: body.slice(0, 500), status: r.status };
+    const loc = r.headers.get("location");
+    return { answer: body, callId: loc ? (loc.split("/").filter(Boolean).pop() ?? null) : null };
+  } catch (e) {
+    return { error: `request failed: ${e instanceof Error ? e.message : String(e)}`, status: 504 };
+  }
 }
 
 export async function hangup(callId: string): Promise<void> {
@@ -31,6 +36,7 @@ export async function hangup(callId: string): Promise<void> {
     await fetch(`${API}/realtime/calls/${encodeURIComponent(callId)}/hangup`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key()}` },
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     /* already gone */
@@ -47,6 +53,7 @@ export async function jsonResponse(model: string, instructions: string, input: s
       input,
       text: { format: { type: "json_object" } },
     }),
+    signal: AbortSignal.timeout(60_000),
   });
   if (!r.ok) throw new Error(`responses ${r.status}: ${(await r.text()).slice(0, 300)}`);
   const data = (await r.json()) as {

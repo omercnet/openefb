@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertSegment, buildEditionManifest, mergeProductManifest, objectKey } from "../lib.mjs";
+import { assertApprovable, assertImmutable, assertSegment, buildEditionManifest, mergeProductManifest, objectKey } from "../lib.mjs";
 
 const files = [{ name: "pack.mbtiles", bytes: 5, sha256: "ab" }];
 const base = { product: "israel-cvfr", source: { validated_at: "2026-11-01" }, files, now: "2026-11-02T00:00:00Z" };
@@ -40,4 +40,19 @@ test("absolute urls only when a base url is given", () => {
   const withUrl = buildEditionManifest({ ...base, edition: "e1", approve: false, existing: null, baseUrl: "https://charts.example/" });
   assert.equal(withUrl.files[0].url, "https://charts.example/israel-cvfr/e1/pack.mbtiles");
   assert.equal(buildEditionManifest({ ...base, edition: "e1", approve: false, existing: null }).files[0].url, undefined);
+});
+
+test("a published edition's files are immutable: same hash passes, different hash is refused", () => {
+  const existing = { files: [{ name: "pack.mbtiles", sha256: "ab" }] };
+  assertImmutable(existing, [{ name: "pack.mbtiles", sha256: "ab" }]);
+  assertImmutable(existing, [{ name: "other.mbtiles", sha256: "cd" }]);
+  assertImmutable(null, files);
+  assert.throws(() => assertImmutable(existing, [{ name: "pack.mbtiles", sha256: "cdcdcdcdcdcdcdcd" }]), /immutable/);
+});
+
+test("--approve needs a passing validation in the pipeline manifest", () => {
+  assertApprovable({ validation: { passed: true } }, true);
+  assertApprovable({}, false);
+  assert.throws(() => assertApprovable({}, true), /validation/);
+  assert.throws(() => assertApprovable({ validation: { passed: false } }, true), /validation/);
 });

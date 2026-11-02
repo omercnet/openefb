@@ -75,9 +75,12 @@ struct IsraelChartDownloadSection: View {
 
     /// Nil when there is nothing to fetch (already on the latest edition).
     private var downloadLabel: String? {
+        let failed = store.errorMessage != nil
         switch store.status {
-        case .notDownloaded: return store.pausedProgress == nil ? "Download" : "Resume"
-        case .updateAvailable: return "Update"
+        case .notDownloaded:
+            if failed { return "Retry" }
+            return store.pausedProgress == nil ? "Download" : "Resume"
+        case .updateAvailable: return failed ? "Retry" : "Update"
         case .installed: return nil
         }
     }

@@ -16,12 +16,12 @@ you -> POST /run          (Bearer RUN_SECRET; manual scrape, e.g. the first run 
 
 - **CPU (10 ms per invocation):** a steady-state run fetches the 1.4 MB list page and parses it, but reuses parsed
   items from KV for every NOTAM it has seen. Measured in Node (same V8, warm), CPU per run: **~2.3 ms** with nothing new,
-  **~3.5 ms** when 40 detail pages are parsed, 0.1 ms to decode the list page. Network waits don't count as CPU. These are
+  **~3.5 ms** when 40 detail pages are parsed (a run is capped at 36 now), 0.1 ms to decode the list page. Network waits don't count as CPU. These are
   Node numbers: workerd doesn't expose CPU time locally, so check `wrangler tail` / the dashboard's CPU time after deploy.
-- **Subrequests (50 per invocation, KV calls count):** list (1) plus at most 36 detail pages, leaving room for up to 9 KV calls. A cold start therefore backfills over 3-4
+- **Subrequests (50 per invocation, KV calls count):** list (1) plus at most 36 detail pages (`MAX_DETAIL_REQUESTS` in `src/job.ts`), leaving room for up to 9 KV calls. A cold start therefore backfills over 3-4
   runs (about an hour); NOTAMs not yet fetched are published with `parsed: false` and raw list text meanwhile.
-- **KV writes (1000 per day):** a run writes `notams.json` and `meta.json` (and the cache only when it changed): 192-288 a day. History adds two writes only on runs that saw a new NOTAM (at most 192 a day, in practice a few dozen): well inside 1000.
-- Wall time of a cold 40-detail run: ~22 s (400 ms politeness delay between requests). Waiting isn't CPU.
+- **KV writes (1000 per day):** a run writes `meta.json` and `notams.json` (and the detail cache only when it changed), and history adds up to two writes on runs that saw a new NOTAM: at most 5 x 96 = 480 a day, typically 192, well inside 1000. Failed runs write 1, and the backoff lowers the rate further.
+- Wall time of a cold 40-detail run (measured before the 36-page cap): ~22 s (400 ms politeness delay between requests). Waiting isn't CPU.
 
 ## What the scraper does
 
@@ -70,7 +70,9 @@ npm run scrape -- --force         # no wrangler: plain node scrape into .data/ a
 Local KV lives in `.wrangler/state` (ignored). To rerun inside the 14-minute guard:
 `npx wrangler kv key delete --binding NOTAM_KV --local meta.json`.
 
-## Deploy (owner; no Cloudflare login exists on the build machine)
+## Deploy
+
+Deployed at `https://openefb-notam-relay.omerc.workers.dev` (checked 2026-11-02: `/health` 200, `/notams.json` served with `X-Feed-Age-Seconds`; the `NOTAM_KV` id is in `wrangler.toml`). To deploy again or on a new account:
 
 1. `cd web/notam-relay && npx wrangler login`
 2. `npx wrangler kv namespace create NOTAM_KV`, paste the printed `id` into `wrangler.toml`.
@@ -78,11 +80,11 @@ Local KV lives in `.wrangler/state` (ignored). To rerun inside the 14-minute gua
 4. Optional manual trigger: `openssl rand -hex 32 | npx wrangler secret put RUN_SECRET`, then
    `curl -X POST -H "Authorization: Bearer $RUN_SECRET" https://openefb-notam-relay.<subdomain>.workers.dev/run`.
 5. Check `https://openefb-notam-relay.<subdomain>.workers.dev/health` after a run, then `/notams.json`.
-6. Put `https://openefb-notam-relay.<subdomain>.workers.dev/notams.json` in the app (UserDefaults key
-   `israelNotamFeedURL`; the app has no built-in default URL).
+6. A new URL needs the app to know it: set the `israelNotamFeedURL` UserDefaults key, or change `IsraelNotamService.defaultFeedURL`
+   (the app's built-in default is the URL above).
 
-Not verified: the deployed Worker (Cron Trigger, KV, real CPU time) and whether the IAA answers Cloudflare's addresses.
-`wrangler dev` runs the same code in workerd from this Mac, where the scrape succeeded.
+Not verified: the deployed Worker's real CPU time per run (check `wrangler tail` or the dashboard).
+On 2026-11-02 the IAA answered the Worker's Cloudflare addresses; one HTTP 403 earlier that day recovered through the backoff (`docs/RELIABILITY.md`).
 
 ## Risk: the IAA may block cloud IPs
 

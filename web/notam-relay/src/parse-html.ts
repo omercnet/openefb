@@ -8,7 +8,9 @@ export function htmlText(fragment: string): string {
     .replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, ent: string) => {
       if (ent[0] === "#") {
         const code = ent[1] === "x" || ent[1] === "X" ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10);
-        return Number.isFinite(code) ? String.fromCodePoint(code) : whole;
+        // Out-of-range or surrogate code points make fromCodePoint throw; garbled markup must not fail the whole page.
+        const valid = Number.isFinite(code) && code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff);
+        return valid ? String.fromCodePoint(code) : whole;
       }
       return ENTITIES[ent.toLowerCase()] ?? whole;
     });

@@ -119,6 +119,7 @@ final class MapViewModel {
     func onMapStyleLoaded(style: MLNStyle) {
         mapService.onStyleLoaded(style: style)
         mapService.israelChart.setActive(appState.region == .israel)
+        mapService.israelLSA.setActive(appState.region == .israel)
         syncOfficialChart()
 
         // Load initial data for the CONUS view (default zoom is low: towered airports only)
@@ -399,6 +400,7 @@ final class MapViewModel {
     func regionDidChange() {
         let region = appState.region
         mapService.israelChart.setActive(region == .israel)
+        mapService.israelLSA.setActive(region == .israel)
         syncOfficialChart()
         for layer in MapLayer.allCases {
             mapService.setLayerVisibility(layer, visible: appState.visibleLayers.contains(layer))
@@ -409,11 +411,14 @@ final class MapViewModel {
             loadedTFRs = []
             tfrFetchedAt = nil
             tfrLoadFailed = false
+            tfrOverlay = .current
             mapService.updateTFRs([])
         }
         if !region.isAvailable(.advisories) {
+            loadedAdvisories = []
             advisoriesFetchedAt = nil
             advisoriesLoadFailed = false
+            advisoryOverlay = .current
             mapService.updateAdvisories([])
         }
         if !region.isAvailable(.navaids) {
@@ -527,9 +532,13 @@ final class MapViewModel {
 
     // MARK: - Weather Dot Loading (Plan 04)
 
-    /// Fetch weather for visible airports and update map weather dots.
-    func loadWeatherDots() async {
-        guard let weatherService else { return }
+    /// When the weather dots were last fetched successfully; nil until the first fetch.
+    private(set) var weatherFetchedAt: Date?
+
+    /// Fetch weather for visible airports and update map weather dots. Returns whether the fetch succeeded.
+    @discardableResult
+    func loadWeatherDots() async -> Bool {
+        guard let weatherService else { return false }
 
         // Build station ID list and coordinate lookup from visible airports, plus the region's
         // own stations (Israel has no airport data yet, so its stations come from the region).
@@ -542,7 +551,7 @@ final class MapViewModel {
             stationIDs.append(station.id)
             stationCoordinates[station.id] = station.coordinate
         }
-        guard !stationIDs.isEmpty else { return }
+        guard !stationIDs.isEmpty else { return false }
 
         do {
             let weather = try await weatherService.fetchWeatherForStations(stationIDs)
@@ -550,8 +559,11 @@ final class MapViewModel {
 
             // Track oldest observation for weather age badge
             _oldestWeatherObservationTime = weather.compactMap { $0.observationTime }.min()
+            weatherFetchedAt = Date()
+            return true
         } catch {
             // Weather fetch failure is non-critical -- dots just won't update
+            return false
         }
     }
 
@@ -564,6 +576,13 @@ final class MapViewModel {
     /// True when the last load failed with no cached data to fall back on.
     private(set) var tfrLoadFailed: Bool = false
 
+    /// How the TFR layer is drawn right now: current, stale (OLD badge, dashed) or hidden (EXPIRED data).
+    private(set) var tfrOverlay: OverlayStaleness = .current
+    /// Same for the AIRMET/SIGMET layer.
+    private(set) var advisoryOverlay: OverlayStaleness = .current
+    /// Last loaded advisories (all validity windows); redrawn as time passes.
+    private var loadedAdvisories: [AviationAdvisory] = []
+
     /// Load TFRs (service caches for 10 minutes) and redraw the TFR layer.
     func loadTFRs() async {
         guard let tfrService else { return }
@@ -573,7 +592,7 @@ final class MapViewModel {
             loadedTFRs = snapshot.tfrs
             tfrFetchedAt = snapshot.fetchedAt
             tfrLoadFailed = false
-            mapService.updateTFRs(snapshot.tfrs)
+            drawTFRs()
         } catch {
             // Service already falls back to its cache; reaching here means nothing was ever fetched
             tfrLoadFailed = true
@@ -593,11 +612,94 @@ final class MapViewModel {
 
         do {
             let snapshot = try await airSigmetService.currentAdvisories()
+            loadedAdvisories = snapshot.advisories
             advisoriesFetchedAt = snapshot.fetchedAt
             advisoriesLoadFailed = false
-            mapService.updateAdvisories(snapshot.valid(at: Date()))
+            drawAdvisories()
         } catch {
             advisoriesLoadFailed = true
+        }
+    }
+
+    /// Draw the TFR layer per the age of its snapshot: stale is marked, expired is not drawn.
+    private func drawTFRs(now: Date = Date()) {
+        tfrOverlay = OverlayStaleness.evaluate(.tfr, fetchedAt: tfrFetchedAt, now: now)
+        switch tfrOverlay {
+        case .current: mapService.updateTFRs(loadedTFRs, now: now)
+        case .stale: mapService.updateTFRs(loadedTFRs, now: now, stale: true)
+        case .hidden: mapService.updateTFRs([], now: now)
+        }
+    }
+
+    private func drawAdvisories(now: Date = Date()) {
+        advisoryOverlay = OverlayStaleness.evaluate(.airmetSigmet, fetchedAt: advisoriesFetchedAt, now: now)
+        let valid = loadedAdvisories.filter { $0.isValid(at: now) }
+        switch advisoryOverlay {
+        case .current: mapService.updateAdvisories(valid)
+        case .stale: mapService.updateAdvisories(valid, stale: true)
+        case .hidden: mapService.updateAdvisories([])
+        }
+    }
+
+    /// Re-evaluate overlay age as time passes (called by the periodic tick), redrawing only on a change,
+    /// so a snapshot that ages from current to OLD to EXPIRED never stays drawn as current.
+    func refreshOverlayStaleness(now: Date = Date()) {
+        if OverlayStaleness.evaluate(.tfr, fetchedAt: tfrFetchedAt, now: now) != tfrOverlay { drawTFRs(now: now) }
+        if OverlayStaleness.evaluate(.airmetSigmet, fetchedAt: advisoriesFetchedAt, now: now) != advisoryOverlay {
+            drawAdvisories(now: now)
+        }
+    }
+
+    // MARK: - Basemap Tile Health (efb-zfm.18)
+
+    /// True while basemap tiles keep failing to load; the map shows "Map tiles not loading".
+    private(set) var tilesFailing = false
+    @ObservationIgnored private var tileTracker = TileFailureTracker()
+
+    func noteTileError() {
+        tileTracker.recordError()
+        if tileTracker.isFailing, !tilesFailing { tilesFailing = true }
+    }
+
+    func noteTileLoadedFromNetwork() {
+        tileTracker.recordNetworkLoad()
+        if tilesFailing { tilesFailing = false }
+    }
+
+    // MARK: - Periodic Refresh (efb-zfm.13)
+
+    @ObservationIgnored private var refreshScheduler = DataRefreshScheduler()
+
+    /// Refresh the weather, TFR and AIRMET/SIGMET layers that are on and due, per `DataRefreshScheduler`
+    /// (interval per product, doubled in Low Power Mode, none offline, backoff after a failure).
+    /// Called about once a minute by the map screen while it is visible.
+    func refreshDueData(now: Date = Date(), lowPower: Bool = ProcessInfo.processInfo.isLowPowerModeEnabled) async {
+        let region = appState.region
+        var wanted: Set<RefreshProduct> = []
+        if appState.visibleLayers.contains(.weatherDots) { wanted.insert(.weather) }
+        if appState.visibleLayers.contains(.tfrs), region.isAvailable(.tfrs) { wanted.insert(.tfr) }
+        if appState.visibleLayers.contains(.advisories), region.isAvailable(.advisories) { wanted.insert(.advisories) }
+
+        let due = refreshScheduler.due(
+            wanted: wanted,
+            lastData: [.weather: weatherFetchedAt, .tfr: tfrFetchedAt, .advisories: advisoriesFetchedAt].compactMapValues { $0 },
+            now: now, lowPower: lowPower, networkAvailable: appState.networkAvailable)
+
+        for product in due {
+            let success: Bool
+            switch product {
+            case .weather:
+                success = await loadWeatherDots()
+            case .tfr:
+                let before = tfrFetchedAt
+                await loadTFRs()
+                success = tfrFetchedAt != before  // a failed refresh serves the cache, with the old time
+            case .advisories:
+                let before = advisoriesFetchedAt
+                await loadAdvisories()
+                success = advisoriesFetchedAt != before
+            }
+            refreshScheduler.recordAttempt(product, at: now, success: success)
         }
     }
 

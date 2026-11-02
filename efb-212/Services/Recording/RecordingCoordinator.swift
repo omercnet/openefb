@@ -116,6 +116,14 @@ actor RecordingCoordinator {
         // Start track recorder
         let tracker = TrackRecorder(recordingDB: recordingDB, flightID: flightID)
         trackRecorder = tracker
+        await tracker.setFailureHandlers(
+            onWriteFailure: { [weak self] _ in
+                Task { [weak self] in await self?.handleTrackFailure(.trackWriteFailed) }
+            },
+            onStreamFailure: { [weak self] _ in
+                Task { [weak self] in await self?.handleTrackFailure(.trackStreamFailed) }
+            }
+        )
         await tracker.startTracking()
 
         // Audio file for this flight
@@ -357,6 +365,15 @@ actor RecordingCoordinator {
         }
     }
 
+    /// The track recorder lost points or its location stream. Recording continues (audio may still
+    /// be good), but the pilot must know the track is incomplete.
+    private func handleTrackFailure(_ error: RecordingError) async {
+        logger.error("Track recording problem: \(error.localizedDescription)")
+        await MainActor.run { [state] in
+            state.lastError = .recordingFailed(underlying: error)
+        }
+    }
+
     private func startCountdown() async {
         for remaining in stride(from: 3, through: 1, by: -1) {
             await MainActor.run { [state] in
@@ -418,6 +435,10 @@ enum RecordingError: LocalizedError, Sendable {
     case alreadyRecording
     case invalidState
     case notRecording
+    case trackWriteFailed
+    case trackStreamFailed
+    case trackUnreadable
+    case flightNotSaved
 
     var errorDescription: String? {
         switch self {
@@ -427,6 +448,14 @@ enum RecordingError: LocalizedError, Sendable {
             return "The recording cannot do that in its current state."
         case .notRecording:
             return "No recording is running."
+        case .trackWriteFailed:
+            return "The GPS track could not be saved. Some of this flight's track is missing."
+        case .trackStreamFailed:
+            return "GPS tracking stopped. The rest of this flight's track will not be recorded."
+        case .trackUnreadable:
+            return "This flight's track could not be read. The flight and its audio were kept and marked in History."
+        case .flightNotSaved:
+            return "This flight could not be saved to History. Its recording was kept and is recovered when you reopen the app."
         }
     }
 }

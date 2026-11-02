@@ -52,11 +52,21 @@ final class IsraelDiagramStore {
     }
 
     /// Ask the host for the latest servable edition. The installed pack keeps working when it fails.
+    /// The installed pack is re-hashed once per launch; a pack that fails is removed and the pilot is told.
     func refresh() async {
         isChecking = true
         defer { isChecking = false }
+        if !verified, pack != nil {
+            verified = true
+            if await service.verifyInstalled() == false {
+                reload()
+                errorMessage = EFBError.chartCorrupted(ChartPackService.regionName(service.product)).errorDescription
+            }
+        }
         latest = try? await service.latestServable(allowUnpublished: IsraelChartConfig.allowUnpublished)
     }
+
+    @ObservationIgnored private var verified = false
 
     /// True when the host has a servable edition that is not the installed one.
     var canDownload: Bool {

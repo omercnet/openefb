@@ -129,7 +129,13 @@ struct IsraelFlightPlanMessageTests {
         let plan = try Self.route([Self.point(1, "LLHZ", .arp, he: "הרצליה"), Self.point(2, "NTAIM"), Self.point(3, "LLIB", .arp, he: "ראש פינה")])
         let text = IsraelFlightPlanMessage.hebrewSummary(plan: plan, input: Self.input())
         // 11:00 UTC on 29 Sep 2022 is 14:00 in Israel (IDT); 20 NM at 90 kt lands 14:13.
-        #expect(text == "תכנית טיסה בנתיבי התובלה הנמוכים, המראה מהרצליה ב-29.09.2022 בשעה 14:00 זמן מקומי, נתיב: LLHZ NTAIM LLIB, נחיתה בראש פינה בשעה 14:13 זמן מקומי")
+        let f = "\u{2068}", p = "\u{2069}"
+        #expect(text == """
+        תכנית טיסה בנתיבי התובלה הנמוכים
+        המראה: \(f)הרצליה\(p), \(f)29.09.2022\(p) בשעה \(f)14:00\(p) זמן מקומי
+        נתיב: \(f)הרצליה\(p) - \(f)NTAIM\(p) - \(f)ראש פינה\(p)
+        נחיתה: \(f)ראש פינה\(p) בשעה \(f)14:13\(p) זמן מקומי
+        """)
     }
 
     // MARK: Validation

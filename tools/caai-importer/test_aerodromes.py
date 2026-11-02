@@ -21,7 +21,7 @@ def gis_from_database():
     """ARP points and runway rows exactly as build_points / build_runways produce them, read back from the built DB."""
     db = sqlite3.connect(str(ic.DEFAULT_OUTPUT))
     db.row_factory = sqlite3.Row
-    points = [dict(r) for r in db.execute("SELECT code, name_en, kind, lat, lon FROM reporting_points WHERE kind = 'arp'")]
+    points = [dict(r) for r in db.execute("SELECT code, name_en, kind, lat, lon FROM reporting_points WHERE kind = 'arp' AND network = 'cvfr'")]
     runways = [dict(r) for r in db.execute(
         "SELECT id, aerodrome, name_en, length_m, arp_lat, arp_lon, a_lat, a_lon, b_lat, b_lon FROM runways")]
     db.close()

@@ -226,7 +226,13 @@ nonisolated struct Notam: Identifiable, Equatable, Hashable, Sendable {
 nonisolated struct NotamReport: Sendable, Equatable {
     let location: String
     let notams: [Notam]
+    /// When the FAA last answered with this data. A fallback copy keeps its original time, so the
+    /// data-age badge shows the true age rather than the time of the failed refresh.
     let fetchedAt: Date
+    /// The latest refresh failed; `notams` is the last good copy.
+    var refreshFailed = false
+    /// The page cap or time budget stopped the download: later pages (possibly closures) are missing.
+    var isIncomplete = false
 }
 
 /// One decoded page of the FAA response.
@@ -244,12 +250,14 @@ actor NotamService: NotamServiceProtocol {
     nonisolated static let endpoint = "https://external-api.faa.gov/notamapi/v1/notams"
     nonisolated static let cacheExpiry: TimeInterval = 600  // 10 minutes
     nonisolated static let pageSize = 100                    // FAA allows up to 1000
-    nonisolated static let maxPages = 20                     // safety cap on pagination
+    nonisolated static let maxPages = 5                      // cap on sequential pages (500 NOTAMs)
+    nonisolated static let fetchBudget: TimeInterval = 30    // seconds for all pages of one airport
 
     private let session: URLSession
     private let credentialsProvider: @Sendable () -> NotamCredentials?
+    private let clock: @Sendable () -> Date
     /// All parsed NOTAMs per location query value; filtered for effectiveness on every read.
-    private var cache: [String: (notams: [Notam], fetchedAt: Date)] = [:]
+    private var cache: [String: (notams: [Notam], fetchedAt: Date, incomplete: Bool)] = [:]
 
     private let logger = Logger(subsystem: "quartermint.efb-212", category: "NotamService")
 
@@ -258,7 +266,9 @@ actor NotamService: NotamServiceProtocol {
     /// - Parameters:
     ///   - session: Override for tests; defaults to a session with short timeouts.
     ///   - credentials: Override for tests; defaults to reading the Keychain on every fetch.
-    init(session: URLSession? = nil, credentials: (@Sendable () -> NotamCredentials?)? = nil) {
+    ///   - now: Override for tests (cache age, fetch time budget).
+    init(session: URLSession? = nil, credentials: (@Sendable () -> NotamCredentials?)? = nil,
+         now: @escaping @Sendable () -> Date = { Date() }) {
         if let session {
             self.session = session
         } else {
@@ -269,6 +279,7 @@ actor NotamService: NotamServiceProtocol {
             self.session = URLSession(configuration: config)
         }
         self.credentialsProvider = credentials ?? { NotamCredentials.load() }
+        self.clock = now
     }
 
     // MARK: - Fetch
@@ -280,32 +291,54 @@ actor NotamService: NotamServiceProtocol {
 
         let query = Self.locationQuery(for: airport)
         let location = query.value ?? airport.icao
-        let now = Date()
+        let now = clock()
         if let cached = cache[location], now.timeIntervalSince(cached.fetchedAt) < Self.cacheExpiry {
             return NotamReport(
                 location: location,
                 notams: Self.activeSorted(cached.notams, at: now),
-                fetchedAt: cached.fetchedAt
+                fetchedAt: cached.fetchedAt,
+                isIncomplete: cached.incomplete
             )
         }
 
         var all: [Notam] = []
-        var pageNum = 1
-        var lastPage = 1
-        repeat {
-            let page = try await fetchPage(query: query, pageNum: pageNum, credentials: credentials)
-            all.append(contentsOf: page.notams)
-            lastPage = min(page.totalPages, Self.maxPages)
-            pageNum += 1
-        } while pageNum <= lastPage
+        var incomplete = false
+        do {
+            var pageNum = 1
+            var lastPage = 1
+            repeat {
+                let page = try await fetchPage(query: query, pageNum: pageNum, credentials: credentials)
+                all.append(contentsOf: page.notams)
+                lastPage = page.totalPages
+                pageNum += 1
+                if pageNum <= lastPage, pageNum > Self.maxPages || clock().timeIntervalSince(now) >= Self.fetchBudget {
+                    incomplete = true  // never present a cut-off list as complete
+                    break
+                }
+            } while pageNum <= lastPage
+        } catch {
+            // Fail honestly: serve the last good copy for this airport, flagged, with its true age.
+            if let previous = cache[location] {
+                logger.error("NOTAM refresh failed for \(location, privacy: .public), serving the copy from \(previous.fetchedAt): \(error.localizedDescription, privacy: .public)")
+                return NotamReport(
+                    location: location,
+                    notams: Self.activeSorted(previous.notams, at: now),
+                    fetchedAt: previous.fetchedAt,
+                    refreshFailed: true,
+                    isIncomplete: previous.incomplete
+                )
+            }
+            throw error
+        }
 
-        let fetchedAt = Date()
-        cache[location] = (all, fetchedAt)
-        logger.info("Fetched \(all.count) NOTAMs for \(location, privacy: .public)")
+        let fetchedAt = clock()
+        cache[location] = (all, fetchedAt, incomplete)
+        logger.info("Fetched \(all.count) NOTAMs for \(location, privacy: .public)\(incomplete ? " (incomplete)" : "")")
         return NotamReport(
             location: location,
             notams: Self.activeSorted(all, at: fetchedAt),
-            fetchedAt: fetchedAt
+            fetchedAt: fetchedAt,
+            isIncomplete: incomplete
         )
     }
 

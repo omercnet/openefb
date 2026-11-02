@@ -52,6 +52,7 @@ final class IsraelChartStore {
     /// Re-read the device state and ask the host for the latest servable edition.
     func refresh() async {
         installed = service.installed()
+        await verifyInstalledOnce()
         isChecking = true
         defer { isChecking = false }
         do {
@@ -61,6 +62,19 @@ final class IsraelChartStore {
             // Offline or host down: keep what is installed, say the check failed, never invent an edition.
             latest = nil
             checkFailed = true
+        }
+    }
+
+    @ObservationIgnored private var verified = false
+
+    /// Hashes the installed pack once per launch (off the main thread). A pack that fails its check is
+    /// removed and the pilot is told, instead of the map drawing from a corrupt file.
+    private func verifyInstalledOnce() async {
+        guard !verified, installed != nil else { return }
+        verified = true
+        if await service.verifyInstalled() == false {
+            installed = nil
+            errorMessage = EFBError.chartCorrupted(ChartPackService.regionName(service.product)).errorDescription
         }
     }
 

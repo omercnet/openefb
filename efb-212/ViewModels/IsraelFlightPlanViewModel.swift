@@ -42,6 +42,27 @@ final class IsraelFlightPlanViewModel {
     var allowByRequest: Bool = false { didSet { scheduleReroute() } }
     /// Pilot override: plan over blue military segments. The result is not fileable.
     var allowMilitary: Bool = false { didSet { scheduleReroute() } }
+    /// The route network the plan is flown on. Changing it clears the via points (their codes belong to one network).
+    var network: IsraelRouteNetwork = .cvfr {
+        didSet {
+            guard network != oldValue else { return }
+            viaCodes = []
+            viaError = nil
+            scheduleReroute()
+        }
+    }
+    /// The pilot picked the network; the aircraft profile no longer preselects it.
+    private(set) var networkChosenByPilot = false
+    /// The pilot's declaration that the departure day is a holiday or a holiday eve (no holiday calendar in the data).
+    var dayOverride: IsraelDayOverride = .none { didSet { scheduleReroute() } }
+    /// The AIP's weekend definition for the LSA routes, for display; nil until the database has been read.
+    private(set) var weekendRule: IsraelLSAWeekendRule?
+
+    /// Choose the network (the pilot's choice, which the aircraft profile no longer overrides).
+    func selectNetwork(_ newValue: IsraelRouteNetwork) {
+        networkChosenByPilot = true
+        network = newValue
+    }
     /// Persons on board for P/ when the aircraft profile has none.
     var personsOnBoardOverride: Int?
 
@@ -70,7 +91,7 @@ final class IsraelFlightPlanViewModel {
     private var modelContext: ModelContext?
     private var routeTask: Task<Void, Never>?
 
-    private var network: (points: [IsraelReportingPoint], segments: [IsraelRouteSegment])?
+    private var loadedNetworks: [IsraelRouteNetwork: (points: [IsraelReportingPoint], segments: [IsraelRouteSegment])] = [:]
 
     init(
         appState: AppState,
@@ -88,6 +109,14 @@ final class IsraelFlightPlanViewModel {
     func configure(mapService: MapService?, modelContext: ModelContext) {
         self.mapService = mapService
         self.modelContext = modelContext
+        preselectNetworkFromProfile()
+    }
+
+    /// The pilot's own choice stays; otherwise the active aircraft's usual network preselects the planner.
+    private func preselectNetworkFromProfile() {
+        guard !networkChosenByPilot, let profile = aircraftProfile,
+              let preferred = IsraelAircraftNetworkPreference.network(for: profile.id), preferred != network else { return }
+        network = preferred
     }
 
     /// The next full hour, at least 30 minutes ahead (A-11: file at least 60 min before ETD).
@@ -129,8 +158,8 @@ final class IsraelFlightPlanViewModel {
     func addVia(code rawCode: String) {
         let code = rawCode.trimmingCharacters(in: .whitespaces).uppercased()
         guard !code.isEmpty else { return }
-        guard let database = try? databaseProvider(), (try? database.reportingPoint(code: code)) != nil else {
-            viaError = "\(code) is not a reporting point of the CVFR network."
+        guard let database = try? databaseProvider(), (try? database.reportingPoint(code: code, network: network)) != nil else {
+            viaError = "\(code) is not a reporting point of the \(network.title) network."
             return
         }
         viaError = nil
@@ -182,12 +211,18 @@ final class IsraelFlightPlanViewModel {
         if let notamFetcher { report = try? await notamFetcher() }
         if Task.isCancelled { return }
         let current = now()
-        let network = IsraelChartNetwork(points: loaded.points, segments: loaded.segments)
-        let options = IsraelRouteOptions(allowByRequest: allowByRequest, allowMilitary: allowMilitary)
-        let applied = IsraelRoutePlanner.closures(
-            from: report, network: network, departure: departureTime, window: options.closureWindow, now: current
+        let chartNetwork = IsraelChartNetwork(points: loaded.points, segments: loaded.segments)
+        let options = IsraelRouteOptions(
+            allowByRequest: allowByRequest, allowMilitary: allowMilitary,
+            departure: departureTime, dayOverride: dayOverride
         )
+        let marks = IsraelRoutePlanner.closures(
+            from: report, network: chartNetwork, routeNetwork: network,
+            departure: departureTime, window: options.closureWindow, now: current
+        )
+        let applied = marks.segments
         closures = applied
+        unresolvedClosures = marks.unresolved
         closuresChecked = report.map {
             IsraelChartFeatureBuilder.drawableFreshness.contains($0.freshness(now: current).level)
         } ?? false
@@ -201,11 +236,13 @@ final class IsraelFlightPlanViewModel {
             plan = routed
             routeError = nil
             issues = IsraelFlightPlanValidator.validate(
-                plan: routed, closures: applied, closuresChecked: closuresChecked, input: messageInput()
+                plan: routed, closures: applied, unresolved: marks.unresolved,
+                closuresChecked: closuresChecked, input: messageInput()
             )
             fplText = IsraelFlightPlanMessage.fpl(plan: routed, input: messageInput())
             hebrewSummary = IsraelFlightPlanMessage.hebrewSummary(plan: routed, input: messageInput())
             draw(routed)
+            mapService?.israelLSA.setPlanUsesLSA(routed.network == .lsa)
         } catch {
             plan = nil
             routeError = error
@@ -213,6 +250,7 @@ final class IsraelFlightPlanViewModel {
             fplText = ""
             hebrewSummary = ""
             mapService?.clearRoute()
+            mapService?.israelLSA.setPlanUsesLSA(false)
         }
         isActive = false
     }
@@ -222,15 +260,18 @@ final class IsraelFlightPlanViewModel {
 
     /// Segment closures applied to the current plan; kept so the message can be re-validated after a profile edit.
     private var closures: [Int: IsraelSegmentClosure] = [:]
+    /// Closures the planner could not place on the network; each blocks filing.
+    private var unresolvedClosures: [IsraelUnresolvedClosure] = []
 
     private func loadNetwork() throws -> (points: [IsraelReportingPoint], segments: [IsraelRouteSegment]) {
-        if let network { return network }
+        if let cached = loadedNetworks[network] { return cached }
         let database = try databaseProvider()
         let loaded = (
-            points: try database.reportingPoints(in: .wholeCountry),
-            segments: try database.routeSegments(in: .wholeCountry)
+            points: try database.reportingPoints(in: .wholeCountry, network: network),
+            segments: try database.routeSegments(in: .wholeCountry, network: network)
         )
-        network = loaded
+        loadedNetworks[network] = loaded
+        if weekendRule == nil { weekendRule = (try? database.metadata())?.lsaWeekendRule }
         return loaded
     }
 
@@ -256,9 +297,12 @@ final class IsraelFlightPlanViewModel {
         guard let plan, let first = plan.legs.first, canFile else { return }
         let legs = plan.legs.map {
             ActiveRouteLeg(
+                segmentID: $0.segment.id,
                 fromCode: $0.from.code, toCode: $0.to.code,
+                fromLatitude: $0.from.latitude, fromLongitude: $0.from.longitude,
                 toLatitude: $0.to.latitude, toLongitude: $0.to.longitude,
-                altitudeText: $0.altitudeText, distanceNM: $0.distanceNM
+                altitudeText: $0.altitudeText, distanceNM: $0.distanceNM,
+                path: $0.polyline.map { [$0.latitude, $0.longitude] }
             )
         }
         appState.activeRoute = ActiveRoute(legs: legs)
@@ -292,6 +336,7 @@ final class IsraelFlightPlanViewModel {
         isActive = false
         if appState.activeRoute != nil { appState.clearActiveNavigation() }
         mapService?.clearRoute()
+        mapService?.israelLSA.setPlanUsesLSA(false)
     }
 
     // MARK: - Message input
@@ -337,7 +382,9 @@ final class IsraelFlightPlanViewModel {
         let input = messageInput()
         fplText = IsraelFlightPlanMessage.fpl(plan: plan, input: input)
         hebrewSummary = IsraelFlightPlanMessage.hebrewSummary(plan: plan, input: input)
-        issues = IsraelFlightPlanValidator.validate(plan: plan, closures: closures, closuresChecked: closuresChecked, input: input)
+        issues = IsraelFlightPlanValidator.validate(
+            plan: plan, closures: closures, unresolved: unresolvedClosures, closuresChecked: closuresChecked, input: input
+        )
     }
 
     /// Mail link with the message as the body, addressed to the pilot's own e-mail; the pilot forwards it

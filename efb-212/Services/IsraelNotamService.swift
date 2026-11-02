@@ -267,16 +267,29 @@ actor IsraelNotamService: IsraelNotamServiceProtocol {
     private let session: URLSession
     private let feedURLProvider: @Sendable () -> URL?
     private let now: @Sendable () -> Date
+    /// Where the last good feed is kept so an offline relaunch still has it; nil: memory only (tests).
+    private let storageURL: URL?
     private var cached: IsraelNotamReport?
 
     private let logger = Logger(subsystem: "quartermint.efb-212", category: "IsraelNotamService")
+
+    /// Application Support/IsraelNotam/last-feed.json
+    nonisolated static var defaultStorageURL: URL {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return support.appendingPathComponent("IsraelNotam", isDirectory: true).appendingPathComponent("last-feed.json")
+    }
 
     /// - Parameters:
     ///   - session: Override for tests; defaults to a session with short timeouts.
     ///   - feedURL: Override for tests; defaults to the URL stored under `feedURLDefaultsKey`.
     ///   - now: Override for tests.
-    init(session: URLSession? = nil, feedURL: (@Sendable () -> URL?)? = nil, now: @escaping @Sendable () -> Date = { Date() }) {
+    ///   - storageURL: Override for tests. When omitted, the production service (no `session` override)
+    ///     persists to `defaultStorageURL`; a service with an injected session stays memory-only.
+    init(session: URLSession? = nil, feedURL: (@Sendable () -> URL?)? = nil, now: @escaping @Sendable () -> Date = { Date() },
+         storageURL: URL? = nil) {
         self.now = now
+        self.storageURL = storageURL ?? (session == nil ? Self.defaultStorageURL : nil)
         if let session {
             self.session = session
         } else {
@@ -301,17 +314,49 @@ actor IsraelNotamService: IsraelNotamServiceProtocol {
             let feed = try await download(url)
             let report = IsraelNotamReport(feed: feed, fetchedAt: now(), refreshFailed: false)
             cached = report
+            persist(report)
             logger.info("Fetched \(feed.items.count) Israel NOTAMs, \(feed.closures.count) route closures")
             return report
         } catch {
-            if let cached {
-                logger.error("Israel NOTAM refresh failed, serving cached copy: \(error.localizedDescription, privacy: .public)")
-                let stale = IsraelNotamReport(feed: cached.feed, fetchedAt: cached.fetchedAt, refreshFailed: true)
+            if let previous = cached ?? loadPersisted() {
+                logger.error("Israel NOTAM refresh failed, serving the saved copy: \(error.localizedDescription, privacy: .public)")
+                let stale = IsraelNotamReport(feed: previous.feed, fetchedAt: previous.fetchedAt, refreshFailed: true)
                 self.cached = stale
                 return stale
             }
             throw error
         }
+    }
+
+    // MARK: Persistence
+
+    private struct SavedFeed: Codable {
+        let feed: IsraelNotamFeed
+        let fetchedAt: Date
+    }
+
+    /// Writes the last good feed (atomic). A failure to save never blocks the feed.
+    private func persist(_ report: IsraelNotamReport) {
+        guard let storageURL else { return }
+        do {
+            try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            try encoder.encode(SavedFeed(feed: report.feed, fetchedAt: report.fetchedAt)).write(to: storageURL, options: .atomic)
+        } catch {
+            logger.error("Could not save the Israel NOTAM feed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// The saved feed, or nil when none exists or it cannot be read. Display age comes from the feed's own
+    /// `generatedAt`, so a copy that is too old is still gated by the existing freshness rules.
+    private func loadPersisted() -> IsraelNotamReport? {
+        guard let storageURL, let data = try? Data(contentsOf: storageURL) else { return nil }
+        guard let saved = try? Self.decoder.decode(SavedFeed.self, from: data) else {
+            logger.error("Saved Israel NOTAM feed is unreadable; ignoring it")
+            return nil
+        }
+        return IsraelNotamReport(feed: saved.feed, fetchedAt: saved.fetchedAt, refreshFailed: true)
     }
 
     private func download(_ url: URL) async throws -> IsraelNotamFeed {

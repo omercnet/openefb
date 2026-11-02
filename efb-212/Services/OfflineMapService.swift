@@ -269,6 +269,11 @@ nonisolated enum OfflinePackState: Sendable, Equatable {
     case paused
     case complete
     case failed(String)
+
+    var isFailed: Bool {
+        if case .failed = self { return true }
+        return false
+    }
 }
 
 /// Snapshot of one pack for the UI and the status resolver. Built from `MLNOfflinePack`
@@ -286,6 +291,12 @@ nonisolated struct OfflinePackSummary: Identifiable, Sendable, Equatable {
     var fraction: Double {
         guard expectedResources > 0 else { return state == .complete ? 1 : 0 }
         return min(1, Double(completedResources) / Double(expectedResources))
+    }
+
+    /// MapLibre says complete and every expected resource was fetched. A "complete" pack with
+    /// resources missing must not read as offline-ready.
+    var hasAllResources: Bool {
+        state == .complete && completedResources >= expectedResources
     }
 
     /// Sectional packs fetched before the current cycle's effective date are expired.
@@ -328,17 +339,21 @@ nonisolated enum OfflineStatusResolver {
 
     /// Status of `visible` for a single layer. Coverage is judged per pack (a region inside
     /// one pack's box is ready); two packs that only together cover the view read as partial.
+    /// A failed or removed pack provides nothing offline and is ignored; a pack MapLibre marks
+    /// complete but that is missing resources is only partial.
     static func status(
         visible: OfflineRegionBounds,
         layer: OfflineLayer,
         packs: [OfflinePackSummary],
         at date: Date = Date()
     ) -> OfflineStatus {
-        let relevant = packs.filter { $0.context.layer == layer && $0.context.bounds.intersects(visible) }
+        let relevant = packs.filter {
+            $0.context.layer == layer && $0.context.bounds.intersects(visible) && !$0.state.isFailed
+        }
         guard !relevant.isEmpty else { return .notDownloaded }
 
         let current = relevant.filter { !$0.isExpired(at: date) }
-        if current.contains(where: { $0.state == .complete && $0.context.bounds.contains(visible) }) {
+        if current.contains(where: { $0.hasAllResources && $0.context.bounds.contains(visible) }) {
             return .ready
         }
         if current.isEmpty {

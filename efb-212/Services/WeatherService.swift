@@ -18,6 +18,8 @@ actor WeatherService: WeatherServiceProtocol {
     /// without hopping onto the actor.
     nonisolated private let cache = OSAllocatedUnfairLock<[String: WeatherCache]>(initialState: [:])
     private let session: URLSession
+    /// Clock for cache expiry and `fetchedAt`. Tests inject a fixed or advancing clock.
+    nonisolated private let now: @Sendable () -> Date
     nonisolated private static let metarURL = "https://aviationweather.gov/api/data/metar"
     nonisolated private static let tafURL = "https://aviationweather.gov/api/data/taf"
     nonisolated private static let cacheExpiry: TimeInterval = 900  // 15 minutes
@@ -26,8 +28,11 @@ actor WeatherService: WeatherServiceProtocol {
 
     // MARK: - Init
 
-    /// - Parameter session: Override for tests; defaults to a session with short timeouts.
-    init(session: URLSession? = nil) {
+    /// - Parameters:
+    ///   - session: Override for tests; defaults to a session with short timeouts.
+    ///   - now: Clock; defaults to the wall clock.
+    init(session: URLSession? = nil, now: @escaping @Sendable () -> Date = { Date() }) {
+        self.now = now
         if let session {
             self.session = session
         } else {
@@ -43,7 +48,7 @@ actor WeatherService: WeatherServiceProtocol {
 
     func fetchMETAR(for stationID: String) async throws -> WeatherCache {
         // Check cache -- return if fresh (< 15 minutes old)
-        if let cached = cachedWeather(for: stationID), cached.age < Self.cacheExpiry {
+        if let cached = cachedWeather(for: stationID), now().timeIntervalSince(cached.fetchedAt) < Self.cacheExpiry {
             return cached
         }
 
@@ -103,7 +108,7 @@ actor WeatherService: WeatherServiceProtocol {
         var needsFetch: [String] = []
 
         for id in stationIDs {
-            if let cached = cachedWeather(for: id), cached.age < Self.cacheExpiry {
+            if let cached = cachedWeather(for: id), now().timeIntervalSince(cached.fetchedAt) < Self.cacheExpiry {
                 results.append(cached)
             } else {
                 needsFetch.append(id)
@@ -136,6 +141,13 @@ actor WeatherService: WeatherServiceProtocol {
                 logger.warning("Batch weather fetch failed for \(batch.count) stations: \(error.localizedDescription)")
                 // Continue with other batches
             }
+        }
+
+        // A station the network did not answer for (offline, failed batch, no report) is served from the
+        // last cached report, however old, so the map keeps its dots and the age badge says how old they are.
+        let answered = Set(results.map(\.stationID))
+        for id in needsFetch where !answered.contains(id) {
+            if let stale = cachedWeather(for: id) { results.append(stale) }
         }
 
         return results
@@ -237,7 +249,7 @@ actor WeatherService: WeatherServiceProtocol {
                 flightCategory: fltCat,
                 observationTime: obsTime,
                 altimeterHPa: altimeterHPa,
-                fetchedAt: Date()
+                fetchedAt: now()
             )
         }
     }

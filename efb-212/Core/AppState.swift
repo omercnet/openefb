@@ -31,6 +31,8 @@ final class AppState {
     var selectedAirportID: String?
     var isPresentingLayerControls: Bool = false
     var isPresentingNearestList: Bool = false
+    /// Israel NOTAM briefing sheet over the map (IL-BRIEF).
+    var isPresentingIsraelBriefing: Bool = false
     var searchQuery: String = ""
 
     // MARK: - Region (IL-2)

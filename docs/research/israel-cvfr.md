@@ -76,7 +76,7 @@ machine-readable route data) resolve in opposite directions:
 - Route-following: next reporting point, ETA, published altitude for the current leg and direction; border and P/R
   proximity alerts.
 - Recording/debrief unchanged (J4).
-Not in v1: flight-plan filing (email/phone only, no API), sport-aviation ("LSA") map, helicopter routes, Hebrew UI.
+Not in v1: flight-plan filing (email/phone only, no API), helicopter routes, Hebrew UI. (The sport-aviation "LSA" network shipped later: see IL-LSA below.)
 
 ---
 
@@ -311,7 +311,9 @@ Sizes: S ≤ 2 days, M ≤ 1 week, L > 1 week. "Owner" = product owner decision.
 | IL-11 | **Debrief for CVFR (J4).** Per-leg altitude adherence, reporting-point passage times, Hebrew transcription vocabulary (point names, "דיווח", squawk). | M | IL-7, existing SFR work |
 | IL-12 | **Review with an Israeli CFI.** Walk through rules in §2 against the app; fix symbology/wording. | S | IL-3, IL-7, IL-8 |
 
-> **Shipped (IL-PLAN, T15):** `IsraelRoutePlanner` (Dijkstra over the open CVFR network: published direction only, by-request and military excluded unless overridden and then not fileable, NOTAM closures for the departure window, via points, return flight), `IsraelFlightPlanMessage` (ICAO FPL text in the A-11 layout, ZZZZ with DEP/ and DEST/ for non-ICAO strips, `4X` prefix, Hebrew summary, filing validator) and the Israel branch of the Plans tab (`IsraelFlightPlanView`). The FPL is shared or e-mailed by the pilot; the app never sends it. Activation feeds `AppState.activeRoute` (next point, leg altitude, DTG/ETE). The LSA network is not imported: efb-14e.
+> **Shipped (IL-PLAN, T15):** `IsraelRoutePlanner` (Dijkstra over the open CVFR network: published direction only, by-request and military excluded unless overridden and then not fileable, NOTAM closures for the departure window, via points, return flight), `IsraelFlightPlanMessage` (ICAO FPL text in the A-11 layout, ZZZZ with DEP/ and DEST/ for non-ICAO strips, `4X` prefix, Hebrew summary, filing validator) and the Israel branch of the Plans tab (`IsraelFlightPlanView`). The FPL is shared or e-mailed by the pilot; the app never sends it. Activation feeds `AppState.activeRoute` (next point, leg altitude, DTG/ETE).
+
+> **Shipped (IL-LSA, T24; beads efb-14e, efb-qpk):** the sport-aviation (LSA) network from CAAI `Sportiv 2026.zip` (215 points, 229 routes, six route ends that the points layer does not list) is in `israel-aviation.sqlite` beside CVFR (`network` column, schema 3). The planner takes a network per plan (CVFR / LSA); the aircraft profile's usual network preselects it. LSA routes carry `activity` from the layer's `localType` (AllWeek 96, Weekend 92, special 39, unspecified 2); a Weekend-only route is left out when the departure is not in a weekend and each leg is checked at its own time (Saturday and, from 14:00, Friday are in use; Friday 06:00 to 14:00 blocks filing, because the AIP default starts at 06:00 but some bubbles start at 12:00 or 14:00 and the layer does not say which; holidays are declared by the pilot). The weekend definition (domestic AIP B-08 section 1 item ז, PDF page 147) is stored in `metadata.lsa_weekend_rule` and shown in the planner. NOTAM closures naming LSA, ULTRALIGHT or SPORT apply to the LSA network. A closure the planner cannot place on the network (unknown code, or a leg with no segment) now blocks filing with "Unresolved closure: check NOTAM <id>" (efb-qpk). Open questions for a CAAI reviewer: which direction ALT belongs to on the 56 two-way routes drawn second to first (read as first to second), what the `DUCH` and `BACKAZ` fields mean, and the per-route Friday start.
 
 Critical path: IL-0/IL-1 → IL-3 → IL-7 → IL-8; IL-6 in parallel after IL-1.
 

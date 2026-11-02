@@ -25,8 +25,9 @@ npx wrangler r2 bucket cors set openefb-charts --file cors.json
 npx wrangler r2 bucket dev-url enable openefb-charts     # prints https://pub-<hash>.r2.dev ; or attach a custom domain in the dashboard
 ```
 
+The bucket is live (`openefb-charts`, dev URL `https://pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev`, checked 2026-11-02) with `israel-cvfr` edition 2025-02 and `il-diagrams` edition 2026-08b published, and the app's built-in base URL points at it.
 r2.dev URLs are rate-limited and meant for development; attach a custom domain (dashboard > R2 > bucket > Settings)
-before pilots depend on it. Don't upload anything publicly before the CAAI permission is settled (IL-9).
+before pilots depend on it, then change `IsraelChartConfig.defaultBaseURL` (or set the `israelChartBaseURL` default). The CAAI chart and diagram artwork is © CAAI and Mapa Ltd: publish a new edition only with the owner's go-ahead (`--approve`).
 
 ## Publish an edition
 

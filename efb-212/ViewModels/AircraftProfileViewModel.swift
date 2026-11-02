@@ -60,8 +60,9 @@ final class AircraftProfileViewModel {
         }
     }
 
-    /// Create a new aircraft profile with the given N-number.
-    func addProfile(nNumber: String) {
+    /// Create a new aircraft profile with the given N-number and return it.
+    @discardableResult
+    func addProfile(nNumber: String) -> SchemaV1.AircraftProfile {
         let profile = SchemaV1.AircraftProfile(nNumber: nNumber)
         modelContext.insert(profile)
 
@@ -72,6 +73,7 @@ final class AircraftProfileViewModel {
         }
 
         loadProfiles()
+        return profile
     }
 
     /// Delete the specified aircraft profile.

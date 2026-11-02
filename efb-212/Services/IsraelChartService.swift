@@ -63,9 +63,34 @@ nonisolated protocol ChartPackServiceProtocol: Sendable {
     /// Downloads (resuming a partial download), verifies every file's SHA-256 and installs the edition.
     func download(_ manifest: IsraelChartManifest, progress: @escaping @Sendable (Double) -> Void) async throws -> ChartPackInstalled
     func installed() -> ChartPackInstalled?
+    /// Re-hashes every installed file against its recorded SHA-256. A pack that fails is removed.
+    /// True when the pack is intact, or when nothing is installed.
+    func verifyInstalled() async -> Bool
     /// Location of an installed file; nil when nothing is installed or the file is missing.
     func fileURL(_ name: String) -> URL?
     func remove()
+}
+
+// MARK: - Retry policy
+
+/// Bounded retry for pack downloads. A transport error (stalled connection, lost signal) is retried
+/// after `delay(beforeAttempt:)`; the partial file is kept, so each retry resumes with a Range request.
+/// HTTP errors, checksum failures and cancellation are never retried.
+nonisolated struct ChartPackRetryPolicy: Sendable {
+    /// Total attempts per file, including the first.
+    var maxAttempts: Int
+    /// Base delay; attempt n (1-based retry) waits base * 2^(n-1), with up to 25% jitter.
+    var baseDelay: Duration
+
+    static let standard = ChartPackRetryPolicy(maxAttempts: 4, baseDelay: .seconds(2))
+    static let none = ChartPackRetryPolicy(maxAttempts: 1, baseDelay: .zero)
+
+    func delay(beforeRetry retry: Int) -> Duration {
+        guard retry > 0, baseDelay > .zero else { return .zero }
+        let scaled = baseDelay * (1 << min(retry - 1, 6))
+        let jitter = Double.random(in: 0...0.25)
+        return scaled + scaled * jitter
+    }
 }
 
 // MARK: - Service
@@ -75,6 +100,12 @@ actor ChartPackService: ChartPackServiceProtocol {
     private let baseURL: URL
     private let productDirectory: URL
     private let session: URLSession
+    private let retryPolicy: ChartPackRetryPolicy
+
+    /// Request timeout: a connection that moves no bytes for this long is dropped (then retried).
+    static let requestTimeout: TimeInterval = 30
+    /// Resource timeout: the longest one file transfer may take in total.
+    static let resourceTimeout: TimeInterval = 20 * 60
 
     static var defaultRoot: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -82,11 +113,25 @@ actor ChartPackService: ChartPackServiceProtocol {
         return support.appendingPathComponent("ChartPacks", isDirectory: true)
     }
 
-    init(product: String, baseURL: URL, rootDirectory: URL? = nil, session: URLSession = .shared) {
+    /// Dedicated session: bounded timeouts (the shared session waits 7 days for a resource) and
+    /// `waitsForConnectivity`, so a brief loss of signal does not fail the attempt at once.
+    nonisolated static func makeSession() -> URLSession {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = requestTimeout
+        config.timeoutIntervalForResource = resourceTimeout
+        config.waitsForConnectivity = true
+        config.allowsExpensiveNetworkAccess = true
+        config.urlCache = nil
+        return URLSession(configuration: config)
+    }
+
+    init(product: String, baseURL: URL, rootDirectory: URL? = nil, session: URLSession? = nil,
+         retryPolicy: ChartPackRetryPolicy = .standard) {
         self.product = product
         self.baseURL = baseURL
         self.productDirectory = (rootDirectory ?? Self.defaultRoot).appendingPathComponent(product, isDirectory: true)
-        self.session = session
+        self.session = session ?? Self.makeSession()
+        self.retryPolicy = retryPolicy
     }
 
     // MARK: Network
@@ -152,6 +197,21 @@ actor ChartPackService: ChartPackServiceProtocol {
         return record
     }
 
+    /// The size check in `installed()` runs on the main thread, so it never hashes. This re-hashes every
+    /// installed file off the main thread; the stores call it once per launch. A pack that fails is removed.
+    func verifyInstalled() async -> Bool {
+        guard let record = installed() else { return true }
+        let dir = productDirectory.appendingPathComponent(record.edition, isDirectory: true)
+        for file in record.files {
+            let digest = try? Self.sha256(of: dir.appendingPathComponent(file.name))
+            if digest != file.sha256.lowercased() {
+                remove()
+                return false
+            }
+        }
+        return true
+    }
+
     nonisolated func fileURL(_ name: String) -> URL? {
         guard let record = installed(), record.files.contains(where: { $0.name == name }) else { return nil }
         return productDirectory.appendingPathComponent(record.edition, isDirectory: true).appendingPathComponent(name)
@@ -176,7 +236,7 @@ actor ChartPackService: ChartPackServiceProtocol {
         for file in manifest.files {
             let destination = stage.appendingPathComponent(file.name)
             let base = done
-            try await fetch(file, edition: manifest.edition, to: destination) { fileBytes in
+            try await fetchWithRetry(file, edition: manifest.edition, to: destination) { fileBytes in
                 progress(min(1, Double(base + fileBytes) / Double(total)))
             }
             // Verify before the file can ever be used. A bad file is deleted so a retry starts clean.
@@ -218,6 +278,22 @@ actor ChartPackService: ChartPackServiceProtocol {
             if let url = URL(string: path, relativeTo: root)?.absoluteURL { return url }
         }
         return productURL(edition, file.name)
+    }
+
+    /// Retries a file after a transport error, with exponential backoff. The partial file stays on disk,
+    /// so every retry resumes with a Range request. Cancellation (Pause) and non-transport errors propagate.
+    private func fetchWithRetry(_ file: IsraelChartManifest.File, edition: String, to destination: URL,
+                                onBytes: @Sendable (Int) -> Void) async throws {
+        var attempt = 1
+        while true {
+            do {
+                try await fetch(file, edition: edition, to: destination, onBytes: onBytes)
+                return
+            } catch EFBError.networkUnavailable where attempt < retryPolicy.maxAttempts {
+                try await Task.sleep(for: retryPolicy.delay(beforeRetry: attempt))
+                attempt += 1
+            }
+        }
     }
 
     /// Streams `file` to `destination`, resuming from a partial file with a Range request.

@@ -38,8 +38,12 @@ final class MockDatabaseManager: DatabaseServiceProtocol, @unchecked Sendable {
         }
     }
 
+    /// When set, `airspaces(near:radiusNM:)` throws it (database failure).
+    var airspacesError: Error?
+
     func airspaces(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Airspace] {
-        airspacesData
+        if let airspacesError { throw airspacesError }
+        return airspacesData
     }
 
     func navaids(near coordinate: CLLocationCoordinate2D, radiusNM: Double) throws -> [Navaid] {

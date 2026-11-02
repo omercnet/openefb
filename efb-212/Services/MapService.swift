@@ -31,6 +31,8 @@ final class MapService {
     let airportDiagramOverlay = AirportDiagramOverlay()
     /// Israel CVFR chart (IL-3): routes, points, airspace, runways, NOTAM closures. Active only in Israel.
     let israelChart = IsraelChartOverlay()
+    /// Israel sport-aviation (LSA) network: shown when the Layers panel or an LSA plan asks for it. Active only in Israel.
+    let israelLSA = IsraelLSAOverlay()
     /// Official CAAI CVFR chart raster from the downloaded pack (IL-9); the base chart in Israel.
     let israelOfficialChart = IsraelOfficialChartLayer()
 
@@ -75,6 +77,7 @@ final class MapService {
         addRouteLayer(to: style)
         if let mapView { airportDiagramOverlay.attach(style: style, mapView: mapView) }
         israelChart.attach(style: style)
+        israelLSA.attach(style: style)
         israelOfficialChart.attach(style: style)
     }
 
@@ -276,11 +279,19 @@ final class MapService {
         fillLayer.fillOpacity = NSExpression(forKeyPath: "opacity")
         style.addLayer(fillLayer)
 
-        // 2pt solid red border
+        // 2pt solid red border for current data; dashed for a stale snapshot (marked "OLD" in the badge stack)
         let lineLayer = MLNLineStyleLayer(identifier: "tfr-border", source: source)
         lineLayer.lineColor = NSExpression(forConstantValue: UIColor.systemRed)
         lineLayer.lineWidth = NSExpression(forConstantValue: 2.0)
+        lineLayer.predicate = NSPredicate(format: "stale == 0")
         style.addLayer(lineLayer)
+
+        let staleLineLayer = MLNLineStyleLayer(identifier: "tfr-border-stale", source: source)
+        staleLineLayer.lineColor = NSExpression(forConstantValue: UIColor.systemRed)
+        staleLineLayer.lineWidth = NSExpression(forConstantValue: 2.0)
+        staleLineLayer.lineDashPattern = NSExpression(forConstantValue: [2, 2])
+        staleLineLayer.predicate = NSPredicate(format: "stale == 1")
+        style.addLayer(staleLineLayer)
     }
 
     // MARK: - Advisory Layer (AIRMET / SIGMET / G-AIRMET)
@@ -299,19 +310,29 @@ final class MapService {
 
         let fillLayer = MLNFillStyleLayer(identifier: "advisory-fill", source: source)
         fillLayer.fillColor = NSExpression(forKeyPath: "color")
-        fillLayer.fillOpacity = NSExpression(forConstantValue: 0.15)
+        fillLayer.fillOpacity = NSExpression(forKeyPath: "opacity")  // 0.15 current, 0.06 stale
 
         let lineLayer = MLNLineStyleLayer(identifier: "advisory-border", source: source)
         lineLayer.lineColor = NSExpression(forKeyPath: "color")
         lineLayer.lineWidth = NSExpression(forConstantValue: 1.5)
         lineLayer.lineDashPattern = NSExpression(forConstantValue: [4, 2])
+        lineLayer.predicate = NSPredicate(format: "stale == 0")
+
+        // Stale snapshot: sparser dots, so it reads differently from a current advisory outline.
+        let staleLineLayer = MLNLineStyleLayer(identifier: "advisory-border-stale", source: source)
+        staleLineLayer.lineColor = NSExpression(forKeyPath: "color")
+        staleLineLayer.lineWidth = NSExpression(forConstantValue: 1.5)
+        staleLineLayer.lineDashPattern = NSExpression(forConstantValue: [1, 3])
+        staleLineLayer.predicate = NSPredicate(format: "stale == 1")
 
         if let ownship = style.layer(withIdentifier: "ownship-symbol") {
             style.insertLayer(fillLayer, below: ownship)
             style.insertLayer(lineLayer, below: ownship)
+            style.insertLayer(staleLineLayer, below: ownship)
         } else {
             style.addLayer(fillLayer)
             style.addLayer(lineLayer)
+            style.addLayer(staleLineLayer)
         }
     }
 
@@ -441,32 +462,39 @@ final class MapService {
     }
 
     /// Draw TFR polygons. In-effect TFRs get a stronger fill than upcoming ones; expired
-    /// TFRs (possible when serving a stale cache) are skipped.
-    func updateTFRs(_ tfrs: [TFR], now: Date = Date()) {
+    /// TFRs (possible when serving a stale cache) are skipped. A stale snapshot (`stale`) is drawn
+    /// with a fainter fill and a dashed border; the caller passes no TFRs at all once the snapshot
+    /// is past its useful life (it is never drawn as current).
+    func updateTFRs(_ tfrs: [TFR], now: Date = Date(), stale: Bool = false) {
         let features: [MLNShape] = tfrs.compactMap { tfr -> MLNShape? in
             if let expiration = tfr.expirationDate, expiration < now { return nil }
             guard let polygon = Self.polygonFeature(tfr.boundaries) else { return nil }
+            let opacity = tfr.isActive(at: now) ? 0.25 : 0.08
             polygon.attributes = [
                 "id": tfr.id,
                 "notam": tfr.notamID,
                 "type": tfr.type.rawValue,
                 "altitudes": tfr.altitudeDescription,
-                "opacity": tfr.isActive(at: now) ? 0.25 : 0.08
+                "opacity": stale ? opacity * 0.5 : opacity,
+                "stale": stale ? 1 : 0
             ]
             return polygon
         }
         tfrSource?.shape = MLNShapeCollectionFeature(shapes: features)
     }
 
-    /// Draw advisory polygons, colored by hazard. Callers pass only currently valid advisories.
-    func updateAdvisories(_ advisories: [AviationAdvisory]) {
+    /// Draw advisory polygons, colored by hazard. Callers pass only currently valid advisories,
+    /// and none once the snapshot is past its useful life. `stale` draws a fainter, sparser-dashed style.
+    func updateAdvisories(_ advisories: [AviationAdvisory], stale: Bool = false) {
         let features: [MLNShape] = advisories.compactMap { advisory -> MLNShape? in
             guard let polygon = Self.polygonFeature(advisory.boundaries) else { return nil }
             polygon.attributes = [
                 "id": advisory.id,
                 "kind": advisory.kind.rawValue,
                 "hazard": advisory.hazardCode,
-                "color": advisory.colorHex
+                "color": advisory.colorHex,
+                "opacity": stale ? 0.06 : 0.15,
+                "stale": stale ? 1 : 0
             ]
             return polygon
         }
@@ -490,9 +518,9 @@ final class MapService {
         style.addSource(source)
         self.routeSource = source
 
-        // Magenta (systemPink) 3pt line with rounded caps/joins
+        // Aviation magenta 3pt line with rounded caps/joins; `applyDisplayMode` swaps the night tint.
         let lineLayer = MLNLineStyleLayer(identifier: "route-line-layer", source: source)
-        lineLayer.lineColor = NSExpression(forConstantValue: UIColor.systemPink)
+        lineLayer.lineColor = NSExpression(forConstantValue: Palette.routeLineDay)
         lineLayer.lineWidth = NSExpression(forConstantValue: 3.0)
         lineLayer.lineCap = NSExpression(forConstantValue: "round")
         lineLayer.lineJoin = NSExpression(forConstantValue: "round")
@@ -709,6 +737,10 @@ final class MapService {
 
     /// Toggle style layer visibility by MapLayer enum.
     func setLayerVisibility(_ layer: MapLayer, visible: Bool) {
+        if layer == .lsaRoutes {
+            israelLSA.setLayerVisible(visible)
+            return
+        }
         if layer.isCVFRChart {
             israelChart.setVisible(layer, visible: visible)
             return
@@ -727,14 +759,15 @@ final class MapService {
         case .navaids: return ["navaid-circles"]
         case .airspace: return ["airspace-fill", "airspace-border", "airspace-labels"]
         case .weatherDots: return ["weather-circles"]
-        case .tfrs: return ["tfr-fill", "tfr-border"]
-        case .advisories: return ["advisory-fill", "advisory-border"]
+        case .tfrs: return ["tfr-fill", "tfr-border", "tfr-border-stale"]
+        case .advisories: return ["advisory-fill", "advisory-border", "advisory-border-stale"]
         case .ownship: return ["ownship-symbol"]
         case .sectional: return []  // the sectional is a base-style.json layer driven by `setMapStyle`
         // The route line is shown by having a route in its source, never hidden by the layer sync:
         // `.route` is not in `visibleLayers`, so the sync would hide a drawn route on its next pass.
         case .route: return []
         case .cvfrRoutes, .cvfrPoints, .cvfrAirspace, .cvfrRunways, .cvfrClosures: return []  // drawn by `israelChart`
+        case .lsaRoutes: return []  // drawn by `israelLSA`
         }
     }
 
@@ -799,6 +832,9 @@ final class MapService {
             navaids.circleColor = NSExpression(
                 forConstantValue: night ? NightPalette.navaidDot : UIColor.systemPurple
             )
+        }
+        if let route = style.layer(withIdentifier: "route-line-layer") as? MLNLineStyleLayer {
+            route.lineColor = NSExpression(forConstantValue: night ? Palette.routeLineNight : Palette.routeLineDay)
         }
         airportDiagramOverlay.applyDisplayMode(night: night)
         israelChart.applyDisplayMode(night: night)

@@ -91,6 +91,8 @@ final class AirportDiagramOverlay {
             guard region != oldValue else { return }
             removeAll()
             unavailable = []
+            failedAt = [:]
+            failedAirports = []
             refresh(force: true)
         }
     }
@@ -98,6 +100,16 @@ final class AirportDiagramOverlay {
     private var entries: [String: Entry] = [:]          // ICAO -> drawn diagram
     private var loading: Set<String> = []                // ICAO being fetched / fitted
     private var unavailable: Set<String> = []            // ICAO with no usable diagram this session
+    private var failedAt: [String: Date] = [:]           // ICAO whose diagram failed to load (error), with when
+
+    /// ICAO idents whose diagram could not be loaded (not "no diagram"): surfaced on the map, retried later.
+    private(set) var failedAirports: [String] = []
+    nonisolated static let retryAfter: TimeInterval = 300
+
+    private func isWaitingToRetry(_ icao: String) -> Bool {
+        guard let failed = failedAt[icao] else { return false }
+        return Date().timeIntervalSince(failed) < Self.retryAfter
+    }
     private var pollTimer: Timer?
     private var lastCamera: (latitude: Double, longitude: Double, zoom: Double)?
     private let logger = Logger(subsystem: "quartermint.efb-212", category: "AirportDiagramOverlay")
@@ -178,7 +190,7 @@ final class AirportDiagramOverlay {
         }
         let origin = CLLocation(latitude: center.latitude, longitude: center.longitude)
         let wanted = candidates
-            .filter { $0.type == .airport && !unavailable.contains($0.icao) }
+            .filter { $0.type == .airport && !unavailable.contains($0.icao) && !isWaitingToRetry($0.icao) }
             .sorted { origin.distance(from: CLLocation(latitude: $0.latitude, longitude: $0.longitude))
                     < origin.distance(from: CLLocation(latitude: $1.latitude, longitude: $1.longitude)) }
             .prefix(Self.maximumAirports)
@@ -221,12 +233,24 @@ final class AirportDiagramOverlay {
                 logger.notice("APD \(airport.icao, privacy: .public) not drawn: \(reason, privacy: .public)")
                 unavailable.insert(airport.icao)
             case .accepted(let georeference, let image):
+                clearFailure(airport.icao)
                 add(icao: airport.icao, georeference: georeference, image: image)
             }
         } catch {
+            // A load error (no signal, bad download) is not "no diagram": show it, and try again later.
             logger.error("APD \(airport.icao, privacy: .public) failed: \(error.localizedDescription, privacy: .public)")
-            unavailable.insert(airport.icao)
+            noteFailure(airport.icao)
         }
+    }
+
+    private func noteFailure(_ icao: String) {
+        failedAt[icao] = Date()
+        failedAirports = failedAt.keys.sorted()
+    }
+
+    private func clearFailure(_ icao: String) {
+        guard failedAt.removeValue(forKey: icao) != nil else { return }
+        failedAirports = failedAt.keys.sorted()
     }
 
     // MARK: - Israel (IL-13)
@@ -389,6 +413,7 @@ final class AirportDiagramOverlay {
             backingSourceID: backingSourceID, backingLayerID: backingLayerID, georeference: georeference
         )
         shownAirports = entries.keys.sorted()
+        isShowing = visible   // the Israel source badge reads this; don't wait for the next camera poll
         if region == .israel {
             // IL-3 adds its airspace fills below ownship as its data loads, which can land them above the diagram.
             raiseAboveIsraelFills()

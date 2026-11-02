@@ -15,11 +15,12 @@ struct AircraftEditView: View {
     /// Existing profile to edit (nil = creating new).
     let profile: SchemaV1.AircraftProfile?
 
-    /// Called when saving edits to an existing profile.
+    /// Called after the form is applied to the profile (existing or just created); persists and closes.
     let onSave: () -> Void
 
-    /// Called when creating a new profile -- passes the N-number.
-    let onAddNew: (String) -> Void
+    /// Called when creating a new profile -- passes the N-number and returns the inserted profile,
+    /// which the form then fills with every field (not just the N-number).
+    let onAddNew: (String) -> SchemaV1.AircraftProfile
 
     // MARK: - Form State
 
@@ -27,6 +28,7 @@ struct AircraftEditView: View {
     @State private var aircraftType: String = ""
     @State private var icaoType: String = ""
     @State private var personsOnBoard: String = ""
+    @State private var routeNetwork: IsraelRouteNetwork?
     @State private var fuelCapacity: String = ""
     @State private var fuelBurn: String = ""
     @State private var cruiseSpeed: String = ""
@@ -76,6 +78,21 @@ struct AircraftEditView: View {
                     TextField("Persons on board (flight plans)", text: $personsOnBoard)
                         .keyboardType(.numberPad)
                         .accessibilityLabel("Persons on board")
+                }
+
+                // MARK: - Israel routes
+
+                Section {
+                    Picker("Usual route network", selection: $routeNetwork) {
+                        Text("Not set").tag(IsraelRouteNetwork?.none)
+                        Text("CVFR (general aviation)").tag(IsraelRouteNetwork?.some(.cvfr))
+                        Text("LSA / sport aviation").tag(IsraelRouteNetwork?.some(.lsa))
+                    }
+                    .accessibilityLabel("Usual Israel route network")
+                } header: {
+                    Text("Israel")
+                } footer: {
+                    Text("Preselects the CVFR or sport-aviation (LSA) route network when you plan a flight in Israel.")
                 }
 
                 // MARK: - Performance
@@ -160,6 +177,7 @@ struct AircraftEditView: View {
         cruiseSpeed = profile.cruiseSpeedKts.map { String($0) } ?? ""
         icaoType = profile.icaoTypeDesignator ?? ""
         personsOnBoard = profile.personsOnBoard.map { String($0) } ?? ""
+        routeNetwork = IsraelAircraftNetworkPreference.network(for: profile.id)
 
         if let vSpeeds = profile.vSpeeds {
             showVSpeeds = true
@@ -193,32 +211,34 @@ struct AircraftEditView: View {
             return
         }
 
+        let created: SchemaV1.AircraftProfile
         if let profile {
-            // Editing existing
-            profile.nNumber = trimmedNNumber.uppercased()
-            profile.aircraftType = aircraftType
-            profile.fuelCapacityGallons = Double(fuelCapacity)
-            profile.fuelBurnGPH = Double(fuelBurn)
-            profile.cruiseSpeedKts = Double(cruiseSpeed)
-            profile.icaoTypeDesignator = icaoType.trimmingCharacters(in: .whitespaces).isEmpty ? nil : icaoType.trimmingCharacters(in: .whitespaces).uppercased()
-            profile.personsOnBoard = Int(personsOnBoard)
-            profile.annualDue = hasAnnualDue ? annualDue : nil
-            profile.transponderDue = hasTransponderDue ? transponderDue : nil
-
-            if showVSpeeds {
-                profile.vSpeeds = VSpeeds(
-                    vr: Int(vr), vx: Int(vx), vy: Int(vy), va: Int(va),
-                    vne: Int(vne), vfe: Int(vfe), vs0: Int(vs0), vs1: Int(vs1)
-                )
-            } else {
-                profile.vSpeeds = nil
-            }
-
-            onSave()
+            created = profile  // editing existing
         } else {
-            // Creating new
-            onAddNew(trimmedNNumber.uppercased())
+            created = onAddNew(trimmedNNumber.uppercased())  // creating new: same fields are applied below
         }
+
+        created.nNumber = trimmedNNumber.uppercased()
+        created.aircraftType = aircraftType
+        created.fuelCapacityGallons = Double(fuelCapacity)
+        created.fuelBurnGPH = Double(fuelBurn)
+        created.cruiseSpeedKts = Double(cruiseSpeed)
+        created.icaoTypeDesignator = icaoType.trimmingCharacters(in: .whitespaces).isEmpty ? nil : icaoType.trimmingCharacters(in: .whitespaces).uppercased()
+        created.personsOnBoard = Int(personsOnBoard)
+        IsraelAircraftNetworkPreference.set(routeNetwork, for: created.id)
+        created.annualDue = hasAnnualDue ? annualDue : nil
+        created.transponderDue = hasTransponderDue ? transponderDue : nil
+
+        if showVSpeeds {
+            created.vSpeeds = VSpeeds(
+                vr: Int(vr), vx: Int(vx), vy: Int(vy), va: Int(va),
+                vne: Int(vne), vfe: Int(vfe), vs0: Int(vs0), vs1: Int(vs1)
+            )
+        } else {
+            created.vSpeeds = nil
+        }
+
+        onSave()
     }
 }
 
@@ -251,6 +271,6 @@ private struct VSpeedField: View {
     AircraftEditView(
         profile: nil,
         onSave: {},
-        onAddNew: { _ in }
+        onAddNew: { SchemaV1.AircraftProfile(nNumber: $0) }
     )
 }

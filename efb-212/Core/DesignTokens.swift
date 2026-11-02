@@ -70,6 +70,14 @@ enum Palette {
     })
     /// Quiet container fill for rows and chips.
     static let fill = Color.secondary.opacity(0.12)
+    /// Active route line on the map: aviation magenta (never red, which is reserved for closures and
+    /// warnings). Day #D100D1 on the sectional, street and CAAI chart bases; night #F26BF2, a lighter
+    /// tint that stays visible on the dimmed chart. `MapService` applies these per display mode.
+    static let routeLineDay = UIColor(red: 0.82, green: 0, blue: 0.82, alpha: 1)
+    static let routeLineNight = UIColor(red: 0.95, green: 0.42, blue: 0.95, alpha: 1)
+    static let routeLine = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark ? routeLineNight : routeLineDay
+    })
 
     // Map layer toggle tints. A toggle track is a UI component: >= 3:1 against the panel
     // material (WCAG 1.4.11). System tints are 2.0-2.3:1 by day, so day uses darker variants of

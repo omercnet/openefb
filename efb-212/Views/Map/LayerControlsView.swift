@@ -166,6 +166,7 @@ struct LayerControlsView: View {
             layerToggle(layer: .cvfrAirspace, label: "Airspace (CTR, TMA, P/R/D)", tint: Palette.layerAdvisory)
             layerToggle(layer: .cvfrRunways, label: "Runways", tint: Palette.layerDiagrams)
             layerToggle(layer: .cvfrClosures, label: "NOTAM route closures", tint: Palette.warning)
+            layerToggle(layer: .lsaRoutes, label: "Sport-aviation (LSA) routes", tint: Color(uiColor: IsraelLSAOverlay.routeColor))
             if appState.visibleLayers.contains(.cvfrClosures) {
                 closureStatusRow
                     .padding(.horizontal, Space.l)

@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { assertSegment, buildEditionManifest, mergeProductManifest, objectKey, productManifestKey } from "./lib.mjs";
+import { assertApprovable, assertImmutable, assertSegment, buildEditionManifest, mergeProductManifest, objectKey, productManifestKey } from "./lib.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const USAGE = `usage: publish.sh --product <id> --edition <id> --pack <file> [--pack <file>...] [--manifest <manifest.json>]
@@ -79,6 +79,8 @@ try {
   const now = new Date().toISOString();
 
   const existingEdition = o["dry-run"] ? null : await getJson(objectKey(o.product, o.edition, "manifest.json"), tmp);
+  assertImmutable(existingEdition, files);
+  assertApprovable(source, Boolean(o.approve));
   const edition = buildEditionManifest({ product: o.product, edition: o.edition, source, files, existing: existingEdition, approve: Boolean(o.approve), now, baseUrl });
   const existingProduct = o["dry-run"] ? null : await getJson(productManifestKey(o.product), tmp);
   const product = mergeProductManifest(existingProduct, edition, now);

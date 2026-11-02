@@ -70,6 +70,9 @@ final class ProximityAlertService {
     var activeAlerts: [ProximityAlert] = []
     var isInAirspace: Bool = false
     var nearestAirspaceDistance: Double?  // nautical miles
+    /// The last airspace check could not run (database error). "No alert" and "check failed" must never
+    /// look the same, so the map shows an amber "airspace check unavailable" while this is true.
+    var checkUnavailable: Bool = false
 
     // MARK: - Configuration
 
@@ -114,11 +117,14 @@ final class ProximityAlertService {
             activeAlerts = result.alerts
             isInAirspace = result.alerts.contains { $0.isInside }
             nearestAirspaceDistance = result.nearestDistance
+            checkUnavailable = false
         } catch {
             logger.warning("Airspace proximity check failed: \(error.localizedDescription)")
+            // Old alerts describe an earlier position, so they are cleared; the failure is shown, never silent.
             activeAlerts = []
             isInAirspace = false
             nearestAirspaceDistance = nil
+            checkUnavailable = true
         }
     }
 

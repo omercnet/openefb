@@ -101,6 +101,13 @@ private struct FlightHistoryRow: View {
                 Text(LogbookViewModel.formatDurationHM(record.durationSeconds))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                // Kept despite a problem (unreadable track, recovered after a crash): amber caution.
+                if let warning = record.healthWarning {
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Palette.caution)
+                }
             }
 
             Spacer()

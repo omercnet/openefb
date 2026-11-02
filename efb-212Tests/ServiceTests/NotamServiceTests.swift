@@ -359,4 +359,79 @@ struct NotamServiceTests {
             _ = try await service.fetchNotams(for: Self.kpao)
         }
     }
+
+    // MARK: - Reliability (efb-zfm.15)
+
+    final class Clock: @unchecked Sendable {
+        private let lock = NSLock()
+        private var date = Date()
+        var now: Date { lock.withLock { date } }
+        func advance(_ seconds: TimeInterval) { lock.withLock { date = date.addingTimeInterval(seconds) } }
+    }
+
+    nonisolated private static func pageNumber(_ request: URLRequest) -> Int {
+        let items = URLComponents(url: request.url ?? URL(fileURLWithPath: "/"), resolvingAgainstBaseURL: false)?.queryItems ?? []
+        return Int(items.first { $0.name == "pageNum" }?.value ?? "") ?? 0
+    }
+
+    @Test func aFailedRefreshServesTheLastGoodCopyFlaggedWithItsOriginalAge() async throws {
+        let clock = Clock()
+        let failing = NotamRequestRecorder()
+        let service = NotamService(
+            session: StubURLProtocol.session { request in
+                if failing.requests.contains(where: { $0.url?.host == "fail" }) { throw URLError(.timedOut) }
+                return (200, Self.permanentPage(number: "01/001", pageNum: 1, totalPages: 1))
+            },
+            credentials: { NotamCredentials(clientID: "a", clientSecret: "b") },
+            now: { clock.now })
+        let good = try await service.fetchNotams(for: Self.kpao)
+        #expect(good.refreshFailed == false)
+
+        failing.record(URLRequest(url: URL(string: "https://fail/")!))  // flips the stub to failing
+        clock.advance(1_200)  // cache (10 min) has expired, so a refresh is attempted
+        let stale = try await service.fetchNotams(for: Self.kpao)
+
+        #expect(stale.refreshFailed)
+        #expect(stale.notams == good.notams)
+        #expect(stale.fetchedAt == good.fetchedAt)  // the badge ages from the last good download
+    }
+
+    @Test func aFailureWithNothingSavedStillThrows() async {
+        let service = Self.makeService { _ in throw URLError(.timedOut) }
+        await #expect(throws: (any Error).self) { _ = try await service.fetchNotams(for: Self.kpao) }
+    }
+
+    @Test func theNumberOfSequentialPagesIsCappedAndTheListIsMarkedIncomplete() async throws {
+        let recorder = NotamRequestRecorder()
+        let service = Self.makeService { request in
+            recorder.record(request)
+            return (200, Self.permanentPage(number: "0\(Self.pageNumber(request))/001", pageNum: Self.pageNumber(request), totalPages: 20))
+        }
+        let report = try await service.fetchNotams(for: Self.kpao)
+        #expect(recorder.requests.count == NotamService.maxPages)
+        #expect(report.isIncomplete)
+    }
+
+    @Test func aCompleteListIsNotMarkedIncomplete() async throws {
+        let service = Self.makeService { request in
+            (200, Self.permanentPage(number: "0\(Self.pageNumber(request))/001", pageNum: Self.pageNumber(request), totalPages: 2))
+        }
+        #expect(try await service.fetchNotams(for: Self.kpao).isIncomplete == false)
+    }
+
+    @Test func theTimeBudgetStopsFurtherPagesAndMarksTheListIncomplete() async throws {
+        let clock = Clock()
+        let recorder = NotamRequestRecorder()
+        let service = NotamService(
+            session: StubURLProtocol.session { request in
+                recorder.record(request)
+                clock.advance(NotamService.fetchBudget)  // the first page used the whole budget
+                return (200, Self.permanentPage(number: "01/001", pageNum: 1, totalPages: 4))
+            },
+            credentials: { NotamCredentials(clientID: "a", clientSecret: "b") },
+            now: { clock.now })
+        let report = try await service.fetchNotams(for: Self.kpao)
+        #expect(recorder.requests.count == 1)
+        #expect(report.isIncomplete)
+    }
 }

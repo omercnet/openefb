@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build efb-212/Resources/israel-aviation.sqlite from the CAAI GIS layer packages.
 
-Input  : the three zips downloaded from https://www.gov.il/he/pages/aip?chapterIndex=11 into
+Input  : the four zips downloaded from https://www.gov.il/he/pages/aip?chapterIndex=11 into
          tools/caai-importer/input/ (see README.md for the exact file names).
 Output : a read-only, WGS-84 SQLite database with R-tree indexes. Same input + same
          --import-date gives a byte-identical file.
@@ -30,8 +30,8 @@ from pyproj import Geod
 
 warnings.filterwarnings("ignore")
 
-IMPORTER_VERSION = 2
-SCHEMA_VERSION = 2
+IMPORTER_VERSION = 3
+SCHEMA_VERSION = 3
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
@@ -42,9 +42,11 @@ DEFAULT_OUTPUT = REPO / "efb-212" / "Resources" / "israel-aviation.sqlite"
 ZIP_CVFR = "CVFR2026.zip"                # נתיבי תובלה נמוכים CVFR
 ZIP_FIR = "FIR-TMA-ACC-CTR.zip"          # שכבות FIR, TMA, ACC, CTR
 ZIP_PRD = "PRD-CTR.zip"                  # אסורים לטיסה וCTRים
+ZIP_LSA = "Sportiv 2026.zip"             # נתיבי גובה נמוך לתעופה ספורטיבית (LSA / sport-aviation routes)
 SOURCE_URLS = [
     "https://www.gov.il/he/pages/aip?chapterIndex=11",
     "https://www.gov.il/BlobFolder/guide/aip/he/CVFR2026.zip",
+    "https://www.gov.il/BlobFolder/guide/aip/he/Sportiv%202026.zip",
     "https://www.gov.il/BlobFolder/guide/aip/he/%D7%A9%D7%9B%D7%91%D7%95%D7%AA%20FIR,%20TMA,%20ACC,%20CTR.zip",
     "https://www.gov.il/BlobFolder/guide/aip/he/%D7%90%D7%A1%D7%95%D7%A8%D7%99%D7%9D%20%D7%9C%D7%98%D7%99%D7%A1%D7%94%20%D7%95CTR%D7%99%D7%9D.zip",
 ]
@@ -76,6 +78,15 @@ EXPECTED = {
     "fir": 1,
     "runways": 42,
 }
+
+# Sport-aviation (LSA) network, docs/research/israel-cvfr.md section 4. Source rows, before the derived
+# endpoints below are added. Any mismatch aborts the import.
+EXPECTED_LSA = {"lsa_points": 215, "lsa_segments": 229}
+# Six route endpoints (bubbles BSARN BSARS BSHAN BSVTA BKRML and the point MACHR) have no row in the points
+# layer; the importer places them at the end of the route line that names them (kind 'unlisted').
+EXPECTED_LSA_UNLISTED = ["BKRML", "BSARN", "BSARS", "BSHAN", "BSVTA", "MACHR"]
+# Same tolerance as CVFR for the other routes that share an unlisted endpoint.
+UNLISTED_ENDPOINT_SPREAD_M = 1000.0
 
 # Segment endpoints must lie within this distance of their point...
 ENDPOINT_TOLERANCE_M = 1000.0
@@ -259,7 +270,7 @@ def build_points(frame):
             fail("point %s: attribute coordinates disagree with geometry" % r["Code"])
         rows.append({
             "code": clean(r["Code"]), "name_en": clean(r["LocalName"]), "name_he": clean(r["HebrewName"]),
-            "kind": kind, "lat": round6(lat), "lon": round6(lon),
+            "network": "cvfr", "kind": kind, "lat": round6(lat), "lon": round6(lon),
         })
     rows.sort(key=lambda p: (p["code"], p["name_en"] or "", p["lat"], p["lon"]))
     for i, p in enumerate(rows, 1):
@@ -331,6 +342,7 @@ def build_segments(frame, points):
             "alt_north": raw["north"], "alt_south": raw["south"], "alt_west": raw["west"], "alt_east": raw["east"],
             "lower_alt_ft": to_int(r["LowerALT"]), "map_sheet": clean(r["MAP"]),
             "polyline": [[round6(y), round6(x)] for x, y in coords],
+            "network": "cvfr", "activity": None, "activity_source": None, "small_only": 0,
         })
         if clean(r["Military"]) not in ("CIVIL", "MIL") or clean(r["byReques"]) not in ("OPEN", "BR"):
             fail("segment %s-%s: unknown Military/byReques value" % (first, second))
@@ -341,6 +353,166 @@ def build_segments(frame, points):
     for i, s in enumerate(rows, 1):
         s["id"] = i
     return rows, gaps
+
+# ---------------------------------------------------------------------------------------------
+# Sport-aviation (LSA) network: "Sportiv 2026.zip", layers SPORTIVE_POINTS2026 / SPORTIVE_ROUTES2026
+# ---------------------------------------------------------------------------------------------
+
+# What the layer's `localType` says about when a route is in use, mapped without interpretation.
+# AllWeek / Weekend are the two published values; the one 'מיוחד' (special) group carries its conditions
+# on the CAAI chart notes, not in the layer; the two remaining values ('C', 'AllWeek/Weekend') are
+# kept verbatim in activity_source and treated as unspecified.
+LSA_ACTIVITY = {"AllWeek": "all_week", "Weekend": "weekend", "מיוחד": "special"}
+
+# The weekend definition the domestic AIP gives (B-08 section 1.ז, PDF page 147, amendment 1/26 text).
+# Stored verbatim in metadata so the app can show it; the planner applies only what it can prove from it.
+LSA_WEEKEND_RULE = {
+    "source": "Domestic AIP B-08, section 1 item ז ('ימי סוף שבוע'), PDF page 147; bubble start times in notes 2 and 3",
+    "text_he": ("בכל מקום בנוהל זה ובנספח א' \"ימי סוף שבוע\" פירושם ימי שישי החל משעה 06:00, ערבי חג החל משעה 14:00, "
+                "וימי שבת וחג במשך כל היום, אלא אם צוין אחרת לאזור/בועה מסוימים. ימי חול המועד יחשבו כימי אמצע שבוע. "
+                "בבועות שדרות דרום, באר שבע, מיתר, להבים ובכל מרחב הפיקוח של חצרים והנתיבים בפיקוח קדם סוף השבוע מתחיל "
+                "ביום שישי בשעה 14:00; בבועות שדרות צפון, ניצנים, ים המלח, זוהר, שלם ואורן ביום שישי בשעה 12:00."),
+    "text_en": ("Weekend days mean Fridays from 06:00, holiday eves from 14:00, and Saturdays and holidays all day, unless "
+                "stated otherwise for a bubble. Intermediate festival days count as weekdays. In the Sderot South, Beer "
+                "Sheva, Mitar and Lehavim bubbles, the whole Hatzerim control area and the routes under Kedem control, the "
+                "weekend starts Friday 14:00; in the Sderot North, Nitzanim, Dead Sea, Zohar, Shalem and Oren bubbles, "
+                "Friday 12:00. Translation by the importer author; the Hebrew text is the source."),
+    "friday_start_default": "06:00",
+    "friday_start_latest_published": "14:00",
+    "holiday_eve_start": "14:00",
+    "timezone": "Asia/Jerusalem",
+    "layer_does_not_say": "which Friday start applies to which route; holidays are not in the data",
+}
+
+
+def lsa_activity(value):
+    text = clean(value)
+    return LSA_ACTIVITY.get(text, "unspecified"), text
+
+
+def alt_text(value):
+    """Published altitude as text: 1700.0 -> '1700'. '0' and 'X' mean none."""
+    text = clean(value)
+    if text is None or text.upper() == "X":
+        return None
+    try:
+        number = float(text)
+    except ValueError:
+        return text  # e.g. '2500/3500': kept as text, no numeric altitude
+    if number == 0:
+        return None
+    return str(int(round(number))) if abs(number - round(number)) < 1e-9 else text
+
+
+def build_lsa_points(frame):
+    kinds = {"חובה": "compulsory", "דרישה": "onRequest", "ARP": "arp"}
+    rows = []
+    for _, r in frame.iterrows():
+        kind = kinds.get(clean(r["Report"]))
+        if kind is None:
+            fail("LSA point %s: unknown Report value %r" % (r["CODE"], r["Report"]))
+        lat, lon = r.geometry.y, r.geometry.x
+        if abs(lat - r["N"]) > 1e-6 or abs(lon - r["E"]) > 1e-6:
+            fail("LSA point %s: attribute coordinates disagree with geometry" % r["CODE"])
+        rows.append({
+            "code": clean(r["CODE"]), "name_en": None, "name_he": clean(r["NAME"]),
+            "network": "lsa", "kind": kind, "lat": round6(lat), "lon": round6(lon),
+        })
+    return rows
+
+
+def build_lsa_segments(frame, points, id_offset, segment_offset):
+    """Returns (points incl. unlisted endpoints with ids, segments with ids, unlisted codes)."""
+    by_code = {}
+    for p in points:
+        by_code.setdefault(p["code"], []).append(p)
+
+    def nearest(codes, code, xy):
+        p = min(codes[code], key=lambda q: distance_m(xy, (q["lon"], q["lat"])))
+        return p, distance_m(xy, (p["lon"], p["lat"]))
+
+    oriented = []
+    for _, r in frame.iterrows():
+        first, second = clean(r["FirstWayPo"]), clean(r["secondWayp"])
+        lines = list(r.geometry.geoms)
+        if len(lines) != 1:
+            fail("LSA segment %s-%s: expected one line, found %d" % (first, second, len(lines)))
+        coords = [(x, y) for x, y, *_ in lines[0].coords]
+        if first in by_code and second in by_code:
+            da = nearest(by_code, first, coords[0])[1]; dz = nearest(by_code, second, coords[-1])[1]
+            db = nearest(by_code, first, coords[-1])[1]; dd = nearest(by_code, second, coords[0])[1]
+            if db + dd < da + dz:
+                coords = coords[::-1]
+        elif first in by_code:
+            if nearest(by_code, first, coords[-1])[1] < nearest(by_code, first, coords[0])[1]:
+                coords = coords[::-1]
+        elif second in by_code:
+            if nearest(by_code, second, coords[0])[1] < nearest(by_code, second, coords[-1])[1]:
+                coords = coords[::-1]
+        else:
+            fail("LSA segment %s-%s: neither endpoint is a published point" % (first, second))
+        oriented.append((first, second, coords, r))
+    oriented.sort(key=lambda o: (o[0], o[1]))
+
+    # Endpoints the points layer does not list: placed at the end of the route line that names them.
+    unlisted = {}
+    for first, second, coords, _ in oriented:
+        for code, xy in ((first, coords[0]), (second, coords[-1])):
+            if code not in by_code:
+                unlisted.setdefault(code, []).append((round6(xy[1]), round6(xy[0])))
+    for code, spots in sorted(unlisted.items()):
+        lat, lon = spots[0]
+        for other in spots[1:]:
+            spread = distance_m((lon, lat), (other[1], other[0]))
+            if spread > UNLISTED_ENDPOINT_SPREAD_M:
+                fail("LSA unlisted endpoint %s: routes end %.0f m apart" % (code, spread))
+    if sorted(unlisted) != EXPECTED_LSA_UNLISTED:
+        fail("LSA unlisted endpoints %s differ from the expected %s" % (sorted(unlisted), EXPECTED_LSA_UNLISTED))
+    extra = [{"code": c, "name_en": None, "name_he": None, "network": "lsa", "kind": "unlisted",
+              "lat": spots[0][0], "lon": spots[0][1]} for c, spots in sorted(unlisted.items())]
+    all_points = points + extra
+    all_points.sort(key=lambda p: (p["code"], p["name_he"] or "", p["lat"], p["lon"]))
+    for i, p in enumerate(all_points, id_offset + 1):
+        p["id"] = i
+    placed = {}
+    for p in all_points:
+        placed.setdefault(p["code"], []).append(p)
+
+    rows = []
+    for first, second, coords, r in oriented:
+        start, end = coords[0], coords[-1]
+        p_from, d_from = nearest(placed, first, start)
+        p_to, d_to = nearest(placed, second, end)
+        if d_from > ENDPOINT_TOLERANCE_M or d_to > ENDPOINT_TOLERANCE_M:
+            fail("LSA segment %s-%s: line ends %.0f m / %.0f m from its points" % (first, second, d_from, d_to))
+        if clean(r["byRequest"]) not in ("OPEN", "BR") or clean(r["ONEWAY"]) not in ("V", "X"):
+            fail("LSA segment %s-%s: unknown byRequest/ONEWAY value" % (first, second))
+        bearing = geodesic_bearing(start, end)
+        one_way = clean(r["ONEWAY"]) == "V"
+        forward = alt_text(r["ALT"])
+        reverse = None if one_way else alt_text(r["REV_ALT"])
+        activity, source = lsa_activity(r["localType"])
+        rows.append({
+            "from_code": first, "to_code": second, "from_point_id": p_from["id"], "to_point_id": p_to["id"],
+            "name_en": (clean(r["unit"]) or "").replace("_", "-") or None, "name_he": clean(r["HebrewName"]),
+            "length_nm": round(float(r["Length"]), 3),
+            "civil": 1, "military": 0, "by_request": 1 if clean(r["byRequest"]) == "BR" else 0,
+            "bearing_true": round(bearing, 1),
+            "alt_forward_ft": single_alt(forward), "alt_forward_text": forward,
+            "alt_reverse_ft": single_alt(reverse), "alt_reverse_text": reverse,
+            "alt_north": None, "alt_south": None, "alt_west": None, "alt_east": None,
+            "lower_alt_ft": to_int(r["Lower_ALT"]), "map_sheet": clean(r["גליון"]),
+            "polyline": [[round6(y), round6(x)] for x, y in coords],
+            "network": "lsa", "activity": activity, "activity_source": source,
+            "small_only": 1 if clean(r["קטנות_בלבד"]) == "V" else 0,
+        })
+    keys = [(s["from_code"], s["to_code"]) for s in rows]
+    if len(set(keys)) != len(keys):
+        fail("duplicate LSA from/to segment pairs")
+    for i, s in enumerate(rows, segment_offset + 1):
+        s["id"] = i
+    return all_points, rows, sorted(unlisted)
+
 
 
 def directional(raw, bearing):
@@ -631,17 +803,20 @@ CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
 -- code is not unique: the source publishes LLNV twice (Nevatim, Negav), both ARP.
 CREATE TABLE reporting_points (
     id INTEGER PRIMARY KEY,
+    network TEXT NOT NULL CHECK (network IN ('cvfr','lsa')),
     code TEXT NOT NULL,
     name_en TEXT, name_he TEXT,
-    kind TEXT NOT NULL CHECK (kind IN ('compulsory','onRequest','arp')),
+    -- 'unlisted' (LSA only): named by a route but absent from the points layer; placed at the route line's end.
+    kind TEXT NOT NULL CHECK (kind IN ('compulsory','onRequest','arp','unlisted')),
     lat REAL NOT NULL,   -- degrees, WGS-84
     lon REAL NOT NULL    -- degrees, WGS-84
 );
-CREATE INDEX idx_reporting_points_code ON reporting_points(code);
+CREATE INDEX idx_reporting_points_code ON reporting_points(network, code);
 
 -- from -> to is the code order of the source; polyline runs from -> to ([lat, lon] pairs).
 CREATE TABLE route_segments (
     id INTEGER PRIMARY KEY,
+    network TEXT NOT NULL CHECK (network IN ('cvfr','lsa')),
     from_code TEXT NOT NULL, to_code TEXT NOT NULL,
     from_point_id INTEGER NOT NULL REFERENCES reporting_points(id),
     to_point_id INTEGER NOT NULL REFERENCES reporting_points(id),
@@ -656,10 +831,15 @@ CREATE TABLE route_segments (
     alt_north TEXT, alt_south TEXT, alt_west TEXT, alt_east TEXT,  -- source fields, northbound etc.
     lower_alt_ft INTEGER,           -- feet MSL, the lower of the published altitudes
     map_sheet TEXT,
+    -- LSA only: 'all_week' | 'weekend' | 'special' | 'unspecified' from the layer's localType (verbatim in
+    -- activity_source); NULL on CVFR. The weekend definition is metadata.lsa_weekend_rule.
+    activity TEXT CHECK (activity IN ('all_week','weekend','special','unspecified')),
+    activity_source TEXT,
+    small_only INTEGER NOT NULL DEFAULT 0,  -- LSA: the layer marks the route for small aircraft only
     polyline TEXT NOT NULL          -- JSON [[lat, lon], ...]
 );
-CREATE UNIQUE INDEX idx_route_segments_codes ON route_segments(from_code, to_code);
-CREATE INDEX idx_route_segments_to ON route_segments(to_code);
+CREATE UNIQUE INDEX idx_route_segments_codes ON route_segments(network, from_code, to_code);
+CREATE INDEX idx_route_segments_to ON route_segments(network, to_code);
 
 CREATE TABLE airspaces (
     id INTEGER PRIMARY KEY,
@@ -748,7 +928,7 @@ def write_database(path, points, segments, airspaces, runways, aerodromes, aerod
     db.execute("PRAGMA journal_mode = DELETE")
     db.execute("PRAGMA page_size = 4096")
     db.executescript(SCHEMA)
-    db.executemany("INSERT INTO reporting_points VALUES (:id,:code,:name_en,:name_he,:kind,:lat,:lon)", points)
+    db.executemany("INSERT INTO reporting_points VALUES (:id,:network,:code,:name_en,:name_he,:kind,:lat,:lon)", points)
     db.executemany("INSERT INTO reporting_points_rtree VALUES (:id,:lat,:lat,:lon,:lon)", points)
 
     for s in segments:
@@ -757,10 +937,10 @@ def write_database(path, points, segments, airspaces, runways, aerodromes, aerod
         s["_bbox"] = (min(lats), max(lats), min(lons), max(lons))
         s["polyline_json"] = compact(s["polyline"])
     db.executemany("""INSERT INTO route_segments VALUES (
-        :id,:from_code,:to_code,:from_point_id,:to_point_id,:name_en,:name_he,:length_nm,
+        :id,:network,:from_code,:to_code,:from_point_id,:to_point_id,:name_en,:name_he,:length_nm,
         :civil,:military,:by_request,:bearing_true,:alt_forward_ft,:alt_forward_text,
         :alt_reverse_ft,:alt_reverse_text,:alt_north,:alt_south,:alt_west,:alt_east,
-        :lower_alt_ft,:map_sheet,:polyline_json)""", segments)
+        :lower_alt_ft,:map_sheet,:activity,:activity_source,:small_only,:polyline_json)""", segments)
     db.executemany("INSERT INTO route_segments_rtree VALUES (?,?,?,?,?)",
                    [(s["id"],) + s["_bbox"] for s in segments])
 
@@ -813,7 +993,7 @@ def main(argv=None):
     else:
         import_date = datetime.now(timezone.utc).date().isoformat()
 
-    zips = {name: args.input / name for name in (ZIP_CVFR, ZIP_FIR, ZIP_PRD)}
+    zips = {name: args.input / name for name in (ZIP_CVFR, ZIP_FIR, ZIP_PRD, ZIP_LSA)}
     for name, path in zips.items():
         if not path.exists():
             fail("missing input %s (see README.md for the download)" % path)
@@ -827,6 +1007,8 @@ def main(argv=None):
 
         point_frame = read_layer(roots[ZIP_CVFR], "F_CVFR_POINTS2026")
         route_frame = read_layer(roots[ZIP_CVFR], "F_CVFR_ROUTES2026")
+        lsa_point_frame = read_layer(roots[ZIP_LSA], "SPORTIVE_POINTS2026")
+        lsa_route_frame = read_layer(roots[ZIP_LSA], "SPORTIVE_ROUTES2026")
         ctr_frame = read_layer(roots[ZIP_PRD], "CTR")
         prd_frame = read_layer(roots[ZIP_PRD], "F_Limited")
         tma_frame = read_layer(roots[ZIP_FIR], "TMA")
@@ -847,6 +1029,11 @@ def main(argv=None):
         corrections = apply_corrections(route_frame)
         points = build_points(point_frame)
         segments, gaps = build_segments(route_frame, points)
+        lsa_source_points_rows = build_lsa_points(lsa_point_frame)
+        lsa_source_points = len(lsa_source_points_rows)
+        lsa_points, lsa_segments, lsa_unlisted = build_lsa_segments(
+            lsa_route_frame, lsa_source_points_rows, id_offset=len(points), segment_offset=len(segments)
+        )
         airspaces, reconciled = build_airspaces(ctr_frame, prd_frame, tma_frame, fir_frame)
         runways = build_runways(rwy_frame)
         aerodromes, aerodrome_runways, aerodrome_frequencies = load_curated(args.curated)
@@ -860,9 +1047,11 @@ def main(argv=None):
         "ctr_atz": sum(kinds.get(k, 0) for k in ("CTR", "ATZ", "CTA")),
         "prd": sum(kinds.get(k, 0) for k in ("P", "R", "D")),
         "tma": kinds.get("TMA", 0), "fir": kinds.get("FIR", 0), "runways": len(runways),
+        "lsa_points": lsa_source_points, "lsa_segments": len(lsa_segments),
+        "lsa_points_unlisted": len(lsa_unlisted),
     }
     counts["aerodromes"] = len(aerodromes)
-    mismatches = ["%s: expected %d, found %d" % (k, v, counts[k]) for k, v in EXPECTED.items() if counts[k] != v]
+    mismatches = ["%s: expected %d, found %d" % (k, v, counts[k]) for k, v in {**EXPECTED, **EXPECTED_LSA}.items() if counts[k] != v]
     if mismatches:
         fail("counts differ from the AIP: " + "; ".join(mismatches))
 
@@ -895,13 +1084,21 @@ def main(argv=None):
         "corrections": compact(corrections),
         "aerodromes_sha256": sha256(args.curated),
         "aerodromes_review": compact({s: sum(1 for a in aerodromes if a["review_status"] == s) for s in REVIEW_STATUSES}),
+        "lsa_weekend_rule": compact(LSA_WEEKEND_RULE),
+        "lsa_notes": ("The sport-aviation (LSA) network is in the same tables with network = 'lsa'. ALT is read as the "
+                      "altitude from the first to the second point (REV_ALT the other way; none on ONEWAY routes); the "
+                      "layer does not say which direction ALT belongs to, and the 21 one-way routes are all drawn first "
+                      "to second. activity comes from the layer's localType (AllWeek, Weekend, special) and is not "
+                      "interpreted beyond that; the weekend definition is lsa_weekend_rule. The DUCH and BACKAZ "
+                      "fields are not used."),
         "notes": ("Altitudes in feet MSL; floor 0 = surface; ceiling 99000 = unlimited. Route altitudes per direction "
                   "are derived from the CAAI north/south/east/west fields using the bearing from -> to. Values the "
                   "source publishes as two numbers ('2500/3500') are kept as text and have no numeric altitude."),
     }
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    write_database(args.output, points, segments, airspaces, runways, aerodromes, aerodrome_runways, aerodrome_frequencies, metadata)
+    write_database(args.output, points + lsa_points, segments + lsa_segments, airspaces, runways, aerodromes,
+                   aerodrome_runways, aerodrome_frequencies, metadata)
 
     unpublished = sum(1 for s in segments if s["alt_forward_text"] is None or s["alt_reverse_text"] is None)
     varying = [("%s-%s" % (s["from_code"], s["to_code"])) for s in segments

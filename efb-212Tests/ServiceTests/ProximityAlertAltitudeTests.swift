@@ -128,4 +128,27 @@ struct ProximityAlertAltitudeTests {
         #expect(!service.isInAirspace)
         #expect(service.nearestAirspaceDistance == 0)
     }
+
+    @Test func aDatabaseErrorIsReportedNotShownAsNoAlert() {
+        let db = MockDatabaseManager()
+        db.airspacesData = Self.shelves
+        let service = ProximityAlertService(databaseService: db)
+        let position = CLLocation(latitude: Self.ringPoint.latitude, longitude: Self.ringPoint.longitude)
+        let t0 = Date(timeIntervalSince1970: 1_000_000)
+
+        service.checkProximity(position: position, altitude: 8000, now: t0)
+        #expect(service.isInAirspace)
+        #expect(!service.checkUnavailable)
+
+        db.airspacesError = EFBError.databaseCorrupted
+        service.checkProximity(position: position, altitude: 8000, now: t0.addingTimeInterval(11))
+        #expect(service.checkUnavailable)  // not just an empty alert list
+        #expect(service.activeAlerts.isEmpty)
+        #expect(!service.isInAirspace)
+
+        db.airspacesError = nil
+        service.checkProximity(position: position, altitude: 8000, now: t0.addingTimeInterval(22))
+        #expect(!service.checkUnavailable)
+        #expect(service.isInAirspace)
+    }
 }

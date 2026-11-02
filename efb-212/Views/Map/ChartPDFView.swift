@@ -86,8 +86,13 @@ struct ChartPDFView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded(let document):
-            PDFKitView(document: document)
-                .ignoresSafeArea(edges: .bottom)
+            VStack(spacing: 0) {
+                if let banner = expiryBanner {
+                    banner
+                }
+                PDFKitView(document: document)
+                    .ignoresSafeArea(edges: .bottom)
+            }
         case .failed(let message):
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")
@@ -102,6 +107,29 @@ struct ChartPDFView: View {
             .padding()
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+    }
+
+    /// The chart's own cycle decides: expired charts are said to be expired, near expiry says so too.
+    private var chartCycle: DTPPCycle? {
+        TerminalProcedureService.cycle(code: chart.cycle, near: Date())
+    }
+
+    private var expiryBanner: AnyView? {
+        guard let cycle = chartCycle else { return nil }
+        let freshness = DataFreshness.evaluate(.chartCycle, validUntil: cycle.expirationDate)
+        guard freshness.level >= .old else { return nil }
+        let text = cycle.isExpired()
+            ? "EXPIRED: cycle \(cycle.code) ended \(cycle.expirationDate.formatted(.dateTime.day().month(.abbreviated).year())). Do not use for navigation."
+            : "Cycle \(cycle.code) \(freshness.text.lowercased())"
+        return AnyView(
+            Label(text, systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(cycle.isExpired() ? Palette.warning : Palette.caution)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(Space.m)
+                .background(.regularMaterial)
+                .accessibilityIdentifier("chart-expiry-banner")
+        )
     }
 
     private func load() async {

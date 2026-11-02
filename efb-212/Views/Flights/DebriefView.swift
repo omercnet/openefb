@@ -267,10 +267,15 @@ struct DebriefView: View {
         promptError = nil
         Task {
             do {
+                let id = flightID, db = recordingDB
+                let facts = await Task.detached {
+                    CVFRDebriefLoader.loadBundled(flightID: id, recordingDB: db).flatMap(CVFRDebriefBuilder.promptFacts)
+                }.value
                 let prompt = try FlightSummaryBuilder.buildPrompt(
                     flightID: flightID,
                     recordingDB: recordingDB,
-                    metadata: metadata
+                    metadata: metadata,
+                    cvfrFacts: facts
                 )
                 await debriefEngine.generateDebrief(
                     prompt: prompt,

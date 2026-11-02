@@ -76,6 +76,7 @@ final class RecordingViewModel {
         do {
             let flightID = try await coordinator.startRecording()
             appState?.activeFlightRecordID = flightID
+            saveActiveRouteLegs(flightID: flightID)
         } catch {
             lastError = .recordingFailed(underlying: error)
         }
@@ -92,6 +93,8 @@ final class RecordingViewModel {
     func confirmStop() async {
         showStopConfirmation = false
         let summary = await coordinator.stopRecording()
+        // The plan may have been activated after the recording started (or auto-started): store it now.
+        if let summary { saveActiveRouteLegs(flightID: summary.flightID) }
         appState?.activeFlightRecordID = nil
         // Don't leave the shared status at .recording until the next 0.5 s sync tick:
         // Flight Detail disables Replay while it isn't .idle.
@@ -106,12 +109,29 @@ final class RecordingViewModel {
         )
         lastPersistenceResult = result
         showDiscardedNotice = Self.shouldShowDiscardedNotice(for: result)
+        // Kept-but-damaged and unsaved flights must reach the pilot, not just the log.
+        switch result {
+        case .savedTrackUnreadable:
+            lastError = .recordingFailed(underlying: RecordingError.trackUnreadable)
+        case .saveFailed:
+            lastError = .recordingFailed(underlying: RecordingError.flightNotSaved)
+        case .saved, .discardedEmpty:
+            break
+        }
     }
 
     /// A recording with no track points is discarded; tell the pilot instead of dropping it silently.
     nonisolated static func shouldShowDiscardedNotice(for result: FlightPersistenceResult) -> Bool {
         if case .discardedEmpty = result { return true }
         return false
+    }
+
+    /// Store the activated Israel plan's legs with the flight so the debrief can compare against them.
+    /// A no-op without an active route (the debrief then matches the track to the network).
+    private func saveActiveRouteLegs(flightID: UUID) {
+        guard let route = appState?.activeRoute, !route.legs.isEmpty,
+              let recordingDB = appState?.getOrCreateRecordingDatabase() else { return }
+        try? recordingDB.saveRouteLegs(route.legs.map { ($0.fromCode, $0.toCode) }, forFlight: flightID)
     }
 
     /// How serious `lastError` is for the pilot.

@@ -192,8 +192,13 @@ func georeference(_ entry: Control.Entry, pdfData: Data) throws -> Outcome {
         throw Reject.message("unreadable PDF")
     }
     let pageBox = page.bounds(for: .mediaBox)
-    let vectors = PDFVectorScanner.scan(page: cgPage)
-    let drawn = vectors.runwayShapes()
+    let vectors = PDFVectorScanner.scan(page: cgPage, restoresGraphicsState: true)   // CAAI sheets set colour inside q/Q
+    var drawn = vectors.runwayShapes()
+    if inspect {
+        for r in drawn { print("    filled shape (\(Int(r.start.x)),\(Int(r.start.y)))-(\(Int(r.end.x)),\(Int(r.end.y))) length \(Int(r.length)) width \(String(format: "%.1f", r.widthPoints))") }
+        for r in vectors.strokedRunwayShapes() { print("    stroked shape (\(Int(r.start.x)),\(Int(r.start.y)))-(\(Int(r.end.x)),\(Int(r.end.y))) length \(Int(r.length)) width \(String(format: "%.1f", r.widthPoints))") }
+    }
+    if drawn.isEmpty { drawn = vectors.strokedRunwayShapes() }
     guard !drawn.isEmpty else { throw Reject.message("no runway polygon found in the vector stream (apron or parking sheet)") }
     let metres = AirportDiagramGeoreference.metresPerDegree(latitude: ref.latitude)
     let local: (Double, Double) -> CGPoint = { lat, lon in

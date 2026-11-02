@@ -19,18 +19,23 @@
 import CoreLocation
 import Foundation
 import SwiftData
+import OSLog
 
 /// Outcome of persisting a stopped recording.
-enum FlightPersistenceResult: Sendable {
-    /// A FlightRecord and draft LogbookEntry were created.
+enum FlightPersistenceResult: Sendable, Equatable {
+    /// A FlightRecord and draft LogbookEntry were created and saved.
     case saved
     /// The recording had no track points; its data was deleted.
     case discardedEmpty
+    /// The track could not be read. The flight and its audio were kept and the record is marked damaged.
+    case savedTrackUnreadable
+    /// The records could not be saved. The recording data is untouched and is recovered at next launch.
+    case saveFailed
 }
 
 @MainActor
 protocol FlightPersistenceServiceProtocol {
-    /// Persist a stopped recording. Inserts into `modelContext` (SwiftData autosaves).
+    /// Persist a stopped recording: inserts into `modelContext` and saves it.
     func persist(
         summary: FlightRecordingSummary,
         aircraftProfileID: UUID?,
@@ -55,22 +60,59 @@ final class FlightPersistenceService: FlightPersistenceServiceProtocol {
         self.databaseService = databaseService
     }
 
+    private let logger = Logger(subsystem: "quartermint.efb-212", category: "FlightPersistence")
+
     func persist(
         summary: FlightRecordingSummary,
         aircraftProfileID: UUID?,
         pilotProfileID: UUID?,
         modelContext: ModelContext
     ) -> FlightPersistenceResult {
-        // The database is the truth for the track, not the coordinator's counter.
-        let track = (try? recordingDB.trackPoints(forFlight: summary.flightID)) ?? []
+        store(
+            summary: summary, aircraftProfileID: aircraftProfileID, pilotProfileID: pilotProfileID,
+            modelContext: modelContext, origin: .stopped
+        )
+    }
 
-        guard let first = track.first, let last = track.last else {
+    /// Why a FlightRecord is being created.
+    enum Origin: Sendable {
+        /// The pilot (or auto-stop) ended the recording.
+        case stopped
+        /// Launch-time recovery of a recording the app never finished (crash or kill).
+        case recovered
+    }
+
+    /// Create the FlightRecord and draft logbook entry and save them. Never deletes anything when
+    /// the track cannot be read, and never relies on SwiftData autosave.
+    func store(
+        summary: FlightRecordingSummary,
+        aircraftProfileID: UUID?,
+        pilotProfileID: UUID?,
+        modelContext: ModelContext,
+        origin: Origin
+    ) -> FlightPersistenceResult {
+        // The database is the truth for the track, not the coordinator's counter.
+        // A read ERROR is not an empty track: keep the flight and its audio, and mark it damaged.
+        let track: [TrackPointRecord]
+        var trackUnreadable = false
+        do {
+            track = try recordingDB.trackPoints(forFlight: summary.flightID)
+        } catch {
+            logger.error("Track unreadable for \(summary.flightID.uuidString): \(error.localizedDescription)")
+            track = []
+            trackUnreadable = true
+        }
+
+        // Recovery keeps flights with audio or transcript but no track; only a normal stop discards.
+        if !trackUnreadable && track.isEmpty && origin == .stopped {
             discard(summary)
             return .discardedEmpty
         }
 
-        let departure = nearestAirport(latitude: first.latitude, longitude: first.longitude)
-        let arrival = nearestAirport(latitude: last.latitude, longitude: last.longitude)
+        let first = track.first
+        let last = track.last
+        let departure = first.flatMap { nearestAirport(latitude: $0.latitude, longitude: $0.longitude) }
+        let arrival = last.flatMap { nearestAirport(latitude: $0.latitude, longitude: $0.longitude) }
 
         let record = SchemaV1.FlightRecord()
         record.id = summary.flightID
@@ -81,11 +123,16 @@ final class FlightPersistenceService: FlightPersistenceServiceProtocol {
         record.departureName = departure?.name
         record.arrivalICAO = arrival?.icao
         record.arrivalName = arrival?.name
-        record.trackPointCount = track.count
+        record.trackPointCount = trackUnreadable ? summary.trackPointCount : track.count
         record.transcriptSegmentCount = summary.transcriptSegmentCount
         record.audioFileURL = summary.audioFileURL.flatMap(Self.relativeToApplicationSupport)
         record.aircraftProfileID = aircraftProfileID?.uuidString
         record.pilotProfileID = pilotProfileID?.uuidString
+        if trackUnreadable {
+            record.notes = SchemaV1.FlightRecord.trackUnreadableNote
+        } else if origin == .recovered {
+            record.notes = SchemaV1.FlightRecord.recoveredNote
+        }
         modelContext.insert(record)
 
         logbook.createFromRecording(
@@ -100,7 +147,15 @@ final class FlightPersistenceService: FlightPersistenceServiceProtocol {
             modelContext: modelContext
         )
 
-        return .saved
+        // Save now: a kill right after stop must not lose the History row while track and audio stay.
+        // On failure the recording data is untouched, so launch-time recovery rebuilds the record.
+        do {
+            try modelContext.save()
+        } catch {
+            logger.error("Saving flight \(summary.flightID.uuidString) failed: \(error.localizedDescription)")
+            return .saveFailed
+        }
+        return trackUnreadable ? .savedTrackUnreadable : .saved
     }
 
     // MARK: - Helpers
@@ -114,6 +169,8 @@ final class FlightPersistenceService: FlightPersistenceServiceProtocol {
         return nearby.first { $0.type == .airport } ?? nearby.first
     }
 
+    /// Delete a recording with no track. Only called after the track was READ successfully and was
+    /// empty; a read error never reaches here (see `persist`).
     private func discard(_ summary: FlightRecordingSummary) {
         try? recordingDB.deleteFlightData(flightID: summary.flightID)
         if let audio = summary.audioFileURL {

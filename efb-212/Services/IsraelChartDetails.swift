@@ -74,6 +74,7 @@ nonisolated enum IsraelChartDetails {
         case .compulsory: return "Compulsory reporting point"
         case .onRequest: return "On-request reporting point"
         case .arp: return "Aerodrome reference point"
+        case .unlisted: return "Sport-aviation route end (not a published point)"
         }
     }
 

@@ -25,6 +25,11 @@ struct DataAgeBadge: View {
         freshness = DataFreshness.evaluate(product, validFrom: validFrom, validUntil: validUntil, now: now)
     }
 
+    /// An already evaluated freshness (a TAF, whose valid period and fetch age are combined by the view model).
+    init(freshness: DataFreshness) {
+        self.freshness = freshness
+    }
+
     private var tint: Color {
         switch freshness.level {
         case .unknown, .fresh: return Palette.secondaryText

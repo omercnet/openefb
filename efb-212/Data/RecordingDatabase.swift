@@ -245,6 +245,29 @@ final class RecordingDatabase: @unchecked Sendable {
             try db.execute(sql: "ALTER TABLE transcript_segments_new RENAME TO transcript_segments")
             try db.execute(sql: "CREATE INDEX IF NOT EXISTS idx_transcript_segments_flight ON transcript_segments(flightID)")
         }
+        // v4: the CVFR route legs the pilot had activated while recording (IL-DEBRIEF).
+        // Stored as codes (from -> to, in the order flown); the debrief resolves them to segments.
+        migrator.registerMigration("v4_flight_route_legs") { db in
+            try db.execute(sql: """
+                CREATE TABLE IF NOT EXISTS flight_route_legs (
+                    flightID TEXT NOT NULL,
+                    seq INTEGER NOT NULL,
+                    fromCode TEXT NOT NULL,
+                    toCode TEXT NOT NULL,
+                    PRIMARY KEY (flightID, seq)
+                )
+                """)
+        }
+        // v5: debrief_results.generatedAt was written as seconds since 2001 (a bare number) but GRDB
+        // reads a number as seconds since 1970, so every stored date was ~31 years early. New rows
+        // are written as GRDB dates (text); shift the old numeric rows to the 1970 epoch.
+        migrator.registerMigration("v5_debrief_generatedAt_epoch") { db in
+            try db.execute(sql: """
+                UPDATE debrief_results
+                SET generatedAt = generatedAt + 978307200
+                WHERE typeof(generatedAt) IN ('real', 'integer')
+                """)
+        }
         try migrator.migrate(dbPool)
     }
 
@@ -300,7 +323,7 @@ final class RecordingDatabase: @unchecked Sendable {
         try dbPool.write { db in
             try db.execute(
                 sql: "UPDATE phase_markers SET endTimestamp = ? WHERE id = ?",
-                arguments: [endTimestamp.timeIntervalSinceReferenceDate, id]
+                arguments: [endTimestamp, id]
             )
         }
     }
@@ -341,7 +364,7 @@ final class RecordingDatabase: @unchecked Sendable {
                     record.phaseObservationsJSON,
                     record.improvementsJSON,
                     record.overallRating,
-                    record.generatedAt.timeIntervalSinceReferenceDate,
+                    record.generatedAt,
                     record.promptTokensEstimate,
                     record.responseTokensEstimate
                 ]
@@ -365,14 +388,57 @@ final class RecordingDatabase: @unchecked Sendable {
         }
     }
 
+    // MARK: - Route Legs (CVFR plan)
+
+    /// Replace the planned route legs stored for a flight (codes, from -> to, in flying order).
+    nonisolated func saveRouteLegs(_ legs: [(from: String, to: String)], forFlight flightID: UUID) throws {
+        try dbPool.write { db in
+            try db.execute(sql: "DELETE FROM flight_route_legs WHERE flightID = ?", arguments: [flightID])
+            for (seq, leg) in legs.enumerated() {
+                try db.execute(
+                    sql: "INSERT INTO flight_route_legs (flightID, seq, fromCode, toCode) VALUES (?, ?, ?, ?)",
+                    arguments: [flightID, seq, leg.from, leg.to]
+                )
+            }
+        }
+    }
+
+    /// The planned route legs stored for a flight, in flying order; empty when it had no Israel plan.
+    nonisolated func routeLegs(forFlight flightID: UUID) throws -> [(from: String, to: String)] {
+        try dbPool.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT fromCode, toCode FROM flight_route_legs WHERE flightID = ? ORDER BY seq",
+                arguments: [flightID]
+            ).map { (from: $0["fromCode"] as String, to: $0["toCode"] as String) }
+        }
+    }
+
+    // MARK: - Recovery
+
+    /// Every flight ID that has track points or transcript segments, for launch-time recovery of
+    /// recordings that never got a FlightRecord.
+    nonisolated func flightIDsWithRecordedData() throws -> [UUID] {
+        try dbPool.read { db in
+            try UUID.fetchAll(db, sql: """
+                SELECT flightID FROM track_points
+                UNION
+                SELECT flightID FROM transcript_segments
+                """)
+        }
+    }
+
     // MARK: - Deletion
 
-    /// Delete all recording data for a specific flight (track points, transcripts, phase markers).
+    /// Delete all recording data for a specific flight (track points, transcripts, phase markers,
+    /// route legs and its debrief).
     nonisolated func deleteFlightData(flightID: UUID) throws {
         try dbPool.write { db in
             try db.execute(sql: "DELETE FROM track_points WHERE flightID = ?", arguments: [flightID])
             try db.execute(sql: "DELETE FROM transcript_segments WHERE flightID = ?", arguments: [flightID])
             try db.execute(sql: "DELETE FROM phase_markers WHERE flightID = ?", arguments: [flightID])
+            try db.execute(sql: "DELETE FROM flight_route_legs WHERE flightID = ?", arguments: [flightID])
+            try db.execute(sql: "DELETE FROM debrief_results WHERE flightID = ?", arguments: [flightID])
         }
     }
 }

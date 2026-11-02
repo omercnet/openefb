@@ -3,7 +3,7 @@ import { config, utcDate } from "@/lib/config";
 import { activePath, saveInterview } from "@/lib/interviews";
 import { noiseReductionFor, sessionConfig } from "@/lib/interviewer";
 import { parseDevice, parseLang } from "@/lib/lang";
-import { checkLimits, clientIp, hashIp, inviteOk, reserve } from "@/lib/limits";
+import { checkLimits, clientIp, hashIp, inviteOk, releaseReservation, reserve } from "@/lib/limits";
 import { createCall, hangup } from "@/lib/openai";
 import { putObject } from "@/lib/storage";
 import { CONSENT_VERSION, type Interview } from "@/lib/types";
@@ -48,15 +48,20 @@ export async function POST(req: Request) {
   const limit = await checkLimits(ipHash);
   if (!limit.ok) return json({ error: limit.error }, limit.status);
 
+  // Take the slot first: the caps are enforced by this write-then-recount, before any paid OpenAI call is made.
+  const id = `${utcDate()}-${randomBytes(16).toString("hex")}`;
+  const slot = await reserve(ipHash, id);
+  if (!slot.ok) return json({ error: slot.error }, slot.status);
+
   const lang = parseLang(body.lang);
   const device = parseDevice(body.device);
   const call = await createCall(body.sdp, sessionConfig(lang, device), ipHash);
   if ("error" in call) {
     console.error("OpenAI createCall failed", call.status, call.error);
+    await releaseReservation(ipHash, id);
     return json({ error: "Could not start the voice session. Please try again in a minute." }, 502);
   }
 
-  const id = `${utcDate()}-${randomBytes(16).toString("hex")}`;
   const now = new Date().toISOString();
   const iv: Interview = {
     id,
@@ -79,11 +84,11 @@ export async function POST(req: Request) {
   };
   try {
     await saveInterview(iv);
-    await reserve(ipHash, id);
     await putObject(activePath(id), JSON.stringify({ id, callId: iv.callId, startedAt: now }));
   } catch (e) {
     console.error("storage failed at session start", e);
     if (call.callId) await hangup(call.callId);
+    await releaseReservation(ipHash, id);
     return json({ error: "Storage error. Please try again later." }, 500);
   }
 

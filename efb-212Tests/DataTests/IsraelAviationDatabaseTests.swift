@@ -191,8 +191,8 @@ struct IsraelAviationDatabaseTests {
         #expect(metadata.aipAmendment == nil)      // never guessed: the GDBs don't carry it
         #expect(metadata.effectiveDate == nil)
         #expect(metadata.sourceDataDate == "2026-10-25")   // newest GDB zip member timestamp
-        #expect(metadata.downloadDate == "2026-11-01")
-        #expect(metadata.schemaVersion == 2)
+        #expect(metadata.downloadDate == "2026-11-02")   // the Sportiv zip was saved on 2 Nov
+        #expect(metadata.schemaVersion == 3)
         #expect(metadata.attribution == "Aeronautical data: Civil Aviation Authority of Israel (CAAI), data of 25 Oct 2026")
         #expect(metadata.sourceURLs.contains("https://www.gov.il/he/pages/aip?chapterIndex=11"))
     }

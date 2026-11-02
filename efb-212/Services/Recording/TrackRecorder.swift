@@ -14,7 +14,9 @@ import CoreLocation
 
 /// Summary returned when track recording stops.
 nonisolated struct TrackRecorderSummary: Sendable {
-    let trackPointCount: Int
+    let trackPointCount: Int      // points actually stored
+    let failedWriteCount: Int     // points that could not be written
+    let streamFailed: Bool        // the location stream threw while tracking
     let phaseMarkers: [PhaseMarkerRecord]
     let currentPhase: FlightPhaseType
 }
@@ -30,10 +32,27 @@ actor TrackRecorder {
     private var backgroundSession: CLBackgroundActivitySession?
     private let flightID: UUID
     private var _trackPointCount: Int = 0
+    private var _failedWriteCount: Int = 0
+    private var _streamFailed = false
+    private var lastFixTimestamp: Date?
     private var _currentPhase: FlightPhaseType = .preflight
 
     /// Phase change callback -- called on each phase transition.
     var onPhaseChange: (@Sendable (FlightPhaseType, PhaseMarkerRecord) -> Void)?
+
+    /// Called once, on the first track point that could not be written.
+    var onWriteFailure: (@Sendable (Error) -> Void)?
+
+    /// Called when the location stream throws while tracking (the track stops growing).
+    var onStreamFailure: (@Sendable (Error) -> Void)?
+
+    func setFailureHandlers(
+        onWriteFailure: (@Sendable (Error) -> Void)?,
+        onStreamFailure: (@Sendable (Error) -> Void)?
+    ) {
+        self.onWriteFailure = onWriteFailure
+        self.onStreamFailure = onStreamFailure
+    }
 
     // MARK: - Init
 
@@ -58,6 +77,12 @@ actor TrackRecorder {
         verticalSpeedEstimator.verticalSpeedFPM
     }
 
+    /// A stream failure ends the track silently otherwise; flag it for the summary and callback.
+    private func noteStreamFailure(_ error: Error) {
+        _streamFailed = true
+        onStreamFailure?(error)
+    }
+
     /// Start GPS tracking via CLLocationUpdate.liveUpdates(.airborne).
     /// Creates CLBackgroundActivitySession for background operation.
     func startTracking() async {
@@ -75,21 +100,38 @@ actor TrackRecorder {
                     await self.ingest(location)
                 }
             } catch {
-                // CLLocationUpdate can throw on cancellation or auth denial
+                // CLLocationUpdate can throw on cancellation or auth denial. A throw while still
+                // tracking means the track stops growing: record it and tell the coordinator.
+                if !Task.isCancelled, let self {
+                    await self.noteStreamFailure(error)
+                }
             }
         }
     }
 
-    /// Stop GPS tracking and return summary.
+    /// Stop GPS tracking and return summary. The still-open final phase marker is closed at the
+    /// last fix, in the database and in the returned summary.
     func stopTracking() -> TrackRecorderSummary {
         trackingTask?.cancel()
         trackingTask = nil
         backgroundSession?.invalidate()
         backgroundSession = nil
 
+        var markers = phaseDetector.phaseMarkers
+        if let last = markers.last, last.endTimestamp == nil, let end = lastFixTimestamp {
+            try? recordingDB.updatePhaseMarkerEnd(id: last.id, endTimestamp: end)
+            markers[markers.count - 1] = PhaseMarkerRecord(
+                id: last.id, flightID: last.flightID, phase: last.phase,
+                startTimestamp: last.startTimestamp, endTimestamp: end,
+                latitude: last.latitude, longitude: last.longitude
+            )
+        }
+
         return TrackRecorderSummary(
             trackPointCount: _trackPointCount,
-            phaseMarkers: phaseDetector.phaseMarkers,
+            failedWriteCount: _failedWriteCount,
+            streamFailed: _streamFailed,
+            phaseMarkers: markers,
             currentPhase: _currentPhase
         )
     }
@@ -121,9 +163,18 @@ actor TrackRecorder {
             courseDegrees: trackDegrees
         )
 
-        // Write to GRDB (append-only, no memory accumulation)
-        try? recordingDB.insertTrackPoint(point)
-        _trackPointCount += 1
+        // Write to GRDB (append-only, no memory accumulation). Only stored points are counted:
+        // the stop summary must not report a track that was never written.
+        do {
+            try recordingDB.insertTrackPoint(point)
+            _trackPointCount += 1
+        } catch {
+            _failedWriteCount += 1
+            if _failedWriteCount == 1 {
+                onWriteFailure?(error)  // once per recording; later failures only add to the count
+            }
+        }
+        lastFixTimestamp = location.timestamp
 
         // Run through phase detector
         let previousPhase = _currentPhase
@@ -133,6 +184,11 @@ actor TrackRecorder {
 
         if newPhase != previousPhase, let lastMarker = phaseDetector.phaseMarkers.last {
             try? recordingDB.insertPhaseMarker(lastMarker)
+            // The detector closed the previous marker in memory at this fix; store that end time.
+            let markers = phaseDetector.phaseMarkers
+            if markers.count >= 2, let end = markers[markers.count - 2].endTimestamp {
+                try? recordingDB.updatePhaseMarkerEnd(id: markers[markers.count - 2].id, endTimestamp: end)
+            }
             onPhaseChange?(newPhase, lastMarker)
         }
     }

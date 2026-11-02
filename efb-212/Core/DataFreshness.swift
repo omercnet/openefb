@@ -39,7 +39,7 @@ nonisolated enum DataProduct: String, CaseIterable, Sendable {
     var expiredAfter: TimeInterval? {
         switch self {
         case .metar:        return 3 * 3600
-        case .taf:          return nil           // the valid period decides
+        case .taf:          return 30 * 3600     // longest TAF valid period: backstop when the TAF carries no parsable validity
         case .pirep:        return 2 * 3600      // PirepSection.maxAge
         case .tfr:          return 2 * 3600
         case .airmetSigmet: return 2 * 3600

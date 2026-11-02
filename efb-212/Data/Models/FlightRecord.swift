@@ -69,3 +69,27 @@ extension SchemaV1 {
         init() {}
     }
 }
+
+// MARK: - Recording health
+
+/// A FlightRecord kept despite a problem with its recording. The state lives in `notes` (which the
+/// History and Detail views surface) so no SchemaV1 attribute is added; a SchemaV2 can promote it.
+extension SchemaV1.FlightRecord {
+    nonisolated static let trackUnreadableNote =
+        "Track could not be read. The flight and its audio were kept; try again after restarting the app."
+    nonisolated static let recoveredNote =
+        "Recovered: the app closed while this flight was recording. The track and audio were kept."
+
+    /// The track exists but could not be read when the recording stopped.
+    var isTrackUnreadable: Bool { notes?.hasPrefix(Self.trackUnreadableNote) == true }
+
+    /// Rebuilt at launch from an interrupted recording.
+    var isRecovered: Bool { notes?.hasPrefix(Self.recoveredNote) == true }
+
+    /// Short caution for lists; nil for a normal flight.
+    var healthWarning: String? {
+        if isTrackUnreadable { return "Track damaged" }
+        if isRecovered { return "Recovered" }
+        return nil
+    }
+}

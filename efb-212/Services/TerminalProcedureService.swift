@@ -192,7 +192,9 @@ actor TerminalProcedureService: TerminalProcedureServiceProtocol {
         let folder = cycleDirectory(chart.cycle)
         let destination = folder.appendingPathComponent(fileName)
         if FileManager.default.fileExists(atPath: destination.path) {
-            return destination
+            if Self.isPDF(at: destination) { return destination }
+            // A truncated or corrupt cached file is never trusted: drop it and download again.
+            try? FileManager.default.removeItem(at: destination)
         }
 
         guard let url = URL(string: "\(Self.baseURL)/\(chart.cycle)/\(fileName)") else {
@@ -389,6 +391,16 @@ actor TerminalProcedureService: TerminalProcedureServiceProtocol {
         let number = Int(elapsed - firstOfYear) + 1
         let code = String(format: "%02d%02d", year % 100, number)
         return DTPPCycle(code: code, effectiveDate: effective, expirationDate: effective.addingTimeInterval(cycleLength))
+    }
+
+    /// The cycle with `code` (YYNN) among the cycles within a year of `date`; nil for an unknown code.
+    /// Used to date a chart from its own cycle, not from the newest cycle the device happens to know.
+    nonisolated static func cycle(code: String, near date: Date) -> DTPPCycle? {
+        for offset in -13...13 {
+            let candidate = cycle(containing: date.addingTimeInterval(Double(offset) * cycleLength))
+            if candidate.code == code { return candidate }
+        }
+        return nil
     }
 
     /// Parses the FAA APRA `dtpp/info` JSON:

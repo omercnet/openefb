@@ -1,4 +1,4 @@
-# App Store Connect metadata: draft, 2026-10-31
+# App Store Connect metadata: draft, 2026-10-31; Israel-mode corrections 2026-11-02
 
 Plain claims, no bravado. Review and trim before submitting. Character limits noted.
 
@@ -51,7 +51,7 @@ FLIGHT RECORDING AND DEBRIEF
 PRIVACY
 - No account, no analytics, no ads, no tracking
 - Location, audio, transcripts, flights and logbook stay on your device
-- Weather, TFR, NOTAM and chart requests go to NOAA and the FAA; map tiles come from the FAA sectional service (ArcGIS), OpenFreeMap, Esri and OpenTopoMap
+- Weather, TFR, NOTAM and chart requests go to NOAA and the FAA; map tiles come from the FAA sectional service (ArcGIS), OpenFreeMap, Esri and OpenTopoMap; in Israel mode, NOTAMs come from a relay the developer runs on Cloudflare and chart packs download from Cloudflare R2. None of these requests carries your position
 - Open source under MPL-2.0
 
 NEEDS THE INTERNET: weather, TFRs, NOTAMs, PIREPs and any map area you have not downloaded. Works offline: the airport
@@ -65,6 +65,7 @@ charts, ATC communication, and visual references.
 Aviation data (charts, airports, frequencies, airspace) is sourced from the FAA and is subject to change. Always verify
 information against official FAA publications. Expired data is clearly marked but should not be relied upon for
 navigation.
+In Israel mode the data comes from CAAI and the Israel Airports Authority; the binding sources are the Israeli AIP and NOTAMs.
 
 Weather information is provided for planning purposes only and may not reflect current conditions. Always obtain an
 official weather briefing from 1800wxbrief.com or FSS before flight.
@@ -77,7 +78,9 @@ OpenEFB has not been tested, approved, or certified by the FAA or any other avia
 DATA SOURCES
 FAA (charts, airport data, TFRs, NOTAMs, terminal procedures), NOAA Aviation Weather Center (METAR, TAF, PIREP,
 AIRMET/SIGMET, winds aloft), map data (c) OpenStreetMap contributors via OpenFreeMap and OpenMapTiles, imagery (c) Esri,
-Maxar, Earthstar Geographics, terrain (c) OpenTopoMap (CC-BY-SA).
+Maxar, Earthstar Geographics, terrain (c) OpenTopoMap (CC-BY-SA). In Israel mode: Civil Aviation Authority of Israel (CAAI)
+GIS layers, chart and aerodrome diagrams (chart (c) CAAI, base map (c) Mapa Ltd), and NOTAMs from the Israel Airports
+Authority through a relay run by the developer.
 ```
 
 ## Keywords (100 max, comma-separated, no spaces after commas)
@@ -103,6 +106,10 @@ OpenEFB is a VFR electronic flight bag. No login is needed.
   recording. Transcription is on-device (SpeechAnalyzer, or SFSpeechRecognizer with requiresOnDeviceRecognition = true).
   The debrief uses Apple Foundation Models on the device. No audio, transcript or location is sent to a server.
 - Network: NOAA aviationweather.gov (keyless), FAA TFR, terminal chart and NOTAM services, and map tile hosts.
+  The default region is US. In Settings > Region = Israel the app also reads a NOTAM feed from a Cloudflare Worker run
+  by the developer (openefb-notam-relay.omerc.workers.dev), checks small manifest files on a Cloudflare R2 bucket for
+  newer chart and diagram packs, and downloads a pack only when the user taps Download. None of these requests carries
+  a position, an account or credentials.
   NOTAMs need a free FAA API key that the user enters in Settings > NOTAM API (a link there opens the FAA portal).
   Without a key the airport sheet says "NOTAMs need a free FAA API key. Add it in Settings > NOTAM API."
 - To see the map without moving, use Xcode or simulator location Palo Alto (37.4611, -122.1150).
@@ -121,3 +128,5 @@ landscape equivalents. Captured at 2064x2752.
 - Display name: set `OpenEFB` as the home-screen name (currently `efb-212`).
 - Public release only: remove Satellite and Terrain, then delete the Esri and OpenTopoMap lines from the data sources
   paragraph (efb-zfm.8).
+- Owner decision: whether the listing names Israel (see `README.md`, "Pending owner decision"). The description above names no Israeli feature and is otherwise US-only; only its privacy, data-source and data-accuracy lines, and the review notes, cover Israel mode.
+- Public release only: CAAI/Mapa permission to host the CVFR chart and aerodrome diagrams (`NOTICE`).

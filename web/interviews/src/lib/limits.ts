@@ -1,6 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { config, utcDate } from "./config";
-import { listPaths, putObject } from "./storage";
+import { deleteObjects, listPaths, putObject } from "./storage";
 
 export function clientIp(req: Request): string {
   const xff = req.headers.get("x-forwarded-for");
@@ -26,7 +26,7 @@ export function inviteOk(code: unknown): boolean {
 
 export type LimitResult = { ok: true } | { ok: false; status: number; error: string };
 
-/** Counts today's reservation markers: per-IP and global. Racy by a request or two; fine at this scale. */
+/** Counts today's reservation markers: per-IP and global. Cheap pre-check; `reserve` re-counts, which is what actually enforces the caps. */
 export async function checkLimits(ipHash: string): Promise<LimitResult> {
   const day = utcDate();
   const mine = await listPaths(`limits/${day}/${ipHash}/`, config.ipDailyCap);
@@ -40,6 +40,31 @@ export async function checkLimits(ipHash: string): Promise<LimitResult> {
   return { ok: true };
 }
 
-export async function reserve(ipHash: string, id: string): Promise<void> {
-  await putObject(`limits/${utcDate()}/${ipHash}/${id}`, "1", "text/plain");
+const markerPath = (ipHash: string, id: string) => `limits/${utcDate()}/${ipHash}/${id}`;
+
+/**
+ * Take a slot BEFORE any paid OpenAI call: write our marker, count the markers, keep the slot only if the count is within
+ * the cap. Blob has no atomic counter, so a plain check-then-write lets parallel requests all pass. With write-then-count
+ * every racer sees every other racer's marker, so the caps are never exceeded; requests racing exactly at the limit may
+ * all back off (they can simply retry), which is the safe direction for a paid API.
+ */
+export async function reserve(ipHash: string, id: string): Promise<LimitResult> {
+  await putObject(markerPath(ipHash, id), "1", "text/plain");
+  const day = utcDate();
+  const mine = await listPaths(`limits/${day}/${ipHash}/`, config.ipDailyCap + 1);
+  if (mine.length > config.ipDailyCap) {
+    await releaseReservation(ipHash, id);
+    return { ok: false, status: 429, error: "You've reached today's interview limit for this connection. Please try again tomorrow." };
+  }
+  const all = await listPaths(`limits/${day}/`, config.dailyCap + 1);
+  if (all.length > config.dailyCap) {
+    await releaseReservation(ipHash, id);
+    return { ok: false, status: 429, error: "We've reached today's interview capacity. Please try again tomorrow." };
+  }
+  return { ok: true };
+}
+
+/** Give the slot back (the OpenAI call or the save failed, so no interview happened). */
+export async function releaseReservation(ipHash: string, id: string): Promise<void> {
+  await deleteObjects([markerPath(ipHash, id)]);
 }

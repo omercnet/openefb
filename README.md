@@ -4,7 +4,7 @@
 [![iOS 26](https://img.shields.io/badge/iOS-26-000000?logo=apple&logoColor=white)](https://developer.apple.com)
 [![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-brightgreen.svg)](LICENSE)
 
-A free, open-source iPad VFR Electronic Flight Bag: a moving map on the FAA sectional, airport and weather information, flight recording, and an on-device post-flight debrief.
+A free, open-source iPad VFR Electronic Flight Bag: a moving map on the FAA sectional (and, for Israel, the CVFR network), airport and weather information, flight recording, and an on-device post-flight debrief.
 
 **Status: TestFlight beta (version 1.0, build 1).** See [Limitations](#limitations).
 
@@ -50,6 +50,15 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 - Digital logbook with draft entries created from recordings (in the Flights tab)
 - On-device debrief with Apple Foundation Models, where the device supports it
 
+**Israel (Settings > Region)**
+- CVFR routes, reporting points, CTR/ATZ/CTA/TMA and P/R/D areas from CAAI data, with altitudes per direction, drawn on the map; the official CAAI CVFR chart as a downloadable pack
+- 49 curated aerodromes, airstrips and heliports, searchable in Hebrew and English, with runways, frequencies, circuit, hours and PPR
+- CVFR and sport-aviation (LSA) route planning between aerodromes, with a legs table, the ICAO flight plan text for e-mailing to the IAA, and route following with the leg altitude, next reporting point and off-route cautions
+- NOTAM briefing and route closures from the project's NOTAM relay, shown on the map and used by the planner
+- CAAI aerodrome diagrams on the map where they pass the georeferencing gate, and as PDFs otherwise
+- Weather (METAR/TAF, in hPa) for Israeli stations that publish it, proximity alerts for closed legs and P/R/CTR areas
+- A CVFR debrief with per-leg altitude adherence and reporting-point passage, computed in code and shown without Apple Intelligence
+
 ## Limitations
 
 - **TestFlight beta.** It has not been used in a cockpit by pilots yet, and hasn't been tried on a physical iPad in flight.
@@ -61,6 +70,17 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 - **NOTAMs** need your own free FAA API key.
 - iPad only, iOS 26 or later. No IFR procedures, ADS-B traffic, weight and balance, or cloud sync.
 
+**Israel mode**
+
+- **Unreviewed by Israeli pilots.** No Israeli CFI has reviewed the Israel mode yet (efb-aac.13). The 49 curated aerodromes are transcribed from the AIP and carry an amber "Unreviewed data" note on the airport sheet until the owner marks each field reviewed; confirm every value against the AIP.
+- **The bundled CAAI data is a snapshot**: data of 25 Oct 2026, imported 2026-11-01, with no AIP amendment number recorded. The app shows the data date. The binding publications are CAAI's AIP and NOTAMs.
+- **The official CVFR chart is a separate download** with its own validation gate: the app installs an edition only when it is published and passed the gate (cross-validated p95 of at most 200 m against CAAI's own reporting points; the 2025-02 chart measured 187 m, which is the chart's own drafting error). The chart is © CAAI, the base map © Mapa Ltd, and neither is covered by CAAI's approval of the GIS layers or by this project's license. Without the download, the app draws the CVFR routes, points and airspace from the vectors.
+- **Aerodrome diagrams are placed at ±100 ft**, twice the 50 ft US gate, and only when the chart passes the runway and ARP checks: 5 of 13 Israeli charts are placed (LLBG, LLHA, LLIB, LLBS, LLEY); the rest open as sheet-only PDFs. The badge shows the edition and "±100 ft". Verify against the printed chart. Diagram artwork is © CAAI and is not covered by the GIS-layer approval.
+- **NOTAM route closures** come from the project's relay, which scrapes the IAA site, and are parsed by rules. A closure the parser can't read in full shows as "possible closure, read NOTAM"; a closure the planner can't place on the network blocks filing ("Unresolved closure: check NOTAM"). The relay refreshes every 15 minutes, the app judges the feed's age from the relay's own scrape time and not from the download time, and it serves the last saved copy when a refresh fails. If the IAA blocks the relay, the feed stops updating.
+- **Filing:** the app builds the FPL text; you send it to ais@iaa.gov.il yourself. The app sends nothing.
+- **Sport-aviation (LSA) weekend rules** follow the AIP text; the layer has no holiday calendar, so you declare holiday eves in the plan.
+- **Open review findings:** ten severity 1-2 findings from the Israel usability review are filed as efb-aac.21 to efb-aac.30.
+
 ## Tech Stack
 
 | Component | Technology |
@@ -69,10 +89,10 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 | Language | Swift 6.0 language mode, SwiftUI |
 | Architecture | MVVM with the Observation framework (`@Observable`); one root `AppState` |
 | Map Engine | MapLibre Native iOS (open-source, no API fees) |
-| Aviation Data | FAA NASR, imported offline by `tools/nasr-importer` into a bundled SQLite database |
+| Aviation Data | FAA NASR, imported offline by `tools/nasr-importer` into a bundled SQLite database; CAAI GIS layers and curated aerodromes, imported by `tools/caai-importer` into `israel-aviation.sqlite` |
 | Database | GRDB (aviation data with R-tree and FTS indexes; recording data) + SwiftData (profiles, flights, plans, logbook, settings) |
 | Weather | NOAA Aviation Weather API (free, no key) |
-| Charts | FAA VFR sectional raster tiles (ArcGIS); FAA d-TPP terminal chart PDFs |
+| Charts | FAA VFR sectional raster tiles (ArcGIS); FAA d-TPP terminal chart PDFs; Israel: the CVFR overlay drawn from CAAI vectors, plus the official CVFR chart and aerodrome diagrams as downloaded packs from Cloudflare R2 |
 | Recording | In-app: `Services/Recording/` (GPS, audio, `SpeechAnalyzer` transcription) |
 | Debrief | Apple Foundation Models (on-device) |
 
@@ -96,10 +116,12 @@ From a shell, use `tools/sim-test.sh` (it owns the simulator and derived-data ha
 ```bash
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 tools/sim-test.sh build -quiet                        # compile app + tests
-tools/sim-test.sh test -only-testing:efb-212Tests     # unit tests (555 test cases, 0 failed as of 2026-11-01)
+tools/sim-test.sh test -only-testing:efb-212Tests     # unit tests (1065 tests, 0 failed as of 2026-11-02)
 tools/sim-test.sh demo                                # install and launch at KPAO on the simulator
 tools/fly.sh                                          # feed a simulated VFR route (KPAO -> KSQL -> KOAK -> KSFO)
 ```
+
+The server-side pieces under `web/` build separately (`cd web/notam-relay && npm ci && npm test`, and the same in `web/charts`); see `web/README.md`.
 
 ## Project Structure
 
@@ -122,19 +144,20 @@ openefb/
 │   │   ├── Recording/         # Track, audio, transcription, auto-start, persistence
 │   │   ├── Replay/            # Replay engine
 │   │   └── Debrief/           # On-device debrief
-│   ├── Data/                  # AviationDatabase, RecordingDatabase (GRDB), Models/ (SwiftData)
+│   ├── Data/                  # AviationDatabase, IsraelAviationDatabase, RecordingDatabase (GRDB), Models/ (SwiftData)
 │   ├── Core/                  # AppState, types, errors, design tokens
 │   └── Resources/             # Bundled aviation.sqlite, map style
 ├── efb-212Tests/              # Unit and integration tests (Swift Testing)
 ├── efb-212UITests/            # Xcode template stubs
-├── tools/                     # sim-test.sh, fly.sh, nasr-importer/, apd-georef/
+├── tools/                     # sim-test.sh, fly.sh, nasr-importer/, apd-georef/, caai-importer/, caai-chart/, caai-apd/
+├── web/                       # Server side, not in the app: notam-relay/ (Cloudflare Worker), charts/ (R2 publish), interviews/ (Vercel)
 ├── dist-prep/                 # TestFlight / App Store prep
 └── docs/                      # Design, product, handoff briefs
 ```
 
 ## Data Sources
 
-All free, all public domain except the map tiles:
+All free to use. The FAA and NOAA data is public domain. CAAI approved redistribution of its GIS layers only (see `NOTICE`); the chart and diagram artwork is not covered by that approval. Map tiles have their own terms:
 
 | Source | Data | Update Cycle |
 |--------|------|-------------|
@@ -142,10 +165,13 @@ All free, all public domain except the map tiles:
 | FAA AIS Class Airspace | Class B/C/D airspace (bundled database) | with NASR |
 | FAA VFR sectional tiles (ArcGIS) | Sectional raster tiles | 56 days |
 | [FAA d-TPP](https://aeronav.faa.gov) | Terminal charts and airport diagrams (PDF) | 28 days |
-| [NOAA Aviation Weather](https://aviationweather.gov/data/api/) | METARs, TAFs, PIREPs, AIRMET/SIGMET, winds aloft | Real-time |
+| [NOAA Aviation Weather](https://aviationweather.gov/data/api/) | METARs, TAFs, PIREPs, AIRMET/SIGMET, winds aloft (also used for Israeli stations) | Real-time |
 | [FAA TFR](https://tfr.faa.gov) | Temporary flight restrictions | Real-time |
 | FAA NOTAM API | NOTAMs (your own free API key) | Real-time |
+| Civil Aviation Authority of Israel (CAAI) | GIS layers published with the Israeli domestic AIP: CVFR and sport-aviation (LSA) points and routes, CTR/ATZ/CTA, TMA, FIR, prohibited/restricted/danger areas, runways (bundled database, data of 25 Oct 2026); curated aerodrome data from the domestic AIP and eAIP; aerodrome diagrams and the CVFR chart (downloaded packs) | Per AIP amendment; the bundled database is a snapshot |
+| Israel Airports Authority (IAA) | NOTAMs, scraped by the project's relay every 15 minutes; the app reads the relay's `notams.json` and never contacts the IAA | 15 minutes |
 | OpenFreeMap / OpenStreetMap, Esri, OpenTopoMap | Street, Satellite and Terrain base maps | n/a |
+| Cloudflare R2 and Workers | Host the project's Israel chart and diagram packs and the NOTAM relay | n/a |
 
 ## Roadmap
 

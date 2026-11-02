@@ -6,14 +6,30 @@ export const USER_AGENT = "OpenEFB-NOTAM-Relay/0.1 (+https://github.com/quarterm
 
 export type TextFetcher = (url: string) => Promise<string>;
 
+/** The IAA pages are a few hundred KB; anything larger is a block page, a proxy error or an attack, not NOTAMs. */
+export const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+
+export class HttpStatusError extends Error {
+  constructor(
+    readonly status: number,
+    url: string,
+  ) {
+    super(`IAA returned HTTP ${status} for ${url}`);
+  }
+}
+
 /** Both IAA pages are served as windows-1255 (Hebrew); NOTAM text itself is ASCII. Web-standard APIs only (Workers and Node). */
 export const httpFetcher: TextFetcher = async (url) => {
   const res = await fetch(url, {
     headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
     signal: AbortSignal.timeout(30_000),
   });
-  if (!res.ok) throw new Error(`IAA returned HTTP ${res.status} for ${url}`);
-  return new TextDecoder("windows-1255").decode(await res.arrayBuffer());
+  if (!res.ok) throw new HttpStatusError(res.status, url);
+  const declared = Number(res.headers.get("content-length") ?? 0);
+  if (declared > MAX_RESPONSE_BYTES) throw new Error(`IAA response too large (${declared} bytes) for ${url}`);
+  const bytes = await res.arrayBuffer();
+  if (bytes.byteLength > MAX_RESPONSE_BYTES) throw new Error(`IAA response too large (${bytes.byteLength} bytes) for ${url}`);
+  return new TextDecoder("windows-1255").decode(bytes);
 };
 
 export const detailUrl = (rowId: string) => DETAIL_URL_TEMPLATE.replace("{rowId}", encodeURIComponent(rowId));

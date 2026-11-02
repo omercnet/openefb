@@ -16,6 +16,7 @@ struct IsraelFlightPlanView: View {
 
     @State private var viewModel: IsraelFlightPlanViewModel?
     @State private var showPreview = false
+    @State private var showBriefing = false
 
     var body: some View {
         Group {
@@ -40,6 +41,7 @@ struct IsraelFlightPlanView: View {
         @Bindable var vm = vm
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                networkPicker(vm)
                 picker(title: "Departure", query: $vm.departureQuery, results: vm.departureResults,
                        label: "Departure aerodrome", onChange: vm.searchDeparture, onSelect: vm.selectDeparture)
                 picker(title: "Destination", query: $vm.destinationQuery, results: vm.destinationResults,
@@ -49,6 +51,8 @@ struct IsraelFlightPlanView: View {
                 DatePicker("Departure (local)", selection: $vm.departureTime, in: Date()...)
                     .environment(\.timeZone, TimeZone(identifier: "Asia/Jerusalem") ?? .current)
                     .accessibilityIdentifier("il-departure-time")
+
+                if vm.network == .lsa { lsaWeekendSection(vm) }
 
                 overrides(vm)
 
@@ -61,13 +65,22 @@ struct IsraelFlightPlanView: View {
                     issuesList(vm)
                     actions(vm)
                 }
+                Button { showBriefing = true } label: {
+                    Label("NOTAM briefing", systemImage: "doc.text.magnifyingglass").frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("il-notam-briefing")
                 Text(IsraelFlightPlanIssue.disclaimer)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             .padding()
         }
+        .scrollDismissesKeyboard(.interactively)
         .sheet(isPresented: $showPreview) { previewSheet(vm) }
+        .sheet(isPresented: $showBriefing) {
+            IsraelBriefingView(plannedRoute: vm.plan.map { BriefingRoute(plan: $0, departure: vm.departureTime) })
+        }
     }
 
     // MARK: - Pickers
@@ -85,7 +98,11 @@ struct IsraelFlightPlanView: View {
                 .accessibilityLabel(label)
                 .onChange(of: query.wrappedValue) { _, _ in onChange() }
             ForEach(results) { aerodrome in
-                Button { onSelect(aerodrome) } label: {
+                Button {
+                    onSelect(aerodrome)
+                    // The result tapped, the keyboard has done its job: it would hide the summary and legs.
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                } label: {
                     HStack {
                         Text(aerodrome.code).font(.system(.body, design: .monospaced).weight(.semibold))
                         Text(aerodrome.nameEnglish).lineLimit(1)
@@ -139,6 +156,45 @@ struct IsraelFlightPlanView: View {
             Toggle("Allow by-request routes (ATC approval, not fileable)", isOn: $vm.allowByRequest)
             Toggle("Allow military routes (IAF approval, not fileable)", isOn: $vm.allowMilitary)
         }
+    }
+
+    /// CVFR or sport aviation (LSA). The aircraft's usual network preselects it; a tap here overrides that.
+    @ViewBuilder
+    private func networkPicker(_ vm: IsraelFlightPlanViewModel) -> some View {
+        Picker("Route network", selection: Binding(get: { vm.network }, set: { vm.selectNetwork($0) })) {
+            Text("CVFR").tag(IsraelRouteNetwork.cvfr)
+            Text("LSA (sport aviation)").tag(IsraelRouteNetwork.lsa)
+        }
+        .pickerStyle(.segmented)
+        .controlSize(.large)
+        .accessibilityLabel("Route network")
+        .accessibilityIdentifier("il-route-network")
+    }
+
+    /// LSA only: the pilot's holiday declaration and the AIP's weekend definition, as published.
+    @ViewBuilder
+    private func lsaWeekendSection(_ vm: IsraelFlightPlanViewModel) -> some View {
+        @Bindable var vm = vm
+        Picker("Departure day", selection: $vm.dayOverride) {
+            Text("Normal day").tag(IsraelDayOverride.none)
+            Text("Holiday eve").tag(IsraelDayOverride.holidayEve)
+            Text("Holiday").tag(IsraelDayOverride.holiday)
+        }
+        .accessibilityIdentifier("il-day-override")
+        DisclosureGroup("Weekend-only routes (AIP B-08)") {
+            VStack(alignment: .leading, spacing: 8) {
+                if let rule = vm.weekendRule {
+                    Text(rule.textEnglish)
+                    Text(rule.textHebrew).environment(\.layoutDirection, .rightToLeft)
+                    Text("Source: \(rule.source). The route data does not say which Friday start applies to which route, and has no holiday calendar, so declare a holiday above.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Routes marked weekend run on Saturdays and holidays all day and Fridays from 06:00 (some areas from 12:00 or 14:00), holiday eves from 14:00 (AIP B-08).")
+                }
+            }
+            .font(.footnote)
+        }
+        .accessibilityIdentifier("il-weekend-rule")
     }
 
     // MARK: - Result

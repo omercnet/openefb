@@ -204,7 +204,8 @@ struct AviationDatabaseRobustnessTests {
         let installed = try AviationDatabase.installBundledDatabase(from: bundled, into: install, dataVersion: "1")
         #expect(try String(contentsOf: installed, encoding: .utf8) == "bundled-v1")
         let marker = install.appendingPathComponent(AviationDatabase.versionMarkerFileName)
-        #expect(try String(contentsOf: marker, encoding: .utf8) == "1|10")
+        #expect(try String(contentsOf: marker, encoding: .utf8)
+                == (try AviationDatabase.installFingerprint(bundledURL: bundled, dataVersion: "1")))
 
         // Simulate local state (e.g. a cache written by the app) in the installed copy.
         try "installed-local-state".write(to: installed, atomically: true, encoding: .utf8)
@@ -232,7 +233,8 @@ struct AviationDatabaseRobustnessTests {
         #expect(!FileManager.default.fileExists(atPath: wal.path))
         #expect(!FileManager.default.fileExists(atPath: shm.path))
         let marker = install.appendingPathComponent(AviationDatabase.versionMarkerFileName)
-        #expect(try String(contentsOf: marker, encoding: .utf8) == "2|10")
+        #expect(try String(contentsOf: marker, encoding: .utf8)
+                == (try AviationDatabase.installFingerprint(bundledURL: bundledV2, dataVersion: "2")))
     }
 
     @Test func installRecopiesWhenBundledSizeChangesWithSameVersion() throws {

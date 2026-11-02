@@ -82,8 +82,27 @@ struct NotamSection: View {
             }
 
         case .loaded(let report):
+            if report.refreshFailed {
+                Label("Refresh failed. Showing the copy from the last successful download; check NOTAMs again before flight.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.caution)
+                    .accessibilityIdentifier("notam-refresh-failed")
+                Button("Retry") { Task { await load() } }
+                    .font(.subheadline)
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+            }
+            if report.isIncomplete {
+                Label("List incomplete: too many NOTAMs to download. Closures may be missing.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.caution)
+                    .accessibilityIdentifier("notam-incomplete")
+            }
             if report.notams.isEmpty {
-                Text("No active NOTAMs for \(report.location)")
+                Text(report.refreshFailed ? "No active NOTAMs in the saved copy for \(report.location)"
+                                          : "No active NOTAMs for \(report.location)")
                     .font(.subheadline)
                     .foregroundStyle(Palette.secondaryText)
             } else {

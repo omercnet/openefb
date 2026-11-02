@@ -63,6 +63,8 @@ enum MapLayer: String, CaseIterable, Sendable {
     case cvfrAirspace   // CTR/ATZ/TMA and P/R/D
     case cvfrRunways    // Runway lines
     case cvfrClosures   // NOTAM route closures
+    // Israel sport-aviation (LSA) routes, drawn by `IsraelLSAOverlay`
+    case lsaRoutes      // LSA route lines and points
 
     /// The Israel CVFR chart layers (drawn by `IsraelChartOverlay`, not by `MapService`).
     static let cvfrChart: [MapLayer] = [.cvfrRoutes, .cvfrPoints, .cvfrAirspace, .cvfrRunways, .cvfrClosures]

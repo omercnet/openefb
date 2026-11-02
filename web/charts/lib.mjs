@@ -13,6 +13,26 @@ export function assertSegment(label, value) {
 export const objectKey = (product, edition, name) => `${assertSegment("product", product)}/${assertSegment("edition", edition)}/${assertSegment("file", name)}`;
 export const productManifestKey = (product) => `${assertSegment("product", product)}/manifest.json`;
 
+/**
+ * Packs are served `immutable` for a year, so an edition's files must never change once uploaded. Re-publishing
+ * the same edition is fine only when every file that already exists in the edition manifest has the same SHA-256.
+ */
+export function assertImmutable(existing, files) {
+  for (const f of files) {
+    const old = existing?.files?.find((e) => e.name === f.name);
+    if (old && old.sha256 !== f.sha256) {
+      throw new Error(`${f.name} already published in this edition with a different SHA-256 (${old.sha256.slice(0, 12)}... vs ${f.sha256.slice(0, 12)}...). Editions are immutable: publish a new edition id.`);
+    }
+  }
+}
+
+/** The app only serves editions whose validation passed; refuse to approve one that did not. */
+export function assertApprovable(source, approve) {
+  if (approve && source?.validation?.passed !== true) {
+    throw new Error("--approve refused: the pipeline manifest has no validation.passed === true");
+  }
+}
+
 /** Edition manifest = the pipeline's manifest.json plus what only the publisher knows. */
 export function buildEditionManifest({ product, edition, source, files, existing, approve, now, baseUrl }) {
   const wasPublished = existing?.published === true;

@@ -24,13 +24,23 @@ nonisolated struct IsraelRouteOptions: Equatable, Sendable {
     var allowByRequest: Bool = false
     /// Allow blue military segments (civil use only with IAF approval). Not fileable either.
     var allowMilitary: Bool = false
+    /// Planned off-block time. With it, sport-aviation weekend rules are applied: weekend-only routes are left out
+    /// when the departure is not in a weekend, and each leg is checked at its own time. nil skips the time rules.
+    var departure: Date?
+    /// The pilot's holiday declaration for the departure day (the data has no holiday calendar).
+    var dayOverride: IsraelDayOverride = .none
     /// The NOTAM check covers departure to departure + this (seconds). 3 h covers any domestic CVFR leg set.
     var closureWindow: TimeInterval = 3 * 3600
 
-    init(allowByRequest: Bool = false, allowMilitary: Bool = false, closureWindow: TimeInterval = 3 * 3600) {
+    init(
+        allowByRequest: Bool = false, allowMilitary: Bool = false, closureWindow: TimeInterval = 3 * 3600,
+        departure: Date? = nil, dayOverride: IsraelDayOverride = .none
+    ) {
         self.allowByRequest = allowByRequest
         self.allowMilitary = allowMilitary
         self.closureWindow = closureWindow
+        self.departure = departure
+        self.dayOverride = dayOverride
     }
 }
 
@@ -46,11 +56,20 @@ nonisolated enum IsraelRouteCaution: Hashable, Sendable {
     case partialClosure(notamID: String, text: String)
     /// A NOTAM that looks like a closure but the relay could not read in full.
     case checkNotam(notamID: String)
+    /// Sport-aviation weekend-only route; the weekend has begun by the AIP default (Friday 06:00) but a bubble
+    /// may start it as late as 14:00, and the data does not say which. Cannot be filed.
+    case weekendStartUnconfirmed
+    /// Sport-aviation weekend-only route, and this leg is flown outside a weekend (the weekend ends or has not begun).
+    case notInUse
+    /// Sport-aviation route whose conditions are on the CAAI chart notes (`text` is the layer's value).
+    case specialConditions(text: String?)
+    /// The layer marks this sport-aviation route for small aircraft only.
+    case smallAircraftOnly
 
     var blocksFiling: Bool {
         switch self {
-        case .byRequest, .military, .checkNotam: return true
-        case .partialClosure: return false
+        case .byRequest, .military, .checkNotam, .weekendStartUnconfirmed, .notInUse: return true
+        case .partialClosure, .specialConditions, .smallAircraftOnly: return false
         }
     }
 
@@ -61,6 +80,10 @@ nonisolated enum IsraelRouteCaution: Hashable, Sendable {
         case .military: return "MILITARY"
         case .partialClosure: return "PARTIAL CLSD"
         case .checkNotam: return "CHECK NOTAM"
+        case .weekendStartUnconfirmed: return "WEEKEND START?"
+        case .notInUse: return "NOT IN USE"
+        case .specialConditions: return "SPECIAL"
+        case .smallAircraftOnly: return "SMALL A/C"
         }
     }
 }
@@ -103,6 +126,8 @@ nonisolated struct IsraelRoutePlan: Hashable, Sendable {
     var isFileable: Bool { !legs.contains { $0.cautions.contains(where: \.blocksFiling) } }
     /// The whole polyline, departure to destination.
     var polyline: [CLLocationCoordinate2D] { legs.flatMap(\.polyline) }
+    /// The network the plan is flown on (CVFR when the plan has no legs).
+    var network: IsraelRouteNetwork { legs.first?.segment.network ?? .cvfr }
 }
 
 nonisolated enum IsraelNoRouteReason: Equatable, Sendable {
@@ -112,6 +137,8 @@ nonisolated enum IsraelNoRouteReason: Equatable, Sendable {
     case oneWay
     /// A path exists only through by-request or military segments.
     case restricted
+    /// A path exists only through weekend-only sport-aviation routes, and the departure is not in a weekend.
+    case notInUse
     /// The two points are not connected at all.
     case disconnected
 }
@@ -124,13 +151,14 @@ nonisolated enum IsraelRouteError: Error, Equatable, Sendable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .unknownPoint(let code):
-            return "\(code) is not on the CVFR route network."
+            return "\(code) is not on the route network."
         case .noRoute(let from, let to, let reason):
             let base = "No open route between \(from) and \(to)"
             switch reason {
             case .closed: return base + ": the only routes are closed by NOTAM."
             case .oneWay: return base + ": the only routes are one-way against this direction."
             case .restricted: return base + ": the only routes need ATC or IAF approval."
+            case .notInUse: return base + ": the only routes are weekend-only and the departure is not in a weekend."
             case .disconnected: return base + "."
             }
         }
@@ -152,6 +180,31 @@ nonisolated enum IsraelSegmentClosure: Hashable, Sendable {
     case full(notamID: String)
     case partial(notamID: String, text: String)
     case check(notamID: String)
+}
+
+/// A closure the planner could not place on the network in full: a point code it does not know, or a
+/// leg with no published segment. It may still close the planned route, so filing is blocked until the
+/// pilot reads the NOTAM (efb-qpk: never fail open).
+nonisolated struct IsraelUnresolvedClosure: Hashable, Sendable, Identifiable {
+    let notamID: String
+    /// Point codes the network does not know, in chain order.
+    let unknownCodes: [String]
+    /// Legs between known points with no published segment.
+    let unmatchedLegs: [IsraelClosureLeg]
+    var id: String { notamID }
+}
+
+/// The NOTAM closure marks for a planned window: what landed on segments, and what did not.
+nonisolated struct IsraelClosureMarks: Hashable, Sendable {
+    /// Segment id -> closure state.
+    var segments: [Int: IsraelSegmentClosure] = [:]
+    /// Closures (one per NOTAM) that could not be placed in full. Each blocks filing.
+    var unresolved: [IsraelUnresolvedClosure] = []
+
+    init(segments: [Int: IsraelSegmentClosure] = [:], unresolved: [IsraelUnresolvedClosure] = []) {
+        self.segments = segments
+        self.unresolved = unresolved
+    }
 }
 
 // MARK: - Planner
@@ -202,13 +255,19 @@ nonisolated struct IsraelRoutePlanner: Sendable {
     ) throws(IsraelRouteError) -> IsraelRoutePlan {
         let stops = ([from] + via + [to]).map { $0.uppercased() }
         for code in stops where !knowsPoint(code) { throw .unknownPoint(code) }
-        let graph = adjacency(options: options, ignoreClosures: false, ignoreDirection: false)
+        let graph = adjacency(options: options, ignoreClosures: false, ignoreDirection: false, ignoreTimeRules: false)
         var legs: [IsraelRouteLeg] = []
+        var elapsed: TimeInterval = 0  // seconds since departure, for the time rules
         for (start, end) in zip(stops, stops.dropFirst()) where start != end {
             guard let path = shortestPath(graph, from: start, to: end) else {
                 throw .noRoute(from: start, to: end, reason: diagnose(from: start, to: end, options: options))
             }
-            legs.append(contentsOf: path.map { makeLeg($0, cruiseSpeedKnots: cruiseSpeedKnots) })
+            for edge in path {
+                let legStart = options.departure.map { $0.addingTimeInterval(elapsed) }
+                let leg = makeLeg(edge, cruiseSpeedKnots: cruiseSpeedKnots, legStart: legStart, dayOverride: options.dayOverride)
+                legs.append(leg)
+                elapsed += leg.eteSeconds
+            }
         }
         return IsraelRoutePlan(legs: legs, cruiseSpeedKnots: cruiseSpeedKnots)
     }
@@ -226,25 +285,28 @@ nonisolated struct IsraelRoutePlanner: Sendable {
 
     /// Segment closure states from the NOTAM feed for a departure window. A stale or absent feed yields
     /// none; the caller must then tell the pilot the closures were not checked.
+    /// Closures that cannot be placed on the network in full are returned in `unresolved`, never dropped.
     /// - Parameters:
+    ///   - routeNetwork: the network the plan is flown on; only closures naming one of its route kinds count.
     ///   - departure: planned departure; closures overlapping [departure, departure + window] count.
     ///   - now: for the feed-freshness check.
     static func closures(
         from report: IsraelNotamReport?,
         network: IsraelChartNetwork,
+        routeNetwork: IsraelRouteNetwork = .cvfr,
         departure: Date,
         window: TimeInterval,
         now: Date = Date()
-    ) -> [Int: IsraelSegmentClosure] {
+    ) -> IsraelClosureMarks {
         guard let report, IsraelChartFeatureBuilder.drawableFreshness.contains(report.freshness(now: now).level) else {
-            return [:]
+            return IsraelClosureMarks()
         }
         let end = departure.addingTimeInterval(window)
         let active = report.feed.closures.filter { closure in
-            closure.covers(IsraelChartFeatureBuilder.chartRouteKind) && closure.overlaps(start: departure, end: end)
+            routeNetwork.closureKinds.contains(where: closure.covers) && closure.overlaps(start: departure, end: end)
         }
         let mapping = IsraelNotamClosureMapper.map(active, using: network)
-        var result: [Int: IsraelSegmentClosure] = [:]
+        var result = IsraelClosureMarks()
         for match in mapping.matches {
             let state: IsraelSegmentClosure
             switch match.closure.severity {
@@ -254,8 +316,13 @@ nonisolated struct IsraelRoutePlanner: Sendable {
                 state = .partial(notamID: match.closure.notamId, text: IsraelChartFeatureBuilder.closureText(match.closure, now: now))
             }
             for segment in match.segments {
-                if let existing = result[segment.id], existing.rank >= state.rank { continue }
-                result[segment.id] = state
+                if let existing = result.segments[segment.id], existing.rank >= state.rank { continue }
+                result.segments[segment.id] = state
+            }
+            if !match.isFullyMapped, !result.unresolved.contains(where: { $0.notamID == match.closure.notamId }) {
+                result.unresolved.append(IsraelUnresolvedClosure(
+                    notamID: match.closure.notamId, unknownCodes: match.unknownCodes, unmatchedLegs: match.unmatchedLegs
+                ))
             }
         }
         return result
@@ -263,11 +330,17 @@ nonisolated struct IsraelRoutePlanner: Sendable {
 
     // MARK: Graph
 
-    private func adjacency(options: IsraelRouteOptions, ignoreClosures: Bool, ignoreDirection: Bool) -> [String: [Edge]] {
+    private func adjacency(options: IsraelRouteOptions, ignoreClosures: Bool, ignoreDirection: Bool, ignoreTimeRules: Bool) -> [String: [Edge]] {
         var graph: [String: [Edge]] = [:]
+        // A weekend-only sport-aviation route is out when the departure is not in a weekend by any published rule.
+        // Later legs are not excluded here: they are marked per leg, because the flight may cross into or out of a weekend.
+        let weekdayDeparture = options.departure.map {
+            IsraelLSATimeRules.weekendState(at: $0, override: options.dayOverride) == .notInUse
+        } ?? false
         for segment in segments {
             if segment.isByRequest && !options.allowByRequest { continue }
             if segment.isMilitary && !options.allowMilitary { continue }
+            if !ignoreTimeRules, weekdayDeparture, segment.network == .lsa, segment.activity == .weekend { continue }
             if !ignoreClosures, case .full = closures[segment.id] { continue }
             let length = segment.lengthNM ?? Self.length(of: segment.polyline)
             let from = segment.fromCode.uppercased(), to = segment.toCode.uppercased()
@@ -313,20 +386,27 @@ nonisolated struct IsraelRoutePlanner: Sendable {
 
     /// Relax the rules one at a time to tell the pilot which one cut the route.
     private func diagnose(from: String, to: String, options: IsraelRouteOptions) -> IsraelNoRouteReason {
-        if shortestPath(adjacency(options: options, ignoreClosures: true, ignoreDirection: false), from: from, to: to) != nil {
+        if shortestPath(adjacency(options: options, ignoreClosures: false, ignoreDirection: false, ignoreTimeRules: true), from: from, to: to) != nil {
+            return .notInUse
+        }
+        if shortestPath(adjacency(options: options, ignoreClosures: true, ignoreDirection: false, ignoreTimeRules: true), from: from, to: to) != nil {
             return .closed
         }
-        if shortestPath(adjacency(options: options, ignoreClosures: true, ignoreDirection: true), from: from, to: to) != nil {
+        if shortestPath(adjacency(options: options, ignoreClosures: true, ignoreDirection: true, ignoreTimeRules: true), from: from, to: to) != nil {
             return .oneWay
         }
-        let everything = IsraelRouteOptions(allowByRequest: true, allowMilitary: true)
-        if shortestPath(adjacency(options: everything, ignoreClosures: true, ignoreDirection: true), from: from, to: to) != nil {
+        var everything = options
+        everything.allowByRequest = true
+        everything.allowMilitary = true
+        if shortestPath(adjacency(options: everything, ignoreClosures: true, ignoreDirection: true, ignoreTimeRules: true), from: from, to: to) != nil {
             return .restricted
         }
         return .disconnected
     }
 
-    private func makeLeg(_ edge: Edge, cruiseSpeedKnots: Double) -> IsraelRouteLeg {
+    /// - Parameters:
+    ///   - legStart: when this leg is flown (departure + the legs before it); nil skips the time rules.
+    private func makeLeg(_ edge: Edge, cruiseSpeedKnots: Double, legStart: Date?, dayOverride: IsraelDayOverride) -> IsraelRouteLeg {
         let segment = edge.segment
         let fromCode = edge.forward ? segment.fromCode : segment.toCode
         let toCode = edge.toCode
@@ -341,6 +421,21 @@ nonisolated struct IsraelRoutePlanner: Sendable {
         case .partial(let id, let text): cautions.append(.partialClosure(notamID: id, text: text))
         case .check(let id): cautions.append(.checkNotam(notamID: id))
         case .full, .none: break
+        }
+        if segment.network == .lsa {
+            switch segment.activity {
+            case .allWeek: break
+            case .weekend:
+                if let legStart {
+                    switch IsraelLSATimeRules.weekendState(at: legStart, override: dayOverride) {
+                    case .inUse: break
+                    case .startUnconfirmed: cautions.append(.weekendStartUnconfirmed)
+                    case .notInUse: cautions.append(.notInUse)
+                    }
+                }
+            case .special, .unspecified: cautions.append(.specialConditions(text: segment.activitySource))
+            }
+            if segment.smallOnly { cautions.append(.smallAircraftOnly) }
         }
         let speed = max(cruiseSpeedKnots, 1)
         return IsraelRouteLeg(

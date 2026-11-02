@@ -14,6 +14,8 @@ struct FlightDetailView: View {
     let flightRecord: SchemaV1.FlightRecord
     @Environment(AppState.self) private var appState
     @State private var debriefEngine = DebriefEngine()
+    /// The Israel CVFR debrief; nil for flights outside Israel (loaded once, off the main actor).
+    @State private var cvfrDebrief: CVFRDebrief?
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private static let dateFormatter: DateFormatter = {
@@ -41,12 +43,24 @@ struct FlightDetailView: View {
 
                 Divider()
 
+                // MARK: - CVFR Debrief Section (Israel flights; independent of Apple Intelligence)
+                if let cvfrDebrief {
+                    CVFRDebriefContent(debrief: cvfrDebrief)
+
+                    Divider()
+                }
+
                 // MARK: - AI Debrief Section
                 debriefSection
             }
             .padding()
         }
         .navigationTitle("Flight Details")
+        .task(id: flightRecord.id) {
+            guard let recordingDB = appState.getOrCreateRecordingDatabase() else { return }
+            let id = flightRecord.id
+            cvfrDebrief = await Task.detached { CVFRDebriefLoader.loadBundled(flightID: id, recordingDB: recordingDB) }.value
+        }
         .onAppear {
             debriefEngine.checkAvailability()
             if debriefEngine.availabilityStatus == .available {
@@ -109,6 +123,12 @@ struct FlightDetailView: View {
             }
 
             LabeledContent("Duration", value: LogbookViewModel.formatDurationHM(flightRecord.durationSeconds))
+
+            if let note = flightRecord.notes, flightRecord.healthWarning != nil {
+                Label(note, systemImage: "exclamationmark.triangle.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.caution)
+            }
         }
     }
 

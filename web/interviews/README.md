@@ -7,8 +7,9 @@ The Mom Test: past behaviour only, no pitch, the pilot talks ~80% of the time. O
 `/admin` lets the owner read, play, and export them in the kit's notes template for `docs/CUSTOMER.md`.
 
 Lives in the OpenEFB repo under `web/interviews/`, copied from the standalone `~/dev/pilot-interviews` repo at commit
-`0af81df2b331cbd1d93258c6f3d42e5eb241c2f9` (2026-11-01). That repo is retired after the first deploy from here. Runs on
-the Vercel Hobby plan: the only cron is daily (`vercel.json`), which is the Hobby limit. See `web/README.md`.
+`0af81df2b331cbd1d93258c6f3d42e5eb241c2f9` (2026-11-01); that repo is retired. Live at `https://openefb-interviews.vercel.app`
+on the Vercel Hobby plan. The only cron is daily (`vercel.json`, 06:00 UTC), which is the Hobby limit. This site is not part of the
+iPad app and the app never calls it. See `web/README.md`.
 
 ## How it works
 
@@ -91,6 +92,8 @@ suggests headphones or a quieter spot above -45 dBFS. The threshold is a heurist
 with real calls. The measured value is stored with the interview.
 
 ## Deploy to Vercel
+
+The production project already exists: `openefb-interviews` (`https://openefb-interviews.vercel.app`), git-connected to `omercnet/openefb` with Root Directory `web/interviews` and production branch `main`. A push to `main` deploys it, unless the project's Ignored Build Step skips the build (see "Vercel build-skip rule" in `web/README.md`). The steps below create a new project from scratch.
 
 ```bash
 cd web/interviews

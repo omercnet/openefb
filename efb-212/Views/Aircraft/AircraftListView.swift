@@ -94,7 +94,6 @@ struct AircraftListView: View {
                         },
                         onAddNew: { nNumber in
                             vm.addProfile(nNumber: nNumber)
-                            vm.isShowingEditor = false
                         }
                     )
                 }

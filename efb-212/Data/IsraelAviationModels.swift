@@ -47,18 +47,50 @@ nonisolated enum IsraelPointKind: String, Sendable {
     case compulsory
     case onRequest
     case arp          // aerodrome reference point
+    /// Named by a sport-aviation route but absent from CAAI's points layer (bubbles and one point); its position
+    /// is the end of the route line that names it.
+    case unlisted
+}
+
+/// The two published route networks. CAAI publishes them as separate GIS layers.
+nonisolated enum IsraelRouteNetwork: String, Sendable, CaseIterable, Hashable {
+    case cvfr
+    case lsa
+
+    /// "CVFR" / "LSA" as the pilot knows them.
+    var title: String { self == .cvfr ? "CVFR" : "LSA" }
+    /// Hebrew name of the network, as fpl.co.il words it.
+    var hebrewName: String { self == .cvfr ? "נתיבי התובלה הנמוכים" : "נתיבי התעופה הספורטיבית" }
+    /// The route kinds a NOTAM "<KIND> RTE CLSD" clause names for this network (upper-case).
+    var closureKinds: [String] {
+        switch self {
+        case .cvfr: return ["CVFR"]
+        case .lsa: return ["LSA", "ULTRALIGHT", "SPORT", "SPORTS", "SPORTIVE"]
+        }
+    }
+}
+
+/// When a sport-aviation route is in use, from the layer's `localType`.
+nonisolated enum IsraelRouteActivity: String, Sendable, Hashable {
+    case allWeek = "all_week"
+    case weekend
+    /// 'מיוחד': the conditions are on the chart notes, not in the layer.
+    case special
+    /// Any other value the layer holds, and CVFR segments.
+    case unspecified
 }
 
 nonisolated struct IsraelReportingPoint: Identifiable, Hashable, Sendable {
     let id: Int
     /// Five-letter point code ("TAVOR") or four-letter aerodrome ICAO ("LLHZ"). Not unique: the source
-    /// publishes "LLNV" for two ARPs (Nevatim and Negav).
+    /// publishes "LLNV" for two ARPs (Nevatim and Negav), and a code can sit in both networks.
     let code: String
     let nameEnglish: String?
     let nameHebrew: String?
     let kind: IsraelPointKind
     let latitude: Double    // degrees
     let longitude: Double   // degrees
+    var network: IsraelRouteNetwork = .cvfr
 
     var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: latitude, longitude: longitude) }
 }
@@ -95,6 +127,14 @@ nonisolated struct IsraelRouteSegment: Identifiable, Hashable, Sendable {
     let lowerAltitudeFeet: Int?  // feet MSL
     let mapSheet: String?        // "N", "S", "N/S"
     let polyline: [CLLocationCoordinate2D]
+    // Sport-aviation (LSA) fields; the defaults are what a CVFR segment carries.
+    var network: IsraelRouteNetwork = .cvfr
+    /// When the route is in use (LSA only); `.unspecified` on CVFR.
+    var activity: IsraelRouteActivity = .unspecified
+    /// The layer's `localType` verbatim (LSA only).
+    var activitySource: String? = nil
+    /// The layer marks the route for small aircraft only (LSA only).
+    var smallOnly: Bool = false
 
     /// Identity is the database row: two segments are equal when they are the same row.
     static func == (lhs: IsraelRouteSegment, rhs: IsraelRouteSegment) -> Bool { lhs.id == rhs.id }
@@ -320,4 +360,27 @@ nonisolated struct IsraelAviationMetadata: Equatable, Sendable {
     /// Line for Settings > About: "Aeronautical data: Civil Aviation Authority of Israel (CAAI), data of 25 Oct 2026",
     /// with ", AIP amendment N" appended only when the amendment is known.
     let attribution: String
+    /// The AIP's definition of "weekend days" for the sport-aviation (LSA) routes, as the importer stored it.
+    var lsaWeekendRule: IsraelLSAWeekendRule? = nil
+}
+
+/// B-08 section 1 item ז: when the sport-aviation routes marked "Weekend" are in use. Hebrew is the source text;
+/// the English is the importer author's translation.
+nonisolated struct IsraelLSAWeekendRule: Equatable, Sendable, Decodable {
+    let source: String
+    let textHebrew: String
+    let textEnglish: String
+    let fridayStartDefault: String          // "06:00" local Israel time
+    let fridayStartLatestPublished: String  // "14:00": the latest Friday start any bubble has
+    let holidayEveStart: String             // "14:00"
+    let layerDoesNotSay: String
+
+    enum CodingKeys: String, CodingKey {
+        case source
+        case textHebrew = "text_he", textEnglish = "text_en"
+        case fridayStartDefault = "friday_start_default"
+        case fridayStartLatestPublished = "friday_start_latest_published"
+        case holidayEveStart = "holiday_eve_start"
+        case layerDoesNotSay = "layer_does_not_say"
+    }
 }

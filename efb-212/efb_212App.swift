@@ -12,6 +12,7 @@ import SwiftData
 struct efb_212App: App {
     @State private var appState = AppState()
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    private let modelContainer = EFBModelContainer.makeForApp()
 
     /// Whether we are running inside a unit test host (XCTest bundle loaded).
     private var isRunningTests: Bool {
@@ -24,37 +25,16 @@ struct efb_212App: App {
                 // Minimal view for test runner -- avoids MapLibre initialization crash
                 Text("Test Host")
                     .environment(appState)
-                    .modelContainer(for: [
-                        SchemaV1.UserSettings.self,
-                        SchemaV1.AircraftProfile.self,
-                        SchemaV1.PilotProfile.self,
-                        SchemaV1.FlightPlanRecord.self,
-                        SchemaV1.FlightRecord.self,
-                        SchemaV1.LogbookEntry.self
-                    ])
+                    .modelContainer(modelContainer)
             } else if !hasSeenOnboarding {
                 OnboardingView()
                     .environment(appState)
-                    .modelContainer(for: [
-                        SchemaV1.UserSettings.self,
-                        SchemaV1.AircraftProfile.self,
-                        SchemaV1.PilotProfile.self,
-                        SchemaV1.FlightPlanRecord.self,
-                        SchemaV1.FlightRecord.self,
-                        SchemaV1.LogbookEntry.self
-                    ])
+                    .modelContainer(modelContainer)
             } else {
                 ContentView()
                     .appliesDisplayMode()
                     .environment(appState)
-                    .modelContainer(for: [
-                        SchemaV1.UserSettings.self,
-                        SchemaV1.AircraftProfile.self,
-                        SchemaV1.PilotProfile.self,
-                        SchemaV1.FlightPlanRecord.self,
-                        SchemaV1.FlightRecord.self,
-                        SchemaV1.LogbookEntry.self
-                    ])
+                    .modelContainer(modelContainer)
             }
         }
     }

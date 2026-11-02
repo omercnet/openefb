@@ -175,6 +175,77 @@ struct IsraelChartServiceTests {
         #expect(try Data(contentsOf: url) == Self.packBytes)
     }
 
+    @Test func aSameSizeCorruptedInstalledPackFailsReverificationAndIsRemoved() async throws {
+        let root = Self.tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manifest = try Self.decode(Self.manifestJSON())
+        let service = Self.service(root: root) { _ in (200, Self.packBytes) }
+        _ = try await service.download(manifest) { _ in }
+        #expect(await service.verifyInstalled())  // intact
+
+        // Flip a byte without changing the size: the size check at load still passes.
+        let url = try #require(service.fileURL("israel-cvfr-2025-02.mbtiles"))
+        var bytes = try Data(contentsOf: url)
+        bytes[10] ^= 0xFF
+        try bytes.write(to: url)
+        #expect(service.installed() != nil)
+
+        #expect(await service.verifyInstalled() == false)
+        #expect(service.installed() == nil)
+    }
+
+    @Test func reverificationWithNothingInstalledPasses() async {
+        let root = Self.tempRoot()
+        #expect(await Self.service(root: root) { _ in (404, Data()) }.verifyInstalled())
+    }
+
+    @Test func aDroppedConnectionIsRetriedUntilItSucceeds() async throws {
+        let root = Self.tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manifest = try Self.decode(Self.manifestJSON())
+        let calls = LockedBox<Int>(0)
+        let session = StubURLProtocol.session { request in
+            let n = calls.get() + 1
+            calls.set(n)
+            if n < 3 { throw URLError(.networkConnectionLost) }
+            #expect(request.value(forHTTPHeaderField: "Range") == nil)
+            return (200, Self.packBytes)
+        }
+        let service = ChartPackService(product: "israel-cvfr", baseURL: Self.base, rootDirectory: root, session: session,
+                                       retryPolicy: .init(maxAttempts: 3, baseDelay: .milliseconds(1)))
+        _ = try await service.download(manifest) { _ in }
+        #expect(calls.get() == 3)
+        #expect(service.installed() != nil)
+    }
+
+    @Test func retriesAreBoundedAndTheFailureIsReported() async throws {
+        let root = Self.tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manifest = try Self.decode(Self.manifestJSON())
+        let calls = LockedBox<Int>(0)
+        let session = StubURLProtocol.session { _ in
+            calls.set(calls.get() + 1)
+            throw URLError(.timedOut)
+        }
+        let service = ChartPackService(product: "israel-cvfr", baseURL: Self.base, rootDirectory: root, session: session,
+                                       retryPolicy: .init(maxAttempts: 3, baseDelay: .milliseconds(1)))
+        await #expect(throws: EFBError.self) { _ = try await service.download(manifest) { _ in } }
+        #expect(calls.get() == 3)
+        #expect(service.installed() == nil)
+    }
+
+    @Test func anHTTPErrorIsNotRetried() async throws {
+        let root = Self.tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let manifest = try Self.decode(Self.manifestJSON())
+        let calls = LockedBox<Int>(0)
+        let session = StubURLProtocol.session { _ in calls.set(calls.get() + 1); return (404, Data()) }
+        let service = ChartPackService(product: "israel-cvfr", baseURL: Self.base, rootDirectory: root, session: session,
+                                       retryPolicy: .init(maxAttempts: 3, baseDelay: .milliseconds(1)))
+        await #expect(throws: EFBError.self) { _ = try await service.download(manifest) { _ in } }
+        #expect(calls.get() == 1)
+    }
+
     @Test func installingANewEditionRemovesTheOldOne() async throws {
         let root = Self.tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }

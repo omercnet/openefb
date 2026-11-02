@@ -59,3 +59,5 @@ tools/caai-apd/caai-apd
 # confirms the CAAI/Mapa permission covers publishing the chart artwork.
 docs/design/screenshots/IL-9/
 docs/design/screenshots/IL-13/
+# UX-IL review screenshots that show CAAI chart/diagram artwork (same rule as IL-9, IL-13)
+docs/design/screenshots/UX-IL-CAAI/

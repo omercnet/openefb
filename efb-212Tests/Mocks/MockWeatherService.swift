@@ -22,6 +22,9 @@ final class MockWeatherService: WeatherServiceProtocol, @unchecked Sendable {
     /// Whether all fetch methods should throw an error.
     var shouldFail: Bool = false
 
+    /// Whether only `fetchTAF` should throw (METAR still succeeds).
+    var tafShouldFail: Bool = false
+
     // MARK: - Call Tracking
 
     /// Number of times fetchMETAR was called.
@@ -48,7 +51,7 @@ final class MockWeatherService: WeatherServiceProtocol, @unchecked Sendable {
 
     func fetchTAF(for stationID: String) async throws -> String {
         fetchTAFCallCount += 1
-        if shouldFail {
+        if shouldFail || tafShouldFail {
             throw EFBError.weatherFetchFailed(underlying: NSError(domain: "test", code: -1))
         }
         return mockTAF ?? "TAF \(stationID) mock data"

@@ -111,6 +111,7 @@ nonisolated enum IsraelChartSymbol: String, CaseIterable, Sendable {
         case .compulsory: self = .compulsory
         case .onRequest: self = .onRequest
         case .arp: self = .aerodrome
+        case .unlisted: self = .onRequest
         }
     }
 

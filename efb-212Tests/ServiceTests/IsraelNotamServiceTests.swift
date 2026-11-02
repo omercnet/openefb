@@ -127,6 +127,55 @@ struct IsraelNotamServiceTests {
         #expect(feed.items.contains { $0.geometry.polygon != nil })
     }
 
+    // MARK: - Saved copy (efb-zfm.12)
+
+    private static func tempStorage() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("il-notam-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("last-feed.json")
+    }
+
+    private static func service(storage: URL, clock: Clock, handler: @escaping @Sendable (URLRequest) throws -> (Int, Data))
+        -> IsraelNotamService {
+        let url = feedURL
+        return IsraelNotamService(session: StubURLProtocol.session { try handler($0) }, feedURL: { url },
+                                  now: { clock.now }, storageURL: storage)
+    }
+
+    @Test func aRelaunchedOfflineServiceServesTheSavedFeedAsStale() async throws {
+        let storage = Self.tempStorage()
+        defer { try? FileManager.default.removeItem(at: storage.deletingLastPathComponent()) }
+        let clock = Clock(Self.generatedAt)
+        let first = Self.service(storage: storage, clock: clock) { _ in (200, Self.feedJSON()) }
+        _ = try await first.fetchFeed(forceRefresh: false)
+
+        // New process: empty memory, no signal.
+        clock.advance(1_800)
+        let relaunched = Self.service(storage: storage, clock: clock) { _ in throw URLError(.notConnectedToInternet) }
+        let report = try await relaunched.fetchFeed(forceRefresh: false)
+
+        #expect(report.refreshFailed)
+        #expect(report.feed.items.count == 1)
+        #expect(report.feed.closures.count == 1)
+        #expect(report.fetchedAt == Self.generatedAt)  // the original download time, not now
+        #expect(report.feed.generatedAt == Self.generatedAt)
+    }
+
+    @Test func withoutASavedFeedAnOfflineFirstFetchStillFails() async throws {
+        let storage = Self.tempStorage()
+        let service = Self.service(storage: storage, clock: Clock(Self.generatedAt)) { _ in throw URLError(.notConnectedToInternet) }
+        await #expect(throws: (any Error).self) { _ = try await service.fetchFeed(forceRefresh: false) }
+    }
+
+    @Test func anUnreadableSavedFeedIsIgnoredNotServed() async throws {
+        let storage = Self.tempStorage()
+        defer { try? FileManager.default.removeItem(at: storage.deletingLastPathComponent()) }
+        try FileManager.default.createDirectory(at: storage.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("not json".utf8).write(to: storage)
+        let service = Self.service(storage: storage, clock: Clock(Self.generatedAt)) { _ in throw URLError(.notConnectedToInternet) }
+        await #expect(throws: (any Error).self) { _ = try await service.fetchFeed(forceRefresh: false) }
+    }
+
     // MARK: - Requests and cache
 
     @Test func requestsTheConfiguredURLAsJSON() async throws {

@@ -3,8 +3,8 @@
 Converts the official CAAI CVFR chart (domestic AIP B-03 appendix A, "מפת נתיבי תובלה נמוכים", north and south
 sheets, 1:250,000, WGS-84, vector PDF) into one MBTiles pack for all of Israel, validates it against CAAI's own
 coordinates, and prepares it for hosting on our servers. The app downloads this pack from us, never from gov.il.
-The chart is (c) CAAI; the base map is (c) Mapa Ltd. The owner is arranging CAAI permission: **build locally; the
-owner uploads** (`publish.sh`, below). Nothing in this folder publishes anything by itself.
+The chart is (c) CAAI; the base map is (c) Mapa Ltd. Nothing in this folder publishes anything by itself: **build locally; the
+owner uploads and approves** (`publish.sh`, below). Edition 2025-02 is published on R2 (`publishedAt` 2026-11-01); this repository records no CAAI/Mapa permission for the chart, so check with the owner before publishing another edition.
 
 ## Input
 

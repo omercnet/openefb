@@ -4,7 +4,7 @@
 //
 //  The official CAAI aerodrome diagrams we convert, validate and host ourselves (IL-13, product
 //  `il-diagrams`; tools/caai-apd builds it). Per aerodrome the pack carries the sheet PDF and, when the
-//  diagram passed the 50 ft runway gate, a PNG plus the georeference JSON that
+//  diagram passed the runway gate (100 ft), a PNG plus the georeference JSON that
 //  `AirportDiagramOverlay` already draws for FAA diagrams (same `AirportDiagramGeoreference`).
 //  `index.json` says which aerodromes are georeferenced. A diagram that failed the gate is "sheet only":
 //  shown in the PDF viewer, never on the map. The diagrams are (c) CAAI.

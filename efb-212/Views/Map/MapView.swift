@@ -118,6 +118,22 @@ struct MapView: UIViewRepresentable {
             mapViewModel.onMapStyleLoaded(style: style)
         }
 
+        // Basemap tile errors and network loads feed the "map tiles not loading" indicator (efb-zfm.18).
+        // MapLibre calls this from its worker threads (unlike the other delegate methods), so it is
+        // `nonisolated` and hops to the main actor. Only these two operations matter; the rest
+        // (cache reads, parse steps) fire hundreds of times.
+        nonisolated func mapView(_ mapView: MLNMapView, tileDidTriggerAction operation: MLNTileOperation,
+                                 x: Int, y: Int, z: Int, wrap: Int, overscaledZ: Int, sourceID: String) {
+            switch operation {
+            case .error:
+                Task { @MainActor [weak self] in self?.mapViewModel.noteTileError() }
+            case .loadFromNetwork:
+                Task { @MainActor [weak self] in self?.mapViewModel.noteTileLoadedFromNetwork() }
+            default:
+                break
+            }
+        }
+
         // Camera moving (gesture or animation): suspend follow on user drag right away so the
         // Recenter button appears while the finger is still down; keep the north indicator live.
         @MainActor

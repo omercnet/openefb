@@ -64,7 +64,7 @@ struct IsraelDiagramSection: View {
             Text("Official aerodrome diagrams are not on this device.")
                 .font(.subheadline)
                 .foregroundStyle(Palette.secondaryText)
-            Button("Download diagrams") { store.startDownload() }
+            Button(store.errorMessage == nil ? "Download diagrams" : "Retry download") { store.startDownload() }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
         } else {

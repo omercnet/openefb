@@ -5,7 +5,8 @@
 //  GRDB-backed aviation database with R-tree spatial indexes and FTS5 full-text search.
 //  Wraps a DatabasePool for thread-safe concurrent reads with WAL mode.
 //  The bundled SQLite is copied to Application Support on first run and re-copied whenever
-//  the bundled data fingerprint (data version + file size) changes, so app updates refresh it.
+//  the bundled data fingerprint (data version + file size + SHA-256 of the contents) changes,
+//  so app updates refresh it. A damaged installed copy is replaced from the bundle on open.
 //
 //  All query methods are nonisolated -- GRDB DatabasePool handles thread safety internally.
 //  Marked @unchecked Sendable because DatabasePool is inherently thread-safe.
@@ -13,6 +14,7 @@
 
 import Foundation
 import CoreLocation
+import CryptoKit
 import GRDB
 
 final class AviationDatabase: @unchecked Sendable {
@@ -22,8 +24,8 @@ final class AviationDatabase: @unchecked Sendable {
     // MARK: - Bundled Data Version
 
     /// Version of the bundled aviation.sqlite. Bump this whenever tools/nasr-importer regenerates
-    /// the file. The install fingerprint also includes the bundled file size, so a regenerated
-    /// file with a forgotten bump is still re-copied in most cases.
+    /// the file. The install fingerprint also includes the bundled file's size and SHA-256, so a
+    /// regenerated file with a forgotten bump is still re-copied.
     nonisolated static let bundledDataVersion = "nasr-2026-10-29"
 
     /// Name of the installed database file and its version marker (both in the install directory).
@@ -48,6 +50,8 @@ final class AviationDatabase: @unchecked Sendable {
     }
 
     /// Open the database at `bundledURL` after installing it into `installDirectory`.
+    /// If the installed copy cannot be opened or fails `PRAGMA quick_check`, it is discarded and
+    /// re-installed from the bundle once before giving up.
     /// Exposed for tests; production uses `init()`.
     nonisolated init(bundledURL: URL, installDirectory: URL, dataVersion: String) throws {
         let installedURL = try Self.installBundledDatabase(
@@ -56,27 +60,55 @@ final class AviationDatabase: @unchecked Sendable {
             dataVersion: dataVersion
         )
 
+        do {
+            dbPool = try Self.openValidated(at: installedURL)
+        } catch {
+            // Damaged installed copy: wipe it (and its marker) and re-copy from the bundle.
+            let reinstalledURL = try Self.installBundledDatabase(
+                from: bundledURL,
+                into: installDirectory,
+                dataVersion: dataVersion,
+                force: true
+            )
+            do {
+                dbPool = try Self.openValidated(at: reinstalledURL)
+            } catch {
+                throw EFBError.databaseMigrationFailed(underlying: error)
+            }
+        }
+    }
+
+    /// Open a WAL-mode pool at `url` and verify it is a usable aviation database:
+    /// `PRAGMA quick_check` must report "ok" and the `airports` table must exist.
+    nonisolated private static func openValidated(at url: URL) throws -> DatabasePool {
         var config = Configuration()
         config.prepareDatabase { db in
             try db.execute(sql: "PRAGMA journal_mode = WAL")
         }
-        do {
-            dbPool = try DatabasePool(path: installedURL.path, configuration: config)
-        } catch {
-            throw EFBError.databaseMigrationFailed(underlying: error)
+        let pool = try DatabasePool(path: url.path, configuration: config)
+        try pool.read { db in
+            let check = try String.fetchOne(db, sql: "PRAGMA quick_check")
+            guard check == "ok" else {
+                throw DatabaseError(message: "quick_check: \(check ?? "no result")")
+            }
+            guard try db.tableExists("airports") else {
+                throw DatabaseError(message: "missing airports table")
+            }
         }
+        return pool
     }
 
-    /// Copy the bundled database into `directory` when it is missing or its fingerprint differs
-    /// from the installed marker. Removes the old file and its -wal/-shm sidecars before copying
-    /// so a stale write-ahead log can never be applied to the fresh file.
+    /// Copy the bundled database into `directory` when it is missing, its fingerprint differs
+    /// from the installed marker, or `force` is set. Removes the old file and its -wal/-shm
+    /// sidecars before copying so a stale write-ahead log can never be applied to the fresh file.
     /// Returns the URL of the installed database.
     /// Throws EFBError.databaseCorrupted if the bundled file does not exist.
     @discardableResult
     nonisolated static func installBundledDatabase(
         from bundledURL: URL,
         into directory: URL,
-        dataVersion: String
+        dataVersion: String,
+        force: Bool = false
     ) throws -> URL {
         let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: bundledURL.path) else {
@@ -89,7 +121,7 @@ final class AviationDatabase: @unchecked Sendable {
 
         let installedMarker = try? String(contentsOf: markerURL, encoding: .utf8)
         let upToDate = fileManager.fileExists(atPath: installedURL.path) && installedMarker == fingerprint
-        if upToDate {
+        if upToDate && !force {
             return installedURL
         }
 
@@ -105,11 +137,21 @@ final class AviationDatabase: @unchecked Sendable {
         return installedURL
     }
 
-    /// Fingerprint written to the version marker: "<dataVersion>|<bundled file size in bytes>".
+    /// Fingerprint written to the version marker:
+    /// "<dataVersion>|<bundled file size in bytes>|<SHA-256 of the bundled file, hex>".
+    /// The hash is streamed in 1 MiB chunks; the bundled file is ~12 MB, so this costs tens of
+    /// milliseconds per launch and catches a regenerated bundle of identical size.
     nonisolated static func installFingerprint(bundledURL: URL, dataVersion: String) throws -> String {
         let attributes = try FileManager.default.attributesOfItem(atPath: bundledURL.path)
         let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
-        return "\(dataVersion)|\(size)"
+        let handle = try FileHandle(forReadingFrom: bundledURL)
+        defer { try? handle.close() }
+        var hasher = SHA256()
+        while let chunk = try handle.read(upToCount: 1 << 20), !chunk.isEmpty {
+            hasher.update(data: chunk)
+        }
+        let digest = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+        return "\(dataVersion)|\(size)|\(digest)"
     }
 
     /// Internal init for testing with an explicit database pool.

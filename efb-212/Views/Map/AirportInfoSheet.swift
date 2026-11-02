@@ -406,11 +406,20 @@ struct AirportInfoSheet: View {
                         .buttonStyle(.bordered)
                         .controlSize(.large)
                 }
+            } else if weatherViewModel?.metarPublished == false {
+                Text(weatherViewModel?.tafPublished == false
+                     ? "No METAR or TAF is published for this aerodrome."
+                     : "No METAR is published for this aerodrome. The forecast (TAF) is below.")
+                    .font(TypeRole.caption)
+                    .foregroundStyle(Palette.secondaryText)
+                    .accessibilityIdentifier("weather-no-metar")
             } else {
                 Text("No METAR for this airport.")
                     .font(TypeRole.caption)
                     .foregroundStyle(Palette.secondaryText)
             }
+
+            tafView()
         }
     }
 
@@ -421,6 +430,22 @@ struct AirportInfoSheet: View {
             HStack {
                 DataAgeBadge(.metar, observed: wx.observationTime)
                 Spacer()
+            }
+
+            // A cached report is shown, but the refresh failed: say so, and offer Retry (never just an OLD badge).
+            if let error = weatherViewModel?.error {
+                VStack(alignment: .leading, spacing: Space.xs) {
+                    Label("Weather refresh failed. Showing the last report.", systemImage: "exclamationmark.triangle.fill")
+                        .font(TypeRole.body.weight(.semibold))
+                        .foregroundStyle(Palette.caution)
+                    Text(error.localizedDescription)
+                        .font(TypeRole.caption)
+                        .foregroundStyle(Palette.secondaryText)
+                    Button("Retry") { Task { await weatherViewModel?.refreshWeather() } }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                }
+                .accessibilityIdentifier("weather-refresh-failed")
             }
 
             if let vm = weatherViewModel {
@@ -460,18 +485,43 @@ struct AirportInfoSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: Space.s))
                 }
             }
+        }
+    }
 
+    /// The TAF block, independent of the METAR: a TAF-only aerodrome (Israel's LLHZ) shows it alone, and a METAR
+    /// failure never hides it.
+    @ViewBuilder
+    private func tafView() -> some View {
+        VStack(alignment: .leading, spacing: Space.s) {
             if let taf = weatherViewModel?.currentTAF {
-                Text("TAF")
-                    .font(TypeRole.label)
-                    .foregroundStyle(Palette.secondaryText)
-                    .padding(.top, Space.xs)
+                HStack {
+                    Text("TAF")
+                        .font(TypeRole.label)
+                        .foregroundStyle(Palette.secondaryText)
+                    Spacer()
+                    // Valid-period end from the TAF text, else its fetch age: an old forecast reads OLD / EXPIRED.
+                    if let freshness = weatherViewModel?.tafFreshness() {
+                        DataAgeBadge(freshness: freshness)
+                            .accessibilityIdentifier("taf-age-badge")
+                    }
+                }
+                .padding(.top, Space.xs)
                 Text(taf)
                     .font(.footnote.monospaced())
                     .foregroundStyle(Palette.primaryText)
                     .padding(Space.s)
                     .background(Palette.fill)
                     .clipShape(RoundedRectangle(cornerRadius: Space.s))
+                if weatherViewModel?.tafFailed == true {
+                    Label("TAF refresh failed. Showing the last forecast.", systemImage: "exclamationmark.triangle.fill")
+                        .font(TypeRole.caption)
+                        .foregroundStyle(Palette.caution)
+                }
+            } else if weatherViewModel?.tafFailed == true {
+                Label("TAF not loaded", systemImage: "exclamationmark.triangle.fill")
+                    .font(TypeRole.caption)
+                    .foregroundStyle(Palette.caution)
+                    .padding(.top, Space.xs)
             }
         }
     }
