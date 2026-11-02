@@ -11,7 +11,7 @@ Read from `efb-212.xcodeproj/project.pbxproj` and from the Info.plist of the arc
 | MARKETING_VERSION | `1.0` | store version |
 | CURRENT_PROJECT_VERSION | `1` | build number |
 | IPHONEOS_DEPLOYMENT_TARGET | `26.0` | |
-| TARGETED_DEVICE_FAMILY | `2` | iPad only |
+| TARGETED_DEVICE_FAMILY | `1,2` | iPad and iPhone (was `2`; re-verified 2026-11-02, archived `UIDeviceFamily [1, 2]`) |
 | SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD | `NO` | no Mac listing |
 | ITSAppUsesNonExemptEncryption | `NO` | standard HTTPS only; no per-upload export question |
 | PRODUCT_NAME | `efb-212` | file/bundle name only |
@@ -23,7 +23,7 @@ Read from `efb-212.xcodeproj/project.pbxproj` and from the Info.plist of the arc
 - `NSSpeechRecognitionUsageDescription`: "Kanaf transcribes cockpit audio in real-time to create flight transcripts."
 - `NSLocationWhenInUseUsageDescription`: "Kanaf uses your location to show your position on the aviation map and provide navigation guidance."
 - `NSLocationAlwaysAndWhenInUseUsageDescription`: "Kanaf uses your location in the background to continue tracking your flight when the screen is off."
-- `UIBackgroundModes` includes `location`.
+- `UIBackgroundModes` = `location`, `audio` (cockpit audio recording continues with the screen off; Info.plist).
 
 ## Release archive check (run 2026-10-31)
 ```
@@ -37,8 +37,12 @@ Result: **ARCHIVE SUCCEEDED**. The archived `efb-212.app` reports:
 `PrivacyInfo.xcprivacy`. Two deprecation warnings only (`allowBluetooth` in `AudioRecorder.swift`,
 `setVisibleCoordinateBounds` in `FlightPlanViewModel.swift`). Nothing was uploaded.
 
+Re-run 2026-11-02 (same command, output `/tmp`, deleted afterwards): archive succeeded; `CFBundleShortVersionString 1.0`,
+`CFBundleVersion 1` (the upload script overrides the build number), `MinimumOSVersion 26.0`, `UIDeviceFamily [1, 2]`,
+`UIBackgroundModes [location, audio]`, `ITSAppUsesNonExemptEncryption false`.
+
 ## Versions and proposal
-Current: `1.0 (1)`. Proposed first TestFlight upload: `1.0 (1)`. Next uploads: `1.0 (2)`, `1.0 (3)` and so on.
+Project value: `1.0 (1)`. The uploaded build number comes from `upload-testflight.sh` (`BUILD_NUMBER` or `git rev-list --count HEAD`, 86 at `d27c262`) and must exceed every earlier upload of 1.0.
 Bump `MARKETING_VERSION` only when starting a new release (for example `1.1`).
 
 ## Archive steps

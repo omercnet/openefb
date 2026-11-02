@@ -28,7 +28,6 @@ live from NOAA and the FAA at capture time.
 - Status bar shows the app name `efb-212` (home-screen name is still the product name; see `../README.md`).
 - The METAR age badge reads "5 min" in `04-airport-sheet.png` (fresh data at capture time). Stale data shows an amber OLD badge instead.
 
-Before the public release, retake the Satellite/Terrain-free set if those base maps are removed (efb-zfm.8); none of
-these images shows Satellite or Terrain.
+None of these images shows Satellite or Terrain (both base maps were removed 2026-11-02).
 
 Internal TestFlight does not need store screenshots.

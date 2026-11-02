@@ -45,8 +45,6 @@ Israel Airports Authority (IAA)
 
 Base maps
   Street: map data (c) OpenStreetMap contributors (ODbL), via OpenFreeMap (https://openfreemap.org) and OpenMapTiles.
-  Satellite (to be removed before a public release): Imagery (c) Esri, Maxar, Earthstar Geographics.
-  Terrain (to be removed before a public release): (c) OpenTopoMap (CC-BY-SA), data (c) OpenStreetMap contributors.
   See docs/TILE-SOURCES.md.
 
 Downloaded charts (hosted by the project on Cloudflare R2; not part of the MPL-licensed work)

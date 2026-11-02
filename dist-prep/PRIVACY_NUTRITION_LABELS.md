@@ -13,13 +13,11 @@ Audited from the code 2026-10-31 (grep of every `https://` endpoint, `URLSession
 | `external-api.faa.gov/apra/dtpp`, `aeronav.faa.gov/d-tpp` | chart cycle and terminal chart PDFs | no |
 | `tiles.openfreemap.org` | vector map tiles and fonts | tile coordinates and IP address |
 | `tiles.arcgis.com` (FAA VFR sectional) | raster tiles | tile coordinates and IP address |
-| `server.arcgisonline.com` (Esri World Imagery) | satellite tiles, only if the Satellite base map is chosen | tile coordinates and IP address |
-| `tile.opentopomap.org` | terrain tiles, only if the Terrain base map is chosen | tile coordinates and IP address |
 
 GPS position is never put in a request. Tile requests reveal the map area on screen (and the device IP) to the tile
 host, as every map app does. There is no analytics, crash, advertising or tracking SDK in the project.
 
-Added 2026-11-02 (T29): Israel mode (Settings > Region, default US) makes two more kinds of request, both to infrastructure
+Added 2026-11-02 (T29): Israel mode (Settings > Region, default Israel on a new install: `Region.defaultRegion`) makes two more kinds of request, both to infrastructure
 the developer runs on Cloudflare. Neither carries a position, an account, or credentials. Cloudflare sees the device IP
 and the file requested, like any host, under its own terms. The relay's code reads no client header except the owner's
 `/run` authorization and stores no client data; the R2 bucket is plain file hosting. Whether the Cloudflare dashboard's
@@ -76,5 +74,5 @@ address and the file requested.
 1. CloudKit sync is turned on.
 2. An analytics or crash SDK is added.
 3. A remote AI service replaces or supplements Foundation Models.
-4. Tile hosts change (for example the public-release removal of Satellite and Terrain, efb-zfm.8).
+4. Tile hosts change (Satellite and Terrain, `server.arcgisonline.com` and `tile.opentopomap.org`, were removed 2026-11-02).
 5. The Israel relay or the R2 bucket moves, or either starts to receive anything beyond a plain file request.

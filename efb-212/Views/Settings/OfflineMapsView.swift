@@ -219,7 +219,6 @@ struct OfflineMapsView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Works offline: the airport and navaid database, regions downloaded here (sectional and street), and FAA charts and airport diagrams you have opened.")
                 Text("Needs the internet: weather (METAR, TAF, winds aloft), TFRs, NOTAMs, PIREPs, AIRMET/SIGMET and map areas not downloaded.")
-                Text("Satellite and Terrain base maps are online only.")
             }
             .font(.caption)
             .foregroundStyle(Palette.secondaryText)

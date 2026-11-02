@@ -789,8 +789,6 @@ final class MapService {
         for layer in style.layers where layer.identifier.hasPrefix("street-") {
             layer.isVisible = showStreet
         }
-        style.layer(withIdentifier: "base-satellite")?.isVisible = mapStyle == .satellite
-        style.layer(withIdentifier: "base-terrain")?.isVisible = mapStyle == .terrain
         style.layer(withIdentifier: "base-vfr-sectional")?.isVisible = sectional
         appliedMapStyle = mapStyle
         appliedSectional = sectional
@@ -809,11 +807,11 @@ final class MapService {
     /// Night state last applied to the current style; nil until applied after a style load.
     private var appliedNight: Bool?
 
-    /// Dim (night) or restore (day) the raster base layers: sectional, satellite, terrain.
+    /// Dim (night) or restore (day) the raster base layer: the sectional.
     /// Brightness ceiling + desaturation keep the chart readable without washing out night vision.
     func applyDisplayMode(night: Bool) {
         guard night != appliedNight, let style = mapView?.style else { return }
-        for id in ["base-vfr-sectional", "base-satellite", "base-terrain"] {
+        for id in ["base-vfr-sectional"] {
             guard let layer = style.layer(withIdentifier: id) as? MLNRasterStyleLayer else { continue }
             layer.maximumRasterBrightness = NSExpression(
                 forConstantValue: night ? NightPalette.rasterBrightnessMax : 1.0

@@ -57,7 +57,7 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 ## Features
 
 **Map and navigation**
-- Moving map on the FAA VFR sectional (zoom 8-12), with Street, Satellite and Terrain base maps
+- Moving map on the FAA VFR sectional (zoom 8-12), over the Street base map
 - Airport database from FAA NASR (19,134 airports, runways, frequencies, navaids and Class B/C/D airspace), searchable, with spatial queries
 - Ownship, track-up / north-up, instrument strip (ground speed, altitude, vertical speed, track), GPS status
 - Nearest-airport readout and a nearest list with Direct-To; active navigation bar
@@ -99,7 +99,6 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 - **TestFlight beta.** It has not been used in a cockpit by pilots yet, and hasn't been tried on a physical iPad in flight.
 - **Not FAA-approved.** Kanaf has not been tested, approved, or certified by the FAA or any other aviation authority. It is a supplemental reference, not a primary means of navigation. iPad GPS isn't TSO-certified, and Wi-Fi-only iPads have no GPS.
 - **Airport diagrams:** 820 of the 925 FAA airport diagrams (88.6%, cycle 2611) pass the automatic georeferencing checks and can be overlaid on the map. The rest are viewable only as the FAA PDF. Charts and diagrams are downloaded on demand, not bundled.
-- **Satellite and Terrain are online only.** Offline downloads cover the sectional and Street maps. Satellite and Terrain tiles come from third-party hosts and are slated for removal before a public release.
 - **Needs the internet:** weather, TFRs, AIRMET/SIGMET, PIREPs, winds aloft, NOTAMs, FAA charts and any map area you haven't downloaded. Works offline: the airport database, downloaded map regions and charts you have already opened.
 - **Debrief** needs a device that supports Apple Foundation Models.
 - **NOTAMs** need your own free FAA API key.
@@ -205,7 +204,7 @@ All free to use. The FAA and NOAA data is public domain. CAAI approved redistrib
 | FAA NOTAM API | NOTAMs (your own free API key) | Real-time |
 | Civil Aviation Authority of Israel (CAAI) | GIS layers published with the Israeli domestic AIP: CVFR and sport-aviation (LSA) points and routes, CTR/ATZ/CTA, TMA, FIR, prohibited/restricted/danger areas, runways (bundled database, data of 25 Oct 2026); curated aerodrome data from the domestic AIP and eAIP; aerodrome diagrams and the CVFR chart (downloaded packs) | Per AIP amendment; the bundled database is a snapshot |
 | Israel Airports Authority (IAA) | NOTAMs, scraped by the project's relay every 15 minutes; the app reads the relay's `notams.json` and never contacts the IAA | 15 minutes |
-| OpenFreeMap / OpenStreetMap, Esri, OpenTopoMap | Street, Satellite and Terrain base maps | n/a |
+| OpenFreeMap / OpenStreetMap | Street base map | n/a |
 | Cloudflare R2 and Workers | Host the project's Israel chart and diagram packs and the NOTAM relay | n/a |
 
 ## Roadmap

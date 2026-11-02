@@ -6,7 +6,7 @@
 //  Controls visibility of airports, airspace, TFRs, AIRMET/SIGMETs, weather dots, navaids.
 //  Live-data layers (TFRs, AIRMET/SIGMET) show their data age while visible.
 //  Includes sectional opacity slider and chart expiration badge (INFRA-03).
-//  Map style picker for VFR Sectional, Street, Satellite, Terrain.
+//  Sectional overlay toggle with opacity; Street is the only base map.
 //
 
 import SwiftUI
@@ -49,23 +49,6 @@ struct LayerControlsView: View {
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("Close map layers")
-            }
-            .padding(.horizontal, Space.l)
-
-            Divider()
-
-            // Base map (F17): what is drawn under everything
-            VStack(alignment: .leading, spacing: Space.s) {
-                SectionHeader("BASE MAP")
-                Picker("Base map", selection: Binding(
-                    get: { appState.mapStyle == .vfrSectional ? MapStyle.street : appState.mapStyle },
-                    set: { appState.mapStyle = $0 }
-                )) {
-                    ForEach(appState.region.availableMapStyles, id: \.self) { style in
-                        Text(styleName(for: style)).tag(style)
-                    }
-                }
-                .pickerStyle(.segmented)
             }
             .padding(.horizontal, Space.l)
 
@@ -322,14 +305,6 @@ struct LayerControlsView: View {
     }
 
     // MARK: - Helpers
-
-    private func styleName(for style: MapStyle) -> String {
-        switch style {
-        case .vfrSectional, .street: return "Street"
-        case .satellite: return "Satellite"
-        case .terrain: return "Terrain"
-        }
-    }
 
     /// Disabled row for a layer the region has no data source for. Plain reason, never an empty layer.
     private func unavailableRow(_ label: String, padded: Bool = true) -> some View {
