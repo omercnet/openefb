@@ -7,6 +7,7 @@
 //
 
 import CoreLocation
+import _LocationEssentials
 import SwiftUI
 
 struct IsraelBriefingView: View {
