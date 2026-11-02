@@ -71,6 +71,7 @@ for name in "${SCENARIOS[@]}"; do
   # header cannot signal readiness: it is block-buffered into the file.)
   sleep 4
 
+  launched=$(date '+%Y-%m-%d %H:%M:%S')   # the simulator logs in host time; only this launch may satisfy the check
   stamp "launch $name"
   limited 120 tools/fly.sh israel "$name" --speed "$SPEED" || problems+=("launch failed or timed out")
   sleep 5   # launch, first frame
@@ -85,8 +86,8 @@ for name in "${SCENARIOS[@]}"; do
   sleep 2
   kill "$logpid" 2>/dev/null || true; wait "$logpid" 2>/dev/null || true
   if ! grep -q "Scenario $name x" "$OUT/$name.log"; then
-    # The stream may have subscribed after the notice: look it up in the stored log, with a deadline.
-    limited 120 xcrun simctl spawn "$SIM" log show --style compact --last 10m \
+    # The stream may have subscribed after the notice: look it up in the stored log since this launch, with a deadline.
+    limited 120 xcrun simctl spawn "$SIM" log show --style compact --start "$launched" \
       --predicate "subsystem == \"$BUNDLE\" AND category == \"ScenarioPlayback\"" >>"$OUT/$name.log" 2>&1 || true
     grep -q "Scenario $name x" "$OUT/$name.log" || problems+=("no 'Scenario $name' load notice in the app log")
   fi
