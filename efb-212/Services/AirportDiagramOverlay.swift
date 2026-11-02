@@ -372,7 +372,8 @@ final class AirportDiagramOverlay {
         )
         let sourceID = "apd-source-\(icao)", layerID = "apd-layer-\(icao)"
         let backingSourceID = "apd-backing-source-\(icao)", backingLayerID = "apd-backing-\(icao)"
-        let visible = isEnabled && (mapView?.zoomLevel ?? 0) >= Self.minimumZoom
+        // The same rule as `refresh`: a decode that finishes after the config switched the overlay off installs hidden.
+        let visible = isEnabled && !isRemotelyDisabled && (mapView?.zoomLevel ?? 0) >= Self.minimumZoom
 
         let backing: MLNStyleLayer
         if region == .israel {
