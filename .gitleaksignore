@@ -1,0 +1,3 @@
+# False positive: docs/handoff/HOOKS.md names the PEM header that the .p8 rule matches; no key in the file. The second line is the same file in the pre-rewrite commit (tag backup/pre-conventional-commits).
+b38f9d4ec86f822c8e9b363bc6cb75fbef0d4f7b:docs/handoff/HOOKS.md:appstoreconnect-p8-private-key:21
+552d5d84e1a44c89fec5760f54bff959334fe232:docs/handoff/HOOKS.md:appstoreconnect-p8-private-key:21
