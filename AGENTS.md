@@ -228,6 +228,7 @@ lefthook (`lefthook.yml`) runs on each clone after `mise use -g lefthook@latest 
 - **commit-msg:** [Conventional Commits](https://www.conventionalcommits.org): `<type>(<scope>)!: <description>`, type one of `feat fix docs style refactor perf test build ci chore revert`, subject at most 100 characters. Check a range by hand with `tools/hooks/commit-msg.sh --range origin/main..HEAD`. **post-checkout / post-merge:** reminder to run `npm ci` when a `web/*/package-lock.json` changed.
 - Skip: `git commit --no-verify`, or `LEFTHOOK_EXCLUDE=<job>,<job>`.
 - The integrator commits with `git commit-tree`, which bypasses hooks: run `tools/check.sh` first (`--staged` for staged files only, `--quick` to skip the history scan) and write a Conventional Commit message; pre-push rejects any pushed commit that isn't one. Scopes in use: `israel`, `iphone`, `recording`, `map`, `release`, `hooks`, `interviews`, `relay`, `charts`, `skills`, `progress`.
+- **CI and `main`:** `.github/workflows/ci.yml` runs lint, the unit suite and five flight-sim scenarios on `macos-26` (Xcode 26.6), and the web tests on `ubuntu-latest`, for every pull request; `main` is protected by a ruleset that requires a pull request and the `CI gate` check, so nothing is pushed to `main` directly. Branch, push, `gh pr create --repo omercnet/openefb` (a fork: always pass `--repo`), squash merge. Details in `docs/CI.md`. A local Xcode newer than 26.6 can hide errors CI catches.
 
 ## Issue Tracking (Paseo Progress)
 
