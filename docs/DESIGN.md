@@ -44,8 +44,33 @@ Defined in `efb-212/Core/DesignTokens.swift`.
 | `TypeRole.title`, `identifier`, `sectionHeader` | Expanded SF Pro, bold | Names and headings; values in sheets stay regular width |
 | `TypeRole.readout(size:)` | Condensed SF Pro, semibold, fixed-width digits | Instrument strip (32pt). Not SF Mono: width does not apply to it |
 | `mapControlSurface()` | Liquid Glass tinted `Palette.accent`, `onAccent` glyphs | Floating map controls. Never untinted glass: it turns olive over the sectional |
+| `panelSurface()` (`Palette.panelFill`, `panelHairline`) | Day #F2F2F7 at 0.88 with a 1pt `accent` hairline at 35%; night #1C1C1E at 0.9, no hairline; `Radius.l` | Instrument strip and NRST box. Solid, so the sectional's yellow no longer tints them |
+| `Palette.northMarker` | Day #FF9F94, night #FF8F86 | North arrow on the navy compass glass, >= 3:1 (see Kanaf look) |
+| `Palette.categoryMVFR` / `categoryLIFR` | systemBlue / #CC00CC day; #8FB5E0 / #E673E6 night | Flight-category dots (VFR `ok`, IFR `warning`) |
+| `MapColor.*` | The system colours the map layers already used | Ownship, airspace, weather dots, TFRs, replay track, NOTAM map highlight. Named only; recolouring ownship or airspace is a separate decision to make over the sectional |
 
 All are SwiftUI semantic colors, so the night-mode ticket can retheme in one place. Red = warning (the compass north marker, `Palette.northMarker`, is the one convention exception), amber = caution, magenta = route.
+
+## Kanaf look (PR #5)
+
+PR #5 (2026-11-02) gave the app its own look inside the HIG; the follow-ups (2026-11-03) finished it:
+
+- **Accent:** Kanaf navy (`Palette.accent`, `AccentColor` asset), #1556B8 by day (#0C4091 with Increase Contrast), #2E4A6E fill and #8FB4E0 text at night. Day systemBlue failed 4.5:1.
+- **Floating map controls:** `mapControlSurface()`, Liquid Glass tinted navy with white (night grey 85%) glyphs, 60pt. Measured over the official CAAI CVFR chart on the iPad simulator: glyphs 7.3:1 by day, 6.1:1 at night, so no change was needed. Screenshots (CAAI artwork) are kept out of git in `docs/design/screenshots/UX-IL-CAAI/`.
+- **Panels:** the instrument strip and NRST box moved from `.regularMaterial` to `panelSurface()`: a light solid panel with a navy hairline by day, the old dark panel at night. Material took on the sectional's yellow; the solid panel stays neutral grey.
+- **Type:** expanded SF Pro for names and headings (`TypeRole.title`, `identifier`, `sectionHeader`); condensed SF Pro with fixed-width digits for the 32pt readouts.
+- **North marker:** the red arrow on the compass glass was 2.1:1 by day and 2.5:1 at night (needs 3:1 as a graphical object). It is now a light red, measured on screen: 3.7:1 day, 3.9:1 night, 5.2:1 day / 4.1:1 night with Increase Contrast, 3.5:1 / 4.2:1 with Reduce Transparency. The arrow was also invisible: inside the controls' `GlassEffectContainer` it was a sibling over a separate glass view and was drawn under the glass; it is now the glass view's own content.
+- **Increase Contrast / Reduce Transparency** (simulator): the high-contrast navy applies to the map controls; the strip, NRST box and route bar stay legible with both settings, day and night. Still to do on a real iPad: VoiceOver and Reduce Transparency, which the simulator only approximates.
+
+Before (material panels) and after (solid panels), same position and time:
+
+| | |
+|---|---|
+| iPad, KPAO sectional, day | ![](design/screenshots/KANAF/ipad-us-day.png) |
+| iPad, KPAO sectional, night | ![](design/screenshots/KANAF/ipad-us-night.png) |
+| iPhone 17e, KPAO sectional, day | ![](design/screenshots/KANAF/iphone-us-day.png) |
+| iPhone 17e, Israel street map, day | ![](design/screenshots/KANAF/iphone-il-day.png) |
+| iPhone 17e, Israel street map, night | ![](design/screenshots/KANAF/iphone-il-night.png) |
 
 ## Components
 | Component | Decision | Status |
