@@ -8,7 +8,7 @@ fail=0
 
 for f in "$@"; do
   case "$f" in
-    *.p8 | *.mobileprovision | *.xcarchive | *.xcarchive/* | *TmpTests.swift)
+    *.p8 | *.p12 | *.mobileprovision | *.xcarchive | *.xcarchive/* | *TmpTests.swift)
       echo "forbidden file: $f" >&2; fail=1; continue ;;
     .env.example | */.env.example) ;;
     .env* | */.env*)

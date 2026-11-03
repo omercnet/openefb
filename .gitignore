@@ -70,6 +70,15 @@ fastlane_api_key.json
 .vercel
 .wrangler
 *.mobileprovision
+*.p12
+
+# fastlane (bundle install --path vendor/bundle; build output and reports)
+.bundle/
+vendor/bundle/
+fastlane/report.xml
+fastlane/README.md
+fastlane/test_output/
+build/release/
 
 # Python bytecode
 __pycache__/
