@@ -86,8 +86,8 @@ final class MapService {
     private func addOwnshipLayer(to style: MLNStyle) {
         // Create chevron icons programmatically (32x32pt aviation triangle): blue for a live
         // fix, grey when the last fix is stale (F5) so a frozen position never looks current.
-        style.setImage(createOwnshipChevron(fill: .systemBlue), forName: Self.ownshipLiveIcon)
-        style.setImage(createOwnshipChevron(fill: .systemGray), forName: Self.ownshipStaleIcon)
+        style.setImage(createOwnshipChevron(fill: MapColor.ownship), forName: Self.ownshipLiveIcon)
+        style.setImage(createOwnshipChevron(fill: MapColor.ownshipStale), forName: Self.ownshipStaleIcon)
 
         // Ownship exists only once there is a fix. Before that the source is empty: a chevron at
         // a placeholder position would read as the aircraft's live position (it used to sit in
@@ -218,7 +218,7 @@ final class MapService {
         let fillLayer = MLNFillStyleLayer(identifier: "airspace-fill", source: source)
         // Simplified: blue fill at 10% opacity for all airspace classes
         // TODO: Data-driven Class B/C/D colors — requires MapLibre match expression
-        fillLayer.fillColor = NSExpression(forConstantValue: UIColor.systemBlue)
+        fillLayer.fillColor = NSExpression(forConstantValue: MapColor.airspace)
         fillLayer.fillOpacity = NSExpression(forConstantValue: 0.10)
         style.addLayer(fillLayer)
 
@@ -226,7 +226,7 @@ final class MapService {
         let lineLayer = MLNLineStyleLayer(identifier: "airspace-border", source: source)
         // Simplified: blue borders at 2pt for all airspace
         // TODO: Data-driven Charlie purple vs B/D blue — requires MapLibre match expression
-        lineLayer.lineColor = NSExpression(forConstantValue: UIColor.systemBlue)
+        lineLayer.lineColor = NSExpression(forConstantValue: MapColor.airspace)
         lineLayer.lineWidth = NSExpression(forConstantValue: 2.0)
         style.addLayer(lineLayer)
 
@@ -258,7 +258,7 @@ final class MapService {
 
         // Simplified: green weather dots for all categories
         // TODO: Data-driven VFR/MVFR/IFR/LIFR colors — requires MapLibre match expression
-        circleLayer.circleColor = NSExpression(forConstantValue: UIColor.systemGreen)
+        circleLayer.circleColor = NSExpression(forConstantValue: MapColor.weatherDot)
         style.addLayer(circleLayer)
     }
 
@@ -275,19 +275,19 @@ final class MapService {
 
         // Red fill: 25% for TFRs in effect now, 8% for published-but-not-yet-active ones
         let fillLayer = MLNFillStyleLayer(identifier: "tfr-fill", source: source)
-        fillLayer.fillColor = NSExpression(forConstantValue: UIColor.systemRed)
+        fillLayer.fillColor = NSExpression(forConstantValue: MapColor.tfr)
         fillLayer.fillOpacity = NSExpression(forKeyPath: "opacity")
         style.addLayer(fillLayer)
 
         // 2pt solid red border for current data; dashed for a stale snapshot (marked "OLD" in the badge stack)
         let lineLayer = MLNLineStyleLayer(identifier: "tfr-border", source: source)
-        lineLayer.lineColor = NSExpression(forConstantValue: UIColor.systemRed)
+        lineLayer.lineColor = NSExpression(forConstantValue: MapColor.tfr)
         lineLayer.lineWidth = NSExpression(forConstantValue: 2.0)
         lineLayer.predicate = NSPredicate(format: "stale == 0")
         style.addLayer(lineLayer)
 
         let staleLineLayer = MLNLineStyleLayer(identifier: "tfr-border-stale", source: source)
-        staleLineLayer.lineColor = NSExpression(forConstantValue: UIColor.systemRed)
+        staleLineLayer.lineColor = NSExpression(forConstantValue: MapColor.tfr)
         staleLineLayer.lineWidth = NSExpression(forConstantValue: 2.0)
         staleLineLayer.lineDashPattern = NSExpression(forConstantValue: [2, 2])
         staleLineLayer.predicate = NSPredicate(format: "stale == 1")
@@ -600,7 +600,7 @@ final class MapService {
         self.replayTrackSource = trackSource
 
         let lineLayer = MLNLineStyleLayer(identifier: "replay-track-line", source: trackSource)
-        lineLayer.lineColor = NSExpression(forConstantValue: UIColor.systemOrange)
+        lineLayer.lineColor = NSExpression(forConstantValue: MapColor.replay)
         lineLayer.lineWidth = NSExpression(forConstantValue: 3.0)
         lineLayer.lineCap = NSExpression(forConstantValue: "round")
         lineLayer.lineJoin = NSExpression(forConstantValue: "round")
@@ -639,7 +639,7 @@ final class MapService {
             let center = CGPoint(x: 12, y: 12)
 
             // Filled orange circle
-            ctx.setFillColor(UIColor.systemOrange.cgColor)
+            ctx.setFillColor(MapColor.replay.cgColor)
             ctx.addEllipse(in: CGRect(x: 0, y: 0, width: 24, height: 24))
             ctx.fillPath()
 

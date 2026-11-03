@@ -50,8 +50,8 @@ nonisolated struct IsraelChartPalette: Sendable {
         civilRoute: UIColor(red: 0.28, green: 0.58, blue: 0.38, alpha: 1),
         militaryRoute: UIColor(red: 0.36, green: 0.52, blue: 0.84, alpha: 1),
         airspace: UIColor(red: 0.58, green: 0.46, blue: 0.82, alpha: 1),
-        restricted: UIColor.systemOrange.withAlphaComponent(0.85),
-        closure: UIColor.systemRed,
+        restricted: UIColor.systemOrange.withAlphaComponent(0.85),   // night Palette.caution
+        closure: UIColor.systemRed,                                   // night Palette.warning
         runway: UIColor(white: 0.62, alpha: 1),
         symbol: UIColor(red: 0.66, green: 0.72, blue: 0.90, alpha: 1),
         labelText: UIColor(white: 0.74, alpha: 1),

@@ -169,6 +169,44 @@ enum Palette {
     })
 }
 
+// MARK: - Map and category colors
+
+/// Colors drawn into map layers and UIKit images (MapLibre takes `UIColor`), plus the flight-category dots.
+/// Values are the system colors these call sites used before they were named here: no on-screen change.
+/// Whether ownship, airspace and the weather dots should move to brand colors is a separate decision
+/// to make over the sectional.
+enum MapColor {
+    /// Live ownship chevron.
+    static let ownship = UIColor.systemBlue
+    /// Ownship chevron when the last fix is stale.
+    static let ownshipStale = UIColor.systemGray
+    /// Airspace fill (10% opacity) and border.
+    static let airspace = UIColor.systemBlue
+    /// Weather station dots on the map.
+    static let weatherDot = UIColor.systemGreen
+    /// TFR fill and border (a warning area).
+    static let tfr = UIColor.systemRed
+    /// Replay track and marker. Amber by history, not a caution; recolouring it is a separate decision.
+    static let replay = UIColor.systemOrange
+    /// NOTAM highlight on the map: full closure (red = warning), partial or needs-check (amber = caution), other.
+    static let notamClosure = UIColor.systemRed
+    static let notamCaution = UIColor.systemOrange
+    static let notamInfo = UIColor.systemBlue
+}
+
+extension Palette {
+    /// MVFR dot: day systemBlue, night a lighter blue so it stays distinct on the dark map.
+    static let categoryMVFR = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark ? UIColor(red: 0.56, green: 0.71, blue: 0.88, alpha: 1) : .systemBlue
+    })
+    /// LIFR dot: magenta by day, lighter by night.
+    static let categoryLIFR = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.90, green: 0.45, blue: 0.90, alpha: 1)
+            : UIColor(red: 0.80, green: 0.00, blue: 0.80, alpha: 1)
+    })
+}
+
 // MARK: - Section header
 
 /// Uppercase section heading with a bottom rule, shared by the airport sheet and layer panel.
