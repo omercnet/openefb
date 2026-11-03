@@ -75,6 +75,6 @@ struct RemoteConfigBanner: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 4)
         .background(item.isCaution ? Palette.caution.opacity(0.15) : Palette.infoFill)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
     }
 }
