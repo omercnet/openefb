@@ -69,9 +69,16 @@ struct NearestAirportRow: View {
     let onAirportTap: (String) -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    /// Identity, distance and Direct side by side need room: stack them at accessibility sizes, and on
+    /// iPhone from xLarge, where the identity column would wrap the ICAO and leave a closure tag no width.
+    private var stacksVertically: Bool {
+        typeSize.isAccessibilitySize || (horizontalSizeClass == .compact && typeSize >= .xLarge)
+    }
 
     var body: some View {
-        let layout = typeSize.isAccessibilitySize
+        let layout = stacksVertically
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
             : AnyLayout(HStackLayout(spacing: 12))
         layout {
@@ -83,7 +90,7 @@ struct NearestAirportRow: View {
                     Text(entry.airport.name)
                         .font(.subheadline)
                         .foregroundStyle(Palette.secondaryText)
-                        .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
+                        .lineLimit(stacksVertically ? nil : 1)
                 }
                 if let runway = entry.longestRunway {
                     Text("\(runway.id)  \(runway.length)' \(runway.surface.abbreviation)")   // feet
@@ -93,22 +100,13 @@ struct NearestAirportRow: View {
                         .font(.subheadline.weight(.medium).monospaced())
                         .foregroundStyle(Palette.secondaryText)
                 }
-                // Caution tags keep their full width, so they get their own line: at large text sizes
-                // they must never push the runway or the NOTAM closure tag out of the row.
+                // Caution tags keep their full width, so they get their own line: side by side when they fit,
+                // one per line when they don't. They must never push the runway or the NOTAM closure tag out of
+                // the row.
                 if entry.isPrivateUse || entry.isMilitary || entry.requiresPPR || entry.isClosedByNotam {
-                    HStack(spacing: 8) {
-                        if entry.isPrivateUse {
-                            PrivateUseTag()
-                        }
-                        if entry.isMilitary {
-                            MilitaryUseTag()
-                        }
-                        if entry.requiresPPR {
-                            PprTag()
-                        }
-                        if entry.isClosedByNotam {
-                            NotamClosedTag()
-                        }
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 8) { cautionTags }
+                        VStack(alignment: .leading, spacing: 4) { cautionTags }
                     }
                 }
             }
@@ -152,6 +150,14 @@ struct NearestAirportRow: View {
             .layoutPriority(1)
         }
         .frame(minHeight: MapControlMetrics.size + 8)
+    }
+
+    @ViewBuilder
+    private var cautionTags: some View {
+        if entry.isPrivateUse { PrivateUseTag() }
+        if entry.isMilitary { MilitaryUseTag() }
+        if entry.requiresPPR { PprTag() }
+        if entry.isClosedByNotam { NotamClosedTag() }
     }
 }
 

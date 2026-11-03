@@ -132,7 +132,7 @@ struct PrivateUseTag: View {
         Text("PVT")
             .font(.footnote.weight(.heavy))
             .lineLimit(1)
-            .fixedSize()
+            .fixedSize()   // a caution or closure tag is never truncated; layouts give it its own line
             .foregroundStyle(.black)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
