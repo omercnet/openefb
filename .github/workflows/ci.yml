@@ -23,14 +23,27 @@ env:
 jobs:
   lint:
     name: Lint and secrets
-    runs-on: macos-26
+    runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      LEFTHOOK_VERSION: 2.2.2
+      GITLEAKS_VERSION: 8.30.1
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the history scan and the commit range need it
       - name: Install hook tools
-        run: brew install lefthook gitleaks shellcheck
+        # shellcheck and python3 ship with the runner; libplist-utils lints plists and project.pbxproj off macOS.
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libplist-utils
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -fsSL "https://github.com/evilmartians/lefthook/releases/download/v${LEFTHOOK_VERSION}/lefthook_${LEFTHOOK_VERSION}_Linux_x86_64.gz" \
+            | gunzip > "$RUNNER_TEMP/bin/lefthook"
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP/bin" gitleaks
+          chmod +x "$RUNNER_TEMP/bin/lefthook" "$RUNNER_TEMP/bin/gitleaks"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
       - name: Conventional Commits (pull requests)
         if: github.event_name == 'pull_request'
         run: tools/hooks/commit-msg.sh --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"

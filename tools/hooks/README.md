@@ -16,8 +16,8 @@ gitleaks and shellcheck come from mise too (`mise use -g gitleaks shellcheck`); 
 | Hook | Job | Blocks? |
 |---|---|---|
 | pre-commit | gitleaks on staged changes | yes |
-| | forbidden files (`tools/hooks/forbidden-files.sh`): `*.p8`, `.env*` (not `.env.example`), `*.mobileprovision`, `*.xcarchive`, `*TmpTests.swift`, CAAI artwork paths, new files over 5 MB (`efb-212/Resources/*.sqlite` allowed) | yes |
-| | `plutil -lint` on `.plist`, `.xcprivacy`, `.entitlements`, `project.pbxproj` | yes |
+| | forbidden files (`tools/hooks/forbidden-files.sh`): `*.p8`, `*.p12`, `.env*` (not `.env.example`), `*.mobileprovision`, `*.xcarchive`, `*TmpTests.swift`, CAAI artwork paths, new files over 5 MB (`efb-212/Resources/*.sqlite` allowed) | yes |
+| | `tools/hooks/plist-lint.sh` on `.plist`, `.xcprivacy`, `.entitlements`, `project.pbxproj` (`plutil -lint` on macOS, libplist's `plistutil` on Linux) | yes |
 | | `python3 -m json.tool` on `*.json` | yes |
 | | shellcheck on `*.sh` | yes |
 | | Python syntax (compiled in memory, so tracked `.pyc` files stay untouched) | yes |

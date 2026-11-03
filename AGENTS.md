@@ -56,7 +56,7 @@ cd web/charts && npm ci && npm test           # manifest rules (node --test)
 cd web/interviews && npm ci && npm run build  # Next.js build; npm run lint = tsc --noEmit
 ```
 
-Deploys: the Worker with `npx wrangler deploy` from `web/notam-relay` (owner login required); packs with `web/charts/publish.sh` (see its README; `--approve` is the owner's go-ahead). `web/interviews` deploys from git pushes on the Vercel project `openefb-interviews`.
+Deploys: the Worker with `npx wrangler deploy` from `web/notam-relay` (owner login required); packs with `web/charts/publish.sh` (see its README; `--approve` is the owner's go-ahead). `web/interviews` deploys from git pushes on the Vercel project `openefb-interviews`. The app ships through release-please: merging its release pull request tags `vX.Y.Z` and `.github/workflows/release.yml` uploads that version to TestFlight with `bundle exec fastlane ios beta` (`fastlane/Fastfile`; secrets and setup in `docs/CI.md`). The same lane runs on the owner's Mac.
 
 ## File Organization
 
@@ -217,13 +217,13 @@ Network services (free, no key unless noted): NOAA Aviation Weather (METAR, TAF,
 - Israel sport-aviation (LSA) routes (`Services/IsraelRoutePlanner.swift`, `IsraelLSATimeRules.swift`, `IsraelLSAOverlay.swift`): a CVFR / LSA choice per plan (the aircraft's usual network, kept in `IsraelAircraftNetworkPreference`, preselects it), weekend-only routes left out on weekdays and checked per leg, closures naming LSA / ULTRALIGHT / SPORT, the LSA network on the map in purple. A NOTAM closure the planner cannot place on the network blocks filing ("Unresolved closure: check NOTAM <id>").
 - Weather for Israel reads the same NOAA API with the Israel station list; products an aerodrome doesn't publish aren't requested.
 **Server side (`web/`):** `web/notam-relay` (Cloudflare Worker + KV, live at `https://openefb-notam-relay.omerc.workers.dev`; `/health` reported 200 on 2026-11-02), `web/charts` (R2 publish tooling; the R2 bucket is live with both products published), `web/interviews` (Next.js pilot-interview app on Vercel Hobby, live at `https://openefb-interviews.vercel.app`, git-connected to omercnet/openefb with Root Directory `web/interviews`). The iPad app uses the first two; the interviews site is not part of the app. See `web/README.md`.
-**Next:** TestFlight upload (`dist-prep/`), then the public-release items under Known Issues.
+**Next:** releases go to TestFlight from CI (release-please, `docs/CI.md`); then the public-release items under Known Issues.
 
 ## Hooks
 
 lefthook (`lefthook.yml`) runs on each clone after `mise use -g lefthook@latest && lefthook install` (details in `tools/hooks/README.md`).
 
-- **pre-commit** (staged files only): gitleaks (`.gitleaks.toml`), forbidden files (`*.p8`, `.env*`, `*.mobileprovision`, `*.xcarchive`, `*TmpTests.swift`, CAAI artwork and inputs, new files over 5 MB), `plutil -lint`, JSON, shellcheck, Python syntax, web tests/lint for the changed package. swift-format lint is report-only: the tree has about 4,400 findings and this ticket doesn't reformat it.
+- **pre-commit** (staged files only): gitleaks (`.gitleaks.toml`), forbidden files (`*.p8`, `*.p12`, `.env*`, `*.mobileprovision`, `*.xcarchive`, `*TmpTests.swift`, CAAI artwork and inputs, new files over 5 MB), plist lint (`tools/hooks/plist-lint.sh`: `plutil` on macOS, `plistutil` on Linux), JSON, shellcheck, Python syntax, web tests/lint for the changed package. swift-format lint is report-only: the tree has about 4,400 findings and this ticket doesn't reformat it.
 - **pre-push:** Conventional Commits for every pushed commit, gitleaks over the pushed range, `tools/sim-test.sh build -quiet`, web tests for changed packages. The full unit suite (about 4 minutes) is not run: `tools/sim-test.sh test -only-testing:efb-212Tests`.
 - **commit-msg:** [Conventional Commits](https://www.conventionalcommits.org): `<type>(<scope>)!: <description>`, type one of `feat fix docs style refactor perf test build ci chore revert`, subject at most 100 characters. Check a range by hand with `tools/hooks/commit-msg.sh --range origin/main..HEAD`. **post-checkout / post-merge:** reminder to run `npm ci` when a `web/*/package-lock.json` changed.
 - Skip: `git commit --no-verify`, or `LEFTHOOK_EXCLUDE=<job>,<job>`.

@@ -1,0 +1,85 @@
+name: Release
+
+# release-please keeps a release pull request open from the Conventional Commits on main. Merging it tags vX.Y.Z,
+# publishes the GitHub release, and the testflight job uploads that version to TestFlight (see docs/CI.md).
+# Run it by hand (workflow_dispatch) to upload the version in version.txt again, or to check signing with upload off.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload to TestFlight (off = archive and sign only)
+        type: boolean
+        default: true
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release pull request
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write # release labels
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+      body: ${{ steps.release.outputs.body }}
+    steps:
+      - uses: googleapis/release-please-action@v5
+        id: release
+        with:
+          # A pull request opened with GITHUB_TOKEN doesn't trigger CI, so the required "CI gate" never reports.
+          # RELEASE_PLEASE_TOKEN (fine-grained PAT: contents + pull requests, read/write) fixes that.
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  testflight:
+    name: TestFlight upload
+    needs: release-please
+    if: ${{ !cancelled() && !failure() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
+    runs-on: macos-26
+    timeout-minutes: 90
+    environment: testflight
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer # same pin as ci.yml
+      FASTLANE_SKIP_UPDATE_CHECK: "1"
+      FASTLANE_OPT_OUT_USAGE: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name || github.ref }}
+          fetch-depth: 0 # the build number is the commit count
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+          bundler-cache: true
+      - name: Archive, sign and upload
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          DIST_CERT_P12_BASE64: ${{ secrets.DIST_CERT_P12_BASE64 }}
+          DIST_CERT_P12_PASSWORD: ${{ secrets.DIST_CERT_P12_PASSWORD }}
+          VERSION: ${{ needs.release-please.outputs.version }}
+          TESTFLIGHT_GROUPS: ${{ vars.TESTFLIGHT_GROUPS }}
+          TESTFLIGHT_CHANGELOG: ${{ needs.release-please.outputs.body }}
+          UPLOAD: ${{ github.event_name == 'workflow_dispatch' && !inputs.upload && 'false' || 'true' }}
+        run: bundle exec fastlane ios beta "upload:$UPLOAD"
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-build-logs
+          path: ~/Library/Logs/gym
+          retention-days: 7

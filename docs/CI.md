@@ -8,13 +8,34 @@ Runs on every pull request, on pushes to `main`, and by hand (`workflow_dispatch
 
 |Job|Runner|What it does|
 |---|---|---|
-|Lint and secrets|macos-26|Conventional Commits on the PR range (`tools/hooks/commit-msg.sh --range`), then `tools/check.sh`: the pre-commit checks over the whole tree plus the full-history gitleaks scan. The web jobs cover `web/*`; swift-format stays report-only.|
+|Lint and secrets|ubuntu-latest|Conventional Commits on the PR range (`tools/hooks/commit-msg.sh --range`), then `tools/check.sh`: the pre-commit checks over the whole tree plus the full-history gitleaks scan. lefthook and gitleaks are pinned release binaries; plists and `project.pbxproj` are linted with libplist's `plistutil` (`tools/hooks/plist-lint.sh`). The web jobs cover `web/*`; swift-format stays report-only (and is skipped here).|
 |Web (notam-relay, charts, interviews)|ubuntu-latest|`npm ci`, then tests / typecheck / lint as in `lefthook.yml`.|
 |Unit tests (iPad simulator)|macos-26|`tools/sim-test.sh test -only-testing:efb-212Tests` on iPad Pro 13-inch (M5). The `.xcresult` is uploaded when it fails.|
 |Flight scenarios (iPad simulator)|macos-26|Builds the DEBUG app and runs `tools/ci/fly-scenarios.sh`: five `tools/flight-sim` scenarios at 20x. It screenshots at 0/25/50/75/100% of each flight and fails if the app stops running, the scenario never loads, or a crash report appears. Screenshots, app logs and crash reports are uploaded as the `scenario-captures` artifact. What the app does with the fixes is asserted by the unit suite (`efb-212Tests/Simulation`).|
 |CI gate|ubuntu-latest|Passes only when every job above passed. It is the one required check, so jobs can be renamed or added without touching the ruleset.|
 
 Xcode is pinned to 26.6 (`DEVELOPER_DIR` in the workflow). The iOS target is 26.0 and `macos-26` ships iOS 26.5 simulators; move the pin when the image drops 26.6. A newer local Xcode accepts code the CI compiler rejects (a missing `import CoreLocation` in `IsraelBriefingView.swift` was the first case), so CI is the reference build.
+
+Only the simulator jobs need macOS. Building the app on Linux (xtool) was ruled out on 2026-11-03: no iOS Simulator, no asset catalog compiler, no App Store upload, and Linux-built binaries record the wrong SDK version, which App Store Connect rejects.
+
+## Workflow: `.github/workflows/release.yml`
+
+|Job|Runner|What it does|
+|---|---|---|
+|Release pull request|ubuntu-latest|On every push to `main`, release-please (`release-please-config.json`, `.release-please-manifest.json`) keeps a pull request open that bumps `version.txt` and `CHANGELOG.md` from the Conventional Commits since the last release. Merging it tags `vX.Y.Z` and publishes the GitHub release.|
+|TestFlight upload|macos-26, environment `testflight`|Runs when a release was just created, or by hand. Checks out the tag, installs the `Gemfile.lock` fastlane, and runs `bundle exec fastlane ios beta`: Release archive signed with the Apple Distribution identity, version from the release, build number = commit count, upload with symbols. With `TESTFLIGHT_GROUPS` set it waits for processing, adds the build to those external groups and submits it for Beta App Review, with the release notes as What to Test. The `workflow_dispatch` input `upload: false` archives and signs only. gym logs are uploaded when it fails.|
+
+Secrets, in the `testflight` environment (only that job sees them):
+
+|Name|What|
+|---|---|
+|`ASC_KEY_ID`, `ASC_ISSUER_ID`|App Store Connect API key ids (the key that `~/.appstoreconnect/openefb.env` names)|
+|`ASC_KEY_P8`|The `.p8` key file contents|
+|`DIST_CERT_P12_BASE64`, `DIST_CERT_P12_PASSWORD`|The Apple Distribution identity (certificate and private key), base64 `.p12` and its password. Imported into a throwaway keychain per run. When the certificate expires or is revoked, export the new one and replace both.|
+
+Repository variable `TESTFLIGHT_GROUPS` (comma-separated, now `CHU`) names the external groups; empty means internal testing only. Repository secret `RELEASE_PLEASE_TOKEN` (optional, fine-grained token with Contents and Pull requests read/write on this repo): a release pull request opened with the default `GITHUB_TOKEN` does not trigger CI, so its required `CI gate` never reports. Without the token, close and reopen the release pull request to start CI.
+
+The same lane runs on the owner's Mac (`bundle install`, then `bundle exec fastlane ios beta`, `upload:false` to stop after signing); see `dist-prep/TESTFLIGHT.md`.
 
 ## Working with it
 
@@ -37,5 +58,5 @@ Run the simulator scenarios locally with `tools/sim-test.sh build` then `tools/c
 
 - Actions are referenced by major version tag, not commit SHA.
 - No required reviewers: a sole owner cannot approve their own pull request.
-- Release builds, TestFlight upload and signing are not in CI (no secrets are configured).
+- The TestFlight job has run only by hand so far; the first release-please release is its first real run.
 - One run saw `LocationServiceCharacterizationTests/fixIsConvertedToKnotsFeetAndDegrees` miss its 10 s wait on a cold runner; the next run passed. If it recurs, raise the wait in `waitUntil` or run the suite without parallel clones.

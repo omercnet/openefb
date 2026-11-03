@@ -7,9 +7,9 @@ Read from `efb-212.xcodeproj/project.pbxproj` and from the Info.plist of the arc
 |---|---|---|
 | PRODUCT_BUNDLE_IDENTIFIER | `io.omer.efb` | set by the owner; keep |
 | DEVELOPMENT_TEAM | `6F8N897928` | set by the owner; keep. Test targets and the project-level default still carry the old team `SKGLKG576D`; harmless for the app archive |
-| CODE_SIGN_STYLE | `Automatic` | |
-| MARKETING_VERSION | `1.0` | store version |
-| CURRENT_PROJECT_VERSION | `1` | build number |
+| CODE_SIGN_STYLE | `Automatic` | development; the release lane switches the Release config to manual signing (Apple Distribution, `io.omer.efb AppStore`) for the archive and restores the file |
+| MARKETING_VERSION | `1.0` | overridden at release by `version.txt` |
+| CURRENT_PROJECT_VERSION | `1` | overridden at release by the commit count |
 | IPHONEOS_DEPLOYMENT_TARGET | `26.0` | |
 | TARGETED_DEVICE_FAMILY | `1,2` | iPad and iPhone (was `2`; re-verified 2026-11-02, archived `UIDeviceFamily [1, 2]`) |
 | SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD | `NO` | no Mac listing |
@@ -41,16 +41,14 @@ Re-run 2026-11-02 (same command, output `/tmp`, deleted afterwards): archive suc
 `CFBundleVersion 1` (the upload script overrides the build number), `MinimumOSVersion 26.0`, `UIDeviceFamily [1, 2]`,
 `UIBackgroundModes [location, audio]`, `ITSAppUsesNonExemptEncryption false`.
 
-## Versions and proposal
-Project value: `1.0 (1)`. The uploaded build number comes from `upload-testflight.sh` (`BUILD_NUMBER` or `git rev-list --count HEAD`, 86 at `d27c262`) and must exceed every earlier upload of 1.0.
-Bump `MARKETING_VERSION` only when starting a new release (for example `1.1`).
+## Versions
+Project value: `1.0 (1)`. Releases override both on the command line (`fastlane/Fastfile`): the version from
+`version.txt`, which release-please bumps from Conventional Commits, and the build number from `git rev-list --count HEAD`
+(or `BUILD_NUMBER`), which must exceed every earlier upload of the version. Build 88 is version 1.0.
 
-## Archive steps
-1. Scheme `efb-212`, Release configuration.
-2. Destination: Any iOS Device (arm64).
-3. Product > Archive.
-4. Organizer > Distribute App > App Store Connect > Upload.
-5. Automatic signing with team `6F8N897928` handles provisioning.
+## Archive and upload
+`bundle exec fastlane ios beta` (CI: `.github/workflows/release.yml`). Export options live in the lane: app-store,
+manual signing with team `6F8N897928`, `uploadSymbols` true, `manageAppVersionAndBuildNumber` false.
 
 ## Open items
 - None for the display name (set by T30). `PrivacyInfo.xcprivacy` now declares FileTimestamp `C617.1`.

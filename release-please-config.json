@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "simple",
+  "bootstrap-sha": "26156c01a3ddbc4acd5c0a399c0a5f14b84f0989",
+  "include-component-in-tag": false,
+  "include-v-in-tag": true,
+  "pull-request-title-pattern": "chore: release ${version}",
+  "packages": {
+    ".": {
+      "package-name": "kanaf",
+      "changelog-path": "CHANGELOG.md"
+    }
+  }
+}
