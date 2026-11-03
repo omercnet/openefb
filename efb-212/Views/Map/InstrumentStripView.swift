@@ -79,8 +79,7 @@ struct InstrumentStripView: View {
         }
         .padding(.horizontal, isCompact ? 8 : 16)
         .padding(.vertical, 8)
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.l))
+        .panelSurface()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Instruments")
         .accessibilityIdentifier("Instrument strip")

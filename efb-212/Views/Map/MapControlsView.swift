@@ -187,20 +187,19 @@ struct NorthIndicator: View {
     let mapDirection: Double   // degrees clockwise from north
 
     var body: some View {
-        ZStack {
-            Color.clear
-                .glassEffect(.regular.tint(Palette.accent), in: .circle)
-            VStack(spacing: 0) {
-                Image(systemName: "arrowtriangle.up.fill")
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(Palette.northMarker)
-                Text("N")
-                    .font(.callout.weight(.heavy))
-                    .foregroundStyle(Palette.onAccent)
-            }
-            .rotationEffect(.degrees(-mapDirection))
+        // The glyphs are the glass view's own content: inside the controls' GlassEffectContainer, a sibling
+        // drawn over a separate glass view ends up under the container's glass and disappears.
+        VStack(spacing: 0) {
+            Image(systemName: "arrowtriangle.up.fill")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(Palette.northMarker)
+            Text("N")
+                .font(.callout.weight(.heavy))
+                .foregroundStyle(Palette.onAccent)
         }
+        .rotationEffect(.degrees(-mapDirection))
         .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+        .glassEffect(.regular.tint(Palette.accent), in: .circle)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("North indicator")
         .accessibilityValue("Map rotated \(Int(mapDirection.rounded())) degrees")
