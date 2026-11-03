@@ -84,6 +84,13 @@ def build_number
   number
 end
 
+def testflight_groups
+  raw = ENV["TESTFLIGHT_GROUPS"].to_s
+  groups = raw.split(",").map(&:strip).reject(&:empty?)
+  UI.user_error!("TESTFLIGHT_GROUPS ('#{raw}') names no group") if groups.empty? && !raw.strip.empty?
+  groups
+end
+
 platform :ios do
   desc "Archive a Release build and upload it to TestFlight (upload:false stops after signing)"
   lane :beta do |options|
@@ -91,7 +98,8 @@ platform :ios do
     import_distribution_identity
     version = marketing_version
     build = build_number
-    UI.message("Kanaf #{version} (#{build})")
+    groups = testflight_groups
+    UI.message("Kanaf #{version} (#{build})#{groups.empty? ? '' : ", external groups: #{groups.join(', ')}"}")
 
     get_provisioning_profile(
       api_key: api_key,
@@ -144,7 +152,6 @@ platform :ios do
       next
     end
 
-    groups = ENV["TESTFLIGHT_GROUPS"].to_s.split(",").map(&:strip).reject(&:empty?)
     changelog = ENV["TESTFLIGHT_CHANGELOG"].to_s.strip
     changelog = "Kanaf #{version} (#{build})" if changelog.empty?
     upload_to_testflight(

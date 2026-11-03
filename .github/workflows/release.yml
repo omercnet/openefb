@@ -12,10 +12,16 @@ on:
         description: Upload to TestFlight (off = archive and sign only)
         type: boolean
         default: true
+      build_number:
+        description: Build number (default = commit count; use a higher one to retry after Apple accepted an upload)
+        type: string
+        default: ""
 
+# Pending runs queue in order (queue: max) so a manual run never cancels the push run that tags a release.
 concurrency:
   group: release
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
@@ -74,6 +80,7 @@ jobs:
           VERSION: ${{ needs.release-please.outputs.version }}
           TESTFLIGHT_GROUPS: ${{ vars.TESTFLIGHT_GROUPS }}
           TESTFLIGHT_CHANGELOG: ${{ needs.release-please.outputs.body }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
           UPLOAD: ${{ github.event_name == 'workflow_dispatch' && !inputs.upload && 'false' || 'true' }}
         run: bundle exec fastlane ios beta "upload:$UPLOAD"
       - name: Upload build logs
