@@ -101,8 +101,7 @@ struct NearestAirportHUD: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
             .frame(minHeight: MapControlMetrics.size + 4)
-            .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: Radius.l))
+            .panelSurface()
         }
         .buttonStyle(PressableButtonStyle())
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)

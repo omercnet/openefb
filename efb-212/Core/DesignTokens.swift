@@ -96,7 +96,13 @@ enum Palette {
     /// caution). Always carries black text: 9:1 (white on this amber is 2.2:1). For amber *text* use `caution`.
     static let cautionFill = Color.orange
     /// North marker on the compass button. A compass convention, not a warning: the one red that is not `warning`.
-    static let northMarker = Color.red
+    /// A light red, because it sits on the navy glass (a graphical object needs >= 3:1): day #FF9F94 on #1556B8
+    /// 3.7:1 (Increase Contrast #0C4091 4.9:1); night #FF8F86 on the night glass 3.9:1. systemRed was 2.1:1 / 2.5:1.
+    static let northMarker = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 1, green: 0.561, blue: 0.525, alpha: 1)
+            : UIColor(red: 1, green: 0.624, blue: 0.580, alpha: 1)
+    })
     /// Quiet container fill for rows and chips.
     static let fill = Color.secondary.opacity(0.12)
     /// Active route line on the map: aviation magenta (never red, which is reserved for closures and
@@ -161,11 +167,66 @@ enum Palette {
     /// The `AccentColor` asset: day #1556B8 on #F2F2F7 6.2:1 (white 6.9:1); night #8FB4E0 on #1C1C1E 7.9:1
     /// (on black 9.8:1). Increase Contrast variants are darker by day and lighter by night.
     static let accentText = Color("AccentColor")
+    /// Solid panel behind the instrument strip and NRST box. Day #F2F2F7 at 0.88 under a navy hairline;
+    /// night #1C1C1E at 0.9 (the old dark material), no hairline.
+    static let panelFill = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.110, green: 0.110, blue: 0.118, alpha: 0.9)
+            : UIColor(red: 0.949, green: 0.949, blue: 0.969, alpha: 0.88)
+    })
+    /// 1 pt edge of the day panel: `accent` at 35%. Clear at night.
+    static let panelHairline = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark ? .clear : UIColor(Palette.accent).withAlphaComponent(0.35)
+    })
+    /// Opaque base under a tinted status chip on the translucent panel (GPS LOST / STALE), so the chip's amber or
+    /// red text keeps 4.5:1 whatever map shows through: day white + 8% tint, caution 4.9:1, warning 5.2:1;
+    /// night #1C1C1E + 8% tint, caution 7.2:1, warning 4.6:1.
+    static let statusChipBase = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark ? UIColor(red: 0.110, green: 0.110, blue: 0.118, alpha: 1) : .white
+    })
     /// Tinted container behind informational notices (beta banner, selected transcript row).
     static let infoFill = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
             ? accentNight.withAlphaComponent(0.35)
             : accentDay.withAlphaComponent(0.15)
+    })
+}
+
+// MARK: - Map and category colors
+
+/// Colors drawn into map layers and UIKit images (MapLibre takes `UIColor`), plus the flight-category dots.
+/// Values are the system colors these call sites used before they were named here: no on-screen change.
+/// Whether ownship, airspace and the weather dots should move to brand colors is a separate decision
+/// to make over the sectional.
+enum MapColor {
+    /// Live ownship chevron.
+    static let ownship = UIColor.systemBlue
+    /// Ownship chevron when the last fix is stale.
+    static let ownshipStale = UIColor.systemGray
+    /// Airspace fill (10% opacity) and border.
+    static let airspace = UIColor.systemBlue
+    /// Weather station dots on the map.
+    static let weatherDot = UIColor.systemGreen
+    /// TFR fill and border (a warning area).
+    static let tfr = UIColor.systemRed
+    /// Replay track and marker. Amber by history, not a caution; recolouring it is a separate decision.
+    static let replay = UIColor.systemOrange
+    /// NOTAM highlight on the map: full closure (red = warning), partial or needs-check (amber = caution), other.
+    static let notamClosure = UIColor.systemRed
+    static let notamCaution = UIColor.systemOrange
+    static let notamInfo = UIColor.systemBlue
+}
+
+extension Palette {
+    /// MVFR dot: day systemBlue, night a lighter blue so it stays distinct on the dark map.
+    static let categoryMVFR = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark ? UIColor(red: 0.56, green: 0.71, blue: 0.88, alpha: 1) : .systemBlue
+    })
+    /// LIFR dot: magenta by day, lighter by night.
+    static let categoryLIFR = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.90, green: 0.45, blue: 0.90, alpha: 1)
+            : UIColor(red: 0.80, green: 0.00, blue: 0.80, alpha: 1)
     })
 }
 
@@ -199,5 +260,11 @@ extension View {
     func mapControlSurface(in shape: some Shape) -> some View {
         foregroundStyle(Palette.onAccent)
             .glassEffect(.regular.tint(Palette.accent), in: shape)
+    }
+
+    /// Solid in-flight panel (instrument strip, NRST box): `Palette.panelFill` with a navy hairline, `Radius.l` corners.
+    func panelSurface() -> some View {
+        background(Palette.panelFill, in: .rect(cornerRadius: Radius.l))
+            .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Palette.panelHairline, lineWidth: 1))
     }
 }

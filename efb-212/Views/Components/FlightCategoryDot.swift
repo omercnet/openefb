@@ -22,19 +22,9 @@ struct FlightCategoryDot: View {
     var color: Color {
         switch category {
         case .vfr: return Palette.ok
-        case .mvfr:
-            return Color(UIColor { trait in
-                trait.userInterfaceStyle == .dark
-                    ? UIColor(red: 0.56, green: 0.71, blue: 0.88, alpha: 1)
-                    : .systemBlue
-            })
+        case .mvfr: return Palette.categoryMVFR
         case .ifr: return Palette.warning
-        case .lifr:
-            return Color(UIColor { trait in
-                trait.userInterfaceStyle == .dark
-                    ? UIColor(red: 0.90, green: 0.45, blue: 0.90, alpha: 1)
-                    : UIColor(red: 0.80, green: 0.00, blue: 0.80, alpha: 1)
-            })
+        case .lifr: return Palette.categoryLIFR
         }
     }
 

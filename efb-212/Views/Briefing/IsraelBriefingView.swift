@@ -329,9 +329,9 @@ struct IsraelBriefingView: View {
         viewModel.markRead(row.notam)
         let color: UIColor
         switch row.closure {
-        case .full: color = .systemRed
-        case .partial, .check: color = .systemOrange
-        case .none: color = row.needsCheck ? .systemOrange : .systemBlue
+        case .full: color = MapColor.notamClosure
+        case .partial, .check: color = MapColor.notamCaution
+        case .none: color = row.needsCheck ? MapColor.notamCaution : MapColor.notamInfo
         }
         guard IsraelBriefingMapHighlight.show(row.notam, color: color, on: appState.sharedMapService) else {
             cannotShow = "The map is not ready, or this NOTAM has no area or route to draw."
