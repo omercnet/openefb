@@ -91,6 +91,16 @@ def testflight_groups
   groups
 end
 
+# A mistyped group would upload and submit for review without reaching any tester, so check names up front.
+def verify_external_groups(groups)
+  return if groups.empty?
+
+  app = Spaceship::ConnectAPI::App.find(BUNDLE_ID) || UI.user_error!("No App Store Connect app for #{BUNDLE_ID}")
+  external = app.get_beta_groups.reject(&:is_internal_group).map(&:name)
+  missing = groups - external
+  UI.user_error!("TESTFLIGHT_GROUPS: no external group named #{missing.join(', ')} (external groups: #{external.join(', ')})") unless missing.empty?
+end
+
 platform :ios do
   desc "Archive a Release build and upload it to TestFlight (upload:false stops after signing)"
   lane :beta do |options|
@@ -100,6 +110,7 @@ platform :ios do
     build = build_number
     groups = testflight_groups
     UI.message("Kanaf #{version} (#{build})#{groups.empty? ? '' : ", external groups: #{groups.join(', ')}"}")
+    verify_external_groups(groups) unless options[:upload].to_s == "false"
 
     get_provisioning_profile(
       api_key: api_key,
@@ -108,6 +119,8 @@ platform :ios do
       ignore_profiles_with_different_name: true,
       output_path: OUTPUT_DIR
     )
+    # sigh renames a profile it had to recreate (the old name stays taken), so sign with the name it installed.
+    profile_name = lane_context[SharedValues::SIGH_NAME] || PROFILE_NAME
 
     # The project signs automatically for development. Release archives sign manually with the distribution
     # identity; the project file is restored afterwards so a local run leaves the checkout unchanged.
@@ -121,7 +134,7 @@ platform :ios do
         build_configurations: ["Release"],
         team_id: TEAM_ID,
         code_sign_identity: "Apple Distribution",
-        profile_name: PROFILE_NAME
+        profile_name: profile_name
       )
       build_app(
         project: File.join(ROOT, PROJECT),
@@ -138,7 +151,7 @@ platform :ios do
           teamID: TEAM_ID,
           signingStyle: "manual",
           signingCertificate: "Apple Distribution",
-          provisioningProfiles: { BUNDLE_ID => PROFILE_NAME },
+          provisioningProfiles: { BUNDLE_ID => profile_name },
           uploadSymbols: true,
           manageAppVersionAndBuildNumber: false
         }

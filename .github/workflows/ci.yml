@@ -25,33 +25,39 @@ jobs:
     name: Lint and secrets
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      LEFTHOOK_VERSION: 2.2.2
-      GITLEAKS_VERSION: 8.30.1
+    permissions:
+      contents: read
+      pull-requests: read # gitleaks-action lists the pull request's commits
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # the history scan and the commit range need it
-      - name: Install hook tools
-        # shellcheck and python3 ship with the runner; libplist-utils lints plists and project.pbxproj off macOS.
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libplist-utils
-          mkdir -p "$RUNNER_TEMP/bin"
-          curl -fsSL "https://github.com/evilmartians/lefthook/releases/download/v${LEFTHOOK_VERSION}/lefthook_${LEFTHOOK_VERSION}_Linux_x86_64.gz" \
-            | gunzip > "$RUNNER_TEMP/bin/lefthook"
-          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C "$RUNNER_TEMP/bin" gitleaks
-          chmod +x "$RUNNER_TEMP/bin/lefthook" "$RUNNER_TEMP/bin/gitleaks"
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          fetch-depth: 0 # gitleaks and the commit range need the history
+      - name: Secret scan
+        # Official gitleaks action, using .gitleaks.toml: the pull request's commits, the pushed commits on main,
+        # the whole history on a manual run. Free for personal-account repositories.
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+      - name: Install lefthook
+        # lefthook has no official setup action; mise (the repo's tool installer, tools/hooks/README.md) has one.
+        uses: jdx/mise-action@v5
+        with:
+          mise_toml: |
+            [tools]
+            lefthook = "2.2.2"
+      - name: Install plistutil
+        # libplist lints plists and project.pbxproj off macOS (tools/hooks/plist-lint.sh). shellcheck and python3 ship with the runner.
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libplist-utils
       - name: Conventional Commits (pull requests)
         if: github.event_name == 'pull_request'
         run: tools/hooks/commit-msg.sh --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
       - name: Pre-commit checks over the whole tree
-        # The web jobs cover web/*; swift-format is report-only (about 4,400 known findings).
+        # The web jobs cover web/*; swift-format is report-only (about 4,400 known findings); the gitleaks action
+        # above replaces lefthook's gitleaks job and the history scan (--quick).
         env:
-          LEFTHOOK_EXCLUDE: web-interviews,web-relay,web-charts,swift-format
-        run: tools/check.sh
+          LEFTHOOK_EXCLUDE: gitleaks,web-interviews,web-relay,web-charts,swift-format
+        run: tools/check.sh --quick
 
   web:
     name: Web (${{ matrix.package }})

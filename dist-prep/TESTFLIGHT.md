@@ -1,6 +1,6 @@
 # TestFlight materials (T30, drafted 2026-11-02)
 
-Build 88 (1.0) passed Beta App Review on 2026-11-03 and is in the external group CHU. Releases now upload from CI (below).
+Build 88 (1.0) passed Beta App Review on 2026-11-03 and is in the external group Public Beta (first created as CHU; public link on). Releases now upload from CI (below).
 
 **Owner decisions applied:** Q9 = upload through the Apple ID Xcode is signed in to (API key only as a fallback); Q10 = A (internal testers first, then an
 external group with a public link after Beta App Review); Q12 = A (CAAI approved in-app use of the chart and diagrams,
@@ -14,7 +14,7 @@ version comes from `version.txt` (release-please bumps it); the build number is 
 ## Upload
 Releases upload from GitHub Actions: merging the release-please pull request tags `vX.Y.Z` and the `testflight` job in
 `.github/workflows/release.yml` runs `bundle exec fastlane ios beta` on a macOS runner (setup and secrets: `docs/CI.md`).
-When the repository variable `TESTFLIGHT_GROUPS` names external groups (now `CHU`), the job waits for processing,
+When the repository variable `TESTFLIGHT_GROUPS` names external groups (now `Public Beta`), the job waits for processing,
 adds the build to them and submits it for Beta App Review with the release notes as What to Test.
 
 From the owner's Mac, the same lane: `bundle install`, then `bundle exec fastlane ios beta` (add `upload:false` to
