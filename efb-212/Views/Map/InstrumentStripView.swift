@@ -186,7 +186,13 @@ struct GPSStatusChip: View {
         }
         .padding(.horizontal, 10)
         .frame(minHeight: 44)
-        .background(isAlert ? tint.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: Radius.s))
+        .background {
+            if isAlert {
+                RoundedRectangle(cornerRadius: Radius.s)
+                    .fill(tint.opacity(0.08))
+                    .background(Palette.statusChipBase, in: RoundedRectangle(cornerRadius: Radius.s))
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier("GPS status")
         .accessibilityLabel(status.accessibilityDescription)

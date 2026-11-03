@@ -57,20 +57,20 @@ PR #5 (2026-11-02) gave the app its own look inside the HIG; the follow-ups (202
 
 - **Accent:** Kanaf navy (`Palette.accent`, `AccentColor` asset), #1556B8 by day (#0C4091 with Increase Contrast), #2E4A6E fill and #8FB4E0 text at night. Day systemBlue failed 4.5:1.
 - **Floating map controls:** `mapControlSurface()`, Liquid Glass tinted navy with white (night grey 85%) glyphs, 60pt. Measured over the official CAAI CVFR chart on the iPad simulator: glyphs 7.3:1 by day, 6.1:1 at night, so no change was needed. Screenshots (CAAI artwork) are kept out of git in `docs/design/screenshots/UX-IL-CAAI/`.
-- **Panels:** the instrument strip and NRST box moved from `.regularMaterial` to `panelSurface()`: a light solid panel with a navy hairline by day, the old dark panel at night. Material took on the sectional's yellow; the solid panel stays neutral grey.
+- **Panels:** the instrument strip and NRST box moved from `.regularMaterial` to `panelSurface()`: a light solid panel with a navy hairline by day, the old dark panel at night. Material took on the sectional's yellow; the solid panel stays neutral grey. The panel is slightly see-through, so the GPS status chip (GPS LOST / STALE) sits on an opaque `Palette.statusChipBase` with an 8% tint: its amber or red text keeps >= 4.6:1 over any map.
 - **Type:** expanded SF Pro for names and headings (`TypeRole.title`, `identifier`, `sectionHeader`); condensed SF Pro with fixed-width digits for the 32pt readouts.
 - **North marker:** the red arrow on the compass glass was 2.1:1 by day and 2.5:1 at night (needs 3:1 as a graphical object). It is now a light red, measured on screen: 3.7:1 day, 3.9:1 night, 5.2:1 day / 4.1:1 night with Increase Contrast, 3.5:1 / 4.2:1 with Reduce Transparency. The arrow was also invisible: inside the controls' `GlassEffectContainer` it was a sibling over a separate glass view and was drawn under the glass; it is now the glass view's own content.
 - **Increase Contrast / Reduce Transparency** (simulator): the high-contrast navy applies to the map controls; the strip, NRST box and route bar stay legible with both settings, day and night. Still to do on a real iPad: VoiceOver and Reduce Transparency, which the simulator only approximates.
 
 Before (material panels) and after (solid panels), same position and time:
 
-| | |
+| Where | Before (left) and after (right) |
 |---|---|
-| iPad, KPAO sectional, day | ![](design/screenshots/KANAF/ipad-us-day.png) |
-| iPad, KPAO sectional, night | ![](design/screenshots/KANAF/ipad-us-night.png) |
-| iPhone 17e, KPAO sectional, day | ![](design/screenshots/KANAF/iphone-us-day.png) |
-| iPhone 17e, Israel street map, day | ![](design/screenshots/KANAF/iphone-il-day.png) |
-| iPhone 17e, Israel street map, night | ![](design/screenshots/KANAF/iphone-il-night.png) |
+| iPad, KPAO sectional, day | ![iPad at KPAO by day. Before: the instrument strip and NRST box take on the sectional's yellow through the material. After: neutral light-grey panels with a thin navy edge.](design/screenshots/KANAF/ipad-us-day.png) |
+| iPad, KPAO sectional, night | ![iPad at KPAO at night. Before and after look the same: the dark panel is unchanged.](design/screenshots/KANAF/ipad-us-night.png) |
+| iPhone 17e, KPAO sectional, day | ![iPhone at KPAO by day. Before: yellow-tinted strip and NRST box. After: neutral light-grey panels with a navy edge.](design/screenshots/KANAF/iphone-us-day.png) |
+| iPhone 17e, Israel street map, day | ![iPhone near LLHZ by day with an active route. After: the strip and NRST box are neutral light grey with a navy edge instead of see-through material.](design/screenshots/KANAF/iphone-il-day.png) |
+| iPhone 17e, Israel street map, night | ![iPhone near LLHZ at night with an active route. Before and after match: the dark panel is unchanged.](design/screenshots/KANAF/iphone-il-night.png) |
 
 ## Components
 | Component | Decision | Status |

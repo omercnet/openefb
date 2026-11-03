@@ -178,6 +178,12 @@ enum Palette {
     static let panelHairline = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark ? .clear : UIColor(Palette.accent).withAlphaComponent(0.35)
     })
+    /// Opaque base under a tinted status chip on the translucent panel (GPS LOST / STALE), so the chip's amber or
+    /// red text keeps 4.5:1 whatever map shows through: day white + 8% tint, caution 4.9:1, warning 5.2:1;
+    /// night #1C1C1E + 8% tint, caution 7.2:1, warning 4.6:1.
+    static let statusChipBase = Color(UIColor { trait in
+        trait.userInterfaceStyle == .dark ? UIColor(red: 0.110, green: 0.110, blue: 0.118, alpha: 1) : .white
+    })
     /// Tinted container behind informational notices (beta banner, selected transcript row).
     static let infoFill = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
