@@ -77,6 +77,7 @@ duration() {
 
 failed=()
 summary="| Scenario | Flight | Wall | Result |\n|---|---|---|---|\n"
+first_launch=1
 for name in "${SCENARIOS[@]}"; do
   secs=$(duration "$name")
   wall=$(( secs / SPEED + 1 ))
@@ -99,7 +100,8 @@ for name in "${SCENARIOS[@]}"; do
   # The first launch on a fresh runner is cold (install, dyld, first MapLibre frame) and has taken over 120 s
   # under load (run 41626296831); later launches take seconds.
   launch_deadline=120
-  [ "$name" = "${SCENARIOS[0]}" ] && launch_deadline=300
+  [ "$first_launch" -eq 1 ] && launch_deadline=300
+  first_launch=0
   limited "$launch_deadline" tools/fly.sh israel "$name" --speed "$SPEED" || problems+=("launch failed or timed out")
   sleep 5   # launch, first frame
   for pct in 0 25 50 75 100; do
