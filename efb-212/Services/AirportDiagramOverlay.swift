@@ -111,6 +111,12 @@ final class AirportDiagramOverlay {
         return Date().timeIntervalSince(failed) < Self.retryAfter
     }
     private var pollTimer: Timer?
+    /// The remote config switched the Israel diagram overlay off (`RemoteFeature.israelDiagramOverlay`). The US
+    /// overlay is unaffected, and the diagram sheet PDFs stay available.
+    private var isRemotelyDisabled: Bool {
+        region == .israel && RemoteConfigStore.shared.isDisabled(.israelDiagramOverlay)
+    }
+    private var lastRemotelyDisabled = false
     private var lastCamera: (latitude: Double, longitude: Double, zoom: Double)?
     private let logger = Logger(subsystem: "quartermint.efb-212", category: "AirportDiagramOverlay")
 
@@ -147,6 +153,9 @@ final class AirportDiagramOverlay {
     /// Re-evaluates on camera changes. Cheap: three property reads per tick.
     private func pollCamera() {
         guard let mapView else { return }
+        // A config change arrives without a camera move: re-evaluate once when it flips.
+        let remotelyDisabled = isRemotelyDisabled
+        if remotelyDisabled != lastRemotelyDisabled { lastRemotelyDisabled = remotelyDisabled; lastCamera = nil }
         if region == .israel, !entries.isEmpty { raiseAboveIsraelFills() }  // IL-3 may re-add its fills at any time
         let center = mapView.centerCoordinate
         let camera = (center.latitude, center.longitude, mapView.zoomLevel)
@@ -164,13 +173,13 @@ final class AirportDiagramOverlay {
     func refresh(force: Bool) {
         guard let mapView, style != nil else { return }
         let zoomedIn = mapView.zoomLevel >= Self.minimumZoom - 0.5  // start loading slightly before 14
-        let visible = isEnabled && mapView.zoomLevel >= Self.minimumZoom
+        let visible = isEnabled && !isRemotelyDisabled && mapView.zoomLevel >= Self.minimumZoom
         isShowing = visible && !entries.isEmpty
         for entry in entries.values {
             style?.layer(withIdentifier: entry.layerID)?.isVisible = visible
             style?.layer(withIdentifier: entry.backingLayerID)?.isVisible = visible
         }
-        guard isEnabled, zoomedIn else { return }
+        guard isEnabled, !isRemotelyDisabled, zoomedIn else { return }
         if region == .israel {
             refreshIsrael(mapView: mapView)
             return
@@ -363,7 +372,8 @@ final class AirportDiagramOverlay {
         )
         let sourceID = "apd-source-\(icao)", layerID = "apd-layer-\(icao)"
         let backingSourceID = "apd-backing-source-\(icao)", backingLayerID = "apd-backing-\(icao)"
-        let visible = isEnabled && (mapView?.zoomLevel ?? 0) >= Self.minimumZoom
+        // The same rule as `refresh`: a decode that finishes after the config switched the overlay off installs hidden.
+        let visible = isEnabled && !isRemotelyDisabled && (mapView?.zoomLevel ?? 0) >= Self.minimumZoom
 
         let backing: MLNStyleLayer
         if region == .israel {

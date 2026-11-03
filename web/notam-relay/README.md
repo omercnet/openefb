@@ -48,6 +48,23 @@ exceptions), `parsed` and `raw`. A clause that looks like a closure but cannot b
 `parsed: false` (no chain, or an altitude condition left unread): consumers must show it as "possible closure, read NOTAM".
 Fields are only ever added: shipped app builds decode this file.
 
+## config.json (remote app config)
+
+`GET /config.json` serves `config/app-config.json`, a small file the app reads to switch listed features off, move listed
+parameters inside fixed ranges, show notices and ask pilots to update. It is data, never code; the app's own lists and ranges
+(`efb-212/Core/RemoteConfig.swift`) decide what a file can touch, and anything unknown is ignored. Full rules:
+`docs/handoff/REMOTE-CONFIG.md`. Trust is HTTPS from this Worker only (no signature).
+
+To change what the app does:
+1. Edit `config/app-config.json` and **raise `serial`** (the app rejects a file with a lower serial than the one it saved).
+2. Keep `expiresAt` in the future: after it the app ignores the file and uses its built-in values. Push `expiresAt` out again at each change.
+3. Open a pull request (CI runs `npm test`), merge, then the owner runs `npx wrangler deploy`.
+
+Fields: `schemaVersion` (1), `serial`, `issuedAt`, `expiresAt` (required); `minSupportedBuild` and `recommendedBuild` (build numbers,
+`CFBundleVersion`); `updateMessage`, `disabledFeatures.<feature>` and `notices[].text` as `{ "en": "…", "he": "…" }` (English required);
+`parameters.<name>` numbers; `notices[]` with `id`, `severity` (`info` or `caution`), optional `regions` (`us`, `israel`) and `until`.
+Features the app lets you switch off: `israelDiagramOverlay`. Parameters: `cvfrReportWindowSeconds` (30 to 300).
+
 ## History corpus
 
 Every NOTAM the relay sees is recorded once (id plus verbatim ICAO text) in KV: `history-index.json` (all ids) and

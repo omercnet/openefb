@@ -52,6 +52,9 @@ enum EFBError: LocalizedError, Identifiable {
     // Region data (IL-2)
     case regionDataUnavailable(String)  // region display name
 
+    // Remote config
+    case remoteConfigRejected(String)  // why the downloaded file was not used
+
     // MARK: - Identifiable
 
     var id: String {
@@ -94,6 +97,8 @@ enum EFBError: LocalizedError, Identifiable {
             return "airportNotFound-\(icao)"
         case .regionDataUnavailable(let region):
             return "regionDataUnavailable-\(region)"
+        case .remoteConfigRejected(let reason):
+            return "remoteConfigRejected-\(reason)"
         }
     }
 
@@ -160,6 +165,9 @@ enum EFBError: LocalizedError, Identifiable {
 
         case .regionDataUnavailable(let region):
             return "\(region) aviation data is not installed in this build yet."
+
+        case .remoteConfigRejected(let reason):
+            return "The app configuration update was not used: \(reason). The app keeps working with its previous settings."
         }
     }
 
@@ -204,6 +212,8 @@ enum EFBError: LocalizedError, Identifiable {
         case .airportNotFound:
             return .info
         case .regionDataUnavailable:
+            return .info
+        case .remoteConfigRejected:
             return .info
         }
     }

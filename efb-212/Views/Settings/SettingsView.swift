@@ -14,6 +14,7 @@ struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
     @State private var regionSaveError: String?
+    @State private var remoteConfig = RemoteConfigStore.shared
 
     @Query(filter: #Predicate<SchemaV1.PilotProfile> { $0.isActive == true })
     private var activePilots: [SchemaV1.PilotProfile]
@@ -34,6 +35,27 @@ struct SettingsView: View {
                 Section("About") {
                     LabeledContent("Version", value: appVersion)
                     LabeledContent("Build", value: buildNumber)
+                    LabeledContent("Configuration", value: remoteConfig.sourceDescription)
+                        .accessibilityIdentifier("remote-config-source")
+                    if let request = remoteConfig.updateRequest {
+                        switch request {
+                        case .required(let text), .recommended(let text):
+                            Text(text)
+                                .font(.caption)
+                                .foregroundStyle(Palette.caution)
+                                .accessibilityIdentifier("remote-config-update")
+                        }
+                    }
+                    if let ignored = remoteConfig.active?.ignored, !ignored.isEmpty {
+                        Text("\(ignored.count) value(s) in the configuration file were ignored: \(ignored.joined(separator: "; "))")
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
+                    }
+                    if let error = remoteConfig.lastError {
+                        Text("Last configuration check: \(error)")
+                            .font(.caption)
+                            .foregroundStyle(Palette.secondaryText)
+                    }
                     Text("Beta build. Report problems with Send Feedback below.")
                         .font(.caption)
                         .foregroundStyle(Palette.secondaryText)

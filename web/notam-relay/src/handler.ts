@@ -1,3 +1,4 @@
+import appConfig from "../config/app-config.json";
 import { runScrapeJob, readMeta, FEED_FILE } from "./job.js";
 import { kvStore, type KVLike } from "./storage.js";
 
@@ -46,6 +47,19 @@ export async function handleFetch(request: Request, env: Env, now: Date = new Da
     if (meta.lastSuccessAt) headers["X-Feed-Last-Success"] = meta.lastSuccessAt;
     if (stale) headers["Warning"] = '110 - "Response is stale"';
     return new Response(request.method === "HEAD" ? null : body, { headers });
+  }
+
+  // Remote app config (docs/handoff/REMOTE-CONFIG.md): the checked-in config/app-config.json, so a change is a pull
+  // request plus a deploy. The app caches it, rejects a lower serial, and stops using it after `expiresAt`.
+  if (pathname === "/config.json" && (request.method === "GET" || request.method === "HEAD")) {
+    return new Response(request.method === "HEAD" ? null : JSON.stringify(appConfig), {
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=300",
+        "X-Content-Type-Options": "nosniff",
+        ...CORS,
+      },
+    });
   }
 
   if (pathname === "/health" && request.method === "GET") {

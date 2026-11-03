@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "serial": 1,
+  "issuedAt": "2026-11-02T00:00:00Z",
+  "expiresAt": "2027-11-02T00:00:00Z",
+  "minSupportedBuild": 1,
+  "recommendedBuild": 1,
+  "disabledFeatures": {},
+  "parameters": {},
+  "notices": []
+}

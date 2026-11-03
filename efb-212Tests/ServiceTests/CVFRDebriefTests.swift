@@ -226,6 +226,65 @@ struct CVFRDebriefTests {
         #expect(elsewhere.reported == false)
     }
 
+    @Test func reportWindowIsAParameterAndDefaultsToTwoMinutes() throws {
+        let point = Self.reportingPoint(code: "TAVOR", en: "Tavor", he: "תבור", lon: 35.0)
+        let track = (0...120).map { Self.point(lon: 34.94 + Double($0) * 0.001, second: Double($0)) }   // closest at 60 s
+        let report = [Self.transcript("Tavor, Cessna four x-ray", at: 60 + 200)]   // 200 s after the passage
+        let builtIn = try #require(CVFRDebriefBuilder.passage(of: point, trackPoints: track, transcript: report))
+        #expect(builtIn.reported == false)
+        let widened = try #require(CVFRDebriefBuilder.passage(of: point, trackPoints: track, transcript: report, reportWindow: 300))
+        #expect(widened.reported)
+        let narrowed = try #require(CVFRDebriefBuilder.passage(
+            of: point, trackPoints: track, transcript: [Self.transcript("Tavor, Cessna four x-ray", at: 60 + 100)], reportWindow: 30))
+        #expect(narrowed.reported == false)
+    }
+
+    /// A 400 s eastbound track over lat 32.0 whose closest approach to TAVOR (lon 35.0) is at about 200 s, and a
+    /// position report heard 200 s after that: outside the built-in 120 s window, inside a 300 s one.
+    private static func lateReportFixture() -> (
+        track: [TrackPointRecord], transcript: [TranscriptSegmentRecord],
+        segments: [IsraelRouteSegment], points: [String: IsraelReportingPoint]
+    ) {
+        (
+            track: eastbound(lon0: 34.8, lon1: 35.2, count: 400),
+            transcript: [transcript("Tavor, Cessna four x-ray", at: 400)],
+            segments: [segment(1, "ALPHA", "TAVOR", lon0: 34.8, lon1: 35.2)],
+            points: [
+                "ALPHA": reportingPoint(code: "ALPHA", en: "Alpha", he: nil, lon: 34.8),
+                "TAVOR": reportingPoint(code: "TAVOR", en: "Tavor", he: "תבור", lon: 35.0),
+            ]
+        )
+    }
+
+    @Test func theReportWindowReachesThePassageThroughTheBuilder() {
+        let f = Self.lateReportFixture()
+        let builtIn = CVFRDebriefBuilder.build(
+            trackPoints: f.track, transcript: f.transcript, plannedLegs: nil, segments: f.segments, points: f.points)
+        #expect(builtIn.points.first { $0.code == "TAVOR" }?.reported == false)
+        let widened = CVFRDebriefBuilder.build(
+            trackPoints: f.track, transcript: f.transcript, plannedLegs: nil, segments: f.segments, points: f.points,
+            reportWindow: 300)
+        #expect(widened.points.first { $0.code == "TAVOR" }?.reported == true)
+    }
+
+    @Test func theReportWindowReachesThePassageThroughTheLoader() throws {
+        let f = Self.lateReportFixture()
+        let path = NSTemporaryDirectory() + "cvfr-window-\(UUID()).sqlite"
+        let db = try RecordingDatabase(dbPool: try DatabasePool(path: path))
+        for point in f.track { try db.insertTrackPoint(point) }
+        for segment in f.transcript { try db.insertTranscript(segment) }
+        var israel = MockIsraelAviationDatabase()
+        israel.segments = f.segments
+        israel.points = Array(f.points.values)
+
+        let builtIn = try #require(try CVFRDebriefLoader.load(flightID: Self.flightID, recordingDB: db, israelDB: israel))
+        #expect(builtIn.points.first { $0.code == "TAVOR" }?.reported == false)
+        let widened = try #require(try CVFRDebriefLoader.load(
+            flightID: Self.flightID, recordingDB: db, israelDB: israel, reportWindow: 300))
+        #expect(widened.points.first { $0.code == "TAVOR" }?.reported == true)
+        try db.deleteFlightData(flightID: Self.flightID)
+    }
+
     // MARK: Hebrew and English text
 
     @Test func hebrewMatchingIgnoresNiqqudAndFinalLetterForms() {

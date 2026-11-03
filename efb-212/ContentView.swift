@@ -13,6 +13,7 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var appState = appState
@@ -22,6 +23,7 @@ struct ContentView: View {
                 BetaBanner()
             }
             DatabaseUnavailableBanner()
+            RemoteConfigBanner()
 
             TabView(selection: $appState.selectedTab) {
                 Tab(AppTab.map.title, systemImage: AppTab.map.systemImage, value: .map) {
@@ -37,6 +39,20 @@ struct ContentView: View {
                 }
             }
         }
+        .task { await checkRemoteConfig() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await checkRemoteConfig() } }
+        }
+        // A check skipped while recording is retried when the recording ends.
+        .onChange(of: appState.recordingStatus) { oldStatus, newStatus in
+            if oldStatus != .idle, newStatus == .idle { Task { await checkRemoteConfig() } }
+        }
+    }
+
+    /// At launch and whenever the app becomes active; the store limits it to once an hour and never fetches
+    /// while a flight is being recorded.
+    private func checkRemoteConfig() async {
+        await RemoteConfigStore.shared.refreshIfDue(recordingActive: appState.recordingStatus != .idle)
     }
 }
 
