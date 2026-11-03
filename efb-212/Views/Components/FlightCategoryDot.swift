@@ -21,14 +21,14 @@ struct FlightCategoryDot: View {
     /// Day/night pairs: the night variants are lighter so the dot stays distinct on the dark map.
     var color: Color {
         switch category {
-        case .vfr: return .green
+        case .vfr: return Palette.ok
         case .mvfr:
             return Color(UIColor { trait in
                 trait.userInterfaceStyle == .dark
                     ? UIColor(red: 0.56, green: 0.71, blue: 0.88, alpha: 1)
                     : .systemBlue
             })
-        case .ifr: return .red
+        case .ifr: return Palette.warning
         case .lifr:
             return Color(UIColor { trait in
                 trait.userInterfaceStyle == .dark

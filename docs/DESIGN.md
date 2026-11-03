@@ -37,8 +37,15 @@ Defined in `efb-212/Core/DesignTokens.swift`.
 | `Palette.caution` | `.orange` (amber) | Old data, expired cycle |
 | `Palette.warning` | `.red` | Closures, urgent PIREPs, lost GPS |
 | `Palette.fill` | secondary at 12% | Chips, quiet rows |
+| `Palette.ok` | #147832 day / systemGreen night | "Fine" only: confirmed entry, GPS fix, VFR dot |
+| `Palette.cautionFill` | `.orange` | Solid amber chips and banners, always with black text (9:1) |
+| `Palette.accent` / `accentText` / `infoFill` | Kanaf navy, see Night palette | Buttons, links, notices; `accentText` is also the app tint (`AccentColor` asset) |
+| `Radius.xs/s/m/l` | 4 / 8 / 10 / 14 pt | Tags / rows and banners / controls and cards / panels. No literal radii in views |
+| `TypeRole.title`, `identifier`, `sectionHeader` | Expanded SF Pro, bold | Names and headings; values in sheets stay regular width |
+| `TypeRole.readout(size:)` | Condensed SF Pro, semibold, fixed-width digits | Instrument strip (32pt). Not SF Mono: width does not apply to it |
+| `mapControlSurface()` | Liquid Glass tinted `Palette.accent`, `onAccent` glyphs | Floating map controls. Never untinted glass: it turns olive over the sectional |
 
-All are SwiftUI semantic colors, so the night-mode ticket can retheme in one place.
+All are SwiftUI semantic colors, so the night-mode ticket can retheme in one place. Red = warning (the compass north marker, `Palette.northMarker`, is the one convention exception), amber = caution, magenta = route.
 
 ## Components
 | Component | Decision | Status |
@@ -120,10 +127,15 @@ Night = the dark colour scheme set by `DisplayModeModifier` (Day / Night / Auto)
 
 | Token | Day | Night | Contrast |
 |---|---|---|---|
-| `accent` (NRST label, Direct, Recenter, Play, REC stop, Save, onboarding button) | systemBlue | #2E4A6E | with `onAccent`: day 4.6:1, night 5.4:1 |
+| `accent` (NRST label, Direct, Recenter, Play, REC stop, Save, onboarding button) | Kanaf navy #1556B8 (Increase Contrast #0C4091) | #2E4A6E | with `onAccent`: day 6.9:1 (9.7:1 high contrast), night 6.4:1 |
 | `onAccent` | white | grey 85% | see above |
-| `accentText` (info glyphs, selected check, REC label) | systemBlue | #8FB4E0 | night ≥ 9:1 on black |
-| `infoFill` (beta banner, active transcript row) | blue 15% | #2E4A6E 35% | text stays `primaryText` |
+| `accentText` (info glyphs, selected check, REC label; also the app-wide tint through the `AccentColor` asset) | #1556B8 (high contrast #0C4091) | #8FB4E0 (high contrast #B8D0EE) | day 6.2:1 on the #F2F2F7 panel; night 7.9:1 on #1C1C1E, ≥ 9:1 on black |
+| `infoFill` (beta banner, active transcript row) | navy 15% | #2E4A6E 35% | text stays `primaryText` |
+
+Before the Kanaf navy change (2026-11-02) the day accent was systemBlue, documented here as 4.6:1 (white) and 4.5:1 (as text). Recomputed with the WCAG formula it was 3.5-4.0:1 as a button fill and 3.2-3.6:1 as text on the panel, so it failed 4.5:1; the navy fixes that. Night values were right (the 5.4:1 above was a low estimate: #D9D9D9 on #2E4A6E is 6.4:1).
+
+| Token | Day | Night | Contrast |
+|---|---|---|---|
 | Map airport dot | systemCyan | `NightPalette.airportDot` #388D9E | dark ring kept |
 | Map navaid dot | systemPurple | `NightPalette.navaidDot` #735299 | dark ring kept |
 

@@ -189,7 +189,7 @@ struct ReplayView: View {
         }
         .padding(8)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.l))
     }
 
     // MARK: - Speed Picker
@@ -267,7 +267,7 @@ struct ReplayView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
     }
 
     // MARK: - Transcript Toggle Button
@@ -284,7 +284,7 @@ struct ReplayView: View {
                 .foregroundStyle(.primary)
                 .frame(width: 44, height: 44)
                 .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .clipShape(RoundedRectangle(cornerRadius: Radius.s))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -325,7 +325,7 @@ struct ReplayView: View {
         }
         .padding(10)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.m))
     }
 
     // MARK: - Recording Active Guard
@@ -336,7 +336,7 @@ struct ReplayView: View {
             Image(systemName: "record.circle")
                 .accessibilityHidden(true)
                 .font(.largeTitle)
-                .foregroundStyle(.red)
+                .foregroundStyle(Palette.warning)
             Text("End the recording first")
                 .font(.headline)
                 .multilineTextAlignment(.center)
@@ -369,7 +369,7 @@ struct ReplayView: View {
             Image(systemName: "exclamationmark.triangle")
                 .accessibilityHidden(true)
                 .font(.largeTitle)
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.caution)
             Text("Flight not loaded")
                 .font(.headline)
             Text(error)

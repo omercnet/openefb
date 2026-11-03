@@ -144,7 +144,7 @@ private struct TranscriptSegmentRow: View {
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
         .background(
-            RoundedRectangle(cornerRadius: 6)
+            RoundedRectangle(cornerRadius: Radius.s)
                 .fill(isActive ? Palette.infoFill : Color.clear)
         )
         .animation(.easeInOut(duration: 0.2), value: isActive)

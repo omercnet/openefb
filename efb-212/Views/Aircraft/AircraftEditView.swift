@@ -63,7 +63,7 @@ struct AircraftEditView: View {
                     if showValidationError && nNumber.trimmingCharacters(in: .whitespaces).isEmpty {
                         Text("N-number is required")
                             .font(.caption)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Palette.warning)
                     }
 
                     TextField("Aircraft type (e.g., Cessna 172SP)", text: $aircraftType)

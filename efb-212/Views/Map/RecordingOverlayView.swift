@@ -100,28 +100,27 @@ struct RecordingOverlayView: View {
                 if viewModel.isCountingDown {
                     // Countdown: number, tap to cancel
                     Circle()
-                        .fill(Color.orange)  // amber fill under black text; `Palette.caution` is a darker text tone by day
+                        .fill(Palette.cautionFill)
                         .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
                     Text("\(viewModel.countdownRemaining)")
                         .font(.title2.bold())
                         .foregroundStyle(.black)
                 } else if viewModel.isRecording {
-                    // Recording: filled accent circle with a stop square
+                    // Recording: solid accent circle with a ring and a stop square, distinct from idle glass
                     Circle()
                         .fill(Palette.accent)
+                        .overlay(Circle().stroke(Palette.onAccent, lineWidth: 3))
                         .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
-                    RoundedRectangle(cornerRadius: 4)
+                    RoundedRectangle(cornerRadius: Radius.xs)
                         .fill(Palette.onAccent)
                         .frame(width: 18, height: 18)
                 } else {
-                    // Idle: neutral circle with a mic glyph (not warning red)
-                    Circle()
-                        .fill(Color(.systemBackground))  // white by day, dark at night (no glare)
-                        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
-                        .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                    // Idle: navy glass circle with a mic glyph, the same family as the other map controls
+                    // (not warning red)
                     Image(systemName: "mic.fill")
                         .font(.title3)
-                        .foregroundStyle(Palette.primaryText)
+                        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+                        .mapControlSurface(in: .circle)
                 }
             }
             .contentShape(Circle())
@@ -313,7 +312,7 @@ struct AudioLevelMeter: View {
 
 #Preview {
     ZStack {
-        Color.gray.opacity(0.3)
+        Palette.fill
             .ignoresSafeArea()
         // Preview requires real coordinator -- this is for layout only
         Text("Map placeholder")

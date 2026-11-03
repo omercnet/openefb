@@ -134,12 +134,12 @@ struct LogbookListView: View {
 
                 if entry.isConfirmed {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(Palette.ok)
                         .padding(.leading, 4)
                         .accessibilityLabel("Confirmed")
                 } else {
                     Image(systemName: "pencil.circle")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Palette.caution)
                         .padding(.leading, 4)
                         .accessibilityLabel("Draft, not confirmed")
                 }

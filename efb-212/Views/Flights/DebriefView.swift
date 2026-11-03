@@ -119,7 +119,7 @@ struct DebriefView: View {
                 ForEach(Array(debrief.improvements.enumerated()), id: \.offset) { _, improvement in
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "lightbulb.fill")
-                            .foregroundStyle(.yellow)
+                            .foregroundStyle(Palette.caution)
                             .frame(minWidth: 20)
                             .accessibilityHidden(true)
                         Text(improvement)
@@ -173,7 +173,7 @@ struct DebriefView: View {
                 ForEach(Array(improvements.enumerated()), id: \.offset) { _, improvement in
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "lightbulb.fill")
-                            .foregroundStyle(.yellow)
+                            .foregroundStyle(Palette.caution)
                             .frame(minWidth: 20)
                             .accessibilityHidden(true)
                         Text(improvement)
@@ -226,7 +226,7 @@ struct DebriefView: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: Radius.s)
                 .fill(.quaternary)
         )
     }
@@ -238,7 +238,7 @@ struct DebriefView: View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: heroSize))
-                .foregroundStyle(.orange)
+                .foregroundStyle(Palette.caution)
                 .accessibilityHidden(true)
 
             Text("Debrief failed")
@@ -325,8 +325,8 @@ private struct PhaseObservationCard: View {
         }
         .padding()
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(observation.executedWell ? Color.green.opacity(0.1) : Color.orange.opacity(0.1))
+            RoundedRectangle(cornerRadius: Radius.s)
+                .fill((observation.executedWell ? Palette.ok : Palette.caution).opacity(0.1))
         )
     }
 }
@@ -343,7 +343,7 @@ private struct ExecutionBadge: View {
                 .font(.footnote.weight(.medium))
                 .foregroundStyle(Palette.secondaryText)
             Image(systemName: executedWell ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundStyle(executedWell ? .green : .orange)
+                .foregroundStyle(executedWell ? Palette.ok : Palette.caution)
                 .accessibilityHidden(true)
         }
     }
@@ -359,7 +359,7 @@ private struct RatingView: View {
             HStack(spacing: 4) {
                 ForEach(1...5, id: \.self) { star in
                     Image(systemName: star <= rating ? "star.fill" : "star")
-                        .foregroundStyle(star <= rating ? .yellow : .secondary)
+                        .foregroundStyle(star <= rating ? Palette.caution : Palette.secondaryText)
                         .font(.title2)
                 }
             }

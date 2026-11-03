@@ -97,7 +97,7 @@ struct ChartPDFView: View {
             VStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.largeTitle)
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(Palette.caution)
                 Text(message)
                     .font(.subheadline)
                     .multilineTextAlignment(.center)

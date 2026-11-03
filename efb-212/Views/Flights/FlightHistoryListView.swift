@@ -117,7 +117,7 @@ private struct FlightHistoryRow: View {
                 VStack(spacing: 2) {
                     Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
                         .font(.caption)
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Palette.caution)
                         .accessibilityHidden(true)
                     Text("\(record.trackPointCount)")
                         .font(.footnote.monospacedDigit())

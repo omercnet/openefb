@@ -60,7 +60,7 @@ struct OnboardingView: View {
                             .frame(maxWidth: 280, minHeight: 44)
                             .padding(.vertical, 14)
                             .background(Palette.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: Radius.l))
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)

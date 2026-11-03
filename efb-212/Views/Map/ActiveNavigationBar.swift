@@ -26,7 +26,7 @@ struct ActiveNavigationBar: View {
                     .font(.headline)
                     .padding(.horizontal, Space.l)
                     .frame(minHeight: MapControlMetrics.size)  // 60 pt target fills the bar height
-                    .background(Palette.fill, in: RoundedRectangle(cornerRadius: 8))
+                    .background(Palette.fill, in: RoundedRectangle(cornerRadius: Radius.s))
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressableButtonStyle())

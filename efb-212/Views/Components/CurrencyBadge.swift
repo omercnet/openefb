@@ -39,7 +39,7 @@ struct CurrencyBadge: View {
 
     private var statusColor: Color {
         switch status {
-        case .current: return .green
+        case .current: return Palette.ok
         case .warning: return Palette.caution
         case .expired: return Palette.warning
         }

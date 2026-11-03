@@ -14,7 +14,7 @@ import MapLibre
 /// Shared size for in-flight map controls (design: ≥ 60pt).
 enum MapControlMetrics {
     static let size: CGFloat = 60
-    static let cornerRadius: CGFloat = 10
+    static let cornerRadius: CGFloat = Radius.l
 }
 
 struct MapControlsView: View {
@@ -24,7 +24,12 @@ struct MapControlsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     var body: some View {
-        // 12pt between groups: the translucent 60pt controls read as one blob at 8pt over a busy map.
+        // One container so the glass renders consistently; spacing below the 12pt gap keeps the buttons separate.
+        GlassEffectContainer(spacing: 4) { controls }
+    }
+
+    private var controls: some View {
+        // 12pt between groups: the 60pt controls read as one blob at 8pt over a busy map.
         VStack(spacing: 12) {
             // Orientation toggle: text shows the CURRENT mode (F7)
             Button {
@@ -38,8 +43,7 @@ struct MapControlsView: View {
                     .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
             }
             .buttonStyle(PressableButtonStyle())
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+            .mapControlSurface()
             .accessibilityIdentifier("Map orientation")
             .accessibilityLabel("Map orientation")
             .accessibilityValue(appState.mapMode == .northUp ? "North up" : "Track up")
@@ -76,8 +80,7 @@ struct MapControlsView: View {
                 .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel("Zoom out")
             }
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+            .mapControlSurface()
 
             if horizontalSizeClass == .compact {
                 // iPhone: layers, briefing and night mode share one 60pt menu so the column
@@ -110,8 +113,7 @@ struct MapControlsView: View {
                         .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
                         .contentShape(Rectangle())
                 }
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+                .mapControlSurface()
                 .accessibilityIdentifier("map-more-menu")
                 .accessibilityLabel("Map options")
                 .accessibilityHint("Layers, briefing and display mode")
@@ -139,8 +141,7 @@ struct MapControlsView: View {
                 .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
         }
         .buttonStyle(PressableButtonStyle())
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .mapControlSurface()
         .accessibilityLabel("Toggle map layers")
         .accessibilityValue(appState.isPresentingLayerControls ? "Open" : "Closed")
 
@@ -155,8 +156,7 @@ struct MapControlsView: View {
                     .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
             }
             .buttonStyle(PressableButtonStyle())
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+            .mapControlSurface()
             .accessibilityLabel("NOTAM briefing")
             .accessibilityIdentifier("israel-briefing-button")
         }
@@ -171,8 +171,7 @@ struct MapControlsView: View {
                 .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
         }
         .buttonStyle(PressableButtonStyle())
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+        .mapControlSurface()
         .accessibilityIdentifier("Toggle night mode")
         .accessibilityLabel("Night mode")
         .accessibilityValue(colorScheme == .dark ? "On, \(appState.displayMode.title)" : "Off, \(appState.displayMode.title)")
@@ -189,14 +188,15 @@ struct NorthIndicator: View {
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(.ultraThinMaterial)
+            Color.clear
+                .glassEffect(.regular.tint(Palette.accent), in: .circle)
             VStack(spacing: 0) {
                 Image(systemName: "arrowtriangle.up.fill")
                     .font(.footnote.weight(.bold))
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Palette.northMarker)
                 Text("N")
                     .font(.callout.weight(.heavy))
+                    .foregroundStyle(Palette.onAccent)
             }
             .rotationEffect(.degrees(-mapDirection))
         }

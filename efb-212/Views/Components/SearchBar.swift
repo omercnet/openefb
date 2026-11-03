@@ -40,7 +40,7 @@ struct SearchBar: View {
         }
         .padding(.horizontal, 8)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
     }
 }
 

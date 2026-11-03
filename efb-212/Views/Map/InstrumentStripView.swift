@@ -5,7 +5,7 @@
 //  Full-width bottom bar showing a GPS status chip and GS, ALT, VS, TRK instrument cells.
 //  DTG and ETE appear conditionally when a flight plan or direct-to is active.
 //
-//  Design findings F5 and F18: values are 28pt monospaced and labels 13pt so they read at
+//  Design findings F5 and F18: values are 32pt condensed fixed-width digits and labels 13pt so they read at
 //  arm's length over the sectional; the GPS chip is a real cell (no overlap with TRK); when
 //  the last fix is stale (> 5 s) the values grey out instead of pretending to be current.
 //  No animation on value changes (pilot SA).
@@ -52,7 +52,9 @@ struct InstrumentStripView: View {
                             .padding(.trailing, 4)
                         ForEach(primary, id: \.self) { field in
                             Divider().frame(height: 44)
+                            // ALT can be five digits; it gets its width first and GS/TRK shrink instead.
                             cell(for: field)
+                                .layoutPriority(field == .alt ? 1 : 0)
                         }
                     }
                     if !route.isEmpty {
@@ -78,7 +80,7 @@ struct InstrumentStripView: View {
         .padding(.horizontal, isCompact ? 8 : 16)
         .padding(.vertical, 8)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.l))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Instruments")
         .accessibilityIdentifier("Instrument strip")
@@ -89,7 +91,8 @@ struct InstrumentStripView: View {
         let compact = isCompact
         switch field {
         case .gs: InstrumentCell(label: "GS", value: gsValue, unit: "KT", dimmed: isStale, compact: compact)
-        case .alt: InstrumentCell(label: "ALT", value: altValue, unit: "FT", dimmed: isStale || !hasAltitude, compact: compact)
+        // iPhone: ALT keeps its natural width (it can be five digits); the other cells share the rest.
+        case .alt: InstrumentCell(label: "ALT", value: altValue, unit: "FT", dimmed: isStale || !hasAltitude, compact: compact, fillsWidth: false)
         case .vs: InstrumentCell(label: "VS", value: vsValue, unit: "FPM", dimmed: isStale || !hasAltitude, compact: compact)
         case .trk: InstrumentCell(label: "TRK", value: trkValue, unit: "\u{00B0}", dimmed: isStale, compact: compact)
         case .dtg: InstrumentCell(label: "DTG", value: dtgValue, unit: "NM", dimmed: isStale, compact: compact)
@@ -158,9 +161,9 @@ struct GPSStatusChip: View {
 
     private var tint: Color {
         switch status {
-        case .ok: return .green
-        case .degraded: return .orange
-        case .lost: return .red
+        case .ok: return Palette.ok
+        case .degraded: return Palette.caution
+        case .lost: return Palette.warning
         }
     }
 
@@ -184,7 +187,7 @@ struct GPSStatusChip: View {
         }
         .padding(.horizontal, 10)
         .frame(minHeight: 44)
-        .background(isAlert ? tint.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(isAlert ? tint.opacity(0.15) : Color.clear, in: RoundedRectangle(cornerRadius: Radius.s))
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier("GPS status")
         .accessibilityLabel(status.accessibilityDescription)
@@ -193,7 +196,7 @@ struct GPSStatusChip: View {
 
 // MARK: - InstrumentCell
 
-/// Single instrument readout cell: 13pt label, 28pt monospaced semibold value, 13pt unit.
+/// Single instrument readout cell: 13pt label, 32pt condensed fixed-digit semibold value, 13pt unit.
 /// `dimmed` greys the value when the data behind it is stale or missing.
 struct InstrumentCell: View {
     let label: String
@@ -202,10 +205,12 @@ struct InstrumentCell: View {
     var dimmed: Bool = false
     /// iPhone: no minimum width, cell shares the row; the unit moves up next to the label.
     var compact: Bool = false
+    /// iPhone: stretch to share the row. False for a cell that should take only its natural width.
+    var fillsWidth: Bool = true
     @Environment(\.colorScheme) private var colorScheme
     // Instrument readouts keep exact point sizes but scale with Dynamic Type.
     @ScaledMetric(relativeTo: .caption) private var labelSize: CGFloat = 13
-    @ScaledMetric(relativeTo: .largeTitle) private var valueSize: CGFloat = 28
+    @ScaledMetric(relativeTo: .largeTitle) private var valueSize: CGFloat = 32
 
     /// Night: low-luminance text instead of bright white (F16).
     private var valueStyle: Color {
@@ -234,10 +239,11 @@ struct InstrumentCell: View {
                 .lineLimit(1)
             HStack(alignment: .lastTextBaseline, spacing: 3) {
                 Text(value)
-                    .font(.system(size: valueSize, weight: .semibold, design: .monospaced))
+                    .font(TypeRole.readout(size: valueSize))
                     .foregroundStyle(valueStyle)
                     .lineLimit(1)
-                    .minimumScaleFactor(compact ? 0.85 : 1)
+                    // iPhone at xxxLarge: "12500" needs ~94 pt next to the GPS chip on a 375 pt screen.
+                    .minimumScaleFactor(compact ? 0.6 : 1)
                     // Stale values are grey and announced; no extra fade (kept >= 4.5:1)
                 if !unit.isEmpty && !compact {
                     Text(unit)
@@ -246,7 +252,7 @@ struct InstrumentCell: View {
                 }
             }
         }
-        .frame(minWidth: compact ? 0 : 84, maxWidth: compact ? .infinity : nil)
+        .frame(minWidth: compact ? 0 : 84, maxWidth: compact && fillsWidth ? .infinity : nil)
         .padding(.horizontal, compact ? 2 : 6)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken.name)

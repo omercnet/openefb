@@ -73,7 +73,7 @@ struct FlightPlanSummaryCard: View {
         }
         .padding()
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.l))
         .shadow(radius: 4)
     }
 }

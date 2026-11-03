@@ -138,11 +138,11 @@ struct PirepSection: View {
         .padding(8)
         .background(
             pirep.isUrgent ? Palette.warning.opacity(0.15) : Palette.fill,
-            in: RoundedRectangle(cornerRadius: 8)
+            in: RoundedRectangle(cornerRadius: Radius.s)
         )
         .overlay {
             if pirep.isUrgent {
-                RoundedRectangle(cornerRadius: 8).stroke(Palette.warning, lineWidth: 1)
+                RoundedRectangle(cornerRadius: Radius.s).stroke(Palette.warning, lineWidth: 1)
             }
         }
     }

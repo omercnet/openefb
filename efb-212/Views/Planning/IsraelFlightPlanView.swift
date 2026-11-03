@@ -211,7 +211,7 @@ struct IsraelFlightPlanView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Palette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+        .background(Palette.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: Radius.m))
         .accessibilityIdentifier("il-no-route")
     }
 
@@ -344,7 +344,7 @@ struct IsraelFlightPlanView: View {
                         .textSelection(.enabled)
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Palette.fill, in: RoundedRectangle(cornerRadius: 10))
+                        .background(Palette.fill, in: RoundedRectangle(cornerRadius: Radius.m))
                         .accessibilityIdentifier("il-fpl-text")
 
                     Text(vm.hebrewSummary)

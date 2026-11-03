@@ -48,7 +48,7 @@ private struct SearchResultsList: View {
             }
         }
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
         .frame(maxWidth: 300)
     }
 }
@@ -144,8 +144,7 @@ struct MapContainerView: View {
                                     .font(.title3)
                                     .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
                             }
-                            .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+                            .mapControlSurface()
                             .accessibilityLabel("Search airports")
                         }
 
@@ -159,8 +158,7 @@ struct MapContainerView: View {
                                     .font(.title3)
                                     .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
                             }
-                            .background(.ultraThinMaterial)
-                            .clipShape(RoundedRectangle(cornerRadius: MapControlMetrics.cornerRadius))
+                            .mapControlSurface()
                             .accessibilityLabel("Plan a flight")
                         }
 
@@ -192,14 +190,14 @@ struct MapContainerView: View {
                                     .font(TypeRole.caption)
                                     .padding(Space.m)
                                     .background(.regularMaterial)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .clipShape(RoundedRectangle(cornerRadius: Radius.s))
                             } else if searchVM.query.trimmingCharacters(in: .whitespaces).count >= 2 {
                                 Text("No airports match \u{201C}\(searchVM.query)\u{201D}")
                                     .font(TypeRole.caption)
                                     .foregroundStyle(Palette.secondaryText)
                                     .padding(Space.m)
                                     .background(.regularMaterial)
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    .clipShape(RoundedRectangle(cornerRadius: Radius.s))
                                     .accessibilityIdentifier("search-no-results")
                             }
                         }
@@ -358,7 +356,7 @@ struct MapContainerView: View {
                     .foregroundStyle(.black)  // black on amber: 9:1 (white on amber is 2.2:1)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color.orange)
+                    .background(Palette.cautionFill)
                     .clipShape(Capsule())
                     .padding(.bottom, 60)  // above instrument strip
                 }

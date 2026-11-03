@@ -171,7 +171,7 @@ struct NotamSection: View {
             .padding(8)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .background(closure != nil ? Palette.warning.opacity(0.12) : Color.secondary.opacity(0.08))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.s))
         }
         .buttonStyle(PressableButtonStyle())
         .accessibilityHint(isExpanded ? "Collapse NOTAM" : "Expand NOTAM")

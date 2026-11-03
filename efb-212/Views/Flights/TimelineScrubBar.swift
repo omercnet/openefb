@@ -32,7 +32,7 @@ struct TimelineScrubBar: View {
                     }
                 }
             )
-            .tint(.orange)
+            .tint(Palette.caution)
             .accessibilityLabel("Replay position")
             .accessibilityValue("\(spokenTime(currentPosition)) elapsed of \(spokenTime(totalDuration))")
             .overlay(alignment: .leading) {
@@ -55,7 +55,7 @@ struct TimelineScrubBar: View {
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.m))
     }
 
     // MARK: - Phase Marker Overlay
