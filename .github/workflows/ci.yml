@@ -32,32 +32,33 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # gitleaks and the commit range need the history
-      - name: Secret scan
-        # Official gitleaks action, using .gitleaks.toml: the pull request's commits, the pushed commits on main,
-        # the whole history on a manual run. Free for personal-account repositories.
+      - name: Secret scan (pull request / push range)
+        # Official gitleaks action with .gitleaks.toml: PR summary for the commits in this change. It walks first-parent
+        # commits only, so the full-history scan in tools/check.sh below stays the gate.
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: false
-      - name: Install lefthook
+          GITLEAKS_VERSION: "8.30.1" # same as mise below and the local hooks
+      - name: Install lefthook and gitleaks
         # lefthook has no official setup action; mise (the repo's tool installer, tools/hooks/README.md) has one.
         uses: jdx/mise-action@v5
         with:
           mise_toml: |
             [tools]
             lefthook = "2.2.2"
+            gitleaks = "8.30.1"
       - name: Install plistutil
         # libplist lints plists and project.pbxproj off macOS (tools/hooks/plist-lint.sh). shellcheck and python3 ship with the runner.
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libplist-utils
       - name: Conventional Commits (pull requests)
         if: github.event_name == 'pull_request'
         run: tools/hooks/commit-msg.sh --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
-      - name: Pre-commit checks over the whole tree
-        # The web jobs cover web/*; swift-format is report-only (about 4,400 known findings); the gitleaks action
-        # above replaces lefthook's gitleaks job and the history scan (--quick).
+      - name: Pre-commit checks over the whole tree, full-history secret scan
+        # The web jobs cover web/*; swift-format is report-only (about 4,400 known findings).
         env:
-          LEFTHOOK_EXCLUDE: gitleaks,web-interviews,web-relay,web-charts,swift-format
-        run: tools/check.sh --quick
+          LEFTHOOK_EXCLUDE: web-interviews,web-relay,web-charts,swift-format
+        run: tools/check.sh
 
   web:
     name: Web (${{ matrix.package }})
