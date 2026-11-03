@@ -46,21 +46,28 @@ limited 300 xcrun simctl bootstatus "$SIM" -b >/dev/null || { echo "fly-scenario
 # none, 2 when launchctl did not answer (deadline hit or spawn error: a loaded runner during the first cold launch).
 app_state() {
   local list rc=0
-  list=$(limited 45 xcrun simctl spawn "$SIM" launchctl list 2>/dev/null) || rc=$?
+  list=$(limited 30 xcrun simctl spawn "$SIM" launchctl list 2>/dev/null) || rc=$?
   [ "$rc" -eq 0 ] || return 2
   awk -v job="UIKitApplication:$BUNDLE" 'index($3, job) == 1 && $1 ~ /^[0-9]+$/ { found = 1 } END { exit !found }' <<<"$list"
 }
 
-# app_running: app_state with up to 3 tries, 5 s apart; returns the last answer (0 running, 1 not running, 2 unknown).
+# app_running: 0 running, 1 not running, 2 unknown. Only an unknown answer is retried (up to 3 tries, 5 s apart), and
+# only while the run has spent fewer than RETRY_BUDGET retried checks, so the liveness checks stay well inside the
+# job's timeout even if launchctl never answers (worst case 3 x 100 s + the rest at 30 s each).
+RETRY_BUDGET=3
+retried_checks=0
 app_running() {
-  local try state
-  for try in 1 2 3; do
+  local try tries=1 state
+  [ "$retried_checks" -lt "$RETRY_BUDGET" ] && tries=3
+  for (( try = 1; try <= tries; try++ )); do
     state=0
     app_state || state=$?
-    [ "$state" -eq 0 ] && return 0
-    [ "$try" -lt 3 ] && sleep 5
+    [ "$state" -ne 2 ] && return "$state"
+    [ "$try" -lt "$tries" ] || break
+    [ "$try" -eq 1 ] && retried_checks=$(( retried_checks + 1 ))
+    sleep 5
   done
-  return "$state"
+  return 2
 }
 
 # Scenario length in seconds (time of the last fix).
