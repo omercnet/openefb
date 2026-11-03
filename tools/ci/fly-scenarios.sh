@@ -96,7 +96,11 @@ for name in "${SCENARIOS[@]}"; do
 
   launched=$(date '+%Y-%m-%d %H:%M:%S')   # the simulator logs in host time; only this launch may satisfy the check
   stamp "launch $name"
-  limited 120 tools/fly.sh israel "$name" --speed "$SPEED" || problems+=("launch failed or timed out")
+  # The first launch on a fresh runner is cold (install, dyld, first MapLibre frame) and has taken over 120 s
+  # under load (run 41626296831); later launches take seconds.
+  launch_deadline=120
+  [ "$name" = "${SCENARIOS[0]}" ] && launch_deadline=300
+  limited "$launch_deadline" tools/fly.sh israel "$name" --speed "$SPEED" || problems+=("launch failed or timed out")
   sleep 5   # launch, first frame
   for pct in 0 25 50 75 100; do
     [ ${#problems[@]} -eq 0 ] || break
