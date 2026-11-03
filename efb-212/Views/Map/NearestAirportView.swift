@@ -85,26 +85,30 @@ struct NearestAirportRow: View {
                         .foregroundStyle(Palette.secondaryText)
                         .lineLimit(typeSize.isAccessibilitySize ? nil : 1)
                 }
-                HStack(spacing: 8) {
-                    if let runway = entry.longestRunway {
-                        Text("\(runway.id)  \(runway.length)' \(runway.surface.abbreviation)")   // feet
-                            .font(.subheadline.weight(.medium).monospaced())
-                    } else {
-                        Text("no runway data")
-                            .font(.subheadline.weight(.medium).monospaced())
-                            .foregroundStyle(Palette.secondaryText)
-                    }
-                    if entry.isPrivateUse {
-                        PrivateUseTag()
-                    }
-                    if entry.isMilitary {
-                        MilitaryUseTag()
-                    }
-                    if entry.requiresPPR {
-                        PprTag()
-                    }
-                    if entry.isClosedByNotam {
-                        NotamClosedTag()
+                if let runway = entry.longestRunway {
+                    Text("\(runway.id)  \(runway.length)' \(runway.surface.abbreviation)")   // feet
+                        .font(.subheadline.weight(.medium).monospaced())
+                } else {
+                    Text("no runway data")
+                        .font(.subheadline.weight(.medium).monospaced())
+                        .foregroundStyle(Palette.secondaryText)
+                }
+                // Caution tags keep their full width, so they get their own line: at large text sizes
+                // they must never push the runway or the NOTAM closure tag out of the row.
+                if entry.isPrivateUse || entry.isMilitary || entry.requiresPPR || entry.isClosedByNotam {
+                    HStack(spacing: 8) {
+                        if entry.isPrivateUse {
+                            PrivateUseTag()
+                        }
+                        if entry.isMilitary {
+                            MilitaryUseTag()
+                        }
+                        if entry.requiresPPR {
+                            PprTag()
+                        }
+                        if entry.isClosedByNotam {
+                            NotamClosedTag()
+                        }
                     }
                 }
             }
