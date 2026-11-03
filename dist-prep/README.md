@@ -32,14 +32,13 @@ owner to review. Nothing has been uploaded and nothing was changed in App Store 
 - **Default region is Israel (IL-DEFAULT, before the first TestFlight build).** A fresh install starts in the Israel region; an existing install keeps the region it chose. The store screenshots in `dist-prep/` were taken in the US region and are not recaptured; switch Settings > Region to United States to reproduce them. The official CAAI chart and aerodrome diagrams are downloaded from Settings > Region (a one-time hint on the map points there).
 
 ## Do-this-first checklist
-1. Open `efb-212.xcodeproj`, scheme `efb-212`, Any iOS Device (arm64), Product > Archive. Team `6F8N897928`.
-2. Distribute > App Store Connect > Upload, then TestFlight.
+1. Release: merge the release-please pull request; CI archives, signs and uploads (`TESTFLIGHT.md`, `docs/CI.md`).
+   By hand: `bundle exec fastlane ios beta`.
+2. TestFlight: the build reaches the internal group on its own; external groups in `TESTFLIGHT_GROUPS` get it after Beta App Review.
 3. Paste metadata from `APP_STORE_METADATA.md`. Answer privacy questions from `PRIVACY_NUTRITION_LABELS.md`.
 4. Upload `screenshots/` (13-inch iPad slot). The build also runs on iPhone, so the public listing also needs iPhone screenshots (none captured yet). Internal and external TestFlight do not need them.
-5. **Build numbers:** Version proposal for the first TestFlight upload: **1.0 (build 1)**. App Store Connect rejects an
-   upload whose build number isn't higher than every earlier upload of the same version. Increase
-   `CURRENT_PROJECT_VERSION` by one for every further upload of the same version (set it for the app target in both
-   Debug and Release); move `MARKETING_VERSION` only for a new release train, and then the build may restart at 1.
+5. **Build numbers** are the commit count, so every release from `main` beats the last. App Store Connect rejects an
+   upload whose build number isn't higher than every earlier upload of the same version.
 
 ## Before the public release (not blocking TestFlight)
 - Satellite and Terrain base maps are already removed (2026-11-02); see `docs/TILE-SOURCES.md`.

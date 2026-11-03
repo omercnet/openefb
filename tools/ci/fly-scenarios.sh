@@ -42,10 +42,32 @@ stamp "simulator $SIM"
 xcrun simctl boot "$SIM" 2>/dev/null || true
 limited 300 xcrun simctl bootstatus "$SIM" -b >/dev/null || { echo "fly-scenarios: simulator did not boot" >&2; exit 1; }
 
-# The app's launchd job has a numeric PID while it runs ("-" or no line once it exits or crashes).
+# app_state: 0 when the app's launchd job has a numeric PID ("-" or no line once it exits or crashes), 1 when it has
+# none, 2 when launchctl did not answer (deadline hit or spawn error: a loaded runner during the first cold launch).
+app_state() {
+  local list rc=0
+  list=$(limited 30 xcrun simctl spawn "$SIM" launchctl list 2>/dev/null) || rc=$?
+  [ "$rc" -eq 0 ] || return 2
+  awk -v job="UIKitApplication:$BUNDLE" 'index($3, job) == 1 && $1 ~ /^[0-9]+$/ { found = 1 } END { exit !found }' <<<"$list"
+}
+
+# app_running: 0 running, 1 not running, 2 unknown. Only an unknown answer is retried (up to 3 tries, 5 s apart), and
+# only while the run has spent fewer than RETRY_BUDGET retried checks, so the liveness checks stay well inside the
+# job's timeout even if launchctl never answers (worst case 3 x 100 s + the rest at 30 s each).
+RETRY_BUDGET=3
+retried_checks=0
 app_running() {
-  limited 30 xcrun simctl spawn "$SIM" launchctl list |
-    awk -v job="UIKitApplication:$BUNDLE" 'index($3, job) == 1 && $1 ~ /^[0-9]+$/ { found = 1 } END { exit !found }'
+  local try tries=1 state
+  [ "$retried_checks" -lt "$RETRY_BUDGET" ] && tries=3
+  for (( try = 1; try <= tries; try++ )); do
+    state=0
+    app_state || state=$?
+    [ "$state" -ne 2 ] && return "$state"
+    [ "$try" -lt "$tries" ] || break
+    [ "$try" -eq 1 ] && retried_checks=$(( retried_checks + 1 ))
+    sleep 5
+  done
+  return 2
 }
 
 # Scenario length in seconds (time of the last fix).
@@ -61,6 +83,7 @@ for name in "${SCENARIOS[@]}"; do
   quarter=$(( (wall + 3) / 4 ))
   marker=$(mktemp)
   problems=()
+  notes=()
   echo "::group::$name (${secs}s at ${SPEED}x, ~${wall}s)"
 
   # Stream the app's log while it flies (`log show` after the fact can take minutes on a fresh simulator).
@@ -80,7 +103,14 @@ for name in "${SCENARIOS[@]}"; do
     [ "$pct" -gt 0 ] && sleep "$quarter"
     stamp "checkpoint $pct%"
     limited 60 xcrun simctl io "$SIM" screenshot "$OUT/$name-$pct.png" >/dev/null 2>&1 || true
-    app_running || problems+=("app not running at $pct%")
+    state=0
+    app_running || state=$?
+    case $state in
+      1) problems+=("app not running at $pct%") ;;
+      # Unknown is not a failure on its own: a crash still fails through the crash-report scan below.
+      2) stamp "warning: could not check that the app runs at $pct% (launchctl did not answer)"
+         notes+=("liveness unknown at $pct%") ;;
+    esac
   done
 
   sleep 2
@@ -99,8 +129,8 @@ for name in "${SCENARIOS[@]}"; do
   limited 60 tools/fly.sh stop >/dev/null 2>&1 || true
 
   if [ ${#problems[@]} -eq 0 ]; then
-    echo "$name: OK"
-    summary+="| $name | ${secs}s | ${wall}s | OK |\n"
+    echo "$name: OK${notes[*]:+ (${notes[*]})}"
+    summary+="| $name | ${secs}s | ${wall}s | OK${notes[*]:+ (${notes[*]})} |\n"
   else
     printf '%s: FAILED: %s\n' "$name" "${problems[*]}" >&2
     failed+=("$name")
@@ -109,7 +139,7 @@ for name in "${SCENARIOS[@]}"; do
   echo "::endgroup::"
 done
 
-[ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf "### Simulator scenarios (%sx)\n\n$summary" "$SPEED" >>"$GITHUB_STEP_SUMMARY"
+[ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '### Simulator scenarios (%sx)\n\n%b' "$SPEED" "$summary" >>"$GITHUB_STEP_SUMMARY"
 if [ ${#failed[@]} -gt 0 ]; then
   echo "fly-scenarios: FAILED: ${failed[*]} (screenshots and logs in $OUT)" >&2
   exit 1

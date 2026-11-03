@@ -15,7 +15,7 @@ pre-commit:
 
     - name: plist
       glob: "*.{plist,xcprivacy,entitlements,pbxproj}"
-      run: plutil -lint {staged_files}
+      run: tools/hooks/plist-lint.sh {staged_files}
 
     - name: json
       glob: "*.json"

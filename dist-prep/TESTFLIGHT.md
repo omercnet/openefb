@@ -1,29 +1,26 @@
 # TestFlight materials (T30, drafted 2026-11-02)
 
-Draft for the owner. Nothing here has been uploaded or entered in App Store Connect.
+Build 88 (1.0) passed Beta App Review on 2026-11-03 and is in the external group Public Beta (first created as CHU; public link on). Releases now upload from CI (below).
 
 **Owner decisions applied:** Q9 = upload through the Apple ID Xcode is signed in to (API key only as a fallback); Q10 = A (internal testers first, then an
 external group with a public link after Beta App Review); Q12 = A (CAAI approved in-app use of the chart and diagrams,
 see `NOTICE`); Q13 = B (privacy label declares Coarse Location only, `PRIVACY_NUTRITION_LABELS.md`).
 
 ## Build
-`io.omer.efb`, version 1.0, iPad and iPhone (`TARGETED_DEVICE_FAMILY = 1,2`), iOS 26.0 or later. Display name `Kanaf`.
-Build numbers must increase on every upload; `upload-testflight.sh` sets `CURRENT_PROJECT_VERSION` from
-`git rev-list --count HEAD` (or `BUILD_NUMBER`), so the build number is not 1 (86 at commit `d27c262`).
+`io.omer.efb`, iPad and iPhone (`TARGETED_DEVICE_FAMILY = 1,2`), iOS 26.0 or later. Display name `Kanaf`. The marketing
+version comes from `version.txt` (release-please bumps it); the build number is `git rev-list --count HEAD` (or
+`BUILD_NUMBER`) and must beat every earlier upload of the same version.
 
-## Upload (Q9; the integrator runs it after the app record exists)
-Prerequisites: Xcode on this Mac is signed in to the owner's Apple ID for team 6F8N897928 (Xcode > Settings > Accounts),
-and the App Store Connect app record for bundle `io.omer.efb` exists (app 6829641724; My Apps > + > New App: iOS, name Kanaf EFB, SKU
-any, bundle `io.omer.efb`). Then:
-```
-dist-prep/upload-testflight.sh
-```
-The script archives Release (generic iOS device, `-allowProvisioningUpdates`, build number from `git rev-list --count HEAD`
-or `BUILD_NUMBER`) and runs `xcodebuild -exportArchive` with `dist-prep/ExportOptions.plist` (app-store-connect,
-`destination` upload, team 6F8N897928, automatic signing, `uploadSymbols` true, `manageAppVersionAndBuildNumber` false),
-which uploads to App Store Connect. Fallback: if `ASC_KEY_ID` and `ASC_ISSUER_ID` are set, it authenticates with the key at
-`~/.appstoreconnect/private_keys/AuthKey_$ASC_KEY_ID.p8` and refuses to run if that file is missing. It never prints
-secrets. Nothing has been uploaded.
+## Upload
+Releases upload from GitHub Actions: merging the release-please pull request tags `vX.Y.Z` and the `testflight` job in
+`.github/workflows/release.yml` runs `bundle exec fastlane ios beta` on a macOS runner (setup and secrets: `docs/CI.md`).
+When the repository variable `TESTFLIGHT_GROUPS` names external groups (now `Public Beta`), the job waits for processing,
+adds the build to them and submits it for Beta App Review with the release notes as What to Test.
+
+From the owner's Mac, the same lane: `bundle install`, then `bundle exec fastlane ios beta` (add `upload:false` to
+archive and sign without uploading). It reads `ASC_KEY_ID` and `ASC_ISSUER_ID` from `~/.appstoreconnect/openefb.env`,
+the key from `~/.appstoreconnect/private_keys/AuthKey_<id>.p8`, and signs with the Apple Distribution identity in the
+login keychain and the `io.omer.efb AppStore` profile. It never prints secrets.
 
 ## Beta App Description
 Kanaf is a free, open-source VFR electronic flight bag for iPad and iPhone: a moving map, airport information
@@ -33,7 +30,7 @@ official CAAI chart, NOTAM closures, curated aerodromes), and the United States 
 METAR/TAF, TFRs, FAA charts). It is a supplemental reference, not approved by any aviation authority, and not for
 primary navigation. Israel data is unreviewed by an Israeli CFI. The debrief needs a device with Apple Intelligence.
 
-## What to Test (version 1.0; build number from `upload-testflight.sh`)
+## What to Test (sent with the first external build; CI sends each release's notes)
 1. First run: onboarding and the "supplemental reference" disclaimer. A new install starts in the Israel region.
 2. Map (US): switch Settings > Region to United States, then pan and zoom, sectional layer, nearest airports, tap an
    airport (METAR/TAF, frequencies, runways, charts and diagram PDFs), layers (TFR, AIRMET/SIGMET), search.
@@ -82,4 +79,5 @@ rate-limited dev URL.
 2. **External group** with a public link after Beta App Review. Cross-link: the pilot-interview recruits
    (`https://openefb-interviews.vercel.app`, `web/interviews`) get the public TestFlight link in its TestFlight ask; add
    the link to that site once it exists. Who is invited (Q10) is the owner's call.
-3. Submit to Beta App Review for the external group only on the owner's go-ahead.
+3. Each release goes to the external groups in `TESTFLIGHT_GROUPS` and is submitted for Beta App Review automatically
+   (owner's go-ahead, 2026-11-03). Clear the variable to stop at internal testing.
