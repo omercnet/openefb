@@ -6,6 +6,7 @@
 # Per scenario: launch through tools/fly.sh, screenshot at 0/25/50/75/100% of the flight, and fail when the app is not
 # running at a checkpoint, the scenario's load notice is missing from the app log, or a crash report appears.
 # What the app does with the fixes (alerts, route following, debrief) is asserted by efb-212Tests/Simulation.
+# Recording runs without the microphone (--no-audio): CI simulators on VMs abort inside CoreAudio when asked for one.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
@@ -102,7 +103,7 @@ for name in "${SCENARIOS[@]}"; do
   launch_deadline=120
   [ "$first_launch" -eq 1 ] && launch_deadline=300
   first_launch=0
-  limited "$launch_deadline" tools/fly.sh israel "$name" --speed "$SPEED" || problems+=("launch failed or timed out")
+  limited "$launch_deadline" tools/fly.sh israel "$name" --speed "$SPEED" --no-audio || problems+=("launch failed or timed out")
   sleep 5   # launch, first frame
   for pct in 0 25 50 75 100; do
     [ ${#problems[@]} -eq 0 ] || break

@@ -131,18 +131,6 @@ jobs:
         with:
           path: /tmp/efb-dd-${{ github.event.repository.name }}/SourcePackages
           key: spm-${{ hashFiles('efb-212.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-      - name: Virtual audio device
-        # The Tart VMs have no audio device; the app's recorder then aborts inside CoreAudio when it asks for the
-        # microphone format. GitHub's hosted images install BlackHole for the same reason.
-        run: |
-          brew list --cask blackhole-2ch >/dev/null 2>&1 || brew install --cask blackhole-2ch
-          command -v SwitchAudioSource >/dev/null || brew install switchaudio-osx
-          sudo killall coreaudiod || true
-          for _ in 1 2 3 4 5 6; do SwitchAudioSource -a -t input | grep -q "BlackHole 2ch" && break; sleep 5; done
-          SwitchAudioSource -t input -s "BlackHole 2ch"
-          SwitchAudioSource -t output -s "BlackHole 2ch"
-          SwitchAudioSource -a
-          sysctl -n hw.ncpu hw.memsize
       - name: Build the DEBUG app
         run: |
           set -o pipefail

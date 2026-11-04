@@ -3,10 +3,11 @@
 #   tools/fly.sh                       # US: KPAO → KSQL → KOAK → KSFO at ~100 kt (simctl location; lat/lon only)
 #   tools/fly.sh stop                  # stop the route (US route, or a scenario: relaunches the app without it)
 #   tools/fly.sh list                  # the Israel/US scenarios in tools/flight-sim/scenarios
-#   tools/fly.sh israel <scenario> [--speed N] [--start SECONDS] [--notams FILE] [--sim <udid|SIM_TAG>]
+#   tools/fly.sh israel <scenario> [--speed N] [--start SECONDS] [--notams FILE] [--sim <udid|SIM_TAG>] [--no-audio]
 #       launches the DEBUG build with -OpenEFBScenario: fixes with altitude, speed, course and GPS loss,
 #       through the real LocationService. --speed multiplies time (default 1), --start skips ahead (seconds),
 #       --notams serves a fixture NOTAM feed (il-closed-leg gets tools/flight-sim/fixtures/notams-closed-leg.json).
+#       --no-audio records without the microphone (-OpenEFBNoAudio), for simulators without working audio input.
 #       A GPS loss only shows as "no position" when it lasts longer than 5 x speed seconds.
 # Env: SPEED (m/s, US route, default 50 ≈ 97 kt), SIM_TAG (fly on an agent's own sim).
 set -euo pipefail
@@ -31,15 +32,16 @@ case "${1:-}" in
     exit 0 ;;
   israel)
     shift
-    SCENARIO=${1:-}; [ -n "$SCENARIO" ] || { echo "usage: tools/fly.sh israel <scenario> [--speed N] [--start S] [--notams FILE] [--sim udid|tag]" >&2; exit 2; }
+    SCENARIO=${1:-}; [ -n "$SCENARIO" ] || { echo "usage: tools/fly.sh israel <scenario> [--speed N] [--start S] [--notams FILE] [--sim udid|tag] [--no-audio]" >&2; exit 2; }
     shift
-    SPEED_MULT=1; START=0; NOTAMS=""; SIM_ARG=""
+    SPEED_MULT=1; START=0; NOTAMS=""; SIM_ARG=""; NO_AUDIO=""
     while [ $# -gt 0 ]; do
       case "$1" in
         --speed) SPEED_MULT=$2; shift 2 ;;
         --start) START=$2; shift 2 ;;
         --notams) NOTAMS=$2; shift 2 ;;
         --sim) SIM_ARG=$2; shift 2 ;;
+        --no-audio) NO_AUDIO=1; shift ;;
         *) echo "fly.sh: unknown option $1" >&2; exit 2 ;;
       esac
     done
@@ -65,6 +67,7 @@ case "${1:-}" in
     xcrun simctl location "$SIM" clear 2>/dev/null || true   # the scenario replaces the simulator's GPS
     ARGS=(-hasSeenOnboarding YES -OpenEFBScenario "$FILE" -OpenEFBScenarioSpeed "$SPEED_MULT" -OpenEFBScenarioStart "$START")
     [ -n "$NOTAMS" ] && ARGS+=(-OpenEFBNotamFixture "$NOTAMS")
+    [ -n "$NO_AUDIO" ] && ARGS+=(-OpenEFBNoAudio YES)
     xcrun simctl launch --terminate-running-process "$SIM" "$BUNDLE" "${ARGS[@]}"
     echo "Flying $SCENARIO at ${SPEED_MULT}x from ${START}s on $SIM. Stop with: tools/fly.sh stop"
     exit 0 ;;

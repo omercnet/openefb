@@ -77,8 +77,21 @@ actor AudioRecorder: AudioRecorderProtocol {
 
     // MARK: - Start Recording
 
+    #if DEBUG
+    /// `-OpenEFBNoAudio YES` (DEBUG only): record without the microphone. The CI flight scenarios pass it
+    /// (`tools/fly.sh --no-audio`): simulators on the self-hosted VMs abort inside CoreAudio when asked for input.
+    nonisolated static let noAudioKey = "OpenEFBNoAudio"
+    #endif
+
     func startRecording(flightID: UUID, profile: AudioQualityProfile, outputURL: URL) async throws {
         self.flightID = flightID
+
+        #if DEBUG
+        if UserDefaults.standard.bool(forKey: Self.noAudioKey) {
+            logger.notice("Audio capture off (-OpenEFBNoAudio). Recording without audio.")
+            throw EFBError.audioSessionFailed(underlying: AudioRecorderError.noAudioInput)
+        }
+        #endif
 
         // Create recordings directory if needed
         let recordingDir = outputURL.deletingLastPathComponent()
