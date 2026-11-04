@@ -57,11 +57,15 @@ case "${1:-}" in
     xcrun simctl bootstatus "$SIM" -b >/dev/null
     # Install the built DEBUG app (tools/sim-test.sh build first), so the simulator never runs an older build
     # that ignores newer launch arguments such as -OpenEFBNoAudio. Without a build, use the installed app.
-    NAME=$(basename "$PWD"); TAG=${SIM_ARG:-${SIM_TAG:-}}
-    [[ "$TAG" =~ ^[0-9A-Fa-f-]{36}$ ]] && TAG=""
+    # The build's tag: --sim's tag, or SIM_TAG when --sim is a UDID or absent.
+    NAME=$(basename "$PWD"); TAG=${SIM_TAG:-}
+    [ -n "$SIM_ARG" ] && ! [[ "$SIM_ARG" =~ ^[0-9A-Fa-f-]{36}$ ]] && TAG=$SIM_ARG
     APP=${DD:-/tmp/efb-dd-$NAME${TAG:+-$TAG}}/Build/Products/Debug-iphonesimulator/efb-212.app
     if [ -d "$APP" ]; then
       xcrun simctl install "$SIM" "$APP"
+    elif [ -n "$NO_AUDIO" ]; then
+      # An installed older or Release app ignores -OpenEFBNoAudio and can abort on the microphone.
+      echo "fly.sh: --no-audio needs the DEBUG build at $APP; run tools/sim-test.sh build first" >&2; exit 1
     elif ! xcrun simctl get_app_container "$SIM" "$BUNDLE" >/dev/null 2>&1; then
       echo "fly.sh: no built app at $APP; run tools/sim-test.sh build first" >&2; exit 1
     fi
