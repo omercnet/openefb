@@ -142,6 +142,7 @@ jobs:
           SwitchAudioSource -t input -s "BlackHole 2ch"
           SwitchAudioSource -t output -s "BlackHole 2ch"
           SwitchAudioSource -a
+          sysctl -n hw.ncpu hw.memsize
       - name: Build the DEBUG app
         run: |
           set -o pipefail

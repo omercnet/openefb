@@ -112,7 +112,11 @@ for name in "${SCENARIOS[@]}"; do
     state=0
     app_running || state=$?
     case $state in
-      1) problems+=("app not running at $pct%") ;;
+      1) problems+=("app not running at $pct%")
+         # No crash report means the system ended it (memory, watchdog): keep its reason.
+         limited 60 xcrun simctl spawn "$SIM" log show --last 3m --style compact \
+           --predicate 'eventMessage CONTAINS[c] "io.omer.efb" AND (eventMessage CONTAINS[c] "terminat" OR eventMessage CONTAINS[c] "jetsam" OR eventMessage CONTAINS[c] "kill" OR eventMessage CONTAINS[c] "watchdog")' \
+           >"$OUT/$name-exit.log" 2>&1 || true ;;
       # Unknown is not a failure on its own: a crash still fails through the crash-report scan below.
       2) stamp "warning: could not check that the app runs at $pct% (launchctl did not answer)"
          notes+=("liveness unknown at $pct%") ;;
