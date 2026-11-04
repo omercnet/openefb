@@ -89,8 +89,12 @@ jobs:
 
   unit-tests:
     name: Unit tests (iPad simulator)
-    runs-on: macos-26
+    runs-on: [self-hosted, macOS, ARM64, tartelet]
     timeout-minutes: 45
+    env:
+      # The self-hosted Tart VMs (ghcr.io/cirruslabs/macos-runner:golden-gate) carry Xcode 27.x only. Set before
+      # checkout: /usr/bin/git is an xcrun shim and fails on a missing DEVELOPER_DIR.
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
       - name: Cache Swift packages
@@ -114,8 +118,12 @@ jobs:
 
   simulation:
     name: Flight scenarios (iPad simulator)
-    runs-on: macos-26
+    runs-on: [self-hosted, macOS, ARM64, tartelet]
     timeout-minutes: 45
+    env:
+      # The self-hosted Tart VMs (ghcr.io/cirruslabs/macos-runner:golden-gate) carry Xcode 27.x only. Set before
+      # checkout: /usr/bin/git is an xcrun shim and fails on a missing DEVELOPER_DIR.
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
       - name: Cache Swift packages
