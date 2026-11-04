@@ -67,9 +67,10 @@ struct LocationServiceCharacterizationTests {
         var requested: Int { lock.lock(); defer { lock.unlock() }; return requestedCount }
     }
 
-    /// Poll until `condition` holds; the tracking loop hops to the main actor per update.
+    /// Poll until `condition` holds; the tracking loop hops to the main actor per update. 30 s, not 10: the first
+    /// update has missed 10 s on loaded CI runners while the rest of the suite starts up.
     static func waitUntil(
-        _ timeout: Duration = .seconds(10),
+        _ timeout: Duration = .seconds(30),
         _ condition: @MainActor () -> Bool
     ) async -> Bool {
         let deadline = ContinuousClock.now + timeout
