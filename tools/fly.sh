@@ -55,13 +55,15 @@ case "${1:-}" in
     fi
     xcrun simctl boot "$SIM" 2>/dev/null || true
     xcrun simctl bootstatus "$SIM" -b >/dev/null
-    # Install the built DEBUG app when it is not there yet (tools/sim-test.sh build first).
-    if ! xcrun simctl get_app_container "$SIM" "$BUNDLE" >/dev/null 2>&1; then
-      NAME=$(basename "$PWD"); TAG=${SIM_ARG:-${SIM_TAG:-}}
-      [[ "$TAG" =~ ^[0-9A-Fa-f-]{36}$ ]] && TAG=""
-      APP=${DD:-/tmp/efb-dd-$NAME${TAG:+-$TAG}}/Build/Products/Debug-iphonesimulator/efb-212.app
-      [ -d "$APP" ] || { echo "fly.sh: no built app at $APP; run tools/sim-test.sh build first" >&2; exit 1; }
+    # Install the built DEBUG app (tools/sim-test.sh build first), so the simulator never runs an older build
+    # that ignores newer launch arguments such as -OpenEFBNoAudio. Without a build, use the installed app.
+    NAME=$(basename "$PWD"); TAG=${SIM_ARG:-${SIM_TAG:-}}
+    [[ "$TAG" =~ ^[0-9A-Fa-f-]{36}$ ]] && TAG=""
+    APP=${DD:-/tmp/efb-dd-$NAME${TAG:+-$TAG}}/Build/Products/Debug-iphonesimulator/efb-212.app
+    if [ -d "$APP" ]; then
       xcrun simctl install "$SIM" "$APP"
+    elif ! xcrun simctl get_app_container "$SIM" "$BUNDLE" >/dev/null 2>&1; then
+      echo "fly.sh: no built app at $APP; run tools/sim-test.sh build first" >&2; exit 1
     fi
     xcrun simctl privacy "$SIM" grant location-always "$BUNDLE" || true
     xcrun simctl location "$SIM" clear 2>/dev/null || true   # the scenario replaces the simulator's GPS
