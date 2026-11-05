@@ -88,23 +88,39 @@ end
 TOOLING_SCOPES = %w[ci hooks release skills progress charts relay interviews].freeze
 
 # "What to Test" from release-please's markdown notes. TestFlight shows plain text, so: title "Kanaf X.Y.Z (N)",
-# sections as plain headings, "• " bullets, no links, PR numbers, commit hashes or bold scopes, and no
-# developer-only entries (TOOLING_SCOPES). Falls back to the title alone when nothing is left.
+# sections as plain headings, "• " bullets (with their indented continuation lines), no links, PR numbers, commit
+# hashes or bold scopes, and no developer-only entries (TOOLING_SCOPES). Text that isn't release-please output (no
+# "### " sections, e.g. TESTFLIGHT_CHANGELOG set by hand) is kept as written under the title. Falls back to the
+# title alone when nothing is left.
 def testflight_notes(markdown, version, build)
   title = "Kanaf #{version} (#{build})"
+  text = markdown.strip
+  return title if text.empty?
+  return "#{title}\n\n#{text}"[0, 4000] unless text.match?(/^###\s/)
+
+  plain = lambda do |raw|
+    raw.gsub(/\s*\(\[[^\]]+\]\([^)]*\)\)/, "")   # ([#8](url)) and ([4a120d1](url))
+       .gsub(/\[([^\]]+)\]\([^)]*\)/, '\\1')      # remaining [text](url)
+       .gsub(/[*`]/, "").strip
+  end
   sections = []
-  markdown.each_line do |line|
+  keeping = false   # whether the current bullet is kept, so its continuation lines are too
+  text.each_line do |line|
     line = line.rstrip
     if (heading = line[/\A###\s+(.+)/, 1])
       sections << [heading.strip, []]
+      keeping = false
     elsif (item = line[/\A[*-]\s+(.+)/, 1]) && sections.any?
       scope = item[/\A\*\*([^*:]+):\*\*/, 1]
-      next if scope && TOOLING_SCOPES.include?(scope.strip)
-      text = item.sub(/\A\*\*[^*]+:\*\*\s*/, "")
-                 .gsub(/\s*\(\[[^\]]+\]\([^)]*\)\)/, "")   # ([#8](url)) and ([4a120d1](url))
-                 .gsub(/\[([^\]]+)\]\([^)]*\)/, '\\1')      # remaining [text](url)
-                 .gsub(/[*`]/, "").strip
-      sections.last[1] << "• #{text[0].upcase}#{text[1..]}" unless text.empty?
+      keeping = !(scope && TOOLING_SCOPES.include?(scope.strip))
+      next unless keeping
+      body = plain.call(item.sub(/\A\*\*[^*]+:\*\*\s*/, ""))
+      keeping = !body.empty?
+      sections.last[1] << "• #{body[0].upcase}#{body[1..]}" if keeping
+    elsif keeping && line.match?(/\A\s+\S/)
+      sections.last[1] << "  #{plain.call(line)}"
+    else
+      keeping = false unless line.empty?
     end
   end
   body = sections.reject { |_, items| items.empty? }.map { |name, items| ([name] + items).join("\n") }
