@@ -11,7 +11,7 @@
 #   VERSION                                 marketing version (release-please sets it; default version.txt)
 #   BUILD_NUMBER                            default `git rev-list --count HEAD`; must beat every earlier upload of the version
 #   TESTFLIGHT_GROUPS                       comma-separated external groups: distribute and submit for Beta App Review
-#   TESTFLIGHT_CHANGELOG                    "What to Test" text (release notes in CI)
+#   TESTFLIGHT_CHANGELOG                    "What to Test" source (release notes in CI), converted to plain text
 # On a Mac, ASC_KEY_ID and ASC_ISSUER_ID are read from ~/.appstoreconnect/openefb.env when they aren't set.
 
 require "base64"
@@ -82,6 +82,33 @@ def build_number
   number = sh("git", "-C", ROOT, "rev-list", "--count", "HEAD", log: false).strip if number.empty?
   UI.user_error!("build number '#{number}' is not an integer") unless number.match?(/\A\d+\z/)
   number
+end
+
+# Scopes of developer-only changes, left out of the testers' notes.
+TOOLING_SCOPES = %w[ci hooks release skills progress charts relay interviews].freeze
+
+# "What to Test" from release-please's markdown notes. TestFlight shows plain text, so: title "Kanaf X.Y.Z (N)",
+# sections as plain headings, "• " bullets, no links, PR numbers, commit hashes or bold scopes, and no
+# developer-only entries (TOOLING_SCOPES). Falls back to the title alone when nothing is left.
+def testflight_notes(markdown, version, build)
+  title = "Kanaf #{version} (#{build})"
+  sections = []
+  markdown.each_line do |line|
+    line = line.rstrip
+    if (heading = line[/\A###\s+(.+)/, 1])
+      sections << [heading.strip, []]
+    elsif (item = line[/\A[*-]\s+(.+)/, 1]) && sections.any?
+      scope = item[/\A\*\*([^*:]+):\*\*/, 1]
+      next if scope && TOOLING_SCOPES.include?(scope.strip)
+      text = item.sub(/\A\*\*[^*]+:\*\*\s*/, "")
+                 .gsub(/\s*\(\[[^\]]+\]\([^)]*\)\)/, "")   # ([#8](url)) and ([4a120d1](url))
+                 .gsub(/\[([^\]]+)\]\([^)]*\)/, '\\1')      # remaining [text](url)
+                 .gsub(/[*`]/, "").strip
+      sections.last[1] << "• #{text[0].upcase}#{text[1..]}" unless text.empty?
+    end
+  end
+  body = sections.reject { |_, items| items.empty? }.map { |name, items| ([name] + items).join("\n") }
+  ([title] + body).join("\n\n")[0, 4000]
 end
 
 def testflight_groups
@@ -165,12 +192,11 @@ platform :ios do
       next
     end
 
-    changelog = ENV["TESTFLIGHT_CHANGELOG"].to_s.strip
-    changelog = "Kanaf #{version} (#{build})" if changelog.empty?
+    changelog = testflight_notes(ENV["TESTFLIGHT_CHANGELOG"].to_s, version, build)
     upload_to_testflight(
       api_key: api_key,
       ipa: lane_context[SharedValues::IPA_OUTPUT_PATH],
-      changelog: changelog[0, 4000],
+      changelog: changelog,
       uses_non_exempt_encryption: false,
       # Distributing to external groups waits for processing, then submits the build for Beta App Review.
       skip_waiting_for_build_processing: groups.empty?,
