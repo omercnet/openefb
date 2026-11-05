@@ -99,7 +99,7 @@ def testflight_notes(markdown, version, build)
   return "#{title}\n\n#{text}"[0, 4000] unless text.match?(/^###\s/)
 
   plain = lambda do |raw|
-    raw.gsub(/\s*\(\[[^\]]+\]\([^)]*\)\)/, "")   # ([#8](url)) and ([4a120d1](url))
+    raw.gsub(/\s*\(\[(?:#\d+|[0-9a-f]{7,40})\]\([^)]*\)\)/, "")   # generated ([#8](url)) and ([4a120d1](url))
        .gsub(/\[([^\]]+)\]\([^)]*\)/, '\\1')      # remaining [text](url)
        .gsub(/[*`]/, "").strip
   end
@@ -116,7 +116,7 @@ def testflight_notes(markdown, version, build)
       next unless keeping
       body = plain.call(item.sub(/\A\*\*[^*]+:\*\*\s*/, ""))
       keeping = !body.empty?
-      sections.last[1] << "• #{body[0].upcase}#{body[1..]}" if keeping
+      sections.last[1] << "• #{body}" if keeping
     elsif keeping && line.match?(/\A\s+\S/)
       sections.last[1] << "  #{plain.call(line)}"
     else
