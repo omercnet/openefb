@@ -65,9 +65,9 @@ case "${1:-}" in
       xcrun simctl install "$SIM" "$APP"
     elif [ -n "$NO_AUDIO" ]; then
       # An installed older or Release app ignores -OpenEFBNoAudio and can abort on the microphone.
-      echo "fly.sh: --no-audio needs the DEBUG build at $APP; run tools/sim-test.sh build first" >&2; exit 1
+      echo "fly.sh: --no-audio needs the DEBUG build at $APP; run ${TAG:+SIM_TAG=$TAG }tools/sim-test.sh build first" >&2; exit 1
     elif ! xcrun simctl get_app_container "$SIM" "$BUNDLE" >/dev/null 2>&1; then
-      echo "fly.sh: no built app at $APP; run tools/sim-test.sh build first" >&2; exit 1
+      echo "fly.sh: no built app at $APP; run ${TAG:+SIM_TAG=$TAG }tools/sim-test.sh build first" >&2; exit 1
     fi
     xcrun simctl privacy "$SIM" grant location-always "$BUNDLE" || true
     xcrun simctl location "$SIM" clear 2>/dev/null || true   # the scenario replaces the simulator's GPS
