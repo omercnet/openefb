@@ -6,6 +6,7 @@
 # Per scenario: launch through tools/fly.sh, screenshot at 0/25/50/75/100% of the flight, and fail when the app is not
 # running at a checkpoint, the scenario's load notice is missing from the app log, or a crash report appears.
 # What the app does with the fixes (alerts, route following, debrief) is asserted by efb-212Tests/Simulation.
+# Recording runs without the microphone (--no-audio): CI simulators on VMs abort inside CoreAudio when asked for one.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 export DEVELOPER_DIR=${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}
@@ -77,6 +78,7 @@ duration() {
 
 failed=()
 summary="| Scenario | Flight | Wall | Result |\n|---|---|---|---|\n"
+first_launch=1
 for name in "${SCENARIOS[@]}"; do
   secs=$(duration "$name")
   wall=$(( secs / SPEED + 1 ))
@@ -96,7 +98,12 @@ for name in "${SCENARIOS[@]}"; do
 
   launched=$(date '+%Y-%m-%d %H:%M:%S')   # the simulator logs in host time; only this launch may satisfy the check
   stamp "launch $name"
-  limited 120 tools/fly.sh israel "$name" --speed "$SPEED" || problems+=("launch failed or timed out")
+  # The first launch on a fresh runner is cold (install, dyld, first MapLibre frame) and has taken over 120 s
+  # under load (run 41626296831); later launches take seconds.
+  launch_deadline=120
+  [ "$first_launch" -eq 1 ] && launch_deadline=300
+  first_launch=0
+  limited "$launch_deadline" tools/fly.sh israel "$name" --speed "$SPEED" --no-audio || problems+=("launch failed or timed out")
   sleep 5   # launch, first frame
   for pct in 0 25 50 75 100; do
     [ ${#problems[@]} -eq 0 ] || break
@@ -106,7 +113,11 @@ for name in "${SCENARIOS[@]}"; do
     state=0
     app_running || state=$?
     case $state in
-      1) problems+=("app not running at $pct%") ;;
+      1) problems+=("app not running at $pct%")
+         # No crash report means the system ended it (memory, watchdog): keep its reason.
+         limited 60 xcrun simctl spawn "$SIM" log show --last 3m --style compact \
+           --predicate 'eventMessage CONTAINS[c] "io.omer.efb" AND (eventMessage CONTAINS[c] "terminat" OR eventMessage CONTAINS[c] "jetsam" OR eventMessage CONTAINS[c] "kill" OR eventMessage CONTAINS[c] "watchdog")' \
+           >"$OUT/$name-exit.log" 2>&1 || true ;;
       # Unknown is not a failure on its own: a crash still fails through the crash-report scan below.
       2) stamp "warning: could not check that the app runs at $pct% (launchctl did not answer)"
          notes+=("liveness unknown at $pct%") ;;
