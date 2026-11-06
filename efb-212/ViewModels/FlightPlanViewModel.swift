@@ -175,10 +175,14 @@ final class FlightPlanViewModel {
 
         // Update AppState display properties (critical for MapContainerView summary card overlay)
         appState.activeFlightPlan = true
+        appState.directToAirport = nil  // the plan replaces a Direct-To, so live DTG/ETE follow its destination
         appState.distanceToNext = distanceNM
         appState.estimatedTimeEnroute = estimatedTimeSeconds
+        appState.bearingToNext = CLLocation(latitude: dep.latitude, longitude: dep.longitude)
+            .bearing(to: CLLocation(latitude: dest.latitude, longitude: dest.longitude))  // degrees true
         appState.activePlanDeparture = dep.icao
         appState.activePlanDestination = dest.icao
+        appState.activePlanDestinationCoordinate = dest.coordinate
         appState.activePlanFuelGallons = estimatedFuelGallons
 
         // Zoom map to show full route
@@ -288,8 +292,10 @@ final class FlightPlanViewModel {
         appState.activeFlightPlan = false
         appState.distanceToNext = nil
         appState.estimatedTimeEnroute = nil
+        appState.bearingToNext = nil
         appState.activePlanDeparture = nil
         appState.activePlanDestination = nil
+        appState.activePlanDestinationCoordinate = nil
         appState.activePlanFuelGallons = nil
     }
 

@@ -59,6 +59,8 @@ A CodeRabbit "changes requested" review blocks the merge until its comments are 
 
 Run the simulator scenarios locally with `tools/sim-test.sh build` then `tools/ci/fly-scenarios.sh [scenario ...]` (`OUT=<dir>`, `SPEED=<n>`).
 
+After the scenarios, the same job runs `tools/ci/capture-screens.sh`: it launches the DEBUG app on the iPad simulator and on an `iPhone 17 Pro` simulator flying `us-kpao-ksql`, puts it on each screen with DEBUG launch arguments (`-OpenEFBScreen`, `-OpenEFBStripColumn`, `-OpenEFBDisplayMode`, `-OpenEFBDirectTo`; `efb-212/Services/Simulation/ScreenCaptureHooks.swift`) and saves `ipad-<shot>.png` and `iphone-<shot>.png` for map-day, map-night, map-noplan, airport-KSQL, nearest, layers, search and log, plus `ipad-il-map-day.png` on the Israel route. They are in the `screens/` folder of the `scenario-captures` artifact. The step fails only when the app stops running or crashes; image content is reviewed by eye. Locally: `tools/sim-test.sh build` then `tools/ci/capture-screens.sh` (`OUT=<dir>`, default `/tmp/efb-screens`; `WAIT=<seconds>`, default 12).
+
 ## Not done
 
 - Actions are referenced by major version tag, not commit SHA.

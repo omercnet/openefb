@@ -20,7 +20,7 @@ struct FlightPlanView: View {
     @State private var viewModel: FlightPlanViewModel?
 
     var body: some View {
-        // Plans section of the Flights tab; the tab's NavigationStack owns the bar (T22).
+        // Pushed from the log stack; its NavigationStack owns the bar.
         Group {
             if appState.region == .israel {
                 IsraelFlightPlanView()

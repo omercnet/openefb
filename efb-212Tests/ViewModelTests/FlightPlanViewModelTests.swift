@@ -153,6 +153,9 @@ struct FlightPlanViewModelTests {
         #expect(h.appState.activePlanDestination == "KSQL")
         #expect(h.appState.distanceToNext == h.vm.distanceNM)
         #expect(h.appState.estimatedTimeEnroute == h.vm.estimatedTimeSeconds)
+        // The destination is published so every fix can refresh DTG/ETE from ownship.
+        #expect(h.appState.activePlanDestinationCoordinate?.latitude == Self.ksql.latitude)
+        #expect(h.appState.activePlanDestinationCoordinate?.longitude == Self.ksql.longitude)
     }
 
     @Test func withoutAircraftProfileUsesDefault100KnotsAndNoFuel() throws {
@@ -349,6 +352,8 @@ struct FlightPlanViewModelTests {
         #expect(h.appState.estimatedTimeEnroute == nil)
         #expect(h.appState.activePlanDeparture == nil)
         #expect(h.appState.activePlanDestination == nil)
+        #expect(h.appState.activePlanDestinationCoordinate == nil)
+        #expect(h.appState.bearingToNext == nil)
         #expect(h.appState.activePlanFuelGallons == nil)
         // Clearing the active plan does not delete it from storage.
         #expect(h.vm.savedPlans.count == 1)

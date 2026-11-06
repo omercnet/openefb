@@ -339,7 +339,7 @@ struct IsraelBriefingView: View {
         }
         highlightActive = true
         appState.isPresentingIsraelBriefing = false
-        appState.selectedTab = .map
+        appState.selectedScreen = .map
         dismiss()
     }
 

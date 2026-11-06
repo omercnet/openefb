@@ -2,58 +2,17 @@
 //  MapContainerView.swift
 //  efb-212
 //
-//  Complete map tab composing all navigation components:
-//  map, right-edge controls, layer panel, chart expiration badge,
-//  search bar with results, instrument strip, nearest airport HUD,
-//  airport info sheet, nearest airport list,
-//  offline indicator, and all service wiring.
-//
-//  Per UI-SPEC: map fills screen, controls on right edge, ZStack composition.
-//  Per Plan 06: final assembly wiring all Plans 01-05 components.
+//  The map screen (Direction 2, stage 1): the flight log strip at the leading edge beside
+//  the chart, its footer of 60pt cells under it, and all service wiring.
+//  Regular width: a fixed 400pt strip column. Compact width: a 104pt rail beside the chart,
+//  the NOW cell at full width under it, then the footer. The strip is layout, not an overlay;
+//  it sits on the leading edge, so a right-to-left locale mirrors it (the chart never mirrors).
+//  Nothing floats over the chart except the north indicator while rotated.
 //
 
 import SwiftUI
 import SwiftData
 import CoreLocation
-
-// MARK: - SearchResultsList (private helper)
-
-/// Dropdown list of airport search results.
-/// Per UI-SPEC: .regularMaterial background, 300pt max width.
-private struct SearchResultsList: View {
-    let results: [Airport]
-    let onTap: (String) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(results) { airport in
-                Button {
-                    onTap(airport.icao)
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(airport.icao)
-                            .font(.subheadline.bold())
-                        Text(airport.name)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(PressableButtonStyle())
-                if airport.id != results.last?.id {
-                    Divider()
-                }
-            }
-        }
-        .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
-        .frame(maxWidth: 300)
-    }
-}
-
-// MARK: - MapContainerView
 
 struct MapContainerView: View {
     @Environment(AppState.self) private var appState
@@ -93,7 +52,6 @@ struct MapContainerView: View {
 
     // MARK: - Local UI State
 
-    @State private var showingSearch: Bool = false
     @AppStorage(IsraelChartHint.dismissedKey) private var israelChartHintDismissed = false
 
     private var showIsraelChartHint: Bool {
@@ -107,298 +65,19 @@ struct MapContainerView: View {
     var body: some View {
         @Bindable var appState = appState
 
-        ZStack {
-            // MARK: Layer 1 -- Full-screen map
-
-            if let viewModel = mapViewModel {
-                MapView(mapService: mapService, mapViewModel: viewModel)
-                    .ignoresSafeArea(edges: .top)
-
-                // Night dimming for vector base layers (raster layers are dimmed in MapService)
-                Color.black
-                    .opacity(colorScheme == .dark ? NightPalette.mapDimOpacity * 0.6 : 0)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-
-            // MARK: Layer 2 -- Floating UI overlays
-
-            VStack(spacing: 0) {
-                // Currency warning banner (non-blocking, dismissable)
-                CurrencyWarningBanner()
-                    .withAutoCompute()
-                    .padding(.horizontal, 16)
-                    .padding(.top, 52)
-
-                // Top bar: search (left) + controls (right)
-                HStack(alignment: .top) {
-                    // Top-left: Search bar + chart expiration badge
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Search toggle button
-                        if !showingSearch, appState.region.hasAirportData {
-                            Button {
-                                showingSearch = true
-                            } label: {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.title3)
-                                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
-                            }
-                            .mapControlSurface()
-                            .accessibilityLabel("Search airports")
-                        }
-
-                        // Flight planning entry point (F10): opens the Flights tab on Plans
-                        if !showingSearch {
-                            Button {
-                                appState.openFlightsOnPlans = true
-                                appState.selectedTab = .flights
-                            } label: {
-                                Image(systemName: "point.topleft.down.to.point.bottomright.curvepath")
-                                    .font(.title3)
-                                    .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
-                            }
-                            .mapControlSurface()
-                            .accessibilityLabel("Plan a flight")
-                        }
-
-                        // Search bar (shown when activated)
-                        if showingSearch, let searchVM = searchViewModel {
-                            @Bindable var searchVM = searchVM
-                            SearchBar(
-                                text: $searchVM.query,
-                                placeholder: "Search airports (ICAO, name, city)",
-                                onSubmit: { searchVM.search() }
-                            )
-                            .frame(maxWidth: 300)
-                            .onChange(of: searchVM.query) { _, _ in
-                                searchVM.search()
-                            }
-
-                            // Search results dropdown
-                            if !searchVM.results.isEmpty {
-                                SearchResultsList(
-                                    results: searchVM.results,
-                                    onTap: { icao in
-                                        mapViewModel?.onAirportTapped(icao: icao)
-                                        showingSearch = false
-                                        searchVM.clear()
-                                    }
-                                )
-                            } else if searchVM.isSearching {
-                                ProgressView("Searching\u{2026}")
-                                    .font(TypeRole.caption)
-                                    .padding(Space.m)
-                                    .background(.regularMaterial)
-                                    .clipShape(RoundedRectangle(cornerRadius: Radius.s))
-                            } else if searchVM.query.trimmingCharacters(in: .whitespaces).count >= 2 {
-                                Text("No airports match \u{201C}\(searchVM.query)\u{201D}")
-                                    .font(TypeRole.caption)
-                                    .foregroundStyle(Palette.secondaryText)
-                                    .padding(Space.m)
-                                    .background(.regularMaterial)
-                                    .clipShape(RoundedRectangle(cornerRadius: Radius.s))
-                                    .accessibilityIdentifier("search-no-results")
-                            }
-                        }
-
-                        // Chart expiration badge (INFRA-03)
-                        if let viewModel = mapViewModel {
-                            DataAgeBadge(.chartCycle, validUntil: viewModel.chartExpirationDate)
-                                .hiddenWhenFresh()
-                        }
-
-                        // Stale / hidden TFR and AIRMET-SIGMET data (efb-zfm.11)
-                        if let viewModel = mapViewModel {
-                            OverlayStalenessBadges(viewModel: viewModel)
-                        }
-
-                        // First Israel launch: where to get the official chart (once per install)
-                        if appState.region == .israel, showIsraelChartHint {
-                            IsraelChartHintBanner { dismissIsraelChartHint() }
-                        }
-                    }
-                    .padding(.leading, 16)
-
-                    Spacer()
-
-                    // Top-right: Map controls stack
-                    VStack(spacing: 8) {
-                        if let viewModel = mapViewModel {
-                            MapControlsView(mapViewModel: viewModel)
-                        }
-                    }
-                    .padding(.trailing, 16)
+        Group {
+            if let viewModel = mapViewModel, let nearestVM = nearestAirportVM {
+                if horizontalSizeClass == .compact {
+                    compactLayout(viewModel, nearestVM)
+                } else {
+                    regularLayout(viewModel, nearestVM)
                 }
-                .padding(.top, 60)  // below status bar
-
-                Spacer()
-
-                // MARK: Bottom stack
-
-                VStack(spacing: 8) {
-                    // Recenter (only while follow is suspended) and the fixed NRST button,
-                    // bottom-right above the instrument strip (F2, F3)
-                    HStack(alignment: .bottom, spacing: 12) {
-                        Spacer()
-                        if let viewModel = mapViewModel, !viewModel.isFollowing {
-                            RecenterButton { viewModel.recenter() }
-                        }
-                        if let nearestVM = nearestAirportVM {
-                            NearestAirportHUD(entry: nearestVM.nearestEntry)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-
-                    // Why there is no position, with Open Settings when the pilot can fix it.
-                    if let failure = appState.gpsFailure,
-                       (mapViewModel?.gpsStatus ?? .lost(ageSeconds: nil)).isStale {
-                        GPSFailureNotice(reason: failure)
-                            .padding(.horizontal, 16)
-                    }
-
-                    // The airspace proximity check cannot run: say so instead of showing nothing (efb-8lm)
-                    if proximityAlertService?.checkUnavailable == true {
-                        AirspaceCheckUnavailableBanner()
-                            .padding(.horizontal, 16)
-                    }
-
-                    // Israel alerts: one banner area, highest priority on top (red warning, amber caution).
-                    // Without a fresh fix they cannot be evaluated: say so instead of showing the last ones as current.
-                    if israelAlertsSuspended {
-                        IsraelAlertsSuspendedBanner()
-                            .padding(.horizontal, 16)
-                    } else if let alerts = israelAlertService?.alerts, !alerts.isEmpty {
-                        IsraelAlertBanner(alerts: alerts)
-                            .padding(.horizontal, 16)
-                    }
-
-                    // Active Direct-To / route with a Clear button (wrong field picked).
-                    if appState.region == .israel, appState.activeFlightPlan, let route = appState.activeRoute {
-                        IsraelRouteFollowingBar(
-                            route: route,
-                            distanceToNext: appState.distanceToNext,
-                            remainingNM: appState.routeSummaryDistanceNM,
-                            remainingETE: appState.routeSummaryETE,
-                            onPrevious: { appState.sequenceActiveRoute(forward: false) },
-                            onNext: { appState.sequenceActiveRoute(forward: true) },
-                            onClear: {
-                                appState.clearActiveNavigation()
-                                mapService.clearRoute()
-                            }
-                        )
-                        .padding(.horizontal, 16)
-                    } else if let navTitle = ActiveNavigationBar.title(for: appState) {
-                        ActiveNavigationBar(title: navTitle) {
-                            let hadRoute = appState.activePlanDestination != nil
-                            appState.clearActiveNavigation()
-                            if hadRoute { mapService.clearRoute() }
-                        }
-                        .padding(.horizontal, 16)
-                    }
-
-                    // Instrument strip (bottom bar) with the GPS status chip
-                    InstrumentStripView(gpsStatus: mapViewModel?.gpsStatus ?? .lost(ageSeconds: nil))
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 8)
-                }
-            }
-            // Map chrome keeps its 60pt geometry: cap text so controls never cover the map (sheets scale fully)
-            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-
-            // MARK: Layer 3 -- Recording overlay
-
-            if let recVM = recordingViewModel {
-                RecordingOverlayView(viewModel: recVM)
-            } else if recordingUnavailable {
-                VStack {
-                    Label("Recording unavailable", systemImage: "mic.slash.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Palette.caution)
-                        .padding(Space.m)
-                        .background(.regularMaterial)
-                        .clipShape(Capsule())
-                        .padding(.leading, Space.l)
-                        .accessibilityIdentifier("recording-unavailable")
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            // MARK: Layer controls popover
-
-            if appState.isPresentingLayerControls, let viewModel = mapViewModel {
-                VStack {
-                    LayerControlsView(mapViewModel: viewModel)
-                        // iPad: sit left of the map controls column (16 edge + 60 button + 12 gap)
-                        // so the layers button stays tappable to close the panel. iPhone: the panel
-                        // covers the column (it has its own close button) and stops above the strip.
-                        .padding(.trailing, horizontalSizeClass == .compact ? 16 : 88)
-                        .padding(.top, horizontalSizeClass == .compact ? 130 : 140)
-                        .padding(.bottom, horizontalSizeClass == .compact ? 120 : 0)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .transition(.opacity)
-            }
-
-            // MARK: Offline indicator
-
-            if !reachabilityService.isConnected {
-                VStack {
-                    Spacer()
-                    HStack {
-                        Image(systemName: "wifi.slash")
-                            .accessibilityHidden(true)
-                        Text("Offline \u{2014} using cached data")
-                            .font(.caption)
-                    }
-                    .foregroundStyle(.black)  // black on amber: 9:1 (white on amber is 2.2:1)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Palette.cautionFill)
-                    .clipShape(Capsule())
-                    .padding(.bottom, 60)  // above instrument strip
-                }
-            }
-
-            // MARK: Flight plan summary card overlay
-
-            // The Israel route bar carries these totals itself; the card would sit on top of its buttons.
-            if appState.activeFlightPlan, !(appState.region == .israel && appState.activeRoute != nil),
-               let distance = appState.distanceToNext,
-               let departure = appState.activePlanDeparture,
-               let destination = appState.activePlanDestination {
-                VStack {
-                    Spacer()
-                    HStack {
-                        FlightPlanSummaryCard(
-                            // A multi-leg route shows the whole remaining route; DTG on the strip stays "to next point".
-                            distanceNM: appState.routeSummaryDistanceNM ?? distance,
-                            ete: formatETE(appState.activeRoute == nil ? appState.estimatedTimeEnroute : appState.routeSummaryETE),
-                            fuelGallons: appState.activePlanFuelGallons,
-                            departure: departure,
-                            destination: destination
-                        )
-                        .padding()
-                        Spacer()
-                    }
-                }
+            } else {
+                Palette.paper.ignoresSafeArea()
             }
         }
-
-        // MARK: - Airport Info Sheet
-
-        .sheet(isPresented: $appState.isPresentingAirportInfo) {
-            AirportInfoSheet(
-                databaseService: mapViewModel?.databaseService ?? PlaceholderDatabaseService(),
-                weatherService: weatherService,
-                chartService: chartService,
-                notamService: notamService,
-                pirepService: pirepService,
-                windsAloftService: windsAloftService
-            )
-        }
+        // The strip keeps its fixed width: cap text at a size its rows still fit (they scroll beyond).
+        .dynamicTypeSize(...DynamicTypeSize.accessibility2)
 
         // MARK: - Israel CVFR Chart Sheet (IL-3)
 
@@ -414,20 +93,6 @@ struct MapContainerView: View {
         .sheet(isPresented: $appState.isPresentingIsraelBriefing) {
             IsraelBriefingView()
         }
-
-        // MARK: - Nearest Airport List Sheet
-
-        .sheet(isPresented: $appState.isPresentingNearestList) {
-            if let nearestVM = nearestAirportVM, let viewModel = mapViewModel {
-                NearestAirportView(
-                    entries: nearestVM.nearestAirports,
-                    region: appState.region,
-                    onDirectTo: { nearestVM.setDirectTo(airport: $0) },
-                    onAirportTap: { viewModel.onAirportTapped(icao: $0) }
-                )
-            }
-        }
-
         // MARK: - Lifecycle
 
         .onAppear {
@@ -628,14 +293,173 @@ struct MapContainerView: View {
             recordingUnavailable = true
         }
     }
-    // MARK: - Helpers
+}
 
-    /// Format ETE seconds as "h:mm" for summary card display.
-    private func formatETE(_ seconds: TimeInterval?) -> String {
-        guard let seconds = seconds else { return "0:00" }
-        let hours = Int(seconds) / 3600
-        let minutes = (Int(seconds) % 3600) / 60
-        return String(format: "%d:%02d", hours, minutes)
+// MARK: - Layouts
+
+extension MapContainerView {
+    /// iPad: the 400pt strip column (with its footer) at the leading edge, the chart beside it.
+    private func regularLayout(_ viewModel: MapViewModel, _ nearestVM: NearestAirportViewModel) -> some View {
+        HStack(spacing: 0) {
+            VStack(spacing: 0) {
+                stripColumn(viewModel, nearestVM)
+                    .frame(maxHeight: .infinity)
+                FlightLogFooter(mapViewModel: viewModel, nearestEntry: nearestVM.nearestEntry)
+            }
+            .frame(width: StripMetrics.width)
+            .background(Palette.paper.ignoresSafeArea())
+
+            Rectangle()
+                .fill(Palette.rule)
+                .frame(width: 1)
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
+
+            chart(viewModel)
+        }
+    }
+
+    /// iPhone and iPad Split View: header and warnings on top, the NEXT rail beside the chart, the NOW
+    /// cell at full width, then the footer. Other columns cover rail and chart (the map stays alive).
+    private func compactLayout(_ viewModel: MapViewModel, _ nearestVM: NearestAirportViewModel) -> some View {
+        VStack(spacing: 0) {
+            ZStack {
+                VStack(spacing: 0) {
+                    FlightLogHeader(recordingViewModel: recordingViewModel, compact: true)
+                    ColumnRule()
+                    notices(viewModel)
+                    HStack(spacing: 0) {
+                        FlightLogRail(gpsStatus: viewModel.gpsStatus, nearestEntry: nearestVM.nearestEntry)
+                        Rectangle()
+                            .fill(Palette.rule)
+                            .frame(width: 1)
+                            .accessibilityHidden(true)
+                        chart(viewModel)
+                    }
+                    ColumnRule()
+                    FlightLogNowCell(gpsStatus: viewModel.gpsStatus, onClear: clearNavigation, compact: true)
+                }
+                .background(Palette.paper.ignoresSafeArea())
+
+                if appState.stripColumn != .log {
+                    stripColumn(viewModel, nearestVM)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(Palette.paper.ignoresSafeArea())
+                }
+            }
+            FlightLogFooter(mapViewModel: viewModel, nearestEntry: nearestVM.nearestEntry, compact: true)
+                .background(Palette.paperSecondary.ignoresSafeArea(edges: .bottom))
+        }
+    }
+
+    /// The strip column: the log, or the airport, nearest, layers or search column in its place.
+    @ViewBuilder
+    private func stripColumn(_ viewModel: MapViewModel, _ nearestVM: NearestAirportViewModel) -> some View {
+        switch appState.stripColumn {
+        case .log:
+            FlightLogStrip(
+                gpsStatus: viewModel.gpsStatus,
+                nearestEntry: nearestVM.nearestEntry,
+                recordingViewModel: recordingViewModel,
+                notices: notices(viewModel),
+                onClear: clearNavigation
+            )
+        case .airport:
+            AirportColumnView(
+                databaseService: viewModel.databaseService,
+                weatherService: weatherService,
+                chartService: chartService,
+                notamService: notamService,
+                pirepService: pirepService,
+                windsAloftService: windsAloftService,
+                onDirectTo: { airport in
+                    nearestVM.setDirectTo(airport: airport)
+                    appState.stripColumn = .log
+                }
+            )
+        case .nearest:
+            NearestColumnView(
+                entries: nearestVM.nearestAirports,
+                region: appState.region,
+                onDirectTo: { nearestVM.setDirectTo(airport: $0) },
+                onAirportTap: { viewModel.onAirportTapped(icao: $0) }
+            )
+        case .layers:
+            LayersColumnView(mapViewModel: viewModel)
+        case .search:
+            if let searchViewModel {
+                SearchColumnView(searchViewModel: searchViewModel, onSelect: { viewModel.onAirportTapped(icao: $0) })
+            }
+        }
+    }
+
+    /// Warning and caution rows for the strip, in priority order.
+    private func notices(_ viewModel: MapViewModel) -> FlightLogNotices {
+        FlightLogNotices(
+            mapViewModel: viewModel,
+            airspaceCheckUnavailable: proximityAlertService?.checkUnavailable == true,
+            israelAlertsSuspended: israelAlertsSuspended,
+            israelAlerts: israelAlertService?.alerts ?? [],
+            isOffline: !reachabilityService.isConnected,
+            showIsraelChartHint: showIsraelChartHint,
+            onDismissIsraelChartHint: dismissIsraelChartHint,
+            recordingViewModel: recordingViewModel,
+            recordingUnavailable: recordingUnavailable
+        )
+    }
+
+    /// The chart: map, night dim, and the north indicator while rotated.
+    private func chart(_ viewModel: MapViewModel) -> some View {
+        ZStack(alignment: .topTrailing) {
+            MapView(mapService: mapService, mapViewModel: viewModel)
+                .ignoresSafeArea()
+
+            // Night dimming for vector base layers (raster layers are dimmed in MapService)
+            Color.black
+                .opacity(colorScheme == .dark ? NightPalette.mapDimOpacity * 0.6 : 0)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+
+            // Only while the map is rotated (track-up or rotate gesture); an indicator, not a control.
+            if abs(viewModel.mapDirection) > 0.5 {
+                NorthIndicator(mapDirection: viewModel.mapDirection)
+                    .padding(Space.m)
+            }
+        }
+    }
+
+    /// Clear Direct-To or the active route (wrong field picked) and its line on the chart.
+    private func clearNavigation() {
+        let hadRoute = appState.activePlanDestination != nil || appState.activeRoute != nil
+        appState.clearActiveNavigation()
+        if hadRoute { mapService.clearRoute() }
+    }
+}
+
+// MARK: - NorthIndicator
+
+/// Arrow pointing to true north while the map is rotated. Rotates against the map
+/// direction so it always points where north is on screen. Not a button.
+private struct NorthIndicator: View {
+    let mapDirection: Double   // degrees clockwise from north
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Image(systemName: "arrowtriangle.up.fill")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(Palette.northMarker)
+            Text("N")
+                .font(.callout.weight(.heavy))
+                .foregroundStyle(Palette.onAccent)
+        }
+        .rotationEffect(.degrees(-mapDirection))
+        .frame(width: MapControlMetrics.size, height: MapControlMetrics.size)
+        .glassEffect(.regular.tint(Palette.accent), in: .circle)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("North indicator")
+        .accessibilityValue("Map rotated \(Int(mapDirection.rounded())) degrees")
     }
 }
 
