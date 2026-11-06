@@ -13,6 +13,46 @@ Rules (the EFB lens):
 - Stale or unvalidated data is never shown as current.
 - No decorative animation in flight.
 
+## Direction 2: the log and the leading edge (target, 2026-11-05)
+
+The owner rejected four re-skins of today's layout (`docs/design/mocks/directions.html`) and asked for a reinvention. Fable and Opus each proposed one independently (`docs/design/mocks/fable.html`, `docs/design/mocks/opus.html`); the owner chose a merge of the two (Paseo Progress Q2 C). Merged mock: `docs/design/mocks/merge.html`. Until stage 1 lands, the sections below this one describe the shipped app.
+
+**The idea.** A VFR flight is a nav log, and the pilot's question is what comes next. Kanaf shows one object, the log, in three tenses: Next (planned), Now (flying), Flown (debrief and logbook). In flight the log reads forward: the next thing ahead gets the biggest type on the screen.
+
+From Fable (the skeleton):
+- The log is a strip pinned to the chart's edge (left; right edge in Hebrew). Waypoints are rows, legs are the space between them, the active leg's cell holds the live readouts.
+- The home screen is the log stack: planned flights, today's flight, past flights with per-leg grades, totals footer. The stack is also the logbook.
+- An airport opens in the strip's column; the chart stays live beside it. A debrief is the flight's own strip with the actuals written in.
+- The wing (כנף) is both the ownship glyph and the marker on the active leg's gauge.
+
+From Opus (the reading order):
+- Future is loud: time-to-next is the largest number. Present numbers (GS, TRK, ALT with VS) sit in the active cell at readout size, below it.
+- The chart is ruled in minutes along the track; the strip's row times and the map's minute ticks are the same times.
+- Predicted events (airspace floors, boundaries) are rows in the log, in time order, each stating its assumption ("at 312°, +300 fpm"). Stale input turns predictions off; it never shows them as current.
+- Night has no filled amber blocks: amber rule and amber type on near-black.
+- The debrief unrolls the line: strip map, profile against the ±200 ft band, and radio (heard / not heard) on one axis, with no overall score that hides a bad leg.
+
+Thrown away: the tab bar, floating round map buttons, the bottom instrument strip, the NRST box, the layer panel, bottom sheets, list-and-detail flight screens. Layers, night, zoom, NRST and GPS state become 60pt cells in the strip's footer, GPS state first. Direct-to is inserting a row.
+
+Type: one OFL system bundled with the app. Archivo (variable; condensed widths for readouts and idents, normal width for labels), IBM Plex Mono for times and log data, IBM Plex Sans Hebrew. Day chrome is cool paper; magenta = route, chart blue = airspace, red = warning, amber = caution, ink for everything else.
+
+The EFB rules above all still hold.
+
+### Stages
+| Stage | Ships | Needs |
+|---|---|---|
+| 1. The log | Strip and footer replace `InstrumentStripView`, `MapControlsView`, `NearestAirportHUD`, `LayerControlsView`, `ActiveNavigationBar` and `IsraelRouteFollowingBar`; the log stack replaces the three-tab `ContentView` and `FlightHistoryListView` / `LogbookListView`; airport in the strip column replaces `AirportInfoSheet`; minute ticks on the track line (`MapService` line layer, camera padding for the strip); new type and palette tokens in `Core/DesignTokens.swift` with fonts in `UIAppFonts`; night palette; iPhone rail; Hebrew mirroring. Next thing = next waypoint and its ETE. | Builds and simulator runs on a Mac (`tools/sim-test.sh`); Dynamic Type check of the strip at AX sizes; VoiceOver order of the log |
+| 2. The leading edge | Prediction rows (airspace floor and boundary times from track, GS and VS), the amber next-thing block, the compact altitude tape in the active cell; debrief unrolled bands | A prediction service with tests for noisy GPS, rules for suppressing jumpy or stale predictions, and an owner or CFI review before pilots see it |
+
+Riskiest assumptions: a strip that permanently takes a third of an iPad's width beats an edge-to-edge chart (Fable), and predictions from GPS in bumpy air stay steady enough to trust (Opus). Both need a pilot in a real cockpit before stage 2.
+
+### Decisions from the merged mock
+- **Only the next thing is loud.** The top row of the strip carries the one large time (about 100pt on iPad); later rows, waypoints or events, use about 44pt.
+- **NRST opens the nearest list in the strip column; one tap on a row inserts the direct-to.** A one-tap insert of the nearest field could pick a heliport or a short strip (finding F1); two taps keeps the choice (F2).
+- **Footer: GPS state, NRST, layer, zoom in, zoom out.** Night moves into the layer cell's menu, so the footer is one row on iPad and fits the iPhone with NRST showing distance and bearing. After a pan, the zoom-in cell becomes Recenter until the chart follows ownship again (F3), so nothing floats over the chart.
+- **The debrief runs on distance.** The strip map, profile and radio bands share one distance axis; times are labels at the waypoints. Short legs may be drawn at a marked half scale.
+- **The strip is a fixed 400pt in flight on iPad** (owner, Paseo Progress Q3 A): no collapsed mode. That is 34% of an 11" iPad and 29% of a 13" in landscape; test it with a pilot in a cockpit before stage 2.
+
 ## Typography
 SF Pro system text styles (Dynamic Type); numeric readouts monospaced. Roles live in `Core/DesignTokens.swift` (`TypeRole`):
 

@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Kanaf: The Leading Edge</title>
+<meta name="viewport" content="width=1320">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..900&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+Hebrew:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- page ---------- */
+:root{
+  --page:#141517; --pageInk:#E9E4D8; --pageInk2:#A8A397; --pageRule:#2B2D31;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--page);color:var(--pageInk);font-family:Archivo,system-ui,sans-serif;font-stretch:100%;-webkit-font-smoothing:antialiased;padding:72px 0 120px}
+.wrap{width:1240px;margin:0 auto}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.he{font-family:"IBM Plex Sans Hebrew",Archivo,sans-serif}
+.tnum{font-variant-numeric:tabular-nums}
+
+.mast{display:grid;grid-template-columns:420px 1fr;gap:56px;align-items:start;border-bottom:1px solid var(--pageRule);padding-bottom:56px}
+.mast .mark{font-stretch:125%;font-weight:800;font-size:15px;letter-spacing:.32em;text-transform:uppercase;color:var(--pageInk2)}
+.mast h1{font-stretch:62%;font-weight:800;font-size:132px;line-height:.86;letter-spacing:-.01em;margin-top:18px}
+.mast h1 em{font-style:normal;color:#F0A400}
+.mast .wing{margin-top:22px;display:flex;gap:14px;align-items:baseline;color:var(--pageInk2);font-size:15px}
+.mast .wing .he{font-size:28px;color:var(--pageInk);font-weight:600}
+.thesis{font-size:20px;line-height:1.5;color:var(--pageInk)}
+.thesis p+p{margin-top:12px}
+.thesis b{font-weight:700}
+.thesis .k{font-stretch:125%;font-weight:800;font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:var(--pageInk2);display:block;margin-bottom:6px}
+.thesis .risk{border-left:3px solid #F0A400;padding-left:16px}
+
+.rules{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin:40px 0 0}
+.rules div{border-top:2px solid var(--pageInk);padding-top:12px;font-size:14px;line-height:1.45;color:var(--pageInk2)}
+.rules b{display:block;color:var(--pageInk);font-stretch:125%;font-size:13px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px}
+
+section.plate{margin-top:96px}
+.plate-h{display:flex;align-items:baseline;gap:20px;margin-bottom:24px}
+.plate-h .n{font-stretch:62%;font-weight:800;font-size:56px;color:#F0A400;line-height:1}
+.plate-h h2{font-stretch:125%;font-weight:800;font-size:22px;letter-spacing:.04em;text-transform:uppercase}
+.plate-h .sub{color:var(--pageInk2);font-size:15px}
+.note{display:grid;grid-template-columns:1fr 1fr 1fr;gap:32px;margin-top:28px;font-size:15px;line-height:1.5;color:var(--pageInk2)}
+.note b{display:block;color:var(--pageInk);font-stretch:125%;font-size:12px;letter-spacing:.2em;text-transform:uppercase;margin-bottom:6px}
+.note p+p{margin-top:8px}
+
+/* ---------- device frames ---------- */
+.ipad{width:1216px;height:856px;padding:18px;border-radius:40px;background:#050506;box-shadow:0 0 0 1px #2c2d30,0 40px 80px rgba(0,0,0,.5);margin:0 auto}
+.ipad>.screen{width:1180px;height:820px;border-radius:22px;overflow:hidden;position:relative}
+.iphone{width:426px;height:898px;padding:12px;border-radius:64px;background:#050506;box-shadow:0 0 0 1px #2c2d30,0 40px 80px rgba(0,0,0,.5);position:relative}
+.iphone>.screen{width:402px;height:874px;border-radius:52px;overflow:hidden;position:relative}
+.island{position:absolute;left:50%;top:11px;width:124px;height:36px;margin-left:-62px;border-radius:20px;background:#000;z-index:20}
+
+/* ---------- app tokens ---------- */
+.day{
+  --land:#F2EEE4; --hill:#E6DFCE; --water:#BCD2DD; --ocean:#AFC7D3; --coast:#7F9DAD;
+  --ink:#121417; --ink2:#454A51; --ink3:#6B6F75; --rule:#CFC8B8; --grid:rgba(18,20,23,.08);
+  --panel:#FAF8F3; --panel2:#EFEBE2; --edge:#121417;
+  --bravo:#1B58A3; --bravoFill:rgba(27,88,163,.13); --dclass:#1B58A3; --charlie:#A3216F;
+  --route:#C2187A; --track:#121417;
+  --amber:#F0A400; --onAmber:#000; --amberInk:#8A5A00; --amberLine:#D08A00;
+  --red:#C8312C; --ok:#147832; --accent:#1556B8; --onAccent:#fff;
+  --halo:#F2EEE4; --own:#121417; --ownEdge:#fff;
+  color:var(--ink); background:var(--land);
+}
+.night{
+  --land:#0C0D0E; --hill:#111213; --water:#09121A; --ocean:#081018; --coast:#1E3240;
+  --ink:#B6B0A3; --ink2:#8E897E; --ink3:#6E6A62; --rule:#25272A; --grid:rgba(182,176,163,.07);
+  --panel:#08090A; --panel2:#111214; --edge:#3A3B3D;
+  --bravo:#3F6696; --bravoFill:rgba(63,102,150,.14); --dclass:#3F6696; --charlie:#7C3962;
+  --route:#9A3F75; --track:#B6B0A3;
+  --amber:#D2951C; --onAmber:#D2951C; --amberInk:#D2951C; --amberLine:#D2951C;
+  --red:#D9534B; --ok:#4E8F5D; --accent:#2E4A6E; --onAccent:#D9D9D9;
+  --halo:#0C0D0E; --own:#B6B0A3; --ownEdge:#0C0D0E;
+  color:var(--ink); background:var(--land);
+}
+.screen{font-family:Archivo,system-ui,sans-serif}
+.screen svg{position:absolute;left:0;top:0;display:block}
+.abs{position:absolute}
+.status{position:absolute;left:0;right:0;top:0;height:24px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-size:13px;font-weight:600;z-index:10;color:var(--ink)}
+.cap{font-stretch:125%;font-weight:700;font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+
+/* ---------- in-flight iPad ---------- */
+.col{position:absolute;left:764px;top:0;width:416px;height:820px;background:var(--panel)}
+.edge{position:absolute;left:760px;top:0;width:4px;height:820px;background:var(--edge)}
+.next{position:absolute;left:764px;top:0;width:416px;height:164px;padding:30px 24px 0 24px;background:var(--amber);color:var(--onAmber)}
+.night .next{background:var(--panel);border-bottom:3px solid var(--amber);box-shadow:inset 3px 0 0 var(--amber)}
+.next .k{display:flex;gap:10px;align-items:center}
+.next .k .tri{width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:14px solid currentColor}
+.next .row{display:flex;align-items:flex-end;gap:16px;margin-top:4px}
+.next .big{font-stretch:62%;font-weight:800;font-size:84px;line-height:.9;letter-spacing:-.02em}
+.next .what{padding-bottom:8px}
+.next .what .a{font-stretch:75%;font-weight:700;font-size:26px;line-height:1.05}
+.next .what .b{font-stretch:75%;font-weight:600;font-size:20px;line-height:1.1}
+.next .do{font-size:16px;font-weight:600;margin-top:8px;line-height:1.25}
+
+.assume{position:absolute;left:776px;top:174px;width:392px;display:flex;justify-content:space-between;color:var(--ink2);font-size:13px}
+.rung{position:absolute;left:776px;width:150px;line-height:1.1}
+.rung .t{font-stretch:62%;font-weight:800;font-size:30px;letter-spacing:-.01em}
+.rung .w{font-stretch:75%;font-weight:600;font-size:16px;color:var(--ink)}
+.rung.amb .t{color:var(--amberInk)}
+.rung.amb .t::before{content:"";display:inline-block;width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid var(--amberLine);margin-right:6px;vertical-align:4px}
+.rung.neu .t{color:var(--ink2)}
+
+.now{position:absolute;left:764px;top:612px;width:416px;height:208px;border-top:2px solid var(--ink);background:var(--panel)}
+.now .ro{display:grid;grid-template-columns:96px 112px 1fr;padding:10px 20px 0}
+.now .ro .l{font-size:14px;font-weight:600;color:var(--ink2);letter-spacing:.04em}
+.now .ro .v{font-stretch:68%;font-weight:700;font-size:46px;line-height:1;letter-spacing:-.01em}
+.now .ro .v small{font-size:20px;font-weight:600;margin-left:3px;color:var(--ink2)}
+.now .dest{position:absolute;left:12px;right:12px;bottom:14px;height:72px;border-radius:12px;background:var(--panel2);display:flex;align-items:center;padding:0 16px;gap:14px}
+.night .now .dest{background:#111214}
+.dest .id{font-family:"IBM Plex Mono";font-weight:700;font-size:26px}
+.dest .m{font-stretch:75%;font-size:19px;font-weight:600;line-height:1.15}
+.dest .m span{color:var(--ink2);font-weight:500}
+.dest .age{margin-left:auto;font-size:13px;font-weight:600;color:var(--ink2);text-align:right;line-height:1.3}
+
+.tense{position:absolute;left:16px;top:36px;height:64px;border-radius:14px;background:var(--panel);box-shadow:0 0 0 1.5px var(--edge);display:flex;align-items:center;padding:0 18px 0 16px;gap:14px}
+.tense .w{font-stretch:125%;font-weight:800;font-size:16px;letter-spacing:.16em}
+.tense .r{font-family:"IBM Plex Mono";font-size:15px;font-weight:600;color:var(--ink2)}
+.recchip{position:absolute;top:36px;height:64px;border-radius:14px;background:var(--panel);box-shadow:0 0 0 1.5px var(--edge);display:flex;align-items:center;gap:10px;padding:0 16px;font-family:"IBM Plex Mono";font-weight:600;font-size:15px}
+.recchip i{width:10px;height:10px;border-radius:50%;background:var(--ink)}
+.gps{color:var(--ink2)}
+
+.nrst{position:absolute;left:16px;bottom:16px;height:72px;border-radius:14px;background:var(--ink);color:var(--land);display:flex;align-items:center;gap:16px;padding:0 20px}
+.night .nrst{background:#18191B;color:var(--ink);box-shadow:0 0 0 1.5px #3A3B3D}
+.nrst .k{font-stretch:125%;font-weight:800;font-size:15px;letter-spacing:.16em}
+.nrst .id{font-family:"IBM Plex Mono";font-weight:700;font-size:24px}
+.nrst .m{font-stretch:75%;font-size:17px;font-weight:600;opacity:.85;line-height:1.15}
+
+.tabs{position:absolute;left:0;top:300px;width:64px}
+.tabs div{height:64px;background:var(--panel);border:1.5px solid var(--edge);border-left:0;margin-top:-1.5px;display:flex;align-items:center;justify-content:center;font-stretch:100%;font-weight:800;font-size:18px}
+.tabs div:first-child{border-radius:0 14px 0 0;font-size:14px;letter-spacing:.04em}
+.tabs div:last-child{border-radius:0 0 14px 0;font-size:13px;letter-spacing:.06em}
+
+/* ---------- debrief ---------- */
+.dhead{position:absolute;left:0;right:0;top:24px;height:76px;display:flex;align-items:center;padding:0 28px;gap:24px;border-bottom:1.5px solid var(--ink)}
+.tswitch{display:flex;height:52px;border-radius:12px;box-shadow:0 0 0 1.5px var(--ink);overflow:hidden}
+.tswitch div{display:flex;align-items:center;padding:0 20px;font-stretch:125%;font-weight:800;font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink2)}
+.tswitch div+div{border-left:1.5px solid var(--ink)}
+.tswitch .on{background:var(--ink);color:var(--land)}
+.dtitle{font-stretch:62%;font-weight:800;font-size:44px;line-height:1;letter-spacing:-.01em}
+.dtitle .ar{font-weight:400;color:var(--ink2);margin:0 6px}
+.dmeta{margin-left:auto;text-align:right;font-size:14px;line-height:1.4;color:var(--ink2)}
+.dmeta b{color:var(--ink);font-weight:700}
+.verdict{position:absolute;left:28px;right:28px;top:112px;height:44px;display:flex;align-items:center;gap:12px}
+.verdict .v{font-stretch:75%;font-weight:700;font-size:24px;margin-right:8px}
+.chip{display:flex;align-items:center;gap:8px;height:40px;padding:0 14px;border-radius:10px;font-weight:600;font-size:15px}
+.chip.amb{background:var(--amber);color:#000}
+.chip .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid #000}
+.legs{position:absolute;top:290px;height:68px}
+.leg{position:absolute;top:0;height:68px;padding:6px 12px 0;border-left:1.5px solid var(--ink)}
+.leg .n{font-family:"IBM Plex Mono";font-weight:600;font-size:13px;color:var(--ink2)}
+.leg .a{font-stretch:75%;font-weight:600;font-size:16px}
+.leg .p{position:absolute;right:12px;top:4px;font-stretch:62%;font-weight:800;font-size:52px;line-height:1}
+.leg .p small{font-size:24px}
+.leg.amb .p{color:var(--amberInk)}
+.leg .h{font-size:12px;color:var(--ink2);font-weight:600;letter-spacing:.04em}
+.rep{position:absolute;top:620px;height:180px;border-radius:12px;background:var(--panel2);padding:12px 14px}
+.rep .h{display:flex;justify-content:space-between;align-items:baseline}
+.rep .pt{font-family:"IBM Plex Mono";font-weight:700;font-size:17px}
+.rep .s{font-size:13px;font-weight:600;color:var(--ink2)}
+.rep .q{margin-top:8px;font-size:15px;line-height:1.4}
+.rep .q.he{font-size:17px}
+.rep .play{position:absolute;left:14px;bottom:12px;height:44px;padding:0 14px;border-radius:10px;box-shadow:0 0 0 1.5px var(--ink);display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px}
+.rep.amb{background:#FFF3D6;box-shadow:inset 0 0 0 2px var(--amber)}
+.rep.amb .s{color:var(--amberInk)}
+
+/* ---------- iPhone ---------- */
+.p-next{position:absolute;left:0;right:0;top:0;height:236px;background:var(--amber);color:var(--onAmber);padding:58px 20px 0}
+.p-next .row{display:flex;align-items:flex-end;gap:12px}
+.p-next .big{font-stretch:62%;font-weight:800;font-size:76px;line-height:.9}
+.p-next .a{font-stretch:75%;font-weight:700;font-size:22px;line-height:1.05;padding-bottom:6px}
+.p-next .do{font-size:15px;font-weight:600;margin-top:6px}
+.p-now{position:absolute;left:0;right:0;top:690px;height:184px;background:var(--panel);border-top:2px solid var(--ink)}
+.p-now .ro{display:grid;grid-template-columns:1fr 1fr 1.25fr;padding:8px 16px 0}
+.p-now .l{font-size:13px;font-weight:600;color:var(--ink2)}
+.p-now .v{font-stretch:68%;font-weight:700;font-size:38px;line-height:1}
+.p-now .v small{font-size:17px;color:var(--ink2);font-weight:600}
+.p-now .nrst{left:12px;right:12px;bottom:30px;height:64px;border-radius:14px;padding:0 16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="mast">
+  <div>
+    <div class="mark">Kanaf &middot; design direction &middot; Opus</div>
+    <h1>The<br>leading<br><em>edge</em></h1>
+    <div class="wing"><span class="he" dir="rtl">כנף</span><span>wing. The leading edge is the part that meets the air first.</span></div>
+  </div>
+  <div class="thesis">
+    <p><span class="k">Thesis</span><b>Kanaf shows the next ten minutes, not the last second.</b> The panel already shows altitude, speed and heading. Nothing shows what the airplane is about to meet, and when. So every screen is laid out along one axis, the flight line: ruled in minutes in flight, unrolled flat like a 1930s strip map on the ground.</p>
+    <p><span class="k">Thrown away</span>The instrument strip as hero, the tab bar (now three tenses: Next, Now, Flown), floating round buttons, bottom sheets, list-and-detail screens, the map as a backdrop.</p>
+    <p class="risk"><span class="k">Riskiest assumption</span>A prediction from noisy GPS vertical speed and groundspeed in bumpy air stays steady enough that a pilot trusts "Class B floor in 1:50" instead of a countdown that jumps. Hence every prediction states its assumption on screen.</p>
+  </div>
+</header>
+
+<div class="rules">
+  <div><b>One axis</b>Ahead is up in flight, ahead is along the line on the ground. In Hebrew the unrolled line starts on the right.</div>
+  <div><b>Future is loud</b>Big type is reserved for time-to-something. Present-tense numbers are small, because the panel already shows them.</div>
+  <div><b>Assumptions shown</b>Every prediction says what it assumes. Stale input turns the prediction off, never shows it as current.</div>
+  <div><b>Colour is meaning</b>Amber = caution, red = warning, magenta = route, chart blue = airspace. Everything else is ink on paper.</div>
+</div>
+
+<!-- ============ 1. IN-FLIGHT DAY ============ -->
+<section class="plate">
+  <div class="plate-h"><span class="n">01</span><h2>Now &middot; in flight</h2><span class="sub">iPad landscape, day. Near KPAO, 2,450 ft, 98 kt, track 312&deg;, +300 fpm, KOAK 18.4 NM.</span></div>
+  <div class="ipad"><div class="screen day" data-flight></div></div>
+  <div class="note">
+    <div><b>The idea</b><p>The map is track-up and ruled in minutes along your track. The column to its right is the same ruler turned sideways: time goes up, altitude goes across, and airspace is drawn as walls at their floors. The minute marks line up across the edge, so the map and the corridor are one picture at the same scale.</p></div>
+    <div><b>What you read in a glance</b><p>The amber block: you meet the SFO Class B floor in 1:50 if nothing changes, and what to do about it. Then the corridor: the floor drops to 1,500 at 6:12, so leveling at 2,900 only delays the problem. The present (GS, TRK, ALT) sits at the trailing edge, small, because the panel already shows it.</p></div>
+    <div><b>Replaces</b><p>The bottom instrument strip, the floating 60pt circles (now square tabs fixed to the left edge, still 64pt), the NRST box (now one slab with the field, distance and bearing), and the map as a backdrop under chrome. Zooming the map rescales the corridor too.</p></div>
+  </div>
+</section>
+
+<!-- ============ 2. IN-FLIGHT NIGHT ============ -->
+<section class="plate">
+  <div class="plate-h"><span class="n">02</span><h2>Now &middot; night</h2><span class="sub">Same moment, night palette.</span></div>
+  <div class="ipad"><div class="screen night" data-flight></div></div>
+  <div class="note">
+    <div><b>The idea</b><p>Night is not the day screen inverted. Nothing on the screen is brighter than dim warm grey, the chart is near black, and the airspace and route keep their hue at a third of the luminance.</p></div>
+    <div><b>Caution without glare</b><p>A filled amber block at night would be the brightest thing in the cockpit and cost dark adaptation. At night caution becomes an amber rule and amber type on black: same meaning, same position, about a tenth of the light.</p></div>
+    <div><b>Replaces</b><p>The system dark scheme with navy glass controls and a dimmed raster. Here the palette is one set of tokens, so every element has a measured night value instead of whatever the system dark mode produces.</p></div>
+  </div>
+</section>
+
+<!-- ============ 3. DEBRIEF ============ -->
+<section class="plate">
+  <div class="plate-h"><span class="n">03</span><h2>Flown &middot; CVFR debrief</h2><span class="sub">iPad landscape, day. LLHZ to LLIB via TAVOR and DESHE.</span></div>
+  <div class="ipad"><div class="screen day" id="debrief"></div></div>
+  <div class="note">
+    <div><b>The idea</b><p>After landing the line is unrolled. One horizontal axis carries three bands: the strip map (where you were across the route), the profile (where you were in height, against the assigned altitude and the ground), and the radio (what you said at each point). Every finding sits at the place it happened.</p></div>
+    <div><b>Honest about the bad leg</b><p>There is no overall score that could hide a 71% leg. The verdict names the two things to look at; the low stretch on Tavor to Deshe is drawn as an amber area with its depth and duration, and DESHE says "not heard" only because a transcript exists. Aerodrome zones are hatched and labelled "not scored".</p></div>
+    <div><b>Replaces</b><p>The list-and-detail flight screen and the debrief table of rows. Leg 1 is drawn at half scale with a marked break so the short legs where things happened get the room. Replay starts from the point you tap.</p></div>
+  </div>
+</section>
+
+<!-- ============ 4. IPHONE ============ -->
+<section class="plate">
+  <div class="plate-h"><span class="n">04</span><h2>Now &middot; iPhone</h2><span class="sub">Portrait, day. Same moment as 01.</span></div>
+  <div style="display:grid;grid-template-columns:426px 1fr;gap:56px;align-items:start">
+    <div class="iphone"><div class="island"></div><div class="screen day" id="phone"></div></div>
+    <div class="note" style="grid-template-columns:1fr;margin-top:0;font-size:16px">
+      <div><b>The idea</b><p>No room for a corridor beside the map, so it folds twice. The minutes go onto the track line itself, with the walls marked where you will meet them. The altitude axis becomes one horizontal bar inside the amber block: your altitude, your climb and the floor, read left to right like a tape.</p></div>
+      <div><b>Same order of reading</b><p>Top to bottom is future to present: the next thing you will meet, then the map ruled in minutes, then the present at the bottom edge, then NRST at the thumb. The only thing over the map is the destination tag beside its airport.</p></div>
+      <div><b>Replaces</b><p>The compact layout that squeezed the iPad strip and NRST box into a phone. Layout still switches on size class, not device: an iPad in Split View gets this screen.</p></div>
+      <div><b>Hard parts, honestly</b><p>MapLibre draws the chart, rings, route and track line; the corridor and the amber block are SwiftUI Canvas. The minute marks only line up if both read the same camera scale every frame, which means driving the corridor from <span class="mono">MLNMapView</span> camera changes and never animating one without the other.</p></div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<template id="flightTpl">
+  <div class="status"><span class="mono">15:30</span><span class="mono">GPS 3D &middot; 100%</span></div>
+  <svg class="map" width="760" height="820" viewBox="0 0 760 820"></svg>
+  <div class="col"></div>
+  <svg class="corr" width="1180" height="820" viewBox="0 0 1180 820"></svg>
+  <div class="edge"></div>
+
+  <div class="tense"><span class="w">NOW</span><span class="r">KPAO &rarr; KOAK</span></div>
+  <div class="recchip" style="left:262px"><i></i>REC 0:14:22</div>
+  <div class="recchip gps" style="left:430px">GPS &plusmn;12 ft &middot; 1 s</div>
+
+  <div class="tabs"><div>TRK&uarr;</div><div>+</div><div>&minus;</div><div>LAYER</div></div>
+  <div class="nrst"><span class="k">NRST</span><span class="id">KPAO</span><span class="m">2.1 NM &middot; 331&deg;<br>RWY 13/31 2,443 ft</span></div>
+
+  <div class="next">
+    <div class="k cap"><span class="tri"></span>Next &middot; caution</div>
+    <div class="row">
+      <div class="big tnum">1:50</div>
+      <div class="what"><div class="a">Class B floor</div><div class="b">3,000 ft MSL</div></div>
+    </div>
+    <div class="do">Level at 2,900, then right to 341&deg; by 6:12.</div>
+  </div>
+
+  <div class="assume"><span>At <b class="mono">312&deg;</b>, <b class="mono">+300 fpm</b></span></div>
+
+  <div class="rung amb" style="top:503px"><div class="t tnum">1:50</div><div class="w">B floor 3,000</div></div>
+  <div class="rung amb" style="top:317px"><div class="t tnum">6:12</div><div class="w">floor drops to 1,500</div></div>
+  <div class="rung neu" style="top:256px"><div class="t tnum">7:39</div><div class="w">SFO B surface</div></div>
+
+  <div class="now">
+    <div class="ro">
+      <div><div class="l">GS kt</div><div class="v tnum">98</div></div>
+      <div><div class="l">TRK &deg;T</div><div class="v tnum">312</div></div>
+      <div><div class="l">ALT ft MSL</div><div class="v tnum">2,450<small>&uarr;300</small></div></div>
+    </div>
+    <div class="dest"><span class="id">KOAK</span><span class="m">341&deg; &middot; 18.4 NM<br><span>ETE 11:16 &middot; ETA 15:41</span></span><span class="age">Wind 290/12<br>METAR 7 min</span></div>
+  </div>
+</template>
+
+<script>
+/* ---------- geometry ---------- */
+const REF = {lat:37.4611, lon:-122.1150};          // KPAO
+const NMLAT = 60, NMLON = 60*Math.cos(37.55*Math.PI/180); // NM per degree
+const OWN = {lat:37.4311, lon:-122.0940};           // 2 NM SE of KPAO
+const TRK = 312;                                    // degrees true
+const GS = 98;                                      // knots
+
+function projector(ox, oy, s){
+  const a = TRK*Math.PI/180, c=Math.cos(a), sn=Math.sin(a);
+  return (lat, lon) => {
+    const dN=(lat-OWN.lat)*NMLAT, dE=(lon-OWN.lon)*NMLON;
+    const along=dN*c+dE*sn, across=-dN*sn+dE*c;
+    return [ox+across*s, oy-along*s];
+  };
+}
+const off = (p, brg, nm) => [p.lat+nm*Math.cos(brg*Math.PI/180)/NMLAT, p.lon+nm*Math.sin(brg*Math.PI/180)/NMLON];
+const pts = (P, arr) => arr.map(([la,lo]) => P(la,lo).map(v=>v.toFixed(1)).join(',')).join(' ');
+
+const V = GS/60;                                    // NM per minute
+const T_B3000 = 1.833, T_B1500 = 6.2, T_BSFC = 7.65; // minutes to each SFO Class B ring on this track
+const AP = {
+  KPAO:{lat:37.4611,lon:-122.1150,t:1}, KSQL:{lat:37.5119,lon:-122.2495,t:1,side:'l'},
+  KSFO:{lat:37.6190,lon:-122.3750,t:1,side:'l'}, KOAK:{lat:37.7213,lon:-122.2208,t:1},
+  KHWD:{lat:37.6589,lon:-122.1217,t:1}, KNUQ:{lat:37.4161,lon:-122.0491,t:1},
+  KSJC:{lat:37.3626,lon:-121.9290,t:1}
+};
+const alongPt = t => { const a=TRK*Math.PI/180; return [OWN.lat+V*t*Math.cos(a)/NMLAT, OWN.lon+V*t*Math.sin(a)/NMLON]; };
+const R = t => { const p=alongPt(t); return Math.hypot((AP.KSFO.lat-p[0])*NMLAT,(AP.KSFO.lon-p[1])*NMLON); }; // SFO ring radius that this track crosses at minute t
+const DCLS = [{id:'PAO',ap:AP.KPAO,r:1.8,top:1300},{id:'SQL',ap:AP.KSQL,r:3.6,top:1500},{id:'HWD',ap:AP.KHWD,r:3.8,top:1500},{id:'NUQ',ap:AP.KNUQ,r:3.2,top:1500}];
+function dSpan(d){ const [x,y]=projector(0,0,1)(d.ap.lat,d.ap.lon); const al=-y; if(Math.abs(x)>=d.r) return null; const hf=Math.sqrt(d.r*d.r-x*x); const t0=Math.max(0,(al-hf)/V), t1=(al+hf)/V; return t1-t0>0.5 ? [t0,t1] : null; }
+const BAY = [[37.428,-121.975],[37.432,-122.03],[37.436,-122.07],[37.452,-122.098],[37.462,-122.108],[37.478,-122.125],[37.497,-122.17],[37.512,-122.205],[37.535,-122.225],[37.56,-122.245],[37.575,-122.262],[37.588,-122.31],[37.603,-122.352],[37.606,-122.372],[37.626,-122.357],[37.634,-122.378],[37.66,-122.385],[37.71,-122.387],[37.73,-122.362],[37.76,-122.385],[37.81,-122.40],[37.86,-122.40],[37.86,-122.30],[37.82,-122.30],[37.79,-122.28],[37.765,-122.245],[37.735,-122.24],[37.712,-122.245],[37.70,-122.19],[37.67,-122.165],[37.63,-122.14],[37.585,-122.12],[37.55,-122.09],[37.51,-122.05],[37.475,-122.01],[37.45,-121.98]];
+const OCEAN = [[37.20,-122.36],[37.35,-122.41],[37.45,-122.45],[37.50,-122.50],[37.60,-122.515],[37.70,-122.51],[37.78,-122.515],[37.95,-122.55],[37.95,-123.2],[37.2,-123.2]];
+const HILLS = [[37.28,-122.08],[37.36,-122.18],[37.44,-122.26],[37.52,-122.33],[37.58,-122.40],[37.64,-122.46],[37.62,-122.49],[37.50,-122.47],[37.40,-122.40],[37.28,-122.28]];
+const EHILLS = [[37.55,-121.97],[37.66,-122.07],[37.76,-122.15],[37.86,-122.20],[37.95,-122.15],[37.95,-121.80],[37.55,-121.80]];
+
+function buildMap(svg, {w,h,ox,oy,s,labels=true,phone=false}){
+  const P = projector(ox,oy,s);
+  const ppm = s*GS/60; // px per minute along track
+  let o = '';
+  o += `<defs><clipPath id="clip${w}"><rect width="${w}" height="${h}"/></clipPath></defs><g clip-path="url(#clip${w})">`;
+  o += `<rect width="${w}" height="${h}" fill="var(--land)"/>`;
+  o += `<polygon points="${pts(P,HILLS)}" fill="var(--hill)"/><polygon points="${pts(P,EHILLS)}" fill="var(--hill)"/>`;
+  o += `<polygon points="${pts(P,OCEAN)}" fill="var(--ocean)" stroke="var(--coast)" stroke-width="1"/>`;
+  o += `<polygon points="${pts(P,BAY)}" fill="var(--water)" stroke="var(--coast)" stroke-width="1"/>`;
+  // Class D (dashed blue) and C (magenta)
+  const circ = (ap, r, stroke, dash, wdt=1.6) => { const [x,y]=P(ap.lat,ap.lon); return `<circle cx="${x}" cy="${y}" r="${r*s}" fill="none" stroke="${stroke}" stroke-width="${wdt}" ${dash?`stroke-dasharray="${dash}"`:''}/>`; };
+  o += DCLS.map(d=>circ(d.ap,d.r,'var(--dclass)','7 5')).join('');
+  o += circ(AP.KOAK,5,'var(--charlie)','',2) + circ(AP.KOAK,10,'var(--charlie)','',2) + circ(AP.KSJC,5,'var(--charlie)','',2) + circ(AP.KSJC,10,'var(--charlie)','',2);
+  // Class B shelves around SFO
+  [T_B3000,T_B1500,T_BSFC].forEach(t=>{ o += circ(AP.KSFO,R(t),'var(--bravo)','',3); });
+  // shelf labels (sectional style ceiling over floor)
+  const shelf = (r, brg, top, bot) => { const [la,lo]=off(AP.KSFO,brg,r); const [x,y]=P(la,lo); return `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><rect x="-19" y="-21" width="38" height="42" rx="3" fill="var(--land)" opacity=".92"/><text text-anchor="middle" y="-4" font-family="IBM Plex Mono" font-weight="700" font-size="${phone?13:15}" fill="var(--bravo)">${top}</text><line x1="-13" x2="13" y1="2" y2="2" stroke="var(--bravo)" stroke-width="1.5"/><text text-anchor="middle" y="17" font-family="IBM Plex Mono" font-weight="700" font-size="${phone?13:15}" fill="var(--bravo)">${bot}</text></g>`; };
+  o += shelf(R(T_B3000),70,'100','30') + shelf(R(T_B1500),82,'100','15') + shelf(R(T_BSFC),100,'100','SFC');
+  // route (magenta) ownship -> KOAK
+  const [x0,y0]=P(OWN.lat,OWN.lon), [xk,yk]=P(AP.KOAK.lat,AP.KOAK.lon);
+  o += `<line x1="${x0}" y1="${y0}" x2="${xk}" y2="${yk}" stroke="var(--halo)" stroke-width="10" stroke-linecap="round" opacity=".8"/><line x1="${x0}" y1="${y0}" x2="${xk}" y2="${yk}" stroke="var(--route)" stroke-width="5" stroke-linecap="round"/>`;
+  // airports
+  for(const [id,a] of Object.entries(AP)){
+    const [x,y]=P(a.lat,a.lon); if(x<-20||x>w+20||y<-20||y>h+20) continue;
+    const col = a.t ? 'var(--bravo)' : 'var(--charlie)';
+    o += `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><circle r="7" fill="var(--land)" stroke="${col}" stroke-width="3"/>${[0,90,180,270].map(r=>`<line y1="-7" y2="-11" stroke="${col}" stroke-width="3" transform="rotate(${r})"/>`).join('')}`;
+    if(!(phone&&id==='KOAK')&&(labels||['KPAO','KSQL','KSFO'].includes(id))){ const l=a.side==='l'; o += `<text x="${l?-14:14}" y="5" text-anchor="${l?'end':'start'}" font-family="IBM Plex Mono" font-weight="700" font-size="${phone?13:15}" fill="var(--ink)" paint-order="stroke" stroke="var(--land)" stroke-width="4">${id}</text>`; }
+    o += `</g>`;
+  }
+  // projected track line ruled in minutes
+  const L = h; // long enough
+  o += `<line x1="${ox}" y1="${oy}" x2="${ox}" y2="${oy-L}" stroke="var(--halo)" stroke-width="9" opacity=".85"/><line x1="${ox}" y1="${oy}" x2="${ox}" y2="${oy-L}" stroke="var(--track)" stroke-width="3"/>`;
+  for(let m=1;m<=14;m++){
+    const y = oy-m*ppm; if(y<30) break;
+    const big = (m%5===0)||m===1||m===2||m===3;
+    o += `<line x1="${ox-(big?14:8)}" x2="${ox+(big?14:8)}" y1="${y}" y2="${y}" stroke="var(--track)" stroke-width="${big?3:2}"/>`;
+    if(big) o += `<text x="${ox-20}" y="${y+5}" text-anchor="end" font-family="Archivo" font-stretch="75%" font-weight="700" font-size="${phone?14:16}" fill="var(--ink)" paint-order="stroke" stroke="var(--land)" stroke-width="4">${m===1?'1 min':m}</text>`;
+  }
+  // predicted conflicts on the line
+  const at = t => oy - t*ppm;
+  const diamond = (y, label, r=11) => `<g transform="translate(${ox},${y})"><rect x="${-r}" y="${-r}" width="${2*r}" height="${2*r}" transform="rotate(45)" fill="var(--amber)" stroke="var(--ink)" stroke-width="2"/><text x="${r+12}" y="6" font-family="Archivo" font-stretch="75%" font-weight="800" font-size="${phone?16:18}" fill="var(--amberInk)" paint-order="stroke" stroke="var(--land)" stroke-width="5">${label}</text></g>`;
+  o += diamond(at(T_B3000), '1:50 · 3,000');
+  o += diamond(at(T_B1500), '6:12 · 1,500', 8);
+  // ownship
+  o += `<g transform="translate(${ox},${oy})"><path d="M0,-22 L15,14 L0,6 L-15,14 Z" fill="var(--own)" stroke="var(--ownEdge)" stroke-width="2.5" stroke-linejoin="round"/></g>`;
+  o += `</g>`;
+  svg.innerHTML = o;
+  return {P, ppm};
+}
+
+/* ---------- corridor (time up, altitude across) ---------- */
+function buildCorridor(svg, ppm){
+  const now = 600, top = 196;            // y of NOW and top of plot
+  const X0 = 940, X1 = 1164;             // 0 ft .. 4,000 ft
+  const ax = ft => X0 + (X1-X0)*ft/4000;
+  const ty = m => now - m*ppm;
+  let o = `<defs>
+    <pattern id="hb" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="8" height="8" fill="var(--bravoFill)"/><line x1="0" y1="0" x2="0" y2="8" stroke="var(--bravo)" stroke-width="1.6" opacity=".55"/></pattern>
+    <clipPath id="cc"><rect x="764" y="${top}" width="416" height="${now-top}"/></clipPath></defs>`;
+  o += `<g clip-path="url(#cc)">`;
+  // minute grid, continuing across the edge into the map as ticks
+  for(let m=1;m<=10;m++){ const y=ty(m); o += `<line x1="${X0}" x2="${X1}" y1="${y}" y2="${y}" stroke="var(--grid)" stroke-width="${m%5?1:2}"/>`; }
+  for(const ft of [1000,2000,3000]) o += `<line x1="${ax(ft)}" x2="${ax(ft)}" y1="${top}" y2="${now}" stroke="var(--grid)"/>`;
+  // Class B wall: nothing before the 3,000 ring; floor 3,000 to the 1,500 ring; floor 1,500 to the surface ring; surface beyond
+  const b = [[ax(3000),ty(T_B3000)],[ax(3000),ty(T_B1500)],[ax(1500),ty(T_B1500)],[ax(1500),ty(T_BSFC)],[ax(0),ty(T_BSFC)],[ax(0),top],[X1+20,top],[X1+20,ty(T_B3000)]];
+  o += `<polygon points="${b.map(p=>p.join(',')).join(' ')}" fill="url(#hb)" stroke="var(--bravo)" stroke-width="3" stroke-linejoin="round"/>`;
+  // Class D blocks the track crosses (you pass above them)
+  for(const d of DCLS){ const sp=dSpan(d); if(!sp) continue; const y1=ty(sp[1]), y0=ty(sp[0]);
+    o += `<rect x="${ax(0)+2}" y="${y1}" width="${ax(d.top)-ax(0)-2}" height="${y0-y1}" fill="none" stroke="var(--dclass)" stroke-width="1.6" stroke-dasharray="6 4"/>`;
+    o += `<text x="${ax(d.top/2)}" y="${(y0+y1)/2+5}" text-anchor="middle" font-family="IBM Plex Mono" font-weight="700" font-size="13" fill="var(--bravo)">${d.id} D</text>`; }
+  // wall labels
+  const bl = (x,m,t) => `<text x="${x}" y="${ty(m)+5}" text-anchor="middle" font-family="IBM Plex Mono" font-weight="700" font-size="14" fill="var(--bravo)" paint-order="stroke" stroke="var(--panel)" stroke-width="5">${t}</text>`;
+  o += bl(ax(3500),4.0,'B 3k+') + bl(ax(2750),6.9,'B 1.5k+') + bl(ax(2000),9.0,'B SFC');
+  // your path: climb at 300 fpm from 2,450 until it meets the 3,000 floor
+  const tHit = (3000-2450)/300; // minutes
+  o += `<line x1="${ax(2450)}" y1="${now}" x2="${ax(3000)}" y2="${ty(tHit)}" stroke="var(--track)" stroke-width="4" stroke-linecap="round"/>`;
+  // advice: level at 2,900 and you still meet the 1,500 step
+  o += `<line x1="${ax(2900)}" y1="${ty(1.5)}" x2="${ax(2900)}" y2="${ty(T_B1500)}" stroke="var(--ink2)" stroke-width="2.5" stroke-dasharray="2 6" stroke-linecap="round"/>`;
+  o += `<g transform="translate(${ax(3000)},${ty(tHit)})"><rect x="-10" y="-10" width="20" height="20" transform="rotate(45)" fill="var(--amber)" stroke="var(--ink)" stroke-width="2"/></g>`;
+  o += `<g transform="translate(${ax(2900)},${ty(T_B1500)})"><rect x="-7" y="-7" width="14" height="14" transform="rotate(45)" fill="var(--amber)" stroke="var(--ink)" stroke-width="2"/></g>`;
+  o += `</g>`;
+  // altitude scale
+  for(const ft of [1000,2000,3000,4000]) o += `<text x="${ax(ft)}" y="${top-8}" text-anchor="middle" font-family="IBM Plex Mono" font-size="13" font-weight="600" fill="var(--ink2)">${ft/1000}k</text>`;
+  // leaders from rungs to the plot
+  const lead = (y, x2) => `<line x1="900" x2="${x2-14}" y1="${y}" y2="${y}" stroke="var(--amberLine)" stroke-width="2"/>`;
+  o += lead(ty(tHit), ax(3000)) + lead(ty(T_B1500), ax(2900));
+  o += `<line x1="900" x2="${ax(0)-4}" y1="${ty(T_BSFC)}" y2="${ty(T_BSFC)}" stroke="var(--ink3)" stroke-width="1.5"/>`;
+  // NOW marker: your altitude at the trailing edge
+  o += `<path d="M${ax(2450)},${now-16} l-9,15 h18 z" fill="var(--track)"/>`;
+  // minute ticks across the edge
+  for(let m=1;m<=10;m++){ const y=ty(m); if(y<top) break; o += `<line x1="750" x2="774" y1="${y}" y2="${y}" stroke="var(--ink)" stroke-width="${(m%5===0||m<=3)?2.5:1.5}"/>`; }
+  o += `<line x1="750" x2="1180" y1="${now}" y2="${now}" stroke="var(--ink)" stroke-width="2"/>`;
+  svg.innerHTML = o;
+}
+
+/* stamp the in-flight screen twice (day, night) */
+const tpl = document.getElementById('flightTpl');
+document.querySelectorAll('[data-flight]').forEach(scr=>{
+  scr.appendChild(tpl.content.cloneNode(true));
+  const {ppm} = buildMap(scr.querySelector('svg.map'), {w:760,h:820,ox:380,oy:600,s:26});
+  buildCorridor(scr.querySelector('svg.corr'), ppm);
+});
+
+/* ---------- iPhone ---------- */
+(function(){
+  const scr = document.getElementById('phone');
+  scr.innerHTML = `
+    <svg class="map" width="402" height="874" viewBox="0 0 402 874"></svg>
+    <div class="p-next">
+      <div class="cap" style="display:flex;gap:8px;align-items:center"><span style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #000"></span>Next &middot; caution</div>
+      <div class="row"><div class="big tnum">1:50</div><div class="a">Class B floor<br>3,000 ft MSL</div></div>
+      <svg width="362" height="58" style="position:relative;margin-top:8px" viewBox="0 0 362 58">
+        <rect x="0" y="14" width="362" height="22" rx="4" fill="rgba(0,0,0,.12)"/>
+        <rect x="${(3000/4000)*362}" y="14" width="${362-(3000/4000)*362}" height="22" fill="rgba(0,0,0,.35)"/>
+        <line x1="${(3000/4000)*362}" x2="${(3000/4000)*362}" y1="8" y2="42" stroke="#000" stroke-width="3"/>
+        <line x1="${(2450/4000)*362}" x2="${(2900/4000)*362}" y1="25" y2="25" stroke="#000" stroke-width="3" stroke-dasharray="4 4"/>
+        <path d="M${(2450/4000)*362},14 l-8,-12 h16 z" fill="#000"/>
+        <text x="${(2450/4000)*362}" y="54" text-anchor="middle" font-family="IBM Plex Mono" font-weight="700" font-size="13">2,450 &uarr;300</text>
+        <text x="${(3000/4000)*362+6}" y="54" font-family="IBM Plex Mono" font-weight="700" font-size="13">B 3,000</text>
+        <text x="0" y="54" font-family="IBM Plex Mono" font-size="12">0</text>
+      </svg>
+      <div class="do">Level at 2,900, then right to 341&deg; by 6:12.</div>
+    </div>
+    <div class="abs" style="left:0;top:252px;width:60px">
+      <div style="height:60px;background:var(--panel);border:1.5px solid var(--ink);border-left:0;border-radius:0 14px 0 0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">TRK&uarr;</div>
+      <div style="height:60px;margin-top:-1.5px;background:var(--panel);border:1.5px solid var(--ink);border-left:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px">+</div>
+      <div style="height:60px;margin-top:-1.5px;background:var(--panel);border:1.5px solid var(--ink);border-left:0;border-radius:0 0 14px 0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px">&minus;</div>
+    </div>
+    <div class="abs" style="right:14px;top:634px;height:44px;padding:0 12px;border-radius:12px;background:var(--panel);box-shadow:0 0 0 1.5px var(--ink);display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono';font-weight:600;font-size:13px"><i style="width:9px;height:9px;border-radius:50%;background:var(--ink)"></i>REC 0:14:22</div>
+    <div class="p-now">
+      <div class="ro">
+        <div><div class="l">GS kt</div><div class="v tnum">98</div></div>
+        <div><div class="l">TRK &deg;T</div><div class="v tnum">312</div></div>
+        <div><div class="l">ALT ft</div><div class="v tnum">2,450<small>&uarr;300</small></div></div>
+      </div>
+      <div class="nrst"><span class="k">NRST</span><span class="id">KPAO</span><span class="m">2.1 NM &middot; 331&deg;<br>RWY 13/31 2,443 ft</span></div>
+    </div>`;
+  const {P} = buildMap(scr.querySelector('svg.map'), {w:402,h:690,ox:190,oy:640,s:19,labels:false,phone:true});
+  // destination tag above the KOAK symbol
+  const [kx,ky] = P(AP.KOAK.lat, AP.KOAK.lon);
+  const tag = document.createElement('div');
+  tag.className='abs';
+  tag.style.cssText=`right:10px;top:${ky-62}px;height:48px;padding:0 12px;border-radius:12px;background:var(--panel);box-shadow:0 0 0 1.5px var(--route);display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px`;
+  tag.innerHTML = `<span class="mono" style="font-weight:700;font-size:17px">KOAK</span><span style="font-stretch:75%;line-height:1.1">18.4 NM<br>11:16</span>`;
+  scr.appendChild(tag);
+  scr.insertAdjacentHTML('beforeend','<div class="status"><span class="mono">15:30</span><span class="mono">GPS 3D</span></div>');
+})();
+
+/* ---------- debrief ---------- */
+(function(){
+  const scr = document.getElementById('debrief');
+  // piecewise x: leg 1 at half scale (marked), legs 2 and 3 at full
+  const D = {LLHZ:0, TAVOR:43.0, DESHE:55.2, LLIB:62.2};
+  const X = d => d<=43 ? 40+d*(520/43) : d<=55.2 ? 560+(d-43)*30 : 926+(d-55.2)*(214/7);
+  // profile y
+  const PY0=372, PY1=596, AMIN=-1000, AMAX=3200;
+  const Y = a => PY1 - (a-AMIN)*(PY1-PY0)/(AMAX-AMIN);
+  const lerp = (pts, d) => { for(let i=1;i<pts.length;i++){ if(d<=pts[i][0]){ const [d0,a0]=pts[i-1],[d1,a1]=pts[i]; const k=(d-d0)/(d1-d0||1); return a0+(a1-a0)*(0.5-0.5*Math.cos(Math.PI*k)); } } return pts[pts.length-1][1]; };
+  const terrain = [[0,120],[3,150],[10,260],[16,480],[20,640],[24,720],[27,560],[30,330],[34,200],[39,260],[42,520],[43,600],[45,800],[48,980],[50,860],[52,420],[54,-300],[55.2,-640],[56,-690],[57.5,-480],[59,260],[61,760],[62.2,884]];
+  const flown = [[0,121],[1.5,500],[4.5,1440],[6,1510],[12,1460],[16,1540],[19.5,1480],[20.3,1270],[21.4,1290],[22.2,1490],[28,1520],[34,1470],[40,1510],[41.6,1500],[44,2460],[46,2520],[47.2,2480],[48.0,2190],[49.5,2170],[50.6,2180],[51.2,2310],[52.3,2490],[55.2,2510],[56.2,2020],[57.4,1990],[57.8,2240],[58.3,2010],[59.2,1980],[60.6,1500],[62.2,884]];
+  const assigned = [[0,43,1500],[43,55.2,2500],[55.2,62.2,2000]];
+  let o = `<defs>
+    <pattern id="hz" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><line x1="0" y1="0" x2="0" y2="7" stroke="var(--ink3)" stroke-width="1.2" opacity=".55"/></pattern>
+  </defs>`;
+  // --- strip map (plan view straightened) y 168..280
+  const SY=226, xs=18; // centerline, px per NM cross-track
+  o += `<rect x="0" y="166" width="1180" height="116" fill="var(--land)"/>`;
+  // sea at the start (behind LLHZ)
+  o += `<path d="M0,166 L36,166 Q30,200 38,226 Q30,252 34,282 L0,282 Z" fill="var(--water)" stroke="var(--coast)"/>`;
+  // Kinneret on the right side of leg 2
+  o += `<path d="M${X(45.5)},282 Q${X(47)},${SY+46} ${X(49.5)},${SY+42} Q${X(52)},${SY+38} ${X(53.4)},${SY+54} L${X(54)},282 Z" fill="var(--water)" stroke="var(--coast)"/>`;
+  o += `<text x="${X(49.5)}" y="276" text-anchor="middle" font-size="13" font-weight="600" fill="var(--ink2)" font-style="italic">Kinneret</text>`;
+  // hills hachures (Menashe, Lower Galilee) and Mt Tavor
+  const hach = (d0,d1,side) => { let s=''; for(let d=d0; d<d1; d+=0.9){ const x=X(d), y=SY+side*(30+((d*7)%9)); s+=`<path d="M${x},${y} l5,${-side*7} l5,${side*7}" fill="none" stroke="var(--ink3)" stroke-width="1.2"/>`;} return s; };
+  o += hach(18,28,-1) + hach(19,27,1) + hach(44,50,-1) + hach(45,50.5,1);
+  o += `<path d="M${X(41.5)-14},${SY-14} l14,-22 l14,22 z" fill="var(--hill)" stroke="var(--ink2)" stroke-width="1.5"/><text x="${X(41.5)-20}" y="${SY-26}" text-anchor="end" font-size="13" font-weight="600" fill="var(--ink2)">Mt Tavor 1,886</text>`;
+  // corridor band and centerline
+  o += `<rect x="40" y="${SY-xs}" width="1100" height="${2*xs}" fill="rgba(194,24,122,.07)"/>`;
+  o += `<line x1="40" x2="1140" y1="${SY}" y2="${SY}" stroke="var(--route)" stroke-width="4"/>`;
+  // flown track (cross-track wiggle)
+  let tp=''; for(let d=0; d<=62.2; d+=0.25){ const xt = 0.35*Math.sin(d*0.7)+0.25*Math.sin(d*1.9) + (d>47&&d<51?0.5:0); tp += `${X(d).toFixed(1)},${(SY+xt*xs).toFixed(1)} `; }
+  o += `<polyline points="${tp}" fill="none" stroke="var(--ink)" stroke-width="2.2"/>`;
+  // aerodrome zones (not scored) in strip and profile
+  const zone = (d0,d1) => `<rect x="${X(d0)}" y="166" width="${X(d1)-X(d0)}" height="116" fill="url(#hz)"/><rect x="${X(d0)}" y="${PY0}" width="${X(d1)-X(d0)}" height="${PY1-PY0}" fill="url(#hz)"/>`;
+  o += zone(0,5) + zone(59.2,62.2);
+  // points
+  const pt = (d,label,he,anchor='middle') => `<g transform="translate(${X(d)},${SY})"><path d="M0,-11 L10,7 L-10,7 Z" fill="var(--panel)" stroke="var(--ink)" stroke-width="2.5"/></g><text x="${X(d)}" y="${SY+34}" text-anchor="${anchor}" font-family="IBM Plex Mono" font-weight="700" font-size="14" fill="var(--ink)">${label}</text><text x="${X(d)}" y="${SY+52}" text-anchor="${anchor}" class="he" font-size="13" fill="var(--ink2)" direction="rtl">${he}</text>`;
+  const ad = (d,label,anchor) => `<g transform="translate(${X(d)},${SY})"><circle r="9" fill="var(--panel)" stroke="var(--bravo)" stroke-width="3"/>${[0,90,180,270].map(r=>`<line y1="-9" y2="-14" stroke="var(--bravo)" stroke-width="3" transform="rotate(${r})"/>`).join('')}</g><text x="${X(d)}" y="${SY-24}" text-anchor="${anchor}" font-family="IBM Plex Mono" font-weight="700" font-size="15" fill="var(--ink)">${label}</text>`;
+  o += ad(0,'LLHZ','start') + ad(62.2,'LLIB','end') + pt(43,'TAVOR','כפר תבור') + pt(55.2,'DESHE','כרי דשא');
+  // scale break on leg 1
+  o += `<g stroke="var(--ink2)" stroke-width="1.5" fill="none"><path d="M${X(30)},${SY-10} l6,-8 l6,16 l6,-8"/></g><text x="${X(30)+30}" y="${SY+40}" font-size="12" font-weight="600" fill="var(--ink2)">leg 1 at half scale</text>`;
+  o += `<text x="${X(62.2)-4}" y="${SY+40}" text-anchor="end" font-size="12" font-weight="600" fill="var(--ink2)">zone, not scored</text>`;
+
+  // --- profile
+  o += `<line x1="40" x2="1140" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--coast)" stroke-width="1" stroke-dasharray="3 4"/>`;
+  for(const a of [1000,2000,3000]) o += `<line x1="40" x2="1140" y1="${Y(a)}" y2="${Y(a)}" stroke="var(--grid)"/><text x="1148" y="${Y(a)+4}" font-family="IBM Plex Mono" font-size="12" fill="var(--ink2)">${a/1000}k</text>`;
+  o += `<text x="1148" y="${Y(0)+4}" font-family="IBM Plex Mono" font-size="12" fill="var(--ink2)">MSL</text>`;
+  // terrain
+  let tt=`M40,${PY1} `; for(let d=0; d<=62.2; d+=0.2) tt += `L${X(d).toFixed(1)},${Y(lerp(terrain,d)).toFixed(1)} `; tt += `L${X(62.2)},${PY1} Z`;
+  o += `<path d="${tt}" fill="var(--hill)" stroke="var(--ink3)" stroke-width="1.2"/>`;
+  // Mt Tavor ghost (off track)
+  o += `<path d="M${X(40.3)},${Y(500)} Q${X(41.5)},${Y(2300)} ${X(42.7)},${Y(500)}" fill="none" stroke="var(--ink3)" stroke-width="1.2" stroke-dasharray="3 3"/>`;
+  // Kinneret water below sea level
+  o += `<text x="${X(56.4)}" y="${Y(-690)+13}" text-anchor="middle" font-size="12" font-weight="600" fill="var(--ink2)">-690 ft</text>`;
+  // assigned altitude bands
+  for(const [d0,d1,a] of assigned){
+    o += `<rect x="${X(d0)}" y="${Y(a+200)}" width="${X(d1)-X(d0)}" height="${Y(a-200)-Y(a+200)}" fill="rgba(194,24,122,.10)"/>`;
+    o += `<line x1="${X(d0)}" x2="${X(d1)}" y1="${Y(a)}" y2="${Y(a)}" stroke="var(--route)" stroke-width="2.5"/>`;
+  }
+  // amber excursion on leg 2 (below 2,300)
+  let ex = `M${X(47.75)},${Y(2300)} `; for(let d=47.75; d<=51.25; d+=0.05) ex += `L${X(d).toFixed(1)},${Y(Math.min(2300,lerp(flown,d))).toFixed(1)} `; ex += `L${X(51.25)},${Y(2300)} Z`;
+  o += `<path d="${ex}" fill="var(--amber)" stroke="var(--amberLine)" stroke-width="1.5"/>`;
+  // flown line
+  let fl=''; for(let d=0; d<=62.2; d+=0.1) fl += `${X(d).toFixed(1)},${Y(lerp(flown,d)).toFixed(1)} `;
+  o += `<polyline points="${fl}" fill="none" stroke="var(--ink)" stroke-width="2.6" stroke-linejoin="round"/>`;
+  // excursion callout
+  o += `<line x1="${X(49.5)}" x2="${X(49.5)}" y1="${Y(2170)+6}" y2="${Y(1300)}" stroke="var(--amberLine)" stroke-width="2"/>`;
+  // point verticals through all bands
+  for(const d of [43,55.2]) o += `<line x1="${X(d)}" x2="${X(d)}" y1="${SY+58}" y2="616" stroke="var(--ink)" stroke-width="1.2" stroke-dasharray="2 4"/>`;
+  // time axis
+  for(const [d,t] of [[0,'09:12'],[43,'09:38'],[55.2,'09:49'],[62.2,'09:56']]) o += `<text x="${X(d)+(d===62.2?-4:4)}" y="${PY1+16}" text-anchor="${d===62.2?'end':'start'}" font-family="IBM Plex Mono" font-size="12" font-weight="600" fill="var(--ink2)">${t}</text>`;
+  const svg = `<svg width="1180" height="820" viewBox="0 0 1180 820">${o}</svg>`;
+
+  scr.innerHTML = `
+  <div class="status"><span class="mono">10:08</span><span class="mono">On ground &middot; LLIB</span></div>
+  ${svg}
+  <div class="dhead">
+    <div class="tswitch"><div>Next</div><div>Now</div><div class="on">Flown</div></div>
+    <div class="dtitle">LLHZ<span class="ar">&rarr;</span>LLIB</div>
+    <div class="dmeta"><b>Thu 5 Nov 2026 &middot; 0:44 airborne</b><br>4X-CKN &middot; CVFR &middot; transcript 38 segments</div>
+  </div>
+  <div class="verdict">
+    <span class="v">Two things to look at.</span>
+    <span class="chip amb"><span class="tri"></span>Tavor to Deshe: 330 ft low for 4 min</span>
+    <span class="chip amb"><span class="tri"></span>No position report heard at DESHE</span>
+  </div>
+  <div class="legs" style="left:0;width:1180px">
+    <div class="leg" style="left:${X(0)}px;width:${X(43)-X(0)}px;border-left:0"><div class="n">LLHZ &rarr; TAVOR</div><div class="a">1,500 ft &middot; &plusmn;200</div><div class="p tnum">96<small>%</small></div><div class="h" style="position:absolute;right:12px;top:52px">held</div></div>
+    <div class="leg amb" style="left:${X(43)}px;width:${X(55.2)-X(43)}px"><div class="n">TAVOR &rarr; DESHE</div><div class="a">2,500 ft &middot; &plusmn;200</div><div class="p tnum">71<small>%</small></div><div class="h" style="position:absolute;right:12px;top:52px">held</div></div>
+    <div class="leg" style="left:${X(55.2)}px;width:${X(62.2)-X(55.2)}px"><div class="n">DESHE &rarr; LLIB</div><div class="a">2,000 ft</div><div class="p tnum" style="font-size:44px">93<small>%</small></div></div>
+  </div>
+  <div class="abs" style="left:${X(49.5)-118}px;top:${Y(1300)-2}px;width:236px;padding:8px 12px;border-radius:10px;background:var(--panel);box-shadow:0 0 0 2px var(--amber);text-align:center">
+    <div style="font-stretch:75%;font-weight:800;font-size:20px">330 ft low &middot; 4:02</div>
+    <div style="font-size:13px;color:var(--ink2);font-weight:600">09:41 to 09:45 &middot; lowest 2,170</div>
+  </div>
+  <div class="rep" style="left:28px;width:270px">
+    <div class="h"><span class="pt">LLHZ</span><span class="s">heard 09:12</span></div>
+    <div class="q he" dir="rtl">הרצליה מגדל, 4X-CKN מוכן להמראה, יציאה צפונה</div>
+    <div class="play">&#9654; Replay 09:12</div>
+  </div>
+  <div class="rep" style="left:308px;width:330px">
+    <div class="h"><span class="pt">TAVOR</span><span class="s">heard 09:38</span></div>
+    <div class="q he" dir="rtl">4X-CKN מעל כפר תבור, 2,500 רגל, ממשיך לכרי דשא</div>
+    <div class="play">&#9654; Replay 09:38</div>
+  </div>
+  <div class="rep amb" style="left:650px;width:270px">
+    <div class="h"><span class="pt">DESHE</span><span class="s">&#9650; not heard</span></div>
+    <div class="q">Nothing in the transcript from 09:47 to 09:51. Audio was recording.</div>
+    <div class="play">&#9654; Listen 09:47</div>
+  </div>
+  <div class="rep" style="left:932px;width:220px">
+    <div class="h"><span class="pt">LLIB</span><span class="s">09:53</span></div>
+    <div class="q">Joining downwind, heard.</div>
+    <div class="play">&#9654; 09:53</div>
+  </div>`;
+})();
+</script>
+</body>
+</html>
