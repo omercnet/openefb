@@ -20,23 +20,36 @@ struct FlightLogStrip: View {
     let notices: FlightLogNotices
     let onClear: () -> Void
 
+    /// NOW is pinned: the warnings and NEXT above it take their natural height and scroll only when the
+    /// column is too short (warnings, large Dynamic Type); FLOWN scrolls in whatever space is left below.
     var body: some View {
         VStack(spacing: 0) {
             FlightLogHeader(recordingViewModel: recordingViewModel)
             ColumnRule()
+            ViewThatFits(in: .vertical) {
+                aboveNow
+                ScrollView { aboveNow }
+            }
+            .layoutPriority(1)  // after NOW's fixed height, the region above gets the space before FLOWN
+            VStack(alignment: .leading, spacing: 0) {
+                FlightLogSectionLabel(title: "Now")
+                FlightLogNowCell(gpsStatus: gpsStatus, onClear: onClear)
+            }
+            .fixedSize(horizontal: false, vertical: true)
             ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    notices
-                    FlightLogNext(gpsStatus: gpsStatus, nearestEntry: nearestEntry)
-                    FlightLogSectionLabel(title: "Now")
-                    FlightLogNowCell(gpsStatus: gpsStatus, onClear: onClear)
-                    FlightLogFlown()
-                }
+                FlightLogFlown()
             }
         }
         .background(Palette.paper)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Flight log")
+    }
+
+    private var aboveNow: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            notices
+            FlightLogNext(gpsStatus: gpsStatus, nearestEntry: nearestEntry)
+        }
     }
 
     // MARK: - Text (static so tests read the same strings)
@@ -253,14 +266,27 @@ struct FlightLogNext: View {
 
     // MARK: Later rows
 
-    /// The route points after the next one, each with its cumulative time-to at the current ground speed.
+    /// The route points after the next one, each with its cumulative time-to at the current ground speed:
+    /// at most 3 (2 in the rail) so NOW stays in view, then a quiet "+N more to <dest>" line.
     @ViewBuilder
     private var laterRows: some View {
         if let route {
             let later = Array(route.legs.dropFirst(route.currentLeg + 1))
-            ForEach(Array(later.enumerated()), id: \.offset) { index, leg in
+            let shown = later.prefix(compact ? 2 : 3)
+            ForEach(Array(shown.enumerated()), id: \.offset) { index, leg in
                 ColumnRule()
                 laterRow(leg, timeTo: cumulativeTime(through: index, of: later))
+            }
+            if later.count > shown.count, let destination = route.destinationCode {
+                ColumnRule()
+                Text("+\(later.count - shown.count) more to \(destination)")
+                    .font(TypeRole.data)
+                    .foregroundStyle(Palette.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, compact ? Space.s : Space.m)
+                    .padding(.vertical, Space.s)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityIdentifier("next-more-points")
             }
         }
     }
