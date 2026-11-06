@@ -250,30 +250,12 @@ final class NearestAirportViewModel {
 
     // MARK: - Direct-To
 
-    /// Set direct-to navigation to the specified airport. Updates AppState
-    /// with distance and ETE computed from current ownship position and ground speed.
+    /// Set direct-to navigation to the specified airport. Seeds DTG, bearing and ETE from the
+    /// current ownship position and ground speed; every later fix refreshes them.
     func setDirectTo(airport: Airport) {
         appState.directToAirport = airport
         appState.activeFlightPlan = true
-
-        // Compute distance from ownship to target airport
-        if let ownship = appState.ownshipPosition {
-            let targetLocation = CLLocation(
-                latitude: airport.latitude,
-                longitude: airport.longitude
-            )
-            let distanceNM = ownship.distanceInNM(to: targetLocation)
-            appState.distanceToNext = distanceNM
-
-            // Compute ETE from distance and ground speed
-            let gs = appState.groundSpeed  // knots
-            if gs > 10 {
-                // ETE in seconds = (distance NM / speed knots) * 3600
-                appState.estimatedTimeEnroute = (distanceNM / gs) * 3600
-            } else {
-                appState.estimatedTimeEnroute = nil
-            }
-        }
+        appState.updateActiveRouteProgress()
     }
 
     /// Clear the active Direct-To (wrong field picked, or leg finished). DTG/ETE leave the

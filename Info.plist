@@ -15,5 +15,20 @@
 	<string>Kanaf transcribes cockpit audio in real-time to create flight transcripts.</string>
 	<key>TelemetryDeckAppID</key>
 	<string>$(TELEMETRYDECK_APP_ID)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Archivo-Regular.ttf</string>
+		<string>Archivo-Medium.ttf</string>
+		<string>Archivo-SemiBold.ttf</string>
+		<string>Archivo-Condensed-SemiBold.ttf</string>
+		<string>Archivo-ExtraCondensed-SemiBold.ttf</string>
+		<string>Archivo-ExtraCondensed-Bold.ttf</string>
+		<string>IBMPlexMono-Regular.ttf</string>
+		<string>IBMPlexMono-Medium.ttf</string>
+		<string>IBMPlexMono-SemiBold.ttf</string>
+		<string>IBMPlexSansHebrew-Regular.ttf</string>
+		<string>IBMPlexSansHebrew-Medium.ttf</string>
+		<string>IBMPlexSansHebrew-SemiBold.ttf</string>
+	</array>
 </dict>
 </plist>

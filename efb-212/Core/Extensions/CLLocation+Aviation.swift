@@ -36,6 +36,18 @@ extension CLLocationCoordinate2D {
         let loc2 = CLLocation(latitude: other.latitude, longitude: other.longitude)
         return loc1.distanceInNM(to: loc2)
     }
+
+    /// Point reached from here after `distanceNM` nautical miles along `bearingDegrees` (degrees true), great circle.
+    func destination(distanceNM: Double, bearingDegrees: Double) -> CLLocationCoordinate2D {
+        let angular = distanceNM / 3440.065  // NM over Earth's mean radius in NM
+        let bearing = bearingDegrees.degreesToRadians
+        let lat1 = latitude.degreesToRadians
+        let lon1 = longitude.degreesToRadians
+        let lat2 = asin(sin(lat1) * cos(angular) + cos(lat1) * sin(angular) * cos(bearing))
+        let lon2 = lon1 + atan2(sin(bearing) * sin(angular) * cos(lat1), cos(angular) - sin(lat1) * sin(lat2))
+        let longitude = (lon2.radiansToDegrees + 540).truncatingRemainder(dividingBy: 360) - 180
+        return CLLocationCoordinate2D(latitude: lat2.radiansToDegrees, longitude: longitude)
+    }
 }
 
 extension Double {

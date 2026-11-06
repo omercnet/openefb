@@ -312,6 +312,8 @@ final class IsraelFlightPlanViewModel {
         appState.activePlanDestination = plan.points.last?.code
         appState.distanceToNext = first.distanceNM
         appState.estimatedTimeEnroute = first.eteSeconds
+        appState.bearingToNext = CLLocation(latitude: first.from.latitude, longitude: first.from.longitude)
+            .bearing(to: CLLocation(latitude: first.to.latitude, longitude: first.to.longitude))  // degrees true
         appState.activePlanFuelGallons = aircraftProfile?.fuelBurnGPH.map { plan.totalETESeconds / 3600 * $0 }
         appState.updateActiveRouteProgress()
         isActive = true

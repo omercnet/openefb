@@ -242,6 +242,9 @@ final class MapViewModel {
         // drawn but never pulls the camera away from the region's home view.
         guard appState.region.contains(location.coordinate) else { return }
 
+        // Minute-ruled track ahead: track degrees true, ground speed knots; cleared below 30 kt by the service.
+        mapService.updateTrackRuler(origin: location.coordinate, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed)
+
         if !hasCenteredOnFirstFix {
             hasCenteredOnFirstFix = true
             // No animation: follow takes over on the next fix and would cut it short anyway.
@@ -308,6 +311,8 @@ final class MapViewModel {
         if stale != lastAppliedStale {
             lastAppliedStale = stale
             mapService.setOwnshipStale(stale)
+            // A ruler from a frozen fix would read as current; the next live fix redraws it.
+            if stale { mapService.updateTrackRuler(origin: nil, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed) }
         }
     }
 
@@ -322,7 +327,7 @@ final class MapViewModel {
 
     func onAirportTapped(icao: String) {
         appState.selectedAirportID = icao
-        appState.isPresentingAirportInfo = true
+        appState.stripColumn = .airport
     }
 
     // MARK: - Layer Toggles

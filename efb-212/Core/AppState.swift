@@ -24,13 +24,10 @@ final class AppState {
 
     // MARK: - Navigation State
 
-    var selectedTab: AppTab = .map
-    /// One-shot: the map's Plan button sets this so the Flights tab opens on Plans (F10).
-    var openFlightsOnPlans: Bool = false
-    var isPresentingAirportInfo: Bool = false
+    var selectedScreen: AppScreen = .map
+    /// What the strip column beside the chart shows; the in-flight log by default.
+    var stripColumn: StripColumn = .log
     var selectedAirportID: String?
-    var isPresentingLayerControls: Bool = false
-    var isPresentingNearestList: Bool = false
     /// Israel NOTAM briefing sheet over the map (IL-BRIEF).
     var isPresentingIsraelBriefing: Bool = false
     var searchQuery: String = ""
@@ -97,9 +94,11 @@ final class AppState {
     var activeFlightPlan: Bool = false
     var distanceToNext: Double?        // nautical miles
     var estimatedTimeEnroute: TimeInterval?  // seconds
+    var bearingToNext: Double?         // degrees true, ownship to the next waypoint
     var directToAirport: Airport?
     var activePlanDeparture: String?     // ICAO of departure for summary card
     var activePlanDestination: String?   // ICAO of destination for summary card
+    var activePlanDestinationCoordinate: CLLocationCoordinate2D?  // destination of a US direct plan, for live DTG/ETE
     var activePlanFuelGallons: Double?   // Estimated fuel for summary card
     /// Activated multi-leg route (Israel CVFR plan); nil for US direct plans and Direct-To.
     var activeRoute: ActiveRoute?

@@ -2,8 +2,11 @@
 //  DesignTokens.swift
 //  efb-212
 //
-//  Spacing scale, type roles and semantic colors (docs/DESIGN.md `## Tokens`).
-//  Colors are SwiftUI semantic colors so the night-mode / HIG ticket can swap palettes in one place.
+//  Spacing, radii, type roles, semantic colors and strip metrics (docs/DESIGN.md `## Tokens`).
+//  Direction 2, "the log and the leading edge": the strip and the log stack are set in the bundled
+//  Archivo (idents, readouts, labels) and IBM Plex Mono (times, distances, frequencies) faces, with
+//  IBM Plex Sans Hebrew as the cascade fallback so Hebrew text renders in Plex, not SF.
+//  Strip colors are paper and ink: a light paper by day, near-black by night with warm ink.
 //  EFB rule: red = warning, amber = caution, nothing else.
 //
 
@@ -34,31 +37,121 @@ enum Radius {
 
 // MARK: - Type roles
 
-/// Type roles built from Dynamic Type text styles. Values are emphasized over labels:
-/// a label is small and secondary, the value it describes is larger and primary.
-/// Kanaf voice: expanded SF Pro for names and headings, regular width for values read up close,
-/// condensed SF Pro with fixed-width digits for the instrument readouts (SF Mono ignores width).
+/// Bundled faces by PostScript name (registered in Info.plist `UIAppFonts`). The only place font names appear.
+private enum Face: String {
+    case archivoRegular = "ArchivoRoman-Regular"
+    case archivoMedium = "ArchivoRoman-Medium"
+    case archivoSemiBold = "ArchivoRoman-SemiBold"
+    case archivoCondensedSemiBold = "ArchivoRoman-CondensedSemiBold"
+    case archivoExtraCondensedSemiBold = "ArchivoRoman-ExtraCondensedSemiBold"
+    case archivoExtraCondensedBold = "ArchivoRoman-ExtraCondensedBold"
+    case plexMonoRegular = "IBMPlexMono-Regular"
+    case plexMonoMedium = "IBMPlexMono-Medium"
+    case plexMonoSemiBold = "IBMPlexMono-SemiBold"
+
+    /// Weight used for the Hebrew cascade face and for the system fallback.
+    var weight: UIFont.Weight {
+        switch self {
+        case .archivoRegular, .plexMonoRegular: .regular
+        case .archivoMedium, .plexMonoMedium: .medium
+        case .archivoSemiBold, .archivoCondensedSemiBold, .archivoExtraCondensedSemiBold, .plexMonoSemiBold: .semibold
+        case .archivoExtraCondensedBold: .bold
+        }
+    }
+
+    /// IBM Plex Sans Hebrew at the nearest weight (Plex Hebrew stops at SemiBold).
+    var hebrewName: String {
+        switch weight {
+        case .regular: "IBMPlexSansHebrew-Regular"
+        case .medium: "IBMPlexSansHebrew-Medium"
+        default: "IBMPlexSansHebrew-SemiBold"
+        }
+    }
+
+    /// The face at `size` points, scaled for Dynamic Type relative to `style` (nil: fixed size), never past
+    /// `maxSize`. Hebrew glyphs cascade to Plex Sans Hebrew. If the face is not registered (unit-test host),
+    /// the system font at the same size and weight.
+    func font(size: CGFloat, relativeTo style: UIFont.TextStyle?, maxSize: CGFloat? = nil) -> Font {
+        let base: UIFont
+        if let face = UIFont(name: rawValue, size: size) {
+            let hebrew = UIFontDescriptor(name: hebrewName, size: size)
+            base = UIFont(descriptor: face.fontDescriptor.addingAttributes([.cascadeList: [hebrew]]), size: size)
+        } else {
+            base = UIFont.systemFont(ofSize: size, weight: weight)
+        }
+        guard let style else { return Font(base as CTFont) }
+        let metrics = UIFontMetrics(forTextStyle: style)
+        let scaled = maxSize.map { metrics.scaledFont(for: base, maximumPointSize: $0) } ?? metrics.scaledFont(for: base)
+        return Font(scaled as CTFont)
+    }
+}
+
+/// Type roles on the bundled faces, sized from the Dynamic Type text style named beside each (base sizes are
+/// the style's default size). Values are emphasized over labels: a label is small and secondary, the value it
+/// describes is larger and primary. Archivo Condensed for idents and names, Archivo ExtraCondensed with
+/// tabular digits for readouts and times-to, IBM Plex Mono for data read up close.
+/// Computed so a Dynamic Type change applies on the next render.
 enum TypeRole {
-    /// Airport identifier / sheet title.
-    static let title = Font.system(.largeTitle, weight: .bold).width(.expanded)
-    /// Compact identifier next to a distance, e.g. "KPAO" in the NRST box.
-    static let identifier = Font.title3.weight(.bold).width(.expanded)
-    /// Section heading, e.g. "FREQUENCIES".
-    static let sectionHeader = Font.caption.weight(.bold).width(.expanded)
+    /// Airport identifier / sheet title. largeTitle.
+    static var title: Font { Face.archivoCondensedSemiBold.font(size: 34, relativeTo: .largeTitle) }
+    /// Compact identifier next to a distance, e.g. "KPAO" in a nearest row. title3.
+    static var identifier: Font { Face.archivoCondensedSemiBold.font(size: 20, relativeTo: .title3) }
+    /// Section heading, e.g. "FREQUENCIES". caption.
+    static var sectionHeader: Font { Face.archivoSemiBold.font(size: 12, relativeTo: .caption1) }
     /// Instrument readout digits at an exact point size (the caller scales it with `@ScaledMetric`).
     static func readout(size: CGFloat) -> Font {
-        Font.system(size: size, weight: .semibold).width(.condensed).monospacedDigit()
+        Face.archivoExtraCondensedSemiBold.font(size: size, relativeTo: nil).monospacedDigit()
     }
-    /// Field label, e.g. "Wind", "TWR". Always paired with `Palette.secondaryText`.
-    static let label = Font.footnote.weight(.medium)
-    /// Primary value: frequency, runway ident, decoded weather.
-    static let value = Font.title3.monospacedDigit().weight(.semibold)
-    /// Secondary value: smaller readout next to a primary one.
-    static let valueSmall = Font.callout.monospacedDigit().weight(.medium)
-    /// Body text.
-    static let body = Font.subheadline
-    /// Footnotes, source and validity lines.
-    static let caption = Font.footnote
+    /// Field label, e.g. "Wind", "TWR". Always paired with `Palette.secondaryText`. footnote.
+    static var label: Font { Face.archivoMedium.font(size: 13, relativeTo: .footnote) }
+    /// Primary value: frequency, runway ident, decoded weather. title3.
+    static var value: Font { Face.plexMonoSemiBold.font(size: 20, relativeTo: .title3) }
+    /// Secondary value: smaller readout next to a primary one. callout.
+    static var valueSmall: Font { Face.plexMonoMedium.font(size: 16, relativeTo: .callout) }
+    /// Body text. subheadline.
+    static var body: Font { Face.archivoRegular.font(size: 15, relativeTo: .subheadline) }
+    /// Footnotes, source and validity lines. footnote.
+    static var caption: Font { Face.archivoRegular.font(size: 13, relativeTo: .footnote) }
+
+    // Direction 2 strip and log stack roles.
+
+    /// The next thing's time-to, the biggest type on screen: 100 pt relative to largeTitle, capped at 120 pt.
+    static var nextTime: Font {
+        Face.archivoExtraCondensedBold.font(size: 100, relativeTo: .largeTitle, maxSize: 120).monospacedDigit()
+    }
+    /// Later rows' time-to: 44 pt relative to title1, capped at 64 pt so a row fits the 400 pt strip.
+    static var rowTime: Font {
+        Face.archivoExtraCondensedSemiBold.font(size: 44, relativeTo: .title1, maxSize: 64).monospacedDigit()
+    }
+    /// Waypoint and airport idents in rows. 28 pt relative to title1.
+    static var rowIdent: Font { Face.archivoCondensedSemiBold.font(size: 28, relativeTo: .title1) }
+    /// Strip labels ("NEXT", "GS"). Callers apply `.textCase(.uppercase)` and
+    /// `.tracking(StripMetrics.labelTracking)`. caption2.
+    static var stripLabel: Font { Face.archivoMedium.font(size: 11, relativeTo: .caption2) }
+    /// Times, distances, frequencies in the strip and log. subheadline.
+    static var data: Font { Face.plexMonoRegular.font(size: 15, relativeTo: .subheadline) }
+    /// Emphasized data, e.g. the ETA beside the next time-to. subheadline.
+    static var dataEmphasis: Font { Face.plexMonoSemiBold.font(size: 15, relativeTo: .subheadline) }
+}
+
+// MARK: - Strip metrics
+
+/// Fixed geometry of the leading-edge strip (iPad) and rail (iPhone).
+enum StripMetrics {
+    /// iPad strip width, fixed (owner decision Q3 A).
+    static let width: CGFloat = 400
+    /// iPhone rail width.
+    static let railWidth: CGFloat = 104
+    /// Minimum in-flight tap target and footer cell height.
+    static let cell: CGFloat = 60
+    /// Letter spacing for uppercase `TypeRole.stripLabel` text.
+    static let labelTracking: CGFloat = 1.2
+}
+
+/// Shared size for in-flight map controls (design: >= 60 pt).
+enum MapControlMetrics {
+    static let size: CGFloat = 60
+    static let cornerRadius: CGFloat = Radius.l
 }
 
 // MARK: - Semantic colors
@@ -167,29 +260,48 @@ enum Palette {
     /// The `AccentColor` asset: day #1556B8 on #F2F2F7 6.2:1 (white 6.9:1); night #8FB4E0 on #1C1C1E 7.9:1
     /// (on black 9.8:1). Increase Contrast variants are darker by day and lighter by night.
     static let accentText = Color("AccentColor")
-    /// Solid panel behind the instrument strip and NRST box. Day #F2F2F7 at 0.88 under a navy hairline;
-    /// night #1C1C1E at 0.9 (the old dark material), no hairline.
-    static let panelFill = Color(UIColor { trait in
-        trait.userInterfaceStyle == .dark
-            ? UIColor(red: 0.110, green: 0.110, blue: 0.118, alpha: 0.9)
-            : UIColor(red: 0.949, green: 0.949, blue: 0.969, alpha: 0.88)
-    })
-    /// 1 pt edge of the day panel: `accent` at 35%. Clear at night.
-    static let panelHairline = Color(UIColor { trait in
-        trait.userInterfaceStyle == .dark ? .clear : UIColor(Palette.accent).withAlphaComponent(0.35)
-    })
-    /// Opaque base under a tinted status chip on the translucent panel (GPS LOST / STALE), so the chip's amber or
-    /// red text keeps 4.5:1 whatever map shows through: day white + 8% tint, caution 4.9:1, warning 5.2:1;
-    /// night #1C1C1E + 8% tint, caution 7.2:1, warning 4.6:1.
-    static let statusChipBase = Color(UIColor { trait in
-        trait.userInterfaceStyle == .dark ? UIColor(red: 0.110, green: 0.110, blue: 0.118, alpha: 1) : .white
-    })
     /// Tinted container behind informational notices (beta banner, selected transcript row).
     static let infoFill = Color(UIColor { trait in
         trait.userInterfaceStyle == .dark
             ? accentNight.withAlphaComponent(0.35)
             : accentDay.withAlphaComponent(0.15)
     })
+}
+
+// MARK: - Strip colors
+
+/// Paper-and-ink colors for the Direction 2 strip and log stack. Day is a light paper; night is near-black
+/// with warm ink and no filled amber blocks (amber rule + amber text instead).
+extension Palette {
+    /// Strip background: day #EEF0F2, night #0D1013.
+    static let paper = dynamic(day: 0xEEF0F2, night: 0x0D1013)
+    /// Section header bands: day #E2E5E9, night #232930.
+    static let paperSecondary = dynamic(day: 0xE2E5E9, night: 0x232930)
+    /// The NOW cell and the next row: day #FFFFFF, night #161A1F.
+    static let activeCell = dynamic(day: 0xFFFFFF, night: 0x161A1F)
+    /// Hairlines between rows and cells: day #C3C8CE, night #2A3037.
+    static let rule = dynamic(day: 0xC3C8CE, night: 0x2A3037)
+    /// Primary strip text: day #14191F, night #C9C4BA.
+    static let ink = dynamic(day: 0x14191F, night: 0xC9C4BA)
+    /// Strip labels: day #4A535E, night #8E9298.
+    static let inkSecondary = dynamic(day: 0x4A535E, night: 0x8E9298)
+    /// Magenta route glyphs in the strip: day #C2168D, night #93407A.
+    static let route = dynamic(day: 0xC2168D, night: 0x93407A)
+    /// Chart blue for airport idents and data blocks: day #1B58A3, night #86A3CB.
+    static let airspace = dynamic(day: 0x1B58A3, night: 0x86A3CB)
+
+    /// A color that follows `DisplayModeModifier`: `night` in the dark scheme, `day` otherwise (0xRRGGBB).
+    private static func dynamic(day: UInt32, night: UInt32) -> Color {
+        Color(UIColor { trait in
+            let rgb = trait.userInterfaceStyle == .dark ? night : day
+            return UIColor(
+                red: CGFloat((rgb >> 16) & 0xFF) / 255,
+                green: CGFloat((rgb >> 8) & 0xFF) / 255,
+                blue: CGFloat(rgb & 0xFF) / 255,
+                alpha: 1
+            )
+        })
+    }
 }
 
 // MARK: - Map and category colors
@@ -211,6 +323,12 @@ enum MapColor {
     static let tfr = UIColor.systemRed
     /// Replay track and marker. Amber by history, not a caution; recolouring it is a separate decision.
     static let replay = UIColor.systemOrange
+    /// Minute-ruled track line, ticks and labels (Direction 2): strip ink day #14191F, night #B6B0A3;
+    /// label halo white by day, the night paper #0D1013 at night.
+    static let trackRulerDay = UIColor(red: 0x14 / 255, green: 0x19 / 255, blue: 0x1F / 255, alpha: 1)
+    static let trackRulerNight = UIColor(red: 0xB6 / 255, green: 0xB0 / 255, blue: 0xA3 / 255, alpha: 1)
+    static let trackRulerHaloDay = UIColor.white
+    static let trackRulerHaloNight = UIColor(red: 0x0D / 255, green: 0x10 / 255, blue: 0x13 / 255, alpha: 1)
     /// NOTAM highlight on the map: full closure (red = warning), partial or needs-check (amber = caution), other.
     static let notamClosure = UIColor.systemRed
     static let notamCaution = UIColor.systemOrange
@@ -243,28 +361,5 @@ struct SectionHeader: View {
             .font(TypeRole.sectionHeader)
             .foregroundStyle(Palette.secondaryText)
             .accessibilityAddTraits(.isHeader)
-    }
-}
-
-// MARK: - Floating control surface
-
-extension View {
-    /// Surface for floating in-flight map controls: Kanaf-navy tinted Liquid Glass with `Palette.onAccent` glyphs.
-    /// Always tinted: untinted glass takes on the sectional's yellow and loses glyph contrast. Group neighbouring
-    /// surfaces in a `GlassEffectContainer`. Reduce Transparency is handled by the system.
-    func mapControlSurface(cornerRadius: CGFloat = MapControlMetrics.cornerRadius) -> some View {
-        mapControlSurface(in: .rect(cornerRadius: cornerRadius))
-    }
-
-    /// Same surface in any shape, e.g. the round record button.
-    func mapControlSurface(in shape: some Shape) -> some View {
-        foregroundStyle(Palette.onAccent)
-            .glassEffect(.regular.tint(Palette.accent), in: shape)
-    }
-
-    /// Solid in-flight panel (instrument strip, NRST box): `Palette.panelFill` with a navy hairline, `Radius.l` corners.
-    func panelSurface() -> some View {
-        background(Palette.panelFill, in: .rect(cornerRadius: Radius.l))
-            .overlay(RoundedRectangle(cornerRadius: Radius.l).strokeBorder(Palette.panelHairline, lineWidth: 1))
     }
 }
