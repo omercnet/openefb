@@ -3,8 +3,9 @@
 //  efb-212
 //
 //  Recording controls for the flight log strip (F9):
-//  - RecordButton (strip header, 60pt): mic at rest, stop square and "REC 00:12:34" while recording,
-//    the auto-start countdown (tap to cancel), and the stop confirmation "End recording?"
+//  - RecordButton (strip header, 60pt cell): mic at rest; while recording the stop square and level
+//    meter over the elapsed time "00:12:34", the auto-start countdown (tap to cancel), and the stop
+//    confirmation "End recording?"
 //  - RecordingNotices (strip rows): microphone denied with "Open Settings" (GPS track still records),
 //    recording errors and the discarded-recording notice
 //
@@ -44,17 +45,21 @@ struct RecordButton: View {
                 }
             }
         } label: {
-            HStack(spacing: Space.s) {
-                glyph
+            // Glyph (and level meter) over the elapsed time, like the header's other cells: the
+            // 400pt header keeps its width for the route title.
+            VStack(spacing: 2) {
+                HStack(spacing: Space.xs) {
+                    glyph
+                    if viewModel.isRecording, !compact, !viewModel.microphoneDenied {
+                        AudioLevelMeter(dBFS: viewModel.audioLevel)
+                    }
+                }
                 if viewModel.isRecording, !compact {
-                    Text("REC \(viewModel.formattedElapsedTime)")
-                        .font(TypeRole.dataEmphasis)
+                    Text(viewModel.formattedElapsedTime)
+                        .font(TypeRole.data)
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .fixedSize()
-                    if !viewModel.microphoneDenied {
-                        AudioLevelMeter(dBFS: viewModel.audioLevel)
-                    }
                 }
             }
             .padding(.horizontal, Space.s)

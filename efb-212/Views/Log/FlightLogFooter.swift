@@ -46,6 +46,9 @@ struct FlightLogFooter: View {
             }
         }
         .frame(minHeight: StripMetrics.cell)
+        // One row: the 1pt dividers are vertically greedy shapes, so without this the footer split the
+        // column height with the strip content. Fixed at its ideal height, the dividers match the cells.
+        .fixedSize(horizontal: false, vertical: true)
         .background(Palette.paperSecondary)
         .overlay(alignment: .top) { ColumnRule() }
     }
