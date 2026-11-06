@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kanaf: the log is the spine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;600;700;800&family=Archivo:wdth,wght@75..125,400..700&family=Azeret+Mono:wght@400;500;600&family=Rubik:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #24272C;
+    --page-ink: #E6E4DE;
+    --page-dim: #A6A49E;
+
+    /* day chrome */
+    --paper: #EEF0F2;
+    --paper-2: #E2E5E9;
+    --rule: #C3C8CE;
+    --ink: #14191F;
+    --ink-2: #4A535E;
+    --kanaf: #0E3A5C;
+    --kanaf-text: #0E3A5C;
+    --route: #C2168D;
+    --warn: #C8102E;
+    --caution: #E8A000;
+    --ok: #147832;
+    --active: #FFFFFF;
+
+    --display: "Big Shoulders Display", "Archivo", sans-serif;
+    --ui: "Archivo", "Rubik", system-ui, sans-serif;
+    --mono: "Azeret Mono", ui-monospace, monospace;
+    --he: "Rubik", "Archivo", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--page-ink);
+    font-family: var(--ui); font-size: 15px; line-height: 1.5;
+  }
+  a { color: #9FC2E8; }
+
+  /* ---------- page scaffolding ---------- */
+  .wrap { width: 1240px; margin: 0 auto; padding: 48px 30px 120px; }
+  .thesis { border-top: 3px solid var(--page-ink); padding-top: 18px; margin-bottom: 64px; }
+  .thesis h1 { font-family: var(--display); font-weight: 700; font-size: 64px; letter-spacing: .01em; line-height: .95; margin: 0 0 18px; text-transform: uppercase; }
+  .thesis h1 .he { font-family: var(--he); font-weight: 500; font-size: 36px; text-transform: none; color: var(--page-dim); margin-left: 14px; vertical-align: 10px; }
+  .thesis ol { margin: 0; padding-left: 22px; max-width: 980px; font-size: 17px; }
+  .thesis li { margin: 0 0 6px; }
+  .thesis li b { color: #fff; }
+  .screen { margin: 0 0 72px; }
+  .screen h2 { font-family: var(--display); font-weight: 600; font-size: 30px; text-transform: uppercase; letter-spacing: .02em; margin: 0 0 4px; }
+  .screen .sub { color: var(--page-dim); margin: 0 0 16px; font-size: 14px; }
+  .note { max-width: 1180px; margin-top: 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; font-size: 15px; }
+  .note h3 { font-family: var(--mono); font-weight: 500; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--page-dim); margin: 0 0 6px; }
+  .note p { margin: 0 0 8px; }
+  .row2 { display: flex; gap: 40px; align-items: flex-start; }
+
+  /* ---------- device frames ---------- */
+  .ipad { position: relative; width: 1180px; height: 830px; border-radius: 22px; overflow: hidden; background: #000; box-shadow: 0 0 0 10px #0E0F11, 0 24px 60px rgba(0,0,0,.5); }
+  .iphone { position: relative; width: 402px; height: 874px; border-radius: 48px; overflow: hidden; background: #000; box-shadow: 0 0 0 10px #0E0F11, 0 24px 60px rgba(0,0,0,.5); }
+  .frame { position: absolute; inset: 0; color: var(--ink); font-family: var(--ui); }
+  .map { position: absolute; inset: 0; }
+  .map svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  /* ---------- the spine (flight progress strip) ---------- */
+  .spine {
+    position: absolute; top: 0; bottom: 0; left: 0; width: 300px;
+    background: var(--paper); color: var(--ink);
+    border-right: 1px solid var(--rule);
+    display: flex; flex-direction: column;
+    box-shadow: 6px 0 24px rgba(0,0,0,.18);
+  }
+  .spine .head { padding: 14px 16px 10px; border-bottom: 1px solid var(--rule); display: flex; align-items: baseline; justify-content: space-between; }
+  .spine .head .flt { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; color: var(--ink-2); }
+  .spine .head .rec { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; color: var(--ink); display: inline-flex; align-items: center; gap: 6px; }
+  .spine .head .rec::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--kanaf); display: inline-block; }
+  .wp { position: relative; padding: 10px 16px 10px 44px; border-bottom: 1px solid var(--rule); min-height: 60px; display: flex; align-items: center; justify-content: space-between; }
+  .wp .id { font-family: var(--display); font-weight: 700; font-size: 26px; letter-spacing: .02em; line-height: 1; }
+  .wp .t { font-family: var(--mono); font-size: 13px; color: var(--ink-2); text-align: right; line-height: 1.3; }
+  .wp .t b { color: var(--ink); font-weight: 500; }
+  .wp.past .id { color: var(--ink-2); }
+  .wp::before { content: ""; position: absolute; left: 18px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; border: 2px solid var(--ink-2); background: var(--paper); }
+  .wp.past::before { background: var(--ink-2); }
+  .leg { padding: 6px 16px 6px 44px; font-family: var(--mono); font-size: 12px; color: var(--ink-2); border-bottom: 1px solid var(--rule); display: flex; gap: 14px; position: relative; letter-spacing: .02em; }
+  .leg::before { content: ""; position: absolute; left: 23px; top: 0; bottom: 0; border-left: 2px dotted var(--rule); }
+  .leg.flown::before { border-left-style: solid; border-left-color: var(--ink-2); }
+
+  .wp.active { background: var(--active); border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); display: block; padding: 12px 16px 14px 44px; min-height: 0; }
+  .wp.active::before { display: none; }
+  .wp.active .gauge { position: absolute; left: 16px; top: 12px; bottom: 14px; width: 16px; }
+  .wp.active .gauge .track { position: absolute; left: 7px; top: 0; bottom: 0; width: 2px; background: var(--rule); }
+  .wp.active .gauge .done { position: absolute; left: 7px; top: 0; width: 2px; background: var(--route); }
+  .wp.active .gauge .wing { position: absolute; left: 0; width: 16px; height: 10px; margin-top: -5px; }
+  .wp.active .top { display: flex; align-items: baseline; justify-content: space-between; }
+  .wp.active .id { font-size: 44px; }
+  .wp.active .dist { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1; letter-spacing: .01em; }
+  .wp.active .dist small { font-family: var(--ui); font-size: 14px; font-weight: 600; letter-spacing: .06em; margin-left: 2px; color: var(--ink-2); }
+  .wp.active .eta { font-family: var(--mono); font-size: 13px; color: var(--ink-2); margin-top: 4px; letter-spacing: .02em; }
+  .wp.active .eta b { color: var(--ink); font-weight: 500; }
+  .readouts { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+  .ro { border-top: 1px solid var(--rule); padding-top: 6px; }
+  .ro.alt { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; }
+  .ro .lbl { font-family: var(--ui); font-weight: 600; font-size: 13px; letter-spacing: .1em; color: var(--ink-2); text-transform: uppercase; display: block; }
+  .ro .val { font-family: var(--display); font-weight: 700; font-size: 56px; line-height: .9; letter-spacing: .01em; font-variant-numeric: tabular-nums; }
+  .ro.alt .val { font-size: 72px; }
+  .ro .unit { font-family: var(--ui); font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: .06em; margin-left: 4px; }
+  .ro .vs { font-family: var(--mono); font-size: 14px; color: var(--ink); text-align: right; padding-bottom: 6px; line-height: 1.25; }
+  .ro .vs .arrow { display: block; font-size: 22px; line-height: 1; }
+
+  .spine .spacer { flex: 1; }
+  .nrst { height: 64px; margin: 0 10px 10px; border-radius: 10px; background: var(--kanaf); color: #fff; display: flex; align-items: center; padding: 0 14px; gap: 12px; }
+  .nrst .k { font-family: var(--display); font-weight: 800; font-size: 22px; letter-spacing: .06em; }
+  .nrst .id { font-family: var(--display); font-weight: 700; font-size: 30px; letter-spacing: .02em; }
+  .nrst .d { font-family: var(--mono); font-size: 13px; margin-left: auto; text-align: right; line-height: 1.25; opacity: .95; }
+  .foot { height: 60px; border-top: 1px solid var(--rule); display: flex; align-items: stretch; }
+  .foot > div { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: .06em; color: var(--ink-2); border-right: 1px solid var(--rule); }
+  .foot > div:last-child { border-right: 0; }
+  .foot .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+  .foot b { color: var(--ink); font-weight: 500; }
+
+  /* night */
+  .night { --paper: #0F1215; --paper-2: #171B20; --rule: #2A3037; --ink: #CFCBC2; --ink-2: #8E9298; --kanaf: #24405E; --kanaf-text: #8FB4E0; --active: #171B20; --ok: #4FA36A; --route: #D548A7; }
+  .night .map > svg { filter: invert(1) hue-rotate(180deg) brightness(.6) saturate(.7); }
+  .night .hudsvg line, .night .hudsvg circle[fill="none"] { stroke: #CFCBC2; }
+  .night .hudsvg text { fill: #CFCBC2; stroke: rgba(8,10,14,.9); }
+  .night .hudsvg text[fill="#C8102E"] { fill: #FF7A7A; }
+  .night .hudsvg text[fill="#fff"] { fill: #0F1215; stroke: none; }
+  .night .hudsvg rect { fill: #CFCBC2; }
+  .night .spine { box-shadow: 6px 0 24px rgba(0,0,0,.5); }
+  .night .nrst { color: #D9D9D9; }
+  .night .hudsvg path { fill: #CFCBC2; stroke: #0F1215; }
+
+  /* on-map hud (unaffected by night dimming) */
+  .hud { position: absolute; inset: 0; pointer-events: none; }
+  .hud svg { width: 100%; height: 100%; display: block; }
+
+  /* ---------- debrief ---------- */
+  .ground { position: absolute; inset: 0; background: var(--paper); color: var(--ink); display: grid; grid-template-columns: 430px 1fr; grid-template-rows: 64px 1fr; }
+  .ground .bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px; padding: 0 22px; border-bottom: 1px solid var(--rule); font-family: var(--mono); font-size: 13px; color: var(--ink-2); letter-spacing: .04em; }
+  .ground .bar .crumb b { color: var(--ink); font-weight: 500; }
+  .ground .bar .title { font-family: var(--display); font-weight: 700; font-size: 28px; color: var(--ink); letter-spacing: .02em; margin-left: 6px; }
+  .ground .bar .title .he { font-family: var(--he); font-size: 16px; font-weight: 500; color: var(--ink-2); margin-left: 10px; }
+  .ground .bar .right { margin-left: auto; display: flex; gap: 10px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 6px; font-family: var(--mono); font-size: 12px; letter-spacing: .04em; border: 1px solid var(--rule); color: var(--ink); }
+  .chip.caution { background: var(--caution); color: #111; border-color: transparent; font-weight: 500; }
+  .chip .tri, .rpt .tri { border-bottom-color: #111; }
+  .chip.ok { color: var(--ok); border-color: var(--ok); }
+
+  .strip { border-right: 1px solid var(--rule); overflow: hidden; display: flex; flex-direction: column; }
+  .strip .wp, .strip .leg { padding-left: 54px; }
+  .strip .wp::before { left: 26px; }
+  .strip .leg::before { left: 31px; }
+  .strip .leg { padding: 10px 16px 12px 54px; display: block; }
+  .strip .leg .l1 { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--mono); font-size: 13px; color: var(--ink); }
+  .strip .leg .l1 .alt { font-family: var(--display); font-weight: 700; font-size: 22px; color: var(--ink); letter-spacing: .02em; }
+  .strip .leg .held { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+  .strip .leg .held .pct { font-family: var(--display); font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: .01em; width: 70px; }
+  .strip .leg .held .hb { flex: 1; height: 10px; background: var(--paper-2); border-radius: 2px; overflow: hidden; }
+  .strip .leg .held .hb i { display: block; height: 100%; background: var(--ink); }
+  .strip .leg.caution .held .hb i { background: var(--caution); }
+  .strip .leg .why { margin-top: 6px; font-family: var(--ui); font-size: 13px; color: var(--ink-2); }
+  .strip .leg.caution .why { color: var(--ink); }
+  .tri { display: inline-block; width: 0; height: 0; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid var(--caution); vertical-align: -1px; margin-right: 4px; }
+  .strip .wp .rpt { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--ink-2); display: block; margin-top: 2px; }
+  .strip .wp .rpt.ok { color: var(--ok); }
+  .strip .wp .rpt.caution { color: #111; background: var(--caution); padding: 2px 6px; border-radius: 4px; display: block; width: fit-content; margin-left: auto; font-weight: 500; }
+  .strip .wp .he { font-family: var(--he); font-size: 13px; color: var(--ink-2); margin-left: 8px; font-weight: 500; }
+  .strip .sum { margin-top: auto; padding: 14px 16px; border-top: 2px solid var(--ink); font-family: var(--mono); font-size: 13px; line-height: 1.6; }
+  .strip .sum b { color: var(--ink); font-weight: 500; }
+
+  .profile { padding: 18px 22px 0; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+  .profile h4 { margin: 0; font-family: var(--ui); font-weight: 600; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); display: flex; justify-content: space-between; }
+  .profile h4 span { font-weight: 400; letter-spacing: .02em; text-transform: none; font-family: var(--mono); }
+  .profile svg { width: 100%; display: block; }
+  .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .fact { border-top: 1px solid var(--rule); padding-top: 6px; }
+  .fact .lbl { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+  .fact .val { font-family: var(--display); font-weight: 700; font-size: 36px; line-height: 1; letter-spacing: .01em; }
+  .fact .val small { font-family: var(--ui); font-size: 13px; font-weight: 600; color: var(--ink-2); letter-spacing: .06em; margin-left: 3px; }
+  .debrief { border-top: 1px solid var(--rule); padding-top: 12px; font-size: 15px; line-height: 1.55; max-width: 680px; }
+  .debrief .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); margin-bottom: 4px; }
+  .debrief p { margin: 0 0 6px; }
+  .debrief .tape { margin-top: 10px; display: flex; gap: 8px; align-items: center; font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .btnrow { margin-top: auto; display: flex; gap: 10px; padding: 12px 0 16px; }
+  .btn { height: 60px; min-width: 60px; padding: 0 20px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-family: var(--ui); font-weight: 600; font-size: 16px; border: 1.5px solid var(--kanaf); color: var(--kanaf-text); }
+  .btn.fill { background: var(--kanaf); color: #fff; }
+
+  /* ---------- iPhone ---------- */
+  .rail { position: absolute; top: 0; bottom: 196px; left: 0; width: 72px; background: var(--paper); border-right: 1px solid var(--rule); display: flex; flex-direction: column; align-items: stretch; padding-top: 58px; box-shadow: 4px 0 16px rgba(0,0,0,.18); }
+  .rail .r { position: relative; padding: 12px 0 12px 0; text-align: center; font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: .02em; color: var(--ink-2); border-bottom: 1px solid var(--rule); min-height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .rail .r small { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; font-weight: 400; }
+  .rail .r.active { background: var(--active); color: var(--ink); border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); flex: 1; justify-content: flex-start; padding-top: 14px; }
+  .rail .r.active .g { position: absolute; left: 8px; top: 48px; bottom: 14px; width: 2px; background: var(--rule); }
+  .rail .r.active .g i { position: absolute; left: 0; top: 0; width: 2px; background: var(--route); }
+  .rail .r.active .g svg { position: absolute; left: -7px; width: 16px; height: 10px; margin-top: -5px; }
+  .rail .r.active .pct { font-family: var(--mono); font-size: 10px; color: var(--ink-2); margin-top: 6px; }
+  .cell { position: absolute; left: 0; right: 0; bottom: 0; height: 196px; background: var(--active); color: var(--ink); border-top: 2px solid var(--ink); display: flex; flex-direction: column; padding: 0 0 8px; }
+  .cell .line1 { display: flex; align-items: baseline; justify-content: space-between; padding: 10px 16px 0; }
+  .cell .line1 .id { font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: .02em; line-height: 1; }
+  .cell .line1 .dist { font-family: var(--display); font-weight: 700; font-size: 34px; letter-spacing: .01em; line-height: 1; }
+  .cell .line1 .dist small { font-family: var(--ui); font-size: 12px; font-weight: 600; color: var(--ink-2); margin-left: 2px; letter-spacing: .06em; }
+  .cell .line1 .eta { font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .cell .ros { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 0 10px; padding: 6px 16px 0; }
+  .cell .ro .val { font-size: 46px; }
+  .cell .ro.alt { grid-column: auto; display: block; }
+  .cell .ro.alt .val { font-size: 46px; }
+  .cell .ro .vs { display: inline-block; font-size: 12px; text-align: left; padding: 0 0 0 6px; }
+  .cell .ro .vs .arrow { display: inline; font-size: 14px; }
+  .cell .nrst { height: 60px; margin: 10px 12px 0; }
+  .cell .nrst .id { font-size: 26px; }
+  .cell .nrst .k { font-size: 18px; }
+
+  .statusbar { position: absolute; top: 0; left: 0; right: 0; height: 54px; display: flex; justify-content: space-between; align-items: flex-end; padding: 0 28px 8px; font-family: var(--ui); font-weight: 600; font-size: 15px; color: var(--ink); z-index: 3; pointer-events: none; }
+  .island { position: absolute; top: 11px; left: 50%; width: 124px; height: 36px; margin-left: -62px; border-radius: 20px; background: #000; z-index: 4; }
+
+  .caption { font-family: var(--mono); font-size: 12px; color: var(--page-dim); letter-spacing: .06em; text-transform: uppercase; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section class="thesis">
+    <h1>The log is the spine <span class="he">כנף · Kanaf</span></h1>
+    <ol>
+      <li><b>One idea.</b> A VFR flight is a nav log: a column of waypoints with a leg between each pair. Kanaf shows that one object in three tenses, planned, flying, flown, and nothing else. The strip is pinned to the chart's edge like a flight-progress strip in a bay; the active leg's cell is where the readouts live, because the only question at a glance is "where am I on this leg, how high, how fast, pointed where".</li>
+      <li><b>The home screen is the log itself:</b> strips stacked, tomorrow's plan on top, today's flight live, last month's flights below with their grades. Tap a strip and it becomes the spine; the chart takes the rest of the screen. An airport is a row's endpoint opened up. A debrief is the same strip with the actuals written in. A logbook is the stack with the totals footer.</li>
+      <li><b>Thrown away deliberately:</b> the tab bar, the floating round buttons, the bottom instrument strip, bottom sheets, list-and-detail screens, the layer panel, the separate NRST box. The map is no longer a backdrop with chrome floating on it; it is one half of a two-part instrument, chart and log, the way a kneeboard sits beside a sectional.</li>
+      <li><b>Kept, because it is safety:</b> red only for warnings, amber only for cautions, stale never shown as current (the footer says what the GPS is doing right now), 60pt targets in flight, 4.5:1 text, a night palette that dims the chart and keeps the paper near-black, Dynamic Type through the strip's rows, mirrored to the right edge for Hebrew.</li>
+      <li><b>The wing (כנף)</b> is the ownship glyph on the chart and the marker that slides down the leg's gauge in the strip: the same shape in both places, so the eye can match them in one saccade.</li>
+      <li><b>Riskiest assumption:</b> that a 300pt strip permanently owning the chart's edge beats a full-width map with a bottom bar. It costs 25% of the width on a 13" iPad and about 18% on an iPhone, and readouts inside a log cell must read as fast as a dedicated instrument strip. If a pilot in a yoke mount wants the chart edge-to-edge, this idea is wrong.</li>
+      <li><b>Type and colour:</b> Big Shoulders Display for identifiers and readouts (tall, condensed, built for signage), Archivo for labels, Azeret Mono for times and log data, Rubik for Hebrew. Day chrome is cool paper, not cream; the route stays magenta because that is what a course line is on a sectional.</li>
+    </ol>
+  </section>
+
+  <!-- ===================== (a) iPad in flight, day ===================== -->
+  <section class="screen">
+    <h2>A · In flight, iPad landscape, day</h2>
+    <p class="sub">KPAO → KOAK → KSTS. Position 2.1 NM from KPAO, 2,450 ft, 98 kt GS, track 312, climbing 300 fpm, KOAK 18.4 NM.</p>
+    <div class="ipad"><div class="frame" id="flight-day">
+      <div class="map" data-chart="ipad"></div>
+      <aside class="spine">
+        <div class="head">
+          <span class="flt">KPAO ▸ KSTS · 14:32Z</span>
+          <span class="rec">REC 11:08</span>
+        </div>
+        <div class="wp past"><span class="id">KPAO</span><span class="t">OFF <b>14:21</b></span></div>
+        <div class="leg flown"><span>312°</span><span>20.5 NM</span><span>2,500</span></div>
+        <div class="wp active">
+          <div class="gauge"><div class="track"></div><div class="done" style="height:10%"></div>
+            <svg class="wing" style="top:10%" viewBox="0 0 16 10"><path d="M8 0 L16 10 L8 7 L0 10 Z" fill="var(--route)"/></svg></div>
+          <div class="top"><span class="id">KOAK</span><span class="dist">18.4<small>NM</small></span></div>
+          <div class="eta">ETE <b>11 MIN</b> · ETA <b>14:43</b></div>
+          <div class="readouts">
+            <div class="ro alt"><div><span class="lbl">Alt ft</span><span class="val">2450</span></div><div class="vs"><span class="arrow">↑</span>300 FPM</div></div>
+            <div class="ro"><span class="lbl">GS kt</span><span class="val">98</span></div>
+            <div class="ro"><span class="lbl">Trk °</span><span class="val">312</span></div>
+          </div>
+        </div>
+        <div class="leg"><span>335°</span><span>54 NM</span><span>3,500</span></div>
+        <div class="wp"><span class="id">KSTS</span><span class="t">ETA <b>15:21</b></span></div>
+        <div class="spacer"></div>
+        <div class="nrst"><span class="k">NRST</span><span class="id">KPAO</span><span class="d">2.1 NM · 128°<br>RWY 31 · 2,443'</span></div>
+        <div class="foot"><div><span class="dot"></span><b>GPS 3D</b> ±8 M · 1 S</div><div>SECT <b>ON</b></div><div>NIGHT <b>AUTO</b></div></div>
+      </aside>
+    </div></div>
+    <div class="note">
+      <div><h3>The idea</h3><p>The strip on the left is the flight: KPAO flown, KOAK active, KSTS ahead. The active cell holds the four numbers a pilot glances at, at 56 to 72pt, with the leg's gauge beside them; the wing marker on the gauge is the same glyph as ownship on the chart. The chart is track-up around ownship with a compass ring drawn on the map itself, not a widget.</p><p>Nothing floats over the chart. Pan or pinch anywhere; the strip never moves. Tap a row to open that airport in place of the strip (same width, same column); the chart stays live beside it.</p></div>
+      <div><h3>What it replaces</h3><p>The bottom instrument strip, the six floating round buttons, the NRST box, the layer panel and the tab bar. Layers and night mode are two 60pt cells in the strip's footer, next to the GPS state, which is the first thing the footer says: when the fix goes stale the whole active cell greys and the footer reads <span style="font-family:var(--mono)">GPS LOST 14 S</span> in red.</p><p>Direct-to is "insert a row": tap NRST, the airport becomes the next waypoint above KOAK, and the gauge restarts.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== (d) night ===================== -->
+  <section class="screen">
+    <h2>D · In flight, iPad, night</h2>
+    <p class="sub">Same screen, night palette. Chart dimmed at the raster, paper near-black, text warm grey; red and amber keep their meaning and their contrast.</p>
+    <div class="ipad night"><div class="frame" id="flight-night"></div></div>
+    <div class="note">
+      <div><h3>The idea</h3><p>Night is not a theme swap of white to black panels. The chart is dimmed to 42% brightness and desaturated, the strip's paper goes to #0F1215 with #CFCBC2 ink (13.6:1), the active cell is a shade lighter so it still reads as "this one". The wing on the gauge and the course line stay magenta so the eye can find the two moving things.</p></div>
+      <div><h3>What it replaces</h3><p>The separate night toggle button. Night lives in the footer cell as a state (AUTO, from sun elevation) that can be tapped to override; it is a fact about the display, shown next to the other facts.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== (b) debrief ===================== -->
+  <section class="screen">
+    <h2>B · Flown: the CVFR debrief, iPad landscape</h2>
+    <p class="sub">Israel, LLHZ → TAVOR → DESHE → LLIB. The same strip, with actuals written in.</p>
+    <div class="ipad"><div class="frame">
+      <div class="ground">
+        <div class="bar">
+          <span class="crumb">LOG ▸ <b>3 NOV 2026</b></span>
+          <span class="title">LLHZ ▸ LLIB<span class="he">הרצליה אל מגידו</span></span>
+          <span class="crumb">1:12 · 4X-ABC · CVFR</span>
+          <span class="right"><span class="chip ok">2 LEGS HELD</span><span class="chip caution"><i class="tri"></i>1 LEG LOW</span><span class="chip caution"><i class="tri"></i>1 REPORT NOT HEARD</span></span>
+        </div>
+        <div class="strip">
+          <div class="wp past"><span class="id">LLHZ<span class="he">הרצליה</span></span><span class="t">OFF <b>09:02</b></span></div>
+          <div class="leg flown">
+            <div class="l1"><span>LLHZ ▸ TAVOR · 20 NM · 0:19</span><span class="alt">1,500</span></div>
+            <div class="held"><span class="pct">96%</span><div class="hb"><i style="width:96%"></i></div></div>
+            <div class="why">Held within ±200 ft for 18 of 19 min.</div>
+          </div>
+          <div class="wp past"><span class="id">TAVOR<span class="he">תבור</span></span><span class="t"><b>09:21</b><span class="rpt ok">REPORT HEARD 09:20</span></span></div>
+          <div class="leg flown caution">
+            <div class="l1"><span>TAVOR ▸ DESHE · 16 NM · 0:17</span><span class="alt">2,500</span></div>
+            <div class="held"><span class="pct">71%</span><div class="hb"><i style="width:71%"></i></div></div>
+            <div class="why"><i class="tri"></i>330 ft low for 4 min, 09:27 to 09:31.</div>
+          </div>
+          <div class="wp past"><span class="id">DESHE<span class="he">דשה</span></span><span class="t"><b>09:38</b><span class="rpt caution">REPORT NOT HEARD</span></span></div>
+          <div class="leg flown">
+            <div class="l1"><span>DESHE ▸ LLIB · 22 NM · 0:21</span><span class="alt">2,000</span></div>
+            <div class="held"><span class="pct">93%</span><div class="hb"><i style="width:93%"></i></div></div>
+            <div class="why">Held within ±200 ft for 20 of 21 min.</div>
+          </div>
+          <div class="wp past"><span class="id">LLIB<span class="he">מגידו</span></span><span class="t">ON <b>09:59</b></span></div>
+          <div class="sum">Altitude held <b>87%</b> of the route, by time.<br>Position reports heard <b>1 of 2</b>. Transcript: 57 min of 72.</div>
+        </div>
+        <div class="profile">
+          <h4>Altitude profile <span>planned step · flown trace · ±200 ft band · time</span></h4>
+          <svg viewBox="0 0 700 250" id="profile"></svg>
+          <div class="facts">
+            <div class="fact"><div class="lbl">Block</div><div class="val">1:12</div></div>
+            <div class="fact"><div class="lbl">Distance</div><div class="val">58<small>NM</small></div></div>
+            <div class="fact"><div class="lbl">Max alt</div><div class="val">2,640<small>FT</small></div></div>
+            <div class="fact"><div class="lbl">Lowest on leg 2</div><div class="val">2,170<small>FT</small></div></div>
+          </div>
+          <div class="debrief">
+            <div class="eyebrow">Debrief · from the numbers above, nothing else</div>
+            <p>Two of three legs were held. On TAVOR to DESHE you sat 330 ft under the 2,500 ft leg altitude for four minutes after the TAVOR turn; the trace recovers at 09:31 without an overshoot. The DESHE position report was not heard: the transcript has a segment ending 09:34 and the next starts 09:41, with nothing at the point.</p>
+            <div class="tape">TRANSCRIPT 09:20 <bdi dir="rtl">"תבור, אלף חמש מאות"</bdi> · 09:34 to 09:41 no segment · 09:41 <bdi dir="rtl">"…דשה"</bdi></div>
+          </div>
+          <div class="btnrow"><span class="btn fill">Replay from TAVOR</span><span class="btn">Sign to logbook</span></div>
+        </div>
+      </div>
+    </div></div>
+    <div class="note">
+      <div><h3>The idea</h3><p>The debrief is not a report page. It is the flight's own strip with the actuals written in the right-hand column where the planned values were, and a grade per leg at the size of a readout. The profile on the right is the same legs laid on their side: planned step line, flown trace, the ±200 ft band, the four low minutes in amber. The AI paragraph sits under the facts it is allowed to use.</p><p>Hebrew names ride beside the idents in the strip; in a Hebrew UI the whole strip mirrors to the right edge and the bay reads top to bottom as before.</p></div>
+      <div><h3>What it replaces</h3><p>Flights → History → detail → debrief tab, and the 100%-over-a-0%-leg summary. "Not heard" is amber with a triangle and is distinguished from "not checked" (no transcript) in the text, never red. Replay starts from a waypoint, because that is how a pilot remembers the flight, not from 00:00.</p></div>
+    </div>
+  </section>
+
+  <!-- ===================== (c) iPhone ===================== -->
+  <section class="screen">
+    <h2>C · In flight, iPhone portrait</h2>
+    <p class="sub">Same flight. The strip folds: a 72pt rail of waypoints down the left edge and the active cell along the bottom.</p>
+    <div class="row2">
+      <div class="iphone"><div class="frame">
+        <div class="map" data-chart="iphone"></div>
+        <div class="island"></div>
+        <div class="statusbar"><span>14:32</span><span>REC 11:08</span></div>
+        <aside class="rail">
+          <div class="r">KPAO<small>14:21</small></div>
+          <div class="r active">KOAK<div class="g"><i style="height:10%"></i><svg style="top:10%" viewBox="0 0 16 10"><path d="M8 0 L16 10 L8 7 L0 10 Z" fill="var(--route)"/></svg></div><span class="pct">10%</span></div>
+          <div class="r">KSTS<small>15:21</small></div>
+        </aside>
+        <div class="cell">
+          <div class="line1"><span class="id">KOAK</span><span class="eta">ETE 11 MIN · ETA 14:43</span><span class="dist">18.4<small>NM</small></span></div>
+          <div class="ros">
+            <div class="ro alt"><span class="lbl">Alt ft</span><span class="val">2450</span><span class="vs"><span class="arrow">↑</span>300</span></div>
+            <div class="ro"><span class="lbl">GS kt</span><span class="val">98</span></div>
+            <div class="ro"><span class="lbl">Trk °</span><span class="val">312</span></div>
+          </div>
+          <div class="nrst"><span class="k">NRST</span><span class="id">KPAO</span><span class="d">2.1 NM · 128°</span></div>
+        </div>
+      </div></div>
+      <div class="note" style="grid-template-columns: 1fr; max-width: 640px;">
+        <div><h3>The idea</h3><p>The same object, folded for a phone in a lap: the rail keeps the flight's order visible with the gauge in the active row, the cell at the bottom keeps the four numbers at 46pt where a thumb can also hit NRST (60pt). The chart keeps the top 70% of the screen with the compass ring and the next waypoint in view.</p></div>
+        <div><h3>What it replaces</h3><p>The iPhone instrument strip plus HUD plus floating buttons, which together took three stacked bands. Here there are two surfaces and the chart.</p></div>
+        <div><h3>Also implied, not drawn</h3><p>The home screen: a column of strips (planned on top, past below) in this same row grammar, which doubles as the logbook with a totals footer. The airport: the strip's column replaced by the A/FD-style block for that row (weather with its age on the first line, frequencies as a label column, runways as a diagram), the chart still live beside it. Plan: the strip with empty actual columns, and the FPL text as a secondary action under "Activate".</p></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function () {
+  // ---------- chart generator: a plausible sectional drawn north-up, then rotated track-up ----------
+  function chart(container, opts) {
+    const W = opts.w, H = opts.h, cx = opts.cx, cy = opts.cy, track = opts.track, s = opts.scale; // px per NM
+    const rot = (360 - track) % 360; // rotate the north-up drawing clockwise so the track points up
+    const rad = a => a * Math.PI / 180;
+    const nu = (brg, nm) => [nm * s * Math.sin(rad(brg)), -nm * s * Math.cos(rad(brg))]; // north-up offset from ownship
+    const toScreen = ([x, y]) => { const r = rad(rot); return [cx + x * Math.cos(r) - y * Math.sin(r), cy + x * Math.sin(r) + y * Math.cos(r)]; };
+    const P = (brg, nm) => toScreen(nu(brg, nm));
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
+    const el = (n, a, parent) => { const e = document.createElementNS(ns, n); for (const k in a) e.setAttribute(k, a[k]); (parent || svg).appendChild(e); return e; };
+    const poly = pts => pts.map(p => p.join(',')).join(' ');
+
+    // land
+    el('rect', { x: 0, y: 0, width: W, height: H, fill: '#F2ECDC' });
+    // terrain west (Santa Cruz mountains) and east bay hills: contour-ish blobs
+    const hill = (centerBrg, centerNm, rx, ry, rotDeg, fill) => {
+      const c = P(centerBrg, centerNm);
+      el('ellipse', { cx: c[0], cy: c[1], rx: rx * s, ry: ry * s, transform: `rotate(${rot + rotDeg} ${c[0]} ${c[1]})`, fill });
+    };
+    hill(240, 9, 7, 16, -40, '#E6D8B8'); hill(240, 9, 4.5, 12, -40, '#DCC89D');
+    hill(60, 16, 6, 18, -35, '#E6D8B8'); hill(62, 16, 3.5, 12, -35, '#DCC89D');
+    // bay water, a band running NW-SE between the shores
+    const bayPts = [[150, 7], [120, 6.5], [100, 4], [330, 0.6], [320, 4], [318, 9], [322, 15], [330, 22], [336, 30], [350, 34], [5, 32], [20, 26], [25, 20], [30, 14], [40, 9], [62, 6], [110, 2.5]].map(([b, n]) => P(b, n));
+    el('polygon', { points: poly(bayPts), fill: '#BFD8E8' });
+    // urban yellow tint on both shores
+    const urban = (pts, fill) => el('polygon', { points: poly(pts.map(([b, n]) => P(b, n))), fill });
+    urban([[200, 9], [160, 8], [140, 5], [160, 1], [200, 2], [250, 2.5], [300, 4], [320, 6], [300, 9]], '#F3E59F');
+    urban([[345, 15], [20, 14], [40, 16], [45, 22], [20, 27], [355, 26], [345, 21]], '#F3E59F');
+    urban([[300, 23], [320, 24], [330, 28], [312, 32], [296, 28]], '#F3E59F');
+    // roads
+    const road = (pts, w, c) => el('polyline', { points: poly(pts.map(([b, n]) => P(b, n))), fill: 'none', stroke: c, 'stroke-width': w });
+    road([[150, 12], [160, 6], [200, 1.5], [280, 2], [310, 6], [318, 12], [322, 20], [326, 30]], 2, '#A7A29A');
+    road([[135, 10], [120, 3], [40, 3], [30, 9], [25, 15], [20, 22], [15, 30]], 2, '#A7A29A');
+    road([[270, 6], [330, 2], [10, 1.5], [60, 2]], 1.2, '#B9B4AB');
+    // airspace: Class B around SFO (solid blue rings), Class C around OAK (magenta), Class D (blue dashed)
+    const ring = (brg, nm, rNm, stroke, w, dash) => { const c = P(brg, nm); el('circle', { cx: c[0], cy: c[1], r: rNm * s, fill: 'none', stroke, 'stroke-width': w, 'stroke-dasharray': dash || 'none', opacity: .85 }); };
+    ring(325, 20, 5, '#2B5BA8', 3); ring(325, 20, 10, '#2B5BA8', 3); ring(325, 20, 15, '#2B5BA8', 3);
+    ring(312, 18.4, 5, '#B0287A', 2.5); ring(312, 18.4, 10, '#B0287A', 2.5);
+    ring(128, 2.1, 4, '#2B5BA8', 2, '8 5'); ring(320, 6, 4, '#2B5BA8', 2, '8 5'); ring(120, 5, 4, '#2B5BA8', 2, '8 5');
+    // course line: KPAO -> KOAK -> KSTS
+    const kpao = P(128, 2.1), koak = P(312, 18.4), ksts = toScreen([nu(312, 18.4)[0] + nu(335, 54)[0], nu(312, 18.4)[1] + nu(335, 54)[1]]);
+    el('polyline', { points: poly([kpao, koak, ksts]), fill: 'none', stroke: '#fff', 'stroke-width': 7, 'stroke-linejoin': 'round', opacity: .7 });
+    el('polyline', { points: poly([kpao, koak, ksts]), fill: 'none', stroke: '#C2168D', 'stroke-width': 3.5, 'stroke-linejoin': 'round' });
+    // 10 NM ticks on the active leg
+    for (let i = 1; i < 4; i++) {
+      const t = i * 5 / 20.5; const x = kpao[0] + (koak[0] - kpao[0]) * t, y = kpao[1] + (koak[1] - kpao[1]) * t;
+      el('line', { x1: x - 7, y1: y, x2: x + 7, y2: y, stroke: '#C2168D', 'stroke-width': 2.5 });
+    }
+    // airports
+    const apt = (id, brg, nm, towered, big) => {
+      const c = P(brg, nm);
+      el('circle', { cx: c[0], cy: c[1], r: big ? 11 : 8, fill: towered ? '#2B5BA8' : '#B0287A', stroke: '#fff', 'stroke-width': 2 });
+      el('circle', { cx: c[0], cy: c[1], r: big ? 5 : 3.5, fill: '#F2ECDC' });
+      const tx = el('text', { x: c[0] + 15, y: c[1] + 5, 'font-family': 'Archivo, sans-serif', 'font-size': 14, 'font-weight': 700, fill: '#1A1F26', 'paint-order': 'stroke', stroke: '#F2ECDC', 'stroke-width': 4, 'stroke-linejoin': 'round' });
+      tx.textContent = id;
+    };
+    apt('KPAO', 128, 2.1, true); apt('KSQL', 320, 6, true); apt('KNUQ', 120, 5, true, true); apt('KHAF', 262, 14, false);
+    apt('KSFO', 325, 20, true, true); apt('KOAK', 312, 18.4, true, true); apt('KHWD', 345, 13, true);
+    // next waypoint chip
+    const chip = el('g', {});
+    el('rect', { x: koak[0] - 140, y: koak[1] - 34, width: 118, height: 30, rx: 6, fill: '#14191F' }, chip);
+    const ct = el('text', { x: koak[0] - 130, y: koak[1] - 13, 'font-family': 'Azeret Mono, monospace', 'font-size': 13, fill: '#fff' }, chip); ct.textContent = 'KOAK 18.4 NM';
+
+    // ---------- HUD layer: compass ring and ownship, never dimmed ----------
+    const hud = document.createElementNS(ns, 'svg');
+    hud.setAttribute('viewBox', `0 0 ${W} ${H}`); hud.setAttribute('class', 'hudsvg');
+    const h = (n, a) => { const e = document.createElementNS(ns, n); for (const k in a) e.setAttribute(k, a[k]); hud.appendChild(e); return e; };
+    const R = opts.ring;
+    h('circle', { cx, cy, r: R, fill: 'none', stroke: '#14191F', 'stroke-width': 1.5, opacity: .55 });
+    for (let b = 0; b < 360; b += 10) {
+      const a = rad(b + rot - 90); const major = b % 30 === 0;
+      const r1 = R - (major ? 14 : 7);
+      h('line', { x1: cx + r1 * Math.cos(a), y1: cy + r1 * Math.sin(a), x2: cx + R * Math.cos(a), y2: cy + R * Math.sin(a), stroke: '#14191F', 'stroke-width': major ? 2 : 1.2, opacity: .75 });
+      if (major) {
+        const lab = b === 0 ? 'N' : b === 90 ? 'E' : b === 180 ? 'S' : b === 270 ? 'W' : String(b / 10);
+        const t = h('text', { x: cx + (R - 26) * Math.cos(a), y: cy + (R - 26) * Math.sin(a) + 5, 'text-anchor': 'middle', 'font-family': 'Big Shoulders Display, sans-serif', 'font-weight': 700, 'font-size': b % 90 === 0 ? 18 : 14, fill: b === 0 ? '#C8102E' : '#14191F', 'paint-order': 'stroke', stroke: 'rgba(242,236,220,.85)', 'stroke-width': 3 });
+        t.textContent = lab;
+      }
+    }
+    // lubber line + track tag
+    h('line', { x1: cx, y1: cy - R - 10, x2: cx, y2: cy - R + 16, stroke: '#14191F', 'stroke-width': 3 });
+    h('rect', { x: cx - 30, y: cy - R - 42, width: 60, height: 30, rx: 5, fill: '#14191F' });
+    const tt = h('text', { x: cx, y: cy - R - 20, 'text-anchor': 'middle', 'font-family': 'Big Shoulders Display, sans-serif', 'font-weight': 700, 'font-size': 22, fill: '#fff' }); tt.textContent = String(track);
+    // ownship: the wing
+    h('path', { d: 'M0 -22 L20 14 L0 6 L-20 14 Z', transform: `translate(${cx} ${cy})`, fill: '#fff', stroke: '#14191F', 'stroke-width': 3, 'stroke-linejoin': 'round' });
+    h('path', { d: 'M0 -22 L20 14 L0 6 L-20 14 Z', transform: `translate(${cx} ${cy})`, fill: 'none', stroke: '#fff', 'stroke-width': 1 });
+
+    container.appendChild(svg);
+    const hudWrap = document.createElement('div'); hudWrap.className = 'hud'; hudWrap.appendChild(hud); container.appendChild(hudWrap);
+  }
+
+  document.querySelectorAll('[data-chart="ipad"]').forEach(c => chart(c, { w: 1180, h: 830, cx: 740, cy: 520, track: 312, scale: 22, ring: 120 }));
+  document.querySelectorAll('[data-chart="iphone"]').forEach(c => chart(c, { w: 402, h: 874, cx: 237, cy: 440, track: 312, scale: 16, ring: 96 }));
+
+  // night: clone the day frame
+  const night = document.getElementById('flight-night');
+  const day = document.getElementById('flight-day');
+  night.replaceWith(day.cloneNode(true));
+
+  // ---------- altitude profile ----------
+  (function profile() {
+    const svg = document.getElementById('profile'); if (!svg) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    const el = (n, a, txt) => { const e = document.createElementNS(ns, n); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; svg.appendChild(e); return e; };
+    const x0 = 44, x1 = 690, y0 = 18, y1 = 210; // plot area
+    const T = 57; // minutes 09:02 .. 09:59
+    const X = m => x0 + (m / T) * (x1 - x0);
+    const Y = ft => y1 - ((ft - 0) / 3000) * (y1 - y0);
+    // grid
+    [0, 1000, 2000, 3000].forEach(ft => { el('line', { x1: x0, x2: x1, y1: Y(ft), y2: Y(ft), stroke: '#C3C8CE', 'stroke-width': 1 }); el('text', { x: x0 - 6, y: Y(ft) + 4, 'text-anchor': 'end', 'font-family': 'Azeret Mono, monospace', 'font-size': 11, fill: '#4A535E' }, ft === 0 ? '0' : (ft / 1000) + ',000'); });
+    // legs: [startMin, endMin, plannedFt]
+    const legs = [[0, 19, 1500], [19, 36, 2500], [36, 57, 2000]];
+    legs.forEach(([a, b, ft], i) => {
+      el('rect', { x: X(a), y: Y(ft + 200), width: X(b) - X(a), height: Y(ft - 200) - Y(ft + 200), fill: i === 1 ? 'rgba(232,160,0,.14)' : 'rgba(20,25,31,.06)' });
+      el('line', { x1: X(a), x2: X(b), y1: Y(ft), y2: Y(ft), stroke: '#14191F', 'stroke-width': 2, 'stroke-dasharray': '6 4' });
+    });
+    // the low region on leg 2: 09:27..09:31 = minutes 25..29
+    el('rect', { x: X(25), y: Y(2300), width: X(29) - X(25), height: Y(2170) - Y(2300) + 4, fill: '#E8A000', opacity: .9 });
+    // flown trace
+    const pts = [[0, 60], [2, 500], [4, 1000], [6, 1380], [8, 1520], [11, 1480], [14, 1540], [17, 1510], [19, 1560], [21, 2100], [23, 2520], [24, 2400], [25, 2250], [26, 2170], [27, 2180], [28, 2210], [29, 2320], [30, 2520], [32, 2560], [34, 2640], [36, 2500], [38, 2160], [40, 2010], [43, 1980], [46, 2040], [49, 2020], [52, 1700], [54, 1100], [56, 400], [57, 60]];
+    el('polyline', { points: pts.map(([m, ft]) => `${X(m)},${Y(ft)}`).join(' '), fill: 'none', stroke: '#C2168D', 'stroke-width': 2.5, 'stroke-linejoin': 'round' });
+    // waypoint verticals and labels
+    [[0, 'LLHZ 09:02'], [19, 'TAVOR 09:21'], [36, 'DESHE 09:38'], [57, 'LLIB 09:59']].forEach(([m, lab], i) => {
+      el('line', { x1: X(m), x2: X(m), y1: y0 - 4, y2: y1, stroke: '#4A535E', 'stroke-width': 1 });
+      el('text', { x: X(m) + (i === 3 ? -4 : 4), y: y1 + 20, 'text-anchor': i === 3 ? 'end' : 'start', 'font-family': 'Azeret Mono, monospace', 'font-size': 11, fill: '#14191F' }, lab);
+    });
+    // report markers
+    const mark = (m, ft, ok) => { el('circle', { cx: X(m), cy: Y(ft), r: 7, fill: ok ? '#147832' : '#E8A000', stroke: '#fff', 'stroke-width': 2 }); };
+    mark(18, 1510, true); mark(36, 2500, false);
+    el('text', { x: X(36) + 10, y: Y(2500) - 10, 'font-family': 'Archivo, sans-serif', 'font-size': 12, 'font-weight': 600, fill: '#14191F' }, 'Report not heard');
+    el('text', { x: X(27), y: Y(2170) + 22, 'text-anchor': 'middle', 'font-family': 'Archivo, sans-serif', 'font-size': 12, 'font-weight': 600, fill: '#14191F' }, '330 ft low · 4 min');
+    el('text', { x: x1, y: y0 + 2, 'text-anchor': 'end', 'font-family': 'Archivo, sans-serif', 'font-size': 11, fill: '#4A535E' }, 'ft MSL');
+  })();
+})();
+</script>
+</body>
+</html>
