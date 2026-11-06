@@ -34,8 +34,11 @@ limited() {
   pid=$!
   { sleep "$secs"; pkill -9 -P "$pid"; kill -9 "$pid"; } >/dev/null 2>&1 &
   watchdog=$!
-  wait "$pid" 2>/dev/null; rc=$?
-  kill "$watchdog" 2>/dev/null; wait "$watchdog" 2>/dev/null
+  rc=0
+  wait "$pid" 2>/dev/null || rc=$?
+  # The watchdog dies by our SIGTERM (143): never let that reach set -e.
+  kill "$watchdog" 2>/dev/null || true
+  wait "$watchdog" 2>/dev/null || true
   [ "$rc" -eq 137 ] && rc=124
   return "$rc"
 }
@@ -59,7 +62,7 @@ prepare() {
   local sim=$1
   xcrun simctl boot "$sim" 2>/dev/null || true
   limited 300 xcrun simctl bootstatus "$sim" -b >/dev/null || { echo "capture-screens: simulator $sim did not boot" >&2; exit 1; }
-  limited 300 xcrun simctl install "$sim" "$APP"
+  limited 300 xcrun simctl install "$sim" "$APP" || { echo "capture-screens: install on $sim failed" >&2; exit 1; }
   xcrun simctl privacy "$sim" grant location-always "$BUNDLE" || true
   xcrun simctl location "$sim" clear 2>/dev/null || true
 }
