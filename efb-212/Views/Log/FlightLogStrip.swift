@@ -174,20 +174,22 @@ struct FlightLogNext: View {
     // MARK: Next row
 
     /// The time-to is the big element; without a meaningful time (slow, no ETE, stale fix) the ident
-    /// takes its place and the "---" stays small and secondary.
+    /// takes its place and the "---" stays small and secondary. The 104pt rail keeps the ident over the
+    /// time-to in row sizes so the full time fits.
     private func nextRow(_ ident: String) -> some View {
         let quiet = isQuiet
+        let bigTime = TypeRole.nextTime
         let time = Text(timeText)
-            .font(quiet ? TypeRole.data : TypeRole.nextTime)
+            .font(quiet ? TypeRole.data : (compact ? TypeRole.rowTime : bigTime))
             .foregroundStyle(quiet ? Palette.inkSecondary : Palette.ink)
             .lineLimit(1)
-            .minimumScaleFactor(0.3)
+            .minimumScaleFactor(compact ? 0.5 : 0.3)
             .accessibilityHidden(true)
         let identText = Text(ident)
-            .font(quiet ? TypeRole.nextTime : TypeRole.rowIdent)
+            .font(quiet && !compact ? bigTime : TypeRole.rowIdent)
             .foregroundStyle(gpsStatus.isStale ? Palette.inkSecondary : Palette.ink)
             .lineLimit(1)
-            .minimumScaleFactor(quiet ? 0.3 : 0.6)
+            .minimumScaleFactor(compact ? 0.5 : (quiet ? 0.3 : 0.6))
             // One element carries the whole row for VoiceOver and the UI tests ("NEXT BAZRA ...").
             .accessibilityLabel(spokenLine(ident))
             .accessibilityIdentifier(route != nil ? "israel-route-next-point" : "next-waypoint")

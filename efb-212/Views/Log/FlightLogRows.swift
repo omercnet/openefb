@@ -530,7 +530,8 @@ struct AltitudeTape: View {
             let ax = x(altitude)
             let midY = barY + barHeight / 2
             if abs(verticalSpeedFPM) >= 100 {
-                // One minute at the current vertical speed.
+                // One minute at the current vertical speed. The arrow carries no text: the VS value is
+                // printed beside ALT, and a label here collided with the marker.
                 let target = x(altitude + verticalSpeedFPM)
                 let direction: CGFloat = target >= ax ? 1 : -1
                 var shaft = Path()
@@ -543,9 +544,6 @@ struct AltitudeTape: View {
                 head.addLine(to: CGPoint(x: target - direction * 9, y: midY + 6))
                 head.closeSubpath()
                 context.fill(head, with: .color(Palette.ink))
-                let vs = Int(verticalSpeedFPM)
-                context.draw(Text("\(vs > 0 ? "+" : "")\(vs) fpm, 1 min").font(TypeRole.stripLabel).foregroundStyle(Palette.inkSecondary),
-                             at: CGPoint(x: target, y: 8), anchor: direction > 0 ? .trailing : .leading)
             }
             var marker = Path()
             marker.move(to: CGPoint(x: ax - 7, y: 4))
