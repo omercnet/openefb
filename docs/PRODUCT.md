@@ -20,8 +20,10 @@ Excludes: IFR, cloud sync, weight and balance, ADS-B In, anything needing a cert
 | Tab and feature merges (Aircraft into Settings, Logbook into Flights) | J4 | P3 | done (T22, efb-77r.22-23); see "Tab bar decision" below |
 | Validate all of this with pilots | all | P2 | open (efb-77r.7, efb-77r.34) |
 
-### Tab bar decision (T22, 2026-11-01)
-The tab bar is **Map / Flights / Settings** (was Map / Flights / Logbook / Aircraft / Settings). Screenshots: `docs/design/screenshots/T22/`.
+### Tab bar decision (T22, 2026-11-01; superseded 2026-11-06)
+Superseded by Direction 2 stage 1 (`docs/DESIGN.md`): there is no tab bar. The map screen carries the flight log strip; the log stack is home and holds flights, plans, logbook entries and their totals; Settings is a link from the log stack. The draft rule below still holds: a draft logbook entry reads as a neutral to-do in the log stack, not amber.
+
+The tab bar was **Map / Flights / Settings** (was Map / Flights / Logbook / Aircraft / Settings). Screenshots: `docs/design/screenshots/T22/`.
 - Logbook is a section of Flights: the History / Logbook / Plans control sits in the Flights navigation bar (the old History / Plans control at the top of the content was hidden behind the iPadOS floating tab bar; T14 B08 shows no control at all). Every logbook screen stays: draft rows from recordings, confirm/lock, manual entries, delete. Flights did not get worse: one bar, three sections, and a recording's two outcomes (FlightRecord, draft logbook entry) now sit next to each other. The fourth-tab fallback (Map / Flights / Logbook / Settings) was not needed.
 - The draft count reads "Logbook (n)" in the segment, neutral text, not a red badge: a draft is a to-do, not a warning (efb-77r.32).
 - Aircraft & Pilot is a row under Settings > Profiles. Non-current currency (medical, flight review, night) shows as an amber "n to renew" on that row, replacing the old tab badge.

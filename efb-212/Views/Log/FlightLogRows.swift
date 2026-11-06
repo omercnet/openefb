@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 // MARK: - Building blocks
 

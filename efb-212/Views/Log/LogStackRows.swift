@@ -55,6 +55,15 @@ struct LogCautionMarker: View {
     }
 }
 
+/// Draft logbook entry waiting for a signature: a neutral to-do, not a caution (efb-77r.32).
+struct LogDraftMarker: View {
+    var body: some View {
+        Label("Draft, sign", systemImage: "signature")
+            .font(TypeRole.dataEmphasis)
+            .foregroundStyle(Palette.ink)
+    }
+}
+
 /// "DEP ▸ ARR" idents; "---" when unknown.
 func logRouteText(_ departure: String?, _ arrival: String?) -> String {
     "\(departure ?? "---") \u{25B8} \(arrival ?? "---")"
@@ -113,7 +122,7 @@ struct FlownFlightRow: View {
 
             if let draft {
                 Button { onSign(draft) } label: {
-                    LogCautionMarker(text: "Draft, sign")
+                    LogDraftMarker()
                         .frame(minHeight: StripMetrics.cell)
                         .contentShape(Rectangle())
                 }
@@ -164,7 +173,7 @@ struct FlownEntryRow: View {
                             .font(TypeRole.data)
                             .foregroundStyle(Palette.inkSecondary)
                     } else {
-                        LogCautionMarker(text: "Draft, sign")
+                        LogDraftMarker()
                     }
                 }
                 Spacer(minLength: Space.s)

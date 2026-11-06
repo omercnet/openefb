@@ -13,9 +13,11 @@ Rules (the EFB lens):
 - Stale or unvalidated data is never shown as current.
 - No decorative animation in flight.
 
-## Direction 2: the log and the leading edge (target, 2026-11-05)
+## Direction 2: the log and the leading edge (2026-11-05; stage 1 built 2026-11-06)
 
-The owner rejected four re-skins of today's layout (`docs/design/mocks/directions.html`) and asked for a reinvention. Fable and Opus each proposed one independently (`docs/design/mocks/fable.html`, `docs/design/mocks/opus.html`); the owner chose a merge of the two (Paseo Progress Q2 C). Merged mock: `docs/design/mocks/merge.html`. Until stage 1 lands, the sections below this one describe the shipped app.
+The owner rejected four re-skins of today's layout (`docs/design/mocks/directions.html`) and asked for a reinvention. Fable and Opus each proposed one independently (`docs/design/mocks/fable.html`, `docs/design/mocks/opus.html`); the owner chose a merge of the two (Paseo Progress Q2 C). Merged mock: `docs/design/mocks/merge.html`. Stage 1 is in the app (pull request #13); where the older sections below describe the floating controls, instrument strip, NRST box or tab bar, this section wins.
+
+Stage 1 as built: the strip is layout beside the chart, not an overlay, so the map needs no camera padding; the app opens on the map (the in-flight screen) and the strip's LOG button opens the log stack; the CVFR debrief keeps its current screen until stage 2.
 
 **The idea.** A VFR flight is a nav log, and the pilot's question is what comes next. Kanaf shows one object, the log, in three tenses: Next (planned), Now (flying), Flown (debrief and logbook). In flight the log reads forward: the next thing ahead gets the biggest type on the screen.
 
@@ -81,10 +83,13 @@ Defined in `efb-212/Core/DesignTokens.swift`.
 | `Palette.cautionFill` | `.orange` | Solid amber chips and banners, always with black text (9:1) |
 | `Palette.accent` / `accentText` / `infoFill` | Kanaf navy, see Night palette | Buttons, links, notices; `accentText` is also the app tint (`AccentColor` asset) |
 | `Radius.xs/s/m/l` | 4 / 8 / 10 / 14 pt | Tags / rows and banners / controls and cards / panels. No literal radii in views |
-| `TypeRole.title`, `identifier`, `sectionHeader` | Expanded SF Pro, bold | Names and headings; values in sheets stay regular width |
-| `TypeRole.readout(size:)` | Condensed SF Pro, semibold, fixed-width digits | Instrument strip (32pt). Not SF Mono: width does not apply to it |
-| `mapControlSurface()` | Liquid Glass tinted `Palette.accent`, `onAccent` glyphs | Floating map controls. Never untinted glass: it turns olive over the sectional |
-| `panelSurface()` (`Palette.panelFill`, `panelHairline`) | Day #F2F2F7 at 0.88 with a 1pt `accent` hairline at 35%; night #1C1C1E at 0.9, no hairline; `Radius.l` | Instrument strip and NRST box. Solid, so the sectional's yellow no longer tints them |
+| `TypeRole.title`, `identifier`, `sectionHeader`, `label`, `body`, `caption` | Bundled Archivo (Condensed SemiBold for names, Medium / SemiBold for labels, Regular for prose), Dynamic Type through `UIFontMetrics`, Hebrew falls back to IBM Plex Sans Hebrew | Names, headings, labels, prose |
+| `TypeRole.value`, `valueSmall`, `data`, `dataEmphasis` | IBM Plex Mono | Frequencies, times, distances, log data |
+| `TypeRole.readout(size:)`, `nextTime`, `rowTime`, `rowIdent` | Archivo ExtraCondensed with tabular digits (`nextTime` ~100pt capped at 120, `rowTime` 44pt capped at 64) | Readouts in the NOW cell; the next thing's time-to; later rows |
+| `Palette.paper` / `paperSecondary` / `activeCell` / `rule` / `ink` / `inkSecondary` | Day #EEF0F2 / #E2E5E9 / #FFFFFF / #C3C8CE / #14191F / #4A535E; night #0D1013 / #232930 / #161A1F / #2A3037 / #C9C4BA / #8E9298 | The strip, its columns and the log stack |
+| `Palette.route` / `airspace` | Day #C2168D / #1B58A3; night #93407A / #86A3CB | Route glyphs and airport data blocks in the strip |
+| `StripMetrics` | width 400, rail 104, cell 60 | The strip (owner decision Q3 A), the iPhone rail, every in-flight tap target |
+| `MapColor.trackRuler*` | Ink day #14191F, night #B6B0A3 | The minute-ruled track line, ticks and labels |
 | `Palette.northMarker` | Day #FF9F94, night #FF8F86 | North arrow on the navy compass glass, >= 3:1 (see Kanaf look) |
 | `Palette.categoryMVFR` / `categoryLIFR` | systemBlue / #CC00CC day; #8FB5E0 / #E673E6 night | Flight-category dots (VFR `ok`, IFR `warning`) |
 | `MapColor.*` | The system colours the map layers already used | Ownship, airspace, weather dots, TFRs, replay track, NOTAM map highlight. Named only; recolouring ownship or airspace is a separate decision to make over the sectional |
