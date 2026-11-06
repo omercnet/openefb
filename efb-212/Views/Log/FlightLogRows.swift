@@ -63,7 +63,8 @@ struct FlightLogCellButton: View {
 
 // MARK: - Header
 
-/// LOG, route title, SEARCH, BRIEF (Israel), REC. 60pt high.
+/// LOG, route title, SEARCH, BRIEF (Israel), REC. 60pt high. The controls keep their full cell width;
+/// the title takes what is left on one line.
 struct FlightLogHeader: View {
     @Environment(AppState.self) private var appState
     let recordingViewModel: RecordingViewModel?
@@ -77,11 +78,12 @@ struct FlightLogHeader: View {
                 appState.selectedScreen = .log
             }
             .accessibilityIdentifier("flight-log-button")
+            .fixedSize()
 
             Text(title ?? "No route")
                 .font(TypeRole.dataEmphasis)
                 .foregroundStyle(title == nil ? Palette.inkSecondary : Palette.ink)
-                .lineLimit(2)
+                .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Space.s)
@@ -92,6 +94,7 @@ struct FlightLogHeader: View {
                 FlightLogCellButton(title: "Search", systemImage: "magnifyingglass", accessibilityLabel: "Search airports") {
                     appState.stripColumn = .search
                 }
+                .fixedSize()
             }
             if appState.region == .israel {
                 // Israel NOTAM briefing (IL-BRIEF)
@@ -100,9 +103,11 @@ struct FlightLogHeader: View {
                     appState.isPresentingIsraelBriefing = true
                 }
                 .accessibilityIdentifier("israel-briefing-button")
+                .fixedSize()
             }
             if let recordingViewModel {
                 RecordButton(viewModel: recordingViewModel, compact: compact)
+                    .fixedSize()
             }
         }
         .frame(minHeight: StripMetrics.cell)
@@ -263,13 +268,33 @@ struct FlightLogNowCell: View {
 
     // MARK: Readouts
 
+    /// GS, TRK and ALT with VS, each at its full width with the spacing flexing between them. When the
+    /// three do not fit (large Dynamic Type), ALT wraps under GS and TRK: no value is ever dropped.
     private var readouts: some View {
-        HStack(alignment: .top, spacing: Space.s) {
-            readout(label: "GS kt", value: gsValue, name: "Ground speed", unit: "knots", dimmed: isStale)
-            readout(label: "TRK \u{00B0}T", value: trkValue, name: "Track", unit: "degrees true", dimmed: isStale)
-            altitudeReadout
-                .layoutPriority(1)  // ALT can be five digits; it gets its width first
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 0) {
+                groundSpeedReadout
+                Spacer(minLength: Space.l)
+                trackReadout
+                Spacer(minLength: Space.l)
+                altitudeReadout
+            }
+            VStack(alignment: .leading, spacing: Space.s) {
+                HStack(alignment: .top, spacing: Space.l) {
+                    groundSpeedReadout
+                    trackReadout
+                }
+                altitudeReadout
+            }
         }
+    }
+
+    private var groundSpeedReadout: some View {
+        readout(label: "GS kt", value: gsValue, name: "Ground speed", unit: "knots", dimmed: isStale)
+    }
+
+    private var trackReadout: some View {
+        readout(label: "TRK \u{00B0}T", value: trkValue, name: "Track", unit: "degrees true", dimmed: isStale)
     }
 
     private func readout(label: String, value: String, name: String, unit: String, dimmed: Bool) -> some View {
@@ -279,9 +304,8 @@ struct FlightLogNowCell: View {
                 .font(TypeRole.readout(size: compact ? compactReadoutSize : readoutSize))
                 .foregroundStyle(dimmed ? Palette.inkSecondary : Palette.ink)
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)
         .accessibilityValue("\(value) \(unit)\(dimmed ? ", stale" : "")")
@@ -296,7 +320,6 @@ struct FlightLogNowCell: View {
                     .font(TypeRole.readout(size: compact ? compactReadoutSize : readoutSize))
                     .foregroundStyle(dimmed ? Palette.inkSecondary : Palette.ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.5)
                 HStack(spacing: 0) {
                     if let arrow = vsArrow, !dimmed {
                         Image(systemName: arrow)
@@ -309,7 +332,7 @@ struct FlightLogNowCell: View {
                 .fixedSize()
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize()
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Altitude")
         .accessibilityValue("\(altValue) feet, vertical speed \(vsValue) feet per minute\(dimmed ? ", stale" : "")")
@@ -480,10 +503,28 @@ struct AltitudeTape: View {
                 tick.addLine(to: CGPoint(x: x(feet), y: barY + barHeight))
                 context.stroke(tick, with: .color(Palette.rule), lineWidth: 1.5)
             }
-            context.draw(Text("0").font(TypeRole.stripLabel).foregroundStyle(Palette.inkSecondary),
-                         at: CGPoint(x: x0, y: size.height - 6), anchor: .leading)
-            context.draw(Text(Int(top).formatted()).font(TypeRole.stripLabel).foregroundStyle(Palette.inkSecondary),
-                         at: CGPoint(x: x1, y: size.height - 6), anchor: .trailing)
+
+            // Labels under the bar: the scale ends, and the current altitude centred under the marker but
+            // kept inside the tape. An end label the altitude label would touch is not drawn.
+            let labelY = size.height - 6
+            let zeroLabel = context.resolve(Text("0").font(TypeRole.stripLabel).foregroundStyle(Palette.inkSecondary))
+            let topLabel = context.resolve(Text(Int(top).formatted()).font(TypeRole.stripLabel).foregroundStyle(Palette.inkSecondary))
+            let zeroMaxX = x0 + zeroLabel.measure(in: size).width
+            let topMinX = x1 - topLabel.measure(in: size).width
+            var altitudeLabel: (text: GraphicsContext.ResolvedText, centerX: CGFloat, minX: CGFloat, maxX: CGFloat)?
+            if let altitude = altitudeFeet {
+                let text = context.resolve(Text(Int((altitude / 10).rounded() * 10).formatted())
+                    .font(TypeRole.stripLabel).foregroundStyle(Palette.ink))
+                let half = text.measure(in: size).width / 2
+                let centerX = min(max(x(altitude), x0 + half), x1 - half)
+                altitudeLabel = (text, centerX, centerX - half, centerX + half)
+            }
+            if zeroMaxX + Space.xs < altitudeLabel?.minX ?? .infinity {
+                context.draw(zeroLabel, at: CGPoint(x: x0, y: labelY), anchor: .leading)
+            }
+            if topMinX - Space.xs > altitudeLabel?.maxX ?? -.infinity {
+                context.draw(topLabel, at: CGPoint(x: x1, y: labelY), anchor: .trailing)
+            }
 
             guard let altitude = altitudeFeet else { return }
             let ax = x(altitude)
@@ -512,8 +553,9 @@ struct AltitudeTape: View {
             marker.addLine(to: CGPoint(x: ax, y: barY - 2))
             marker.closeSubpath()
             context.fill(marker, with: .color(Palette.ink))
-            context.draw(Text(Int((altitude / 10).rounded() * 10).formatted()).font(TypeRole.stripLabel).foregroundStyle(Palette.ink),
-                         at: CGPoint(x: ax, y: size.height - 6), anchor: .center)
+            if let altitudeLabel {
+                context.draw(altitudeLabel.text, at: CGPoint(x: altitudeLabel.centerX, y: labelY), anchor: .center)
+            }
         }
         .frame(height: 56)
         .accessibilityElement(children: .ignore)
