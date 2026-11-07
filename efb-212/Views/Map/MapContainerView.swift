@@ -334,25 +334,7 @@ extension MapContainerView {
     private func compactLayout(_ viewModel: MapViewModel, _ nearestVM: NearestAirportViewModel) -> some View {
         VStack(spacing: 0) {
             ZStack {
-                VStack(spacing: 0) {
-                    FlightLogHeader(recordingViewModel: recordingViewModel, compact: horizontalSizeClass == .compact,
-                                    showsNextTime: !showsFlightLog, gpsStatus: viewModel.gpsStatus,
-                                    onClear: showsInstruments ? nil : clearNavigation)
-                    ColumnRule()
-                    notices(viewModel)
-                    HStack(spacing: 0) {
-                        if showsFlightLog {
-                            FlightLogRail(gpsStatus: viewModel.gpsStatus, nearestEntry: nearestVM.nearestEntry)
-                            Rectangle()
-                                .fill(Palette.rule)
-                                .frame(width: 1)
-                                .accessibilityHidden(true)
-                        }
-                        chart(viewModel)
-                    }
-                }
-                .background(Palette.paper.ignoresSafeArea(edges: .top))
-
+                compactChartArea(viewModel, nearestVM)
                 if appState.stripColumn != .log {
                     stripColumn(viewModel, nearestVM)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -367,6 +349,37 @@ extension MapContainerView {
             FlightLogFooter(mapViewModel: viewModel, nearestEntry: nearestVM.nearestEntry, compact: true)
                 .background(Palette.paperSecondary.ignoresSafeArea(edges: .bottom))
         }
+    }
+
+    /// Header and warnings over the rail (while the flight log is on) and the chart.
+    private func compactChartArea(_ viewModel: MapViewModel, _ nearestVM: NearestAirportViewModel) -> some View {
+        VStack(spacing: 0) {
+            FlightLogHeader(
+                recordingViewModel: recordingViewModel,
+                compact: horizontalSizeClass == .compact,
+                showsNextTime: !showsFlightLog,
+                gpsStatus: viewModel.gpsStatus,
+                onClear: headerClear
+            )
+            ColumnRule()
+            notices(viewModel)
+            HStack(spacing: 0) {
+                if showsFlightLog {
+                    FlightLogRail(gpsStatus: viewModel.gpsStatus, nearestEntry: nearestVM.nearestEntry)
+                    Rectangle()
+                        .fill(Palette.rule)
+                        .frame(width: 1)
+                        .accessibilityHidden(true)
+                }
+                chart(viewModel)
+            }
+        }
+        .background(Palette.paper.ignoresSafeArea(edges: .top))
+    }
+
+    /// With the instruments hidden, Clear moves from the NOW cell to the header.
+    private var headerClear: (() -> Void)? {
+        showsInstruments ? nil : { clearNavigation() }
     }
 
     /// The strip column: the log, or the airport, nearest, layers or search column in its place.
