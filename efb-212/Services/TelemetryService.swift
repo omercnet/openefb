@@ -87,7 +87,6 @@ nonisolated enum Telemetry {
         for key in ["exceptionType", "exceptionCode", "signal", "appBuildVersion", "osVersion"] {
             parameters[key] = string(parsed.meta[key])
         }
-        parameters["terminationReason"] = string(parsed.meta["terminationReason"]).map { String($0.prefix(200)) }
         parameters["topFrames"] = topFrames(parsed.tree)
         return parameters
     }

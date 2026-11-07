@@ -2,7 +2,7 @@
 
 Last updated: 2026-11-07. Contact: kanaf@omer.io
 
-Kanaf is a free, open-source flight-planning app for iPad and iPhone. It has no account, no ads and no tracking. It
+Kanaf is a free, open-source flight-planning app for iPad and iPhone. It has no account, no ads and no cross-app tracking. It
 sends anonymous usage and crash summaries (below), which you can turn off. The developer does not receive your
 location, audio, transcripts, flights or logbook.
 
@@ -40,8 +40,8 @@ The app never sends your GPS coordinates to any host.
 Kanaf uses [TelemetryDeck](https://telemetrydeck.com/privacy/) to count how features are used and to learn about
 crashes and hangs. It sends short event names (for example "a recording started", "the Flights tab was opened"), the
 app version, iOS version, device model, the selected region (US or Israel) and the iOS vendor identifier, hashed on the
-device so it cannot be read back. Crash and hang summaries come from Apple MetricKit: the exception type, signal,
-termination reason and the top frames of the stack as binary names and offsets. No location, airport or route,
+device so it cannot be read back. Crash and hang summaries come from Apple MetricKit: the exception type and code,
+signal, hang duration and the top frames of the stack as binary names and offsets. No location, airport or route,
 aircraft, name, audio, transcript or other flight data is ever included.
 The data is not linked to you and is not used for tracking.
 

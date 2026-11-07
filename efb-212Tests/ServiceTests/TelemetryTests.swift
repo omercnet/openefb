@@ -78,7 +78,7 @@ struct TelemetryTests {
     }
     """.utf8)
 
-    @Test("Crash: metadata, truncated termination reason, top 8 frames of the crashed thread in order")
+    @Test("Crash: metadata, no free-text termination reason, top 8 frames of the crashed thread in order")
     func crashParameters() throws {
         let parameters = try #require(Telemetry.crashParameters(try Self.crashJSON()))
         #expect(parameters["exceptionType"] == "1")
@@ -86,8 +86,7 @@ struct TelemetryTests {
         #expect(parameters["signal"] == "11")
         #expect(parameters["appBuildVersion"] == "42")
         #expect(parameters["osVersion"] == "iPhone OS 26.0 (23A341)")
-        #expect(parameters["terminationReason"]?.count == 200)
-        #expect(parameters["terminationReason"]?.hasPrefix("Namespace SIGNAL, Code 0xb") == true)
+        #expect(parameters["terminationReason"] == nil)
         #expect(parameters["topFrames"] == (0..<8).map { "bin\($0)+\(100 + $0)" }.joined(separator: " | "))
         #expect(parameters["virtualMemoryRegionInfo"] == nil)
     }

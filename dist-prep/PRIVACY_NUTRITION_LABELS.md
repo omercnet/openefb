@@ -40,11 +40,11 @@ pilot turns off Settings > Privacy > Share anonymous usage data (default on; sto
 
 | Destination | What it carries | Personal data? |
 |---|---|---|
-| `nom.telemetrydeck.com` (TelemetryDeck) | signal names (`Navigation.tab`, `Recording.started` / `.stopped` with a duration bucket, `Debrief.generated`, `FlightPlan.activated`, `Israel.briefingOpened`, `Israel.fplShared`, `ChartPack.installed` with product and edition, `Diagnostics.crash`, `Diagnostics.hang`), the region (`appRegion`: us / israel), the SDK's defaults (app and OS version, device model, locale) and a SHA-256 hash of the iOS vendor identifier (`identifierForVendor`), hashed on the device | no; IP address seen by the host. No coordinates, airport identifiers, tail numbers, names or free text |
+| `nom.telemetrydeck.com` (TelemetryDeck) | signal names and their parameters: `Navigation.tab` (`tab`: map / flights / settings), `Recording.started`, `Recording.stopped` (`durationMinutes`: 0-15 / 15-60 / 60+), `Debrief.generated`, `FlightPlan.activated`, `Israel.briefingOpened`, `Israel.fplShared` (`method`: share / email; counts taps on the control, not completed shares), `ChartPack.installed` (`product`, `edition`), `Diagnostics.crash`, `Diagnostics.hang` (below); the region (`appRegion`: us / israel), the SDK's defaults (app and OS version, device model, locale) and a SHA-256 hash of the iOS vendor identifier (`identifierForVendor`), hashed on the device | no; IP address seen by the host. No coordinates, airport identifiers, tail numbers, names or free text |
 
-Crash and hang signals carry exception type, exception code, signal, termination reason (200 characters max), build,
-OS version, hang duration and the attributed thread's top 8 frames as `binary+offset`. No memory contents (the
-`virtualMemoryRegionInfo` field is dropped).
+Crash and hang signals carry `exceptionType`, `exceptionCode`, `signal`, `appBuildVersion`, `osVersion`, `hangDuration`
+and `topFrames` (the attributed thread's top 8 frames as `binary+offset`). The free-text termination reason and memory
+contents (`virtualMemoryRegionInfo`) are dropped.
 
 ## On-device only
 - Location: moving map, nearest airports, track recording. Stored in the local database.
