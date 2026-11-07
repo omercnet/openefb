@@ -49,7 +49,8 @@ FLIGHT RECORDING AND DEBRIEF
 - Digital logbook
 
 PRIVACY
-- No account, no analytics, no ads, no tracking
+- No account, no ads, no tracking
+- Anonymous usage and crash summaries (no location, no flight data); turn them off in Settings
 - Location, audio, transcripts, flights and logbook stay on your device
 - Weather, TFR, NOTAM and chart requests go to NOAA and the FAA; map tiles come from the FAA sectional service (ArcGIS) and OpenFreeMap; in Israel mode, NOTAMs come from a relay the developer runs on Cloudflare and chart packs download from Cloudflare R2. These requests can reveal the map area on screen or the airport you selected, and your IP address, to those hosts; none carries your GPS coordinates, and the developer receives none of it
 - Open source under MPL-2.0

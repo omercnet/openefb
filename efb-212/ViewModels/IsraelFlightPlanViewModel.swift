@@ -315,6 +315,7 @@ final class IsraelFlightPlanViewModel {
         appState.activePlanFuelGallons = aircraftProfile?.fuelBurnGPH.map { plan.totalETESeconds / 3600 * $0 }
         appState.updateActiveRouteProgress()
         isActive = true
+        Telemetry.signal("FlightPlan.activated")  // region rides on the appRegion default parameter
     }
 
     func clear() {

@@ -43,6 +43,9 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await checkRemoteConfig() } }
         }
+        .onChange(of: appState.selectedTab) { _, tab in
+            Telemetry.signal("Navigation.tab", parameters: ["tab": tab.rawValue])
+        }
         // A check skipped while recording is retried when the recording ends.
         .onChange(of: appState.recordingStatus) { oldStatus, newStatus in
             if oldStatus != .idle, newStatus == .idle { Task { await checkRemoteConfig() } }

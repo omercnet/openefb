@@ -367,11 +367,17 @@ struct IsraelFlightPlanView: View {
                             Label("Share", systemImage: "square.and.arrow.up").frame(maxWidth: .infinity, minHeight: 44)
                         }
                         .buttonStyle(.borderedProminent).tint(Palette.accent)
+                        .simultaneousGesture(TapGesture().onEnded {
+                            Telemetry.signal("Israel.fplShared", parameters: ["method": "share"])
+                        })
                         if let mail = vm.mailURL() {
                             Link(destination: mail) {
                                 Label("E-mail", systemImage: "envelope").frame(maxWidth: .infinity, minHeight: 44)
                             }
                             .buttonStyle(.bordered)
+                            .simultaneousGesture(TapGesture().onEnded {
+                                Telemetry.signal("Israel.fplShared", parameters: ["method": "email"])
+                            })
                         }
                     }
                 }

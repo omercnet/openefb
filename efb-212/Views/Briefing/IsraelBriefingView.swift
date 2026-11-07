@@ -67,6 +67,7 @@ struct IsraelBriefingView: View {
             }
         }
         .task {
+            Telemetry.signal("Israel.briefingOpened")
             viewModel.route = plannedRoute ?? activeRoute()
             if let position = appState.ownshipPosition {
                 viewModel.ownship = IsraelLatLon(lat: position.coordinate.latitude, lon: position.coordinate.longitude)

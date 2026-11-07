@@ -13,5 +13,7 @@
 	<string>Kanaf records cockpit audio during flights for transcription and debrief.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Kanaf transcribes cockpit audio in real-time to create flight transcripts.</string>
+	<key>TelemetryDeckAppID</key>
+	<string>$(TELEMETRYDECK_APP_ID)</string>
 </dict>
 </plist>
