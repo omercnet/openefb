@@ -15,7 +15,8 @@ Audited from the code 2026-10-31 (grep of every `https://` endpoint, `URLSession
 | `tiles.arcgis.com` (FAA VFR sectional) | raster tiles | tile coordinates and IP address |
 
 GPS position is never put in a request. Tile requests reveal the map area on screen (and the device IP) to the tile
-host, as every map app does. There is no analytics, crash, advertising or tracking SDK in the project.
+host, as every map app does. There is no advertising or tracking SDK in the project; anonymous analytics and crash
+summaries go to TelemetryDeck (below).
 
 Added 2026-11-02 (T29): Israel mode (Settings > Region, default Israel on a new install: `Region.defaultRegion`) makes two more kinds of request, both to infrastructure
 the developer runs on Cloudflare. Neither carries a position, an account, or credentials. Cloudflare sees the device IP
@@ -33,6 +34,18 @@ The NOTAM relay itself scrapes the Israel Airports Authority site; the app never
 (`openefb-interviews.vercel.app`) is not part of the app and the app never calls it. Source of this list: a grep of every
 `https://` string in `efb-212/Services`, `Core`, `Data` and `Resources` on 2026-11-02.
 
+Added 2026-11-07: anonymous usage analytics and MetricKit crash / hang summaries through the TelemetryDeck Swift SDK
+(`efb-212/Services/TelemetryService.swift`). Off until `TELEMETRYDECK_APP_ID` is set, off under tests, and off when the
+pilot turns off Settings > Privacy > Share anonymous usage data (default on; stops sending at once).
+
+| Destination | What it carries | Personal data? |
+|---|---|---|
+| `nom.telemetrydeck.com` (TelemetryDeck) | signal names and their parameters: `TelemetryDeck.Session.started` (sent by the SDK at launch and each new session), `Navigation.tab` (`tab`: map / flights / settings), `Recording.started`, `Recording.stopped` (`durationMinutes`: 0-15 / 15-60 / 60+), `Debrief.generated`, `FlightPlan.activated`, `Israel.briefingOpened`, `Israel.fplShared` (`method`: share / email; counts taps on the control, not completed shares), `ChartPack.installed` (`product`, `edition`), `Diagnostics.crash`, `Diagnostics.hang` (below); the region (`appRegion`: us / israel), the SDK's defaults (app and OS version, device model, locale) and a SHA-256 hash of the iOS vendor identifier (`identifierForVendor`), hashed on the device | no; IP address seen by the host. No coordinates, airport identifiers, tail numbers, names or free text |
+
+Crash and hang signals carry `exceptionType`, `exceptionCode`, `signal`, `appBuildVersion`, `osVersion`, `hangDuration`
+and `topFrames` (the attributed thread's top 8 frames as `binary+offset`). The free-text termination reason and memory
+contents (`virtualMemoryRegionInfo`) are dropped.
+
 ## On-device only
 - Location: moving map, nearest airports, track recording. Stored in the local database.
 - Audio and transcripts: `AVAudioEngine` recording; transcription uses `SpeechAnalyzer`, with `SFSpeechRecognizer`
@@ -43,9 +56,10 @@ The NOTAM relay itself scrapes the Israel Airports Authority site; the app never
 
 ## `PrivacyInfo.xcprivacy` (re-audited 2026-11-02, T30)
 - `NSPrivacyTracking = false`, no tracking domains.
-- `NSPrivacyCollectedDataTypes` declares one type, `CoarseLocation`: not linked, not used for tracking, purpose App
-  Functionality (owner decision Q13 = B). It matches the App Store label below. `PreciseLocation` and `AudioData` are no
-  longer declared: GPS and audio stay on the device and no request carries them. `PrivacyManifestTests` pins this.
+- `NSPrivacyCollectedDataTypes` declares `CoarseLocation` (owner decision Q13 = B), plus `CrashData` and
+  `PerformanceData` (added 2026-11-07: the app's own MetricKit code sends crash and hang summaries), all not linked,
+  not used for tracking, purpose App Functionality. `PreciseLocation` and `AudioData` are not declared: GPS and audio
+  stay on the device and no request carries them. `PrivacyManifestTests` pins this.
 - Required-reason APIs:
   - `UserDefaults` with `CA92.1` (the app's own defaults).
   - `FileTimestamp` with `C617.1` (added by T30): `FlightRecoveryService.swift:128` reads `.creationDate` of the app's own
@@ -54,8 +68,9 @@ The NOTAM relay itself scrapes the Israel Airports Authority site; the app never
   - No boot-time, disk-space or active-keyboard calls in app code (grep of `systemUptime`, `mach_absolute_time`,
     `volumeAvailableCapacity`, `systemFreeSize`).
 - SDK manifests: MapLibre ships its own (FileTimestamp C617.1, SystemBootTime 35F9.1, UserDefaults CA92.1, nothing
-  collected, no tracking); GRDB ships one declaring nothing. Both are bundled by Xcode, so the app manifest needs only
-  the app's own use.
+  collected, no tracking); GRDB ships one declaring nothing; TelemetryDeck ships one declaring `ProductInteraction` and
+  `DeviceID` (not linked, not tracking, purpose Analytics) and UserDefaults CA92.1. All are bundled by Xcode, so the app
+  manifest needs only the app's own use.
 - Export compliance: the only cryptography is CryptoKit `SHA256` (file integrity), Keychain storage and HTTPS, all
   exempt; `ITSAppUsesNonExemptEncryption = NO` is set in `Info.plist`.
 - `PrivacyManifestTests` asserts both required-reason entries.
@@ -65,14 +80,18 @@ Apple counts data as "collected" when it leaves the device. Requests reveal the 
 selected airport or a coarse region (weather APIs) and the IP address to third parties; the NOTAM relay and R2 see the IP
 address and the file requested.
 - **Do you or your third-party partners collect data from this app?** -> **Yes**.
-- **Data types:** **Coarse Location** only. Linked to the user: **No**. Used for tracking: **No**. Purpose: **App Functionality**.
-- **Diagnostics: not declared.** Grep of `efb-212` (2026-11-02) finds no MetricKit, crash reporter, analytics SDK or log
-  shipping; nothing diagnostic leaves the device. (Apple's own TestFlight/App Store crash reports are Apple's, not ours.)
-- Re-declare if a diagnostics path is added.
+- **Data types:**
+  - **Location > Coarse Location.** Linked: **No**. Tracking: **No**. Purpose: **App Functionality**.
+  - **Diagnostics > Crash Data** and **Diagnostics > Performance Data** (MetricKit crash and hang summaries via
+    TelemetryDeck). Linked: **No**. Tracking: **No**. Purpose: **App Functionality**.
+  - **Usage Data > Product Interaction** (TelemetryDeck signals). Linked: **No**. Tracking: **No**. Purpose: **Analytics**.
+  - **Identifiers > Device ID** (TelemetryDeck's hashed `identifierForVendor`; its SDK manifest declares it). Linked:
+    **No**. Tracking: **No**. Purpose: **Analytics**.
+- Re-declare if another diagnostics or analytics path is added.
 
 ## Re-check when any of these change
 1. CloudKit sync is turned on.
-2. An analytics or crash SDK is added.
+2. Another analytics or crash SDK is added, or a TelemetryDeck signal gains a parameter.
 3. A remote AI service replaces or supplements Foundation Models.
 4. Tile hosts change (Satellite and Terrain, `server.arcgisonline.com` and `tile.opentopomap.org`, were removed 2026-11-02).
 5. The Israel relay or the R2 bucket moves, or either starts to receive anything beyond a plain file request.

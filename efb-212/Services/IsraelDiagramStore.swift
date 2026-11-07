@@ -87,6 +87,7 @@ final class IsraelDiagramStore {
                 if manifest.isServable(allowUnpublished: false) {
                     defaults.set(installed.edition, forKey: Self.servedEditionKey)
                 }
+                Telemetry.signal("ChartPack.installed", parameters: ["product": installed.product, "edition": installed.edition])
                 reload()
             } catch is CancellationError {
             } catch {

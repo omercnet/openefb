@@ -14,6 +14,10 @@ struct efb_212App: App {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     private let modelContainer = EFBModelContainer.makeForApp()
 
+    init() {
+        Telemetry.start(region: RegionStore.load(from: modelContainer.mainContext))
+    }
+
     /// Whether we are running inside a unit test host (XCTest bundle loaded).
     private var isRunningTests: Bool {
         NSClassFromString("XCTestCase") != nil

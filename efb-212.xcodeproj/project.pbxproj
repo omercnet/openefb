@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		172759092F3F856F007A1A80 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = AA0001012F3E7000007A1A80 /* GRDB */; };
 		1727590A2F3F856F007A1A80 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = AA0001022F3E7000007A1A80 /* MapLibre */; };
+		1727590B2F3F856F007A1A80 /* TelemetryDeck in Frameworks */ = {isa = PBXBuildFile; productRef = AA0001032F3E7000007A1A80 /* TelemetryDeck */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +60,7 @@
 			files = (
 				1727590A2F3F856F007A1A80 /* MapLibre in Frameworks */,
 				172759092F3F856F007A1A80 /* GRDB in Frameworks */,
+				1727590B2F3F856F007A1A80 /* TelemetryDeck in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,6 +123,7 @@
 			packageProductDependencies = (
 				AA0001012F3E7000007A1A80 /* GRDB */,
 				AA0001022F3E7000007A1A80 /* MapLibre */,
+				AA0001032F3E7000007A1A80 /* TelemetryDeck */,
 			);
 			productName = "efb-212";
 			productReference = 172758642F3E6978007A1A80 /* efb-212.app */;
@@ -207,6 +210,7 @@
 			packageReferences = (
 				AA0002012F3E7000007A1A80 /* XCRemoteSwiftPackageReference "GRDB" */,
 				AA0002022F3E7000007A1A80 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */,
+				AA0002032F3E7000007A1A80 /* XCRemoteSwiftPackageReference "SwiftSDK" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 172758652F3E6978007A1A80 /* Products */;
@@ -442,6 +446,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TELEMETRYDECK_APP_ID = "1D708C22-777B-4637-944B-4666F28EE1C8";
 			};
 			name = Debug;
 		};
@@ -482,6 +487,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TELEMETRYDECK_APP_ID = "1D708C22-777B-4637-944B-4666F28EE1C8";
 			};
 			name = Release;
 		};
@@ -639,6 +645,14 @@
 				minimumVersion = 6.0.0;
 			};
 		};
+		AA0002032F3E7000007A1A80 /* XCRemoteSwiftPackageReference "SwiftSDK" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TelemetryDeck/SwiftSDK";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.14.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -651,6 +665,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = AA0002022F3E7000007A1A80 /* XCRemoteSwiftPackageReference "maplibre-gl-native-distribution" */;
 			productName = MapLibre;
+		};
+		AA0001032F3E7000007A1A80 /* TelemetryDeck */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0002032F3E7000007A1A80 /* XCRemoteSwiftPackageReference "SwiftSDK" */;
+			productName = TelemetryDeck;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

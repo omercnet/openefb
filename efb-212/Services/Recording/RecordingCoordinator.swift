@@ -185,6 +185,7 @@ actor RecordingCoordinator {
         startTimer()
 
         logger.info("Recording started: \(flightID.uuidString)")
+        Telemetry.signal("Recording.started")
         return flightID
     }
 
@@ -248,6 +249,9 @@ actor RecordingCoordinator {
         }
 
         logger.info("Recording stopped: \(flightID.uuidString), \(summary.trackPointCount) track points")
+        Telemetry.signal("Recording.stopped", parameters: [
+            "durationMinutes": Telemetry.durationBucket(endDate.timeIntervalSince(startDate))
+        ])
         return summary
     }
 

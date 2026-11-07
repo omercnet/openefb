@@ -175,6 +175,7 @@ final class DebriefEngine {
             )
             try recordingDB.insertDebrief(record)
             logger.info("Debrief generated and saved for flight \(flightID.uuidString)")
+            Telemetry.signal("Debrief.generated")
         } catch {
             self.error = error
             logger.error("Debrief generation failed: \(error.localizedDescription)")

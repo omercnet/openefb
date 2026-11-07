@@ -23,8 +23,9 @@ Current facts from the project file:
 - **Export compliance:** set `ITSAppUsesNonExemptEncryption = NO` if the app only uses standard HTTPS/OS crypto. Verify
   that before setting it.
 - **Privacy manifest:** check `PrivacyInfo.xcprivacy` declares the required-reason APIs actually used (UserDefaults,
-  file timestamps, disk space, system boot time, …): grep the code, MapLibre and GRDB. List the data collected. The app
-  collects nothing for us, but it calls third parties: NOAA, the FAA, the NOTAM relay, R2 and the tile hosts. Update
+  file timestamps, disk space, system boot time, …): grep the code, MapLibre, GRDB and TelemetryDeck. List the data
+  collected. The app sends us only anonymous TelemetryDeck usage and crash summaries; it also calls third parties: NOAA,
+  the FAA, the NOTAM relay, R2 and the tile hosts. Update
   PRIVACY_NUTRITION_LABELS.md so it matches.
 - **Beta behaviour:**
   - the beta banner and the in-app "Report problems" path work;

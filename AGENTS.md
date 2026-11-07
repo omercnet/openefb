@@ -117,16 +117,19 @@ web/                               # Server side, not in the app: notam-relay/ (
 
 ## Key Dependencies
 
-Two remote SwiftPM packages, both in the Xcode project (versions pinned in `efb-212.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`):
+Three remote SwiftPM packages, all in the Xcode project (versions pinned in `efb-212.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`):
 
 | Package | Purpose | Source |
 |---------|---------|--------|
 | **MapLibre Native iOS** | Map rendering, raster and vector tile sources | `maplibre/maplibre-gl-native-distribution` (6.x) |
 | **GRDB.swift** | SQLite with R-tree and FTS for aviation data; recording database | `groue/GRDB.swift` (7.x) |
+| **TelemetryDeck** | Anonymous usage signals and MetricKit crash / hang summaries (`Services/TelemetryService.swift`) | `TelemetryDeck/SwiftSDK` (2.x, product `TelemetryDeck`) |
 
-Not dependencies: SwiftNASR (NASR is parsed offline by `tools/nasr-importer`, which uses GRDB and swift-argument-parser), SFR packages. Apple frameworks used: SwiftData, FoundationModels, Speech, CoreLocation, AVFoundation, PDFKit.
+Not dependencies: SwiftNASR (NASR is parsed offline by `tools/nasr-importer`, which uses GRDB and swift-argument-parser), SFR packages. Apple frameworks used: SwiftData, FoundationModels, Speech, CoreLocation, AVFoundation, PDFKit, MetricKit.
 
 Network services (free, no key unless noted): NOAA Aviation Weather (METAR, TAF, PIREP, AIRMET/SIGMET, winds aloft), FAA TFR, FAA d-TPP charts, FAA NOTAM API (the pilot's own key, stored in Keychain), tile hosts OpenFreeMap and ArcGIS (FAA sectional). Israel adds two services the project runs itself: the NOTAM relay (`openefb-notam-relay.omerc.workers.dev`, Cloudflare Workers free plan; it scrapes the IAA site, the app doesn't) and the chart and diagram packs on Cloudflare R2 (`pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev`, rate-limited dev URL). Vercel hosts only the pilot-interviews site, which the app doesn't call. The relay URL and the R2 base URL are overridable through the `israelNotamFeedURL` and `israelChartBaseURL` defaults.
+
+Analytics: TelemetryDeck (`nom.telemetrydeck.com`). `Telemetry.start` (from the App init) is a no-op while the `TELEMETRYDECK_APP_ID` build setting (Info.plist `TelemetryDeckAppID`) is empty, under XCTest, or when Settings > Privacy > Share anonymous usage data (`telemetryEnabled`, default on) is off. Signals carry no coordinates, airport identifiers, tail numbers, names or free text; `PRIVACY.md` and `dist-prep/PRIVACY_NUTRITION_LABELS.md` list them, so update both when adding one. `region` is a reserved TelemetryDeck parameter: the app's region goes out as `appRegion`.
 
 ## Development Standards
 
@@ -206,6 +209,7 @@ Network services (free, no key unless noted): NOAA Aviation Weather (METAR, TAF,
 - Flight planning and active navigation bar; aircraft and pilot profiles with currency tracking.
 - Flight recording (GPS track, cockpit audio, on-device transcription with `SpeechAnalyzer` and an `SFSpeechRecognizer` fallback), auto-start above 15 kt, phase detection, replay, digital logbook, and an on-device debrief with Apple Foundation Models.
 - Data: bundled `aviation.sqlite` built from FAA NASR cycle 2026-10-29 (19,134 airports, 1,287 airspaces, 1,468 navaids) by `tools/nasr-importer`.
+- Anonymous analytics and crash / hang summaries (TelemetryDeck + MetricKit, `Services/TelemetryService.swift`), opt-out in Settings > Privacy. The App ID is the `TELEMETRYDECK_APP_ID` build setting (not a secret).
 **Shipped (Israel, epic efb-aac):**
 - Bundled `israel-aviation.sqlite` (CAAI GIS layers, data of 25 Oct 2026, imported 2026-11-01, no AIP amendment recorded) built by `tools/caai-importer`: 198 CVFR points and 275 route segments, 221 LSA points and 229 LSA routes, CTR/ATZ/CTA, TMA, FIR, P/R/D areas, runways, and 49 curated aerodromes (`tools/caai-importer/curated/aerodromes-il.csv`, searchable in Hebrew and English, `review_status` unreviewed until the owner reviews). Read through `Data/IsraelAviationDatabase.swift`; the aerodromes reach the app through `Services/IsraelAerodromeAdapter.swift`.
 - CVFR overlay drawn from the vectors (`Services/IsraelChartOverlay.swift`, `IsraelChartFeatures.swift`, `IsraelChartStyle.swift`); official CAAI CVFR chart raster from a downloaded pack (`IsraelOfficialChartLayer.swift`).

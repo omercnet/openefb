@@ -42,6 +42,7 @@ final class AppState {
     /// map and drops layers the new region has no source for.
     var region: Region = .us {
         didSet {
+            Telemetry.setRegion(region)
             guard region != oldValue else { return }
             mapCenter = region.defaultCenter
             mapZoom = region.defaultZoom
