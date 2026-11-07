@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/omercnet/openefb/compare/v1.1.0...v1.1.1) (2026-11-07)
+
+
+### Bug Fixes
+
+* **release:** plain-text What to Test notes for TestFlight ([#11](https://github.com/omercnet/openefb/issues/11)) ([cf14942](https://github.com/omercnet/openefb/commit/cf14942766e06853d45baaf62a477e5f1fa68b97))
+
 ## [1.1.0](https://github.com/omercnet/openefb/compare/v1.0.0...v1.1.0) (2026-11-05)
 
 
