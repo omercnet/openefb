@@ -182,6 +182,7 @@ final class FlightPlanViewModel {
         // Update AppState display properties (critical for MapContainerView summary card overlay)
         appState.activeFlightPlan = true
         appState.directToAirport = nil  // the plan replaces a Direct-To; live DTG/ETE follow its destination
+        appState.activeRoute = nil      // and any multi-leg route left from another region: progress follows this plan
         appState.distanceToNext = distanceNM
         appState.estimatedTimeEnroute = estimatedTimeSeconds
         appState.bearingToNext = CLLocation(latitude: dep.latitude, longitude: dep.longitude)

@@ -345,6 +345,26 @@ struct FlightPlanViewModelTests {
         #expect(h.appState.estimatedTimeEnroute == 168)
     }
 
+    /// A route left active from Israel must not keep steering progress once a US plan is chosen.
+    @Test func choosingAUSPlanDropsALeftoverIsraelRoute() throws {
+        let h = try Self.makeHarness()
+        h.appState.activeRoute = ActiveRoute(legs: [
+            ActiveRouteLeg(
+                segmentID: 1, fromCode: "AAAAA", toCode: "BBBBB",
+                fromLatitude: 32.00, fromLongitude: 34.80, toLatitude: 32.30, toLongitude: 34.80,
+                altitudeText: "2500", distanceNM: 18
+            ),
+        ])
+        let saved = SchemaV1.FlightPlanRecord()
+        saved.departureICAO = "KPAO"; saved.destinationICAO = "KOAK"
+        h.context.insert(saved)
+
+        h.vm.loadPlan(saved)
+
+        #expect(h.appState.activeRoute == nil)
+        #expect(h.appState.activePlanDestination == "KOAK")
+    }
+
     /// Picking a saved plan by hand does replace the Direct-To.
     @Test func loadingAPlanByHandReplacesTheDirectTo() throws {
         let h = try Self.makeHarness()
