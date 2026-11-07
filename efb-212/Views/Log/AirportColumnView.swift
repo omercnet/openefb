@@ -1,26 +1,92 @@
 //
-//  AirportInfoSheet.swift
+//  AirportColumnView.swift
 //  efb-212
 //
-//  Bottom sheet with airport details, runways, frequencies, weather, FAA charts,
-//  NOTAMs, PIREPs, and winds aloft. Half-height default per user decision; drag up for full height.
-//  Per UI-SPEC: .presentationBackground(.regularMaterial), 24pt horizontal padding.
+//  Airport details in the strip column (Direction 2, stage 1): identity, Direct-To, weather with its age,
+//  frequencies, runways, then NOTAMs, charts, diagrams, PIREPs and winds aloft stacked in one narrow column.
+//  Replaces the airport bottom sheet. Also holds the small pieces every strip column shares: the 60 pt
+//  header row with the Log back button, the hairline rule and the uppercase section label.
 //
 
 import SwiftUI
 
-struct AirportInfoSheet: View {
+// MARK: - Shared column pieces
+
+/// 60 pt header row of a strip column: a "Log" back button, then the column's title content.
+struct ColumnHeader<Title: View>: View {
+    @Environment(AppState.self) private var appState
+    private let title: Title
+
+    init(@ViewBuilder title: () -> Title) {
+        self.title = title()
+    }
+
+    var body: some View {
+        HStack(spacing: Space.s) {
+            Button {
+                appState.stripColumn = .log
+            } label: {
+                Label("Log", systemImage: "chevron.backward")
+                    .labelStyle(.titleAndIcon)
+                    .font(TypeRole.label)
+                    .foregroundStyle(Palette.ink)
+                    .frame(minWidth: StripMetrics.cell, minHeight: StripMetrics.cell)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(PressableButtonStyle())
+            .accessibilityLabel("Back to flight log")
+            .accessibilityIdentifier("column-back-to-log")
+
+            title
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.horizontal, Space.s)
+        .frame(minHeight: StripMetrics.cell)
+        .background(Palette.paperSecondary)
+        .overlay(alignment: .bottom) { ColumnRule() }
+    }
+}
+
+/// 1 pt hairline between column rows and sections.
+struct ColumnRule: View {
+    var body: some View {
+        Rectangle()
+            .fill(Palette.rule)
+            .frame(height: 1)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Uppercase tracked section label, e.g. "WEATHER".
+struct ColumnSectionLabel: View {
+    private let title: String
+
+    init(_ title: String) { self.title = title }
+
+    var body: some View {
+        Text(title)
+            .font(TypeRole.stripLabel)
+            .textCase(.uppercase)
+            .tracking(StripMetrics.labelTracking)
+            .foregroundStyle(Palette.inkSecondary)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+// MARK: - AirportColumnView
+
+struct AirportColumnView: View {
 
     @Environment(AppState.self) private var appState
     @Environment(\.dynamicTypeSize) private var typeSize
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
-    let databaseService: any DatabaseServiceProtocol
-    let weatherService: any WeatherServiceProtocol
-    let chartService: any TerminalProcedureServiceProtocol
-    let notamService: any NotamServiceProtocol
-    let pirepService: any PirepServiceProtocol
-    let windsAloftService: any WindsAloftServiceProtocol
+    private let databaseService: any DatabaseServiceProtocol
+    private let weatherService: any WeatherServiceProtocol
+    private let chartService: any TerminalProcedureServiceProtocol
+    private let notamService: any NotamServiceProtocol
+    private let pirepService: any PirepServiceProtocol
+    private let windsAloftService: any WindsAloftServiceProtocol
+    private let onDirectTo: (Airport) -> Void
 
     @State private var airport: Airport?
     /// Israel (IL-4): the curated aerodrome behind `airport`, with its sources and review status.
@@ -28,129 +94,131 @@ struct AirportInfoSheet: View {
     @State private var weatherViewModel: WeatherViewModel?
     @State private var isRawMETARExpanded: Bool = false
 
+    init(databaseService: any DatabaseServiceProtocol, weatherService: any WeatherServiceProtocol,
+         chartService: any TerminalProcedureServiceProtocol, notamService: any NotamServiceProtocol,
+         pirepService: any PirepServiceProtocol, windsAloftService: any WindsAloftServiceProtocol,
+         onDirectTo: @escaping (Airport) -> Void) {
+        self.databaseService = databaseService
+        self.weatherService = weatherService
+        self.chartService = chartService
+        self.notamService = notamService
+        self.pirepService = pirepService
+        self.windsAloftService = windsAloftService
+        self.onDirectTo = onDirectTo
+    }
+
+    private var station: WeatherStation? {
+        appState.region.weatherStation(id: appState.selectedAirportID ?? "")
+    }
+
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            ColumnHeader { headerTitle }
             ScrollView {
                 if let airport {
-                    // Order by J1 relevance: identity, weather + frequencies, runways, NOTAMs, charts, PIREPs, winds.
-                    VStack(alignment: .leading, spacing: Space.xl) {
-                        VStack(alignment: .leading, spacing: Space.m) {
-                            headerSection(airport)
-                            infoChipsRow(airport)
-                        }
-                        weatherAndFrequencies(airport)
+                    // Order by J1 relevance: identity, Direct, weather, frequencies, runways, NOTAMs, charts, PIREPs, winds.
+                    VStack(alignment: .leading, spacing: Space.l) {
+                        directButton(airport)
+                        infoChipsRow(airport)
+                        weatherSection()
+                        ColumnRule()
+                        frequenciesSection(airport)
+                        ColumnRule()
                         if let aerodrome {
                             IsraelAerodromeSection(aerodrome: aerodrome)
                         } else {
                             runwaysSection(airport)
                         }
                         if appState.region.isAvailable(.notams) {
-                            Divider()
+                            ColumnRule()
                             NotamSection(airport: airport, service: notamService)
                         }
                         if appState.region.isAvailable(.airportCharts) {
-                            Divider()
+                            ColumnRule()
                             AirportChartsSection(airport: airport, service: chartService)
                         }
                         if appState.region.isAvailable(.israelDiagrams) {
-                            Divider()
+                            ColumnRule()
                             IsraelDiagramSection(icao: airport.icao)
                         }
-                        if appState.region.isAvailable(.pireps) || appState.region.isAvailable(.windsAloft) {
-                            Divider()
-                            sideBySide(spacing: Space.xl) {
-                                if appState.region.isAvailable(.pireps) {
-                                    PirepSection(airport: airport, service: pirepService)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                                if appState.region.isAvailable(.windsAloft) {
-                                    WindsAloftSection(airport: airport, service: windsAloftService)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
+                        if appState.region.isAvailable(.pireps) {
+                            ColumnRule()
+                            PirepSection(airport: airport, service: pirepService)
+                        }
+                        if appState.region.isAvailable(.windsAloft) {
+                            ColumnRule()
+                            WindsAloftSection(airport: airport, service: windsAloftService)
                         }
                     }
-                    .padding(.bottom, Space.xl)
-                    .padding(.horizontal, Space.xl)
-                    .padding(.top, Space.s)
-                } else if let station = appState.region.weatherStation(id: appState.selectedAirportID ?? "") {
+                    .padding(Space.l)
+                } else if station != nil {
                     // No airport data for this region yet: the station's weather still works.
-                    stationOnlyView(station)
+                    VStack(alignment: .leading, spacing: Space.l) {
+                        weatherSection()
+                        Text("Airport data for \(appState.region.displayName) is not available yet. Only this station's weather is shown.")
+                            .font(TypeRole.caption)
+                            .foregroundStyle(Palette.inkSecondary)
+                    }
+                    .padding(Space.l)
                 } else {
                     ProgressView("Loading airport...")
                         .padding(.top, 40)
                 }
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        appState.isPresentingAirportInfo = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(Palette.secondaryText)
-                            .font(.title2)
-                            .frame(minWidth: 44, minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("Close")
-                }
-            }
         }
-        // Opens at ~60% so identity, weather and frequencies are visible without dragging.
-        .presentationDetents([.fraction(0.62), .large])
-        .presentationBackground(.regularMaterial)
-        .onAppear {
-            loadAirport()
+        .foregroundStyle(Palette.ink)
+        .background(Palette.paper)
+        .task(id: appState.selectedAirportID) {
+            await loadAirport()
         }
     }
 
-    // MARK: - Station Only (regions without airport data)
+    // MARK: - Header
 
-    /// Weather for a region station that has no airport record yet (Israel before IL-4).
-    @ViewBuilder
-    private func stationOnlyView(_ station: WeatherStation) -> some View {
-        VStack(alignment: .leading, spacing: Space.xl) {
-            VStack(alignment: .leading, spacing: Space.xs) {
-                HStack(alignment: .firstTextBaseline, spacing: Space.m) {
-                    Text(station.id)
-                        .font(TypeRole.title)
-                    if let wx = weatherViewModel?.currentWeather {
-                        FlightCategoryDot(category: wx.flightCategory, showsLabel: true)
-                    }
-                }
-                Text(station.name)
-                    .font(TypeRole.body)
-                    .foregroundStyle(Palette.secondaryText)
-            }
-            weatherSection()
-            Text("Airport data for \(appState.region.displayName) is not available yet. Only this station's weather is shown.")
-                .font(TypeRole.caption)
-                .foregroundStyle(Palette.secondaryText)
-        }
-        .padding(.bottom, Space.xl)
-        .padding(.horizontal, Space.xl)
-        .padding(.top, Space.s)
-    }
-
-    // MARK: - Header Section
-
-    @ViewBuilder
-    private func headerSection(_ airport: Airport) -> some View {
-        VStack(alignment: .leading, spacing: Space.xs) {
-            HStack(alignment: .firstTextBaseline, spacing: Space.m) {
-                Text(airport.icao)
+    /// Ident in chart blue with the flight category beside it, then the name.
+    private var headerTitle: some View {
+        let ident = airport?.icao ?? station?.id ?? appState.selectedAirportID ?? ""
+        let name = airport?.name ?? station?.name
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                Text(ident)
                     .font(TypeRole.title)
-
+                    .foregroundStyle(Palette.airspace)
+                    .lineLimit(1)
+                    .fixedSize()
                 // Flight category, next to the identifier (dot + text, never colour alone)
                 if let wx = weatherViewModel?.currentWeather {
                     FlightCategoryDot(category: wx.flightCategory, showsLabel: true)
                 }
             }
-
-            Text(airport.name)
-                .font(TypeRole.body)
-                .foregroundStyle(Palette.secondaryText)
+            if let name {
+                Text(name)
+                    .font(TypeRole.body)
+                    .foregroundStyle(Palette.inkSecondary)
+                    .lineLimit(typeSize.isAccessibilitySize ? nil : 2)
+            }
         }
+        .padding(.vertical, Space.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: - Direct-To
+
+    private func directButton(_ airport: Airport) -> some View {
+        Button {
+            onDirectTo(airport)
+            appState.stripColumn = .log
+        } label: {
+            Label("Direct \(airport.icao)", systemImage: "arrow.up.right")
+                .font(TypeRole.label.weight(.bold))
+                .frame(maxWidth: .infinity, minHeight: StripMetrics.cell)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(Palette.accent)
+        .foregroundStyle(Palette.onAccent)
+        .accessibilityLabel("Direct to \(airport.icao)")
+        .accessibilityIdentifier("airport-direct-to")
     }
 
     // MARK: - Info Chips Row
@@ -175,30 +243,19 @@ struct AirportInfoSheet: View {
         }
     }
 
-    @ViewBuilder
     private func infoChip(icon: String, text: String) -> some View {
         HStack(spacing: Space.xs) {
             Image(systemName: icon)
                 .font(.caption)
                 .accessibilityHidden(true)
             Text(text)
-                .font(TypeRole.caption)
+                .font(TypeRole.data)
         }
-        .foregroundStyle(Palette.primaryText)
+        .foregroundStyle(Palette.ink)
         .padding(.horizontal, Space.m)
         .padding(.vertical, Space.s)
-        .background(Palette.fill)
+        .background(Palette.paperSecondary)
         .clipShape(Capsule())
-    }
-
-    /// Two columns side by side; stacked vertically at accessibility text sizes and on compact width
-    /// (iPhone) so nothing truncates.
-    @ViewBuilder
-    private func sideBySide<Content: View>(spacing: CGFloat, @ViewBuilder content: () -> Content) -> some View {
-        let layout = (typeSize.isAccessibilitySize || horizontalSizeClass == .compact)
-            ? AnyLayout(VStackLayout(alignment: .leading, spacing: spacing))
-            : AnyLayout(HStackLayout(alignment: .top, spacing: spacing))
-        layout(content)
     }
 
     /// Label/value row: label column beside the value, label above the value at accessibility sizes.
@@ -206,18 +263,6 @@ struct AirportInfoSheet: View {
         typeSize.isAccessibilitySize
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.xs))
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: Space.m))
-    }
-
-    // MARK: - Weather + Frequencies
-
-    @ViewBuilder
-    private func weatherAndFrequencies(_ airport: Airport) -> some View {
-        sideBySide(spacing: Space.xl) {
-            weatherSection()
-                .frame(maxWidth: .infinity, alignment: .leading)
-            frequenciesSection(airport)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
     }
 
     // MARK: - Frequencies Section
@@ -281,7 +326,7 @@ struct AirportInfoSheet: View {
     @ViewBuilder
     private func frequenciesSection(_ airport: Airport) -> some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            SectionHeader("FREQUENCIES")
+            ColumnSectionLabel("Frequencies")
 
             if airport.frequencies.isEmpty {
                 if let ctaf = airport.ctafFrequency {
@@ -293,7 +338,7 @@ struct AirportInfoSheet: View {
                 if airport.ctafFrequency == nil && airport.unicomFrequency == nil {
                     Text("No frequencies available")
                         .font(TypeRole.caption)
-                        .foregroundStyle(Palette.secondaryText)
+                        .foregroundStyle(Palette.inkSecondary)
                 }
             } else {
                 let sorted = airport.frequencies.sorted {
@@ -308,17 +353,16 @@ struct AirportInfoSheet: View {
         }
     }
 
-    @ViewBuilder
     private func frequencyRow(type: String, spoken: String, value: Double) -> some View {
         let mhz = String(format: "%.3f", value)  // MHz
-        rowLayout {
+        return rowLayout {
             Text(type)
                 .font(TypeRole.label)
-                .foregroundStyle(Palette.secondaryText)
-                .frame(minWidth: 72, alignment: .leading)
+                .foregroundStyle(Palette.inkSecondary)
+                .frame(minWidth: 80, alignment: .leading)
             Text(mhz)
-                .font(TypeRole.value)
-                .foregroundStyle(Palette.primaryText)
+                .font(TypeRole.dataEmphasis)
+                .foregroundStyle(Palette.ink)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
@@ -330,23 +374,23 @@ struct AirportInfoSheet: View {
     @ViewBuilder
     private func runwaysSection(_ airport: Airport) -> some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            SectionHeader("RUNWAYS")
+            ColumnSectionLabel("Runways")
 
             if airport.runways.isEmpty {
                 Text("No runway data available")
                     .font(TypeRole.caption)
-                    .foregroundStyle(Palette.secondaryText)
+                    .foregroundStyle(Palette.inkSecondary)
             } else {
                 ForEach(airport.runways) { runway in
                     rowLayout {
                         Text(runway.id)
-                            .font(TypeRole.value)
-                            .frame(minWidth: 72, alignment: .leading)
+                            .font(TypeRole.dataEmphasis)
+                            .frame(minWidth: 80, alignment: .leading)
                         Text("\(runway.length)' x \(runway.width)'")  // feet
-                            .font(TypeRole.valueSmall)
+                            .font(TypeRole.data)
                         Text(runway.surface.rawValue.capitalized)
                             .font(TypeRole.body)
-                            .foregroundStyle(Palette.secondaryText)
+                            .foregroundStyle(Palette.inkSecondary)
                     }
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel("Runway \(runway.id)")
@@ -361,28 +405,28 @@ struct AirportInfoSheet: View {
     @ViewBuilder
     private func weatherSection() -> some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            HStack {
-                SectionHeader("WEATHER")
-
+            // Age on the first line: "is what I see current?" before the numbers.
+            HStack(spacing: Space.s) {
+                ColumnSectionLabel("Weather")
+                if let wx = weatherViewModel?.currentWeather {
+                    DataAgeBadge(.metar, observed: wx.observationTime)
+                }
                 Spacer()
-
                 // Manual refresh button per locked decision
-                Button(action: {
-                    Task {
-                        await weatherViewModel?.refreshWeather()
-                    }
-                }) {
+                Button {
+                    Task { await weatherViewModel?.refreshWeather() }
+                } label: {
                     if weatherViewModel?.isLoading == true {
                         ProgressView()
                             .controlSize(.small)
-                            .frame(width: 44, height: 44)
+                            .frame(width: StripMetrics.cell, height: StripMetrics.cell)
                     } else {
                         Image(systemName: "arrow.clockwise")
-                            .frame(width: 44, height: 44)
+                            .frame(width: StripMetrics.cell, height: StripMetrics.cell)
                             .contentShape(Rectangle())
                     }
                 }
-                .foregroundStyle(Palette.secondaryText)
+                .foregroundStyle(Palette.inkSecondary)
                 .accessibilityLabel("Refresh weather")
             }
 
@@ -394,60 +438,50 @@ struct AirportInfoSheet: View {
                         .controlSize(.small)
                     Text("Loading weather...")
                         .font(TypeRole.caption)
-                        .foregroundStyle(Palette.secondaryText)
+                        .foregroundStyle(Palette.inkSecondary)
                 }
             } else if let error = weatherViewModel?.error {
-                VStack(alignment: .leading, spacing: Space.xs) {
-                    Label("Weather not loaded", systemImage: "exclamationmark.triangle.fill")
-                        .font(TypeRole.body.weight(.semibold))
-                        .foregroundStyle(Palette.caution)
-                    Text(error.localizedDescription)
-                        .font(TypeRole.caption)
-                        .foregroundStyle(Palette.secondaryText)
-                    Button("Retry") { Task { await weatherViewModel?.refreshWeather() } }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
-                }
+                weatherError("Weather not loaded", error: error)
             } else if weatherViewModel?.metarPublished == false {
                 Text(weatherViewModel?.tafPublished == false
                      ? "No METAR or TAF is published for this aerodrome."
                      : "No METAR is published for this aerodrome. The forecast (TAF) is below.")
                     .font(TypeRole.caption)
-                    .foregroundStyle(Palette.secondaryText)
+                    .foregroundStyle(Palette.inkSecondary)
                     .accessibilityIdentifier("weather-no-metar")
             } else {
                 Text("No METAR for this airport.")
                     .font(TypeRole.caption)
-                    .foregroundStyle(Palette.secondaryText)
+                    .foregroundStyle(Palette.inkSecondary)
             }
 
             tafView()
         }
     }
 
+    /// Amber failure notice with the error and a Retry button (never just an OLD badge).
+    private func weatherError(_ title: String, error: EFBError) -> some View {
+        VStack(alignment: .leading, spacing: Space.xs) {
+            Label(title, systemImage: "exclamationmark.triangle.fill")
+                .font(TypeRole.body.weight(.semibold))
+                .foregroundStyle(Palette.caution)
+            Text(error.localizedDescription)
+                .font(TypeRole.caption)
+                .foregroundStyle(Palette.inkSecondary)
+            Button("Retry") { Task { await weatherViewModel?.refreshWeather() } }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .frame(minHeight: StripMetrics.cell)
+        }
+    }
+
     @ViewBuilder
     private func weatherDataView(_ wx: WeatherCache) -> some View {
         VStack(alignment: .leading, spacing: Space.s) {
-            // Age badge first: "is what I see current?" before the numbers.
-            HStack {
-                DataAgeBadge(.metar, observed: wx.observationTime)
-                Spacer()
-            }
-
-            // A cached report is shown, but the refresh failed: say so, and offer Retry (never just an OLD badge).
+            // A cached report is shown, but the refresh failed: say so, and offer Retry.
             if let error = weatherViewModel?.error {
-                VStack(alignment: .leading, spacing: Space.xs) {
-                    Label("Weather refresh failed. Showing the last report.", systemImage: "exclamationmark.triangle.fill")
-                        .font(TypeRole.body.weight(.semibold))
-                        .foregroundStyle(Palette.caution)
-                    Text(error.localizedDescription)
-                        .font(TypeRole.caption)
-                        .foregroundStyle(Palette.secondaryText)
-                    Button("Retry") { Task { await weatherViewModel?.refreshWeather() } }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
-                }
-                .accessibilityIdentifier("weather-refresh-failed")
+                weatherError("Weather refresh failed. Showing the last report.", error: error)
+                    .accessibilityIdentifier("weather-refresh-failed")
             }
 
             if let vm = weatherViewModel {
@@ -462,32 +496,38 @@ struct AirportInfoSheet: View {
             // Raw METAR (expandable per user decision)
             if let rawMETAR = wx.rawMETAR {
                 Button {
-                    withAnimation { isRawMETARExpanded.toggle() }
+                    isRawMETARExpanded.toggle()
                 } label: {
                     HStack {
                         Text("Raw METAR")
                             .font(TypeRole.label)
-                            .foregroundStyle(Palette.secondaryText)
+                            .foregroundStyle(Palette.inkSecondary)
                         Spacer()
                         Image(systemName: isRawMETARExpanded ? "chevron.up" : "chevron.down")
                             .font(.caption)
-                            .foregroundStyle(Palette.secondaryText)
+                            .foregroundStyle(Palette.inkSecondary)
                     }
-                    .frame(minHeight: 44)
+                    .frame(minHeight: StripMetrics.cell)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableButtonStyle())
+                .accessibilityValue(isRawMETARExpanded ? "Expanded" : "Collapsed")
 
                 if isRawMETARExpanded {
-                    Text(rawMETAR)
-                        .font(.footnote.monospaced())
-                        .foregroundStyle(Palette.primaryText)
-                        .padding(Space.s)
-                        .background(Palette.fill)
-                        .clipShape(RoundedRectangle(cornerRadius: Radius.s))
+                    rawReport(rawMETAR)
                 }
             }
         }
+    }
+
+    private func rawReport(_ text: String) -> some View {
+        Text(text)
+            .font(TypeRole.data)
+            .foregroundStyle(Palette.ink)
+            .padding(Space.s)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.activeCell)
+            .clipShape(RoundedRectangle(cornerRadius: Radius.s))
     }
 
     /// The TAF block, independent of the METAR: a TAF-only aerodrome (Israel's LLHZ) shows it alone, and a METAR
@@ -496,24 +536,17 @@ struct AirportInfoSheet: View {
     private func tafView() -> some View {
         VStack(alignment: .leading, spacing: Space.s) {
             if let taf = weatherViewModel?.currentTAF {
-                HStack {
-                    Text("TAF")
-                        .font(TypeRole.label)
-                        .foregroundStyle(Palette.secondaryText)
-                    Spacer()
+                HStack(spacing: Space.s) {
+                    ColumnSectionLabel("TAF")
                     // Valid-period end from the TAF text, else its fetch age: an old forecast reads OLD / EXPIRED.
                     if let freshness = weatherViewModel?.tafFreshness() {
                         DataAgeBadge(freshness: freshness)
                             .accessibilityIdentifier("taf-age-badge")
                     }
+                    Spacer()
                 }
                 .padding(.top, Space.xs)
-                Text(taf)
-                    .font(.footnote.monospaced())
-                    .foregroundStyle(Palette.primaryText)
-                    .padding(Space.s)
-                    .background(Palette.fill)
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.s))
+                rawReport(taf)
                 if weatherViewModel?.tafFailed == true {
                     Label("TAF refresh failed. Showing the last forecast.", systemImage: "exclamationmark.triangle.fill")
                         .font(TypeRole.caption)
@@ -528,16 +561,15 @@ struct AirportInfoSheet: View {
         }
     }
 
-    @ViewBuilder
     private func weatherFieldRow(_ label: String, spoken: String, value: String) -> some View {
         rowLayout {
             Text(label)
                 .font(TypeRole.label)
-                .foregroundStyle(Palette.secondaryText)
-                .frame(minWidth: 72, alignment: .leading)
+                .foregroundStyle(Palette.inkSecondary)
+                .frame(minWidth: 80, alignment: .leading)
             Text(value)
-                .font(TypeRole.valueSmall)
-                .foregroundStyle(Palette.primaryText)
+                .font(TypeRole.data)
+                .foregroundStyle(Palette.ink)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(spoken)
@@ -546,7 +578,12 @@ struct AirportInfoSheet: View {
 
     // MARK: - Data Loading
 
-    private func loadAirport() {
+    /// Runs on appear and whenever `appState.selectedAirportID` changes; a newer selection cancels the older load.
+    private func loadAirport() async {
+        airport = nil
+        aerodrome = nil
+        weatherViewModel = nil
+        isRawMETARExpanded = false
         guard let icao = appState.selectedAirportID else { return }
 
         // Load airport from database (regions without airport data have none to find).
@@ -555,31 +592,28 @@ struct AirportInfoSheet: View {
             aerodrome = (try? IsraelAviationDatabase.bundled().aerodrome(code: icao)) ?? nil
             airport = aerodrome.map(IsraelAerodromeAdapter.airport)
         } else if appState.region.hasAirportData {
-            do {
-                airport = try databaseService.airport(byICAO: icao)
-            } catch {
-                airport = nil
-            }
+            airport = try? databaseService.airport(byICAO: icao)
         }
 
-        // Initialize weather view model and load weather
         let vm = WeatherViewModel(weatherService: weatherService)
         vm.region = appState.region
         weatherViewModel = vm
-        Task {
-            await vm.loadWeather(for: icao)
-        }
+        await vm.loadWeather(for: icao)
     }
 }
 
 #Preview {
-    AirportInfoSheet(
+    let appState = AppState()
+    appState.selectedAirportID = "KPAO"
+    return AirportColumnView(
         databaseService: PlaceholderDatabaseService(),
         weatherService: PlaceholderWeatherService(),
         chartService: TerminalProcedureService(),
         notamService: NotamService(),
         pirepService: PirepService(),
-        windsAloftService: WindsAloftService()
+        windsAloftService: WindsAloftService(),
+        onDirectTo: { _ in }
     )
-    .environment(AppState())
+    .frame(width: StripMetrics.width)
+    .environment(appState)
 }

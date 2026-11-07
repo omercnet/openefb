@@ -63,13 +63,14 @@ Deploys: the Worker with `npx wrangler deploy` from `web/notam-relay` (owner log
 ```
 efb-212/
 ├── efb_212App.swift               # App entry point, scene setup
-├── ContentView.swift              # 3-tab root: Map / Flights / Settings; FlightsTabView (History / Logbook / Plans)
+├── ContentView.swift              # Root: map screen or log stack (AppState.selectedScreen); no tab bar
 ├── Views/
-│   ├── Map/                       # Moving map, controls, instrument strip, airport sheet and sections, layers
+│   ├── Log/                       # Direction 2: flight log strip (FlightLog*), strip columns (airport, nearest, layers, search), log stack home
+│   ├── Map/                       # Map container, MapLibre bridge, airport sections, recording controls, banners
 │   ├── Planning/                  # Flight plan creation, summary card
 │   ├── Briefing/                  # Israel pre-flight NOTAM briefing (filters, read/unread, show on map, IMS link)
 │   ├── Flights/                   # Flight history, detail, replay, transcript, debrief
-│   ├── Logbook/                   # Logbook list and entry editing (shown in the Flights tab)
+│   ├── Logbook/                   # Logbook entry editing (reached from the log stack)
 │   ├── Aircraft/                  # Aircraft + pilot profiles (reached from Settings > Profiles)
 │   ├── Settings/                  # Settings, offline maps
 │   ├── Onboarding/                # First-run onboarding
@@ -186,7 +187,7 @@ Analytics: TelemetryDeck (`nom.telemetrydeck.com`). `Telemetry.start` (from the 
 | **Map** | MapLibre integration, tile rendering, layers, ownship | Views/Map/, Services/MapService.swift |
 | **Aviation Data** | NASR import, airport DB, search, spatial queries | Data/AviationDatabase.swift, tools/nasr-importer/ |
 | **Weather** | NOAA API, METAR/TAF, caching, map dots | Services/WeatherService.swift, ViewModels/WeatherViewModel |
-| **Planning** | Flight plans, route rendering, instrument strip | Views/Planning/, ViewModels/FlightPlanViewModel |
+| **Planning** | Flight plans, route rendering, next-waypoint progress | Views/Planning/, ViewModels/FlightPlanViewModel |
 | **Recording** | Recording, replay, debrief | Services/Recording/, Services/Replay/, Services/Debrief/, Data/RecordingDatabase.swift |
 
 ### Coordination Rules
@@ -201,12 +202,12 @@ Analytics: TelemetryDeck (`nom.telemetrydeck.com`). `Telemetry.start` (from the 
 
 **Status:** TestFlight beta preparation (version 1.0, build 1). Not FAA-approved; supplemental reference only.
 **Built:** 166 app Swift files, 102 test files, 2 UI-test template stubs. Last full unit run (`tools/sim-test.sh test -only-testing:efb-212Tests`, 2026-11-02): **1065 tests, 0 failed** (1078 counting parameterized arguments). The UI test target holds only Xcode template stubs.
-**UI:** three tabs, Map / Flights / Settings (`ContentView.swift`). Flights holds a History / Logbook / Plans picker; Aircraft & Pilot profiles are under Settings > Profiles. Onboarding runs once. Settings > Region switches between US and Israel (`Core/Region.swift`, `RegionStore`); the region decides which data layers, weather stations, units (hPa in Israel) and NOTAM provider the app uses.
+**UI:** Direction 2 stage 1 (`docs/DESIGN.md`). The map screen is the chart with a fixed 400pt flight log strip at the leading edge (iPhone: a 104pt rail, the active leg cell and footer at the bottom): NEXT, NOW (GS, TRK, ALT, VS over an altitude tape), FLOWN, and a 60pt footer (GPS state, NRST, layers, zoom / recenter). Airport, nearest, layers and search open in the strip column (`AppState.stripColumn`). The log stack (`Views/Log/LogStackView.swift`) is home: Next / Now / Flown, logbook totals, links to the planner and Settings. Aircraft & Pilot profiles are under Settings > Profiles. Onboarding runs once. Settings > Region switches between US and Israel (`Core/Region.swift`, `RegionStore`); the region decides which data layers, weather stations, units (hPa in Israel) and NOTAM provider the app uses.
 **Shipped (US):**
-- Moving map: FAA VFR sectional (zoom 8-12) over the Street base map, ownship, track-up/north-up, instrument strip, nearest-airport HUD and list with Direct-To, airspace from NASR, day/night/auto display mode.
-- Airport sheet: METAR/TAF, frequencies, runways, PIREPs, winds aloft, NOTAMs (the pilot's own free FAA API key), FAA d-TPP charts and diagram PDFs, georeferenced diagram overlay on the map.
+- Moving map: FAA VFR sectional (zoom 8-12) over the Street base map, ownship, track-up/north-up, the track ruled in minutes (1, 2, 3, 5, 10 min), flight log strip, nearest-airport list with Direct-To, airspace from NASR, day/night/auto display mode.
+- Airport in the strip column: METAR/TAF, frequencies, runways, PIREPs, winds aloft, NOTAMs (the pilot's own free FAA API key), FAA d-TPP charts and diagram PDFs, georeferenced diagram overlay on the map.
 - Layers: TFRs, AIRMET/SIGMET with data-age badges. Offline map regions (sectional and Street).
-- Flight planning and active navigation bar; aircraft and pilot profiles with currency tracking.
+- Flight planning with live distance, time and bearing to the next waypoint; aircraft and pilot profiles with currency tracking.
 - Flight recording (GPS track, cockpit audio, on-device transcription with `SpeechAnalyzer` and an `SFSpeechRecognizer` fallback), auto-start above 15 kt, phase detection, replay, digital logbook, and an on-device debrief with Apple Foundation Models.
 - Data: bundled `aviation.sqlite` built from FAA NASR cycle 2026-10-29 (19,134 airports, 1,287 airspaces, 1,468 navaids) by `tools/nasr-importer`.
 - Anonymous analytics and crash / hang summaries (TelemetryDeck + MetricKit, `Services/TelemetryService.swift`), opt-out in Settings > Privacy. The App ID is the `TELEMETRYDECK_APP_ID` build setting (not a secret).

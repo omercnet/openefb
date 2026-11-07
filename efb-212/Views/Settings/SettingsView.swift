@@ -29,8 +29,9 @@ struct SettingsView: View {
     @State private var notamConfigured: Bool = false
     @State private var notamMessage: String?
 
+    // Pushed from the log stack, whose NavigationStack owns the bar.
     var body: some View {
-        NavigationStack {
+        Group {
             Form {
                 // Section 1: About
                 Section("About") {
@@ -382,6 +383,8 @@ private struct DisclaimersView: View {
 }
 
 #Preview {
-    SettingsView()
-        .environment(AppState())
+    NavigationStack {
+        SettingsView()
+    }
+    .environment(AppState())
 }

@@ -304,6 +304,6 @@ struct MapLoadingFlowTests {
         h.vm.onAirportTapped(icao: "KSQL")
 
         #expect(h.appState.selectedAirportID == "KSQL")
-        #expect(h.appState.isPresentingAirportInfo)
+        #expect(h.appState.stripColumn == .airport)
     }
 }

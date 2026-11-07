@@ -11,26 +11,20 @@ import CoreLocation
 
 // MARK: - Navigation
 
-/// Tab bar: Map / Flights / Settings. Logbook lives in Flights (History / Logbook / Plans) and
-/// Aircraft & Pilot under Settings (T22, efb-77r.22/.23).
-nonisolated enum AppTab: String, CaseIterable, Sendable {
-    case map, flights, settings
+/// Top-level screens (Direction 2, docs/DESIGN.md). No tab bar: the map with its flight log strip is
+/// the in-flight screen; the log stack is home (flights, plans, logbook) and links to Settings.
+nonisolated enum AppScreen: String, CaseIterable, Sendable {
+    case map, log
+}
 
-    var title: String {
-        switch self {
-        case .map: return "Map"
-        case .flights: return "Flights"
-        case .settings: return "Settings"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .map: return "map"
-        case .flights: return "airplane"
-        case .settings: return "gear"
-        }
-    }
+/// What the flight log strip's column shows beside the chart. The column keeps its width and its
+/// footer (GPS state, NRST, layers, zoom) whatever it shows.
+nonisolated enum StripColumn: Equatable, Sendable {
+    case log        // the flight log: next thing, active leg, flown rows
+    case airport    // the airport in `AppState.selectedAirportID`
+    case nearest    // nearest landable airports; a row's Direct inserts the direct-to
+    case layers     // map layers and night mode
+    case search     // airport search
 }
 
 enum MapMode: String, CaseIterable, Sendable {

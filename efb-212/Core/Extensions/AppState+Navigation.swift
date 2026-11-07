@@ -23,8 +23,10 @@ extension AppState {
         activeFlightPlan = false
         distanceToNext = nil            // nautical miles
         estimatedTimeEnroute = nil      // seconds
+        bearingToNext = nil             // degrees true
         activePlanDeparture = nil
         activePlanDestination = nil
+        activePlanDestinationCoordinate = nil
         activePlanFuelGallons = nil
         activeRoute = nil
     }
@@ -41,22 +43,42 @@ extension AppState {
         return distance / groundSpeed * 3600
     }
 
-    /// Advance the active multi-leg route from ownship and refresh DTG/ETE (to the next point) and the
-    /// route-following status (cross-track, altitude deviation). Sequences when within 0.5 NM of the TO point
-    /// or abeam it. No-op without a route or a position. Called on every location update.
+    /// Refresh DTG/ETE/bearing to the next point from ownship, for whichever navigation is active:
+    /// Direct-To (wins over a plan, it is the pilot's latest choice), an Israel multi-leg route (also
+    /// advances the leg and the route-following status: cross-track, altitude deviation; sequences when
+    /// within 0.5 NM of the TO point or abeam it), or a US direct plan's destination. No-op without a
+    /// position or active navigation. Called on every location update.
     func updateActiveRouteProgress(now: Date = Date()) {
-        guard let route = activeRoute, let ownship = ownshipPosition else { return }
-        // No vertical fix (verticalAccuracy < 0): the altitude caution never runs on an unknown altitude.
-        let altitudeFeet: Double? = ownship.verticalAccuracy >= 0 ? altitude : nil  // feet MSL
-        let progress = IsraelRouteFollowing.progress(
-            of: route, position: ownship.coordinate, altitudeFeet: altitudeFeet,
-            groundSpeedKnots: groundSpeed, now: now
-        )
-        if progress.route != activeRoute { activeRoute = progress.route }
-        guard let toNext = progress.distanceToNextNM else { return }
-        distanceToNext = toNext
-        // ETE in seconds = NM / knots * 3600; unknown while stationary.
-        estimatedTimeEnroute = groundSpeed > 30 ? toNext / groundSpeed * 3600 : nil
+        guard let ownship = ownshipPosition else { return }
+        let target: CLLocationCoordinate2D
+        if let airport = directToAirport {
+            target = CLLocationCoordinate2D(latitude: airport.latitude, longitude: airport.longitude)
+        } else if let route = activeRoute {
+            // No vertical fix (verticalAccuracy < 0): the altitude caution never runs on an unknown altitude.
+            let altitudeFeet: Double? = ownship.verticalAccuracy >= 0 ? altitude : nil  // feet MSL
+            let progress = IsraelRouteFollowing.progress(
+                of: route, position: ownship.coordinate, altitudeFeet: altitudeFeet,
+                groundSpeedKnots: groundSpeed, now: now
+            )
+            if progress.route != activeRoute { activeRoute = progress.route }
+            guard let toNext = progress.distanceToNextNM, let leg = progress.route.current else { return }
+            setProgress(distanceNM: toNext, bearing: ownship.bearing(to: CLLocation(
+                latitude: leg.toLatitude, longitude: leg.toLongitude)))
+            return
+        } else if let destination = activePlanDestinationCoordinate {
+            target = destination
+        } else {
+            return
+        }
+        let targetLocation = CLLocation(latitude: target.latitude, longitude: target.longitude)
+        setProgress(distanceNM: ownship.distanceInNM(to: targetLocation), bearing: ownship.bearing(to: targetLocation))
+    }
+
+    /// DTG in NM, bearing in degrees true; ETE in seconds = NM / knots * 3600, unknown below 30 kt.
+    private func setProgress(distanceNM: Double, bearing: Double) {
+        distanceToNext = distanceNM
+        bearingToNext = bearing
+        estimatedTimeEnroute = groundSpeed > 30 ? distanceNM / groundSpeed * 3600 : nil
     }
 
     /// Manual "next" / "previous" leg for the active route, then refresh progress.

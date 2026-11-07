@@ -156,7 +156,7 @@ struct IsraelFlightPlanViewModelTests {
         #expect(state.activeRoute?.current?.toCode == "MIDAA")
         #expect(state.activeRoute?.current?.altitudeText == "1500")
         #expect(state.activePlanDestination == "LLIB")
-        #expect(ActiveNavigationBar.title(for: state)?.contains("MIDAA") == true)
+        #expect(FlightLogStrip.routeTitle(for: state)?.contains("MIDAA") == true)
         vm.clear()
         #expect(!state.activeFlightPlan)
         #expect(state.activeRoute == nil)

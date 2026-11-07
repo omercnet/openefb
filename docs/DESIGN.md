@@ -13,19 +13,50 @@ Rules (the EFB lens):
 - Stale or unvalidated data is never shown as current.
 - No decorative animation in flight.
 
+## Direction 2: the log and the leading edge
+
+Reference mock: `docs/design/mocks/merge.html` (stage 1 and stage 2 screens). Stage 1 is in the app.
+
+**The idea.** A VFR flight is a nav log, and the pilot's question is what comes next. Kanaf shows one object, the log, in three tenses: Next (planned), Now (flying), Flown (debrief and logbook). In flight the log reads forward: the next thing ahead gets the biggest type on the screen.
+
+Structure:
+- The log is a strip beside the chart (layout, not an overlay) at the leading edge; it mirrors to the right edge in Hebrew, the chart never mirrors. Waypoints are rows, legs are the space between them, the active leg's cell holds the live readouts.
+- The home screen is the log stack: planned flights, today's flight, past flights, totals. The stack is also the logbook. The app opens on the map; the strip's LOG button opens the stack.
+- Airport, nearest, layers and search open in the strip's column; the chart stays live beside it. A debrief is the flight's own strip with the actuals written in (stage 2).
+- The wing (כנף) is both the ownship glyph and the marker on the active leg's gauge.
+
+Reading order:
+- Future is loud: time-to-next is the largest number. Present numbers (GS, TRK, ALT with VS) sit in the active cell at readout size, below it.
+- The chart is ruled in minutes along the track; the strip's row times and the map's minute ticks are the same times.
+- Predicted events (airspace floors, boundaries) are rows in the log, in time order, each stating its assumption ("at 312°, +300 fpm"). Stale input turns predictions off; it never shows them as current.
+- Night has no filled amber blocks: amber rule and amber type on near-black.
+- The debrief unrolls the line: strip map, profile against the ±200 ft band, and radio (heard / not heard) on one axis, with no overall score that hides a bad leg.
+
+Not used: a tab bar, floating map buttons, a bottom instrument strip, an NRST box, a layer popover, bottom sheets, list-and-detail flight screens. Layers, zoom, NRST and GPS state are 60pt cells in the strip's footer, GPS state first.
+
+Type: one OFL system bundled with the app. Archivo (condensed widths for readouts and idents, normal width for labels), IBM Plex Mono for times and log data, IBM Plex Sans Hebrew. Day chrome is cool paper; magenta = route, chart blue = airspace, red = warning, amber = caution, ink for everything else.
+
+The EFB rules above all still hold.
+
+### Rules
+- **Only the next thing is loud.** The top row carries the one large time (about 100pt on iPad); later rows use about 44pt. At most 3 later rows on iPad (2 on the iPhone rail), then "+N more to DEST".
+- **The NOW cell stays visible while it is on.** Only the rows above it scroll when the column is short.
+- **NRST opens the nearest list in the strip column; one tap on a row inserts the direct-to.** A one-tap insert of the nearest field could pick a heliport or a short strip (finding F1); two taps keeps the choice (F2).
+- **Footer: GPS state, NRST, layers, zoom in, zoom out, one row.** Night and orientation live in the layers column. After a pan, zoom in becomes Recenter until the chart follows ownship again (F3).
+- **A Direct-To wins.** It is the next waypoint everywhere while it is active; opening the planner does not cancel it.
+- **The strip is 400pt on iPad**: 34% of an 11" iPad and 29% of a 13" in landscape, 39-48% in portrait. The iPhone gets a 104pt rail with the NOW cell and footer under the chart; an opened column (airport, nearest, layers, search) covers only the area above the NOW cell.
+- **The pilot can hide the bars** (Layers > Panels, persisted): *Flight log* hides the strip (iPad) or the rail (iPhone) and the chart takes the width; the header then carries the next waypoint's time-to. *Instruments* hides the NOW cell; the header then carries Clear. The header (LOG, route, SEARCH, REC), warnings and the footer (GPS state, NRST, layers, zoom) never hide, so the toggles are always one tap away.
+- **The debrief runs on distance.** The strip map, profile and radio bands share one distance axis; times are labels at the waypoints. Short legs may be drawn at a marked half scale.
+
+### Stage 2: the leading edge
+Prediction rows (airspace floor and boundary times from track, GS and VS), the amber next-thing block, the floor on the altitude tape, the unrolled debrief. Needs a prediction service with tests for noisy GPS, rules for suppressing jumpy or stale predictions, and an owner or CFI review before pilots see it.
+
+Riskiest assumptions: a strip that permanently takes a third of an iPad's width beats an edge-to-edge chart, and predictions from GPS in bumpy air stay steady enough to trust. Both need a pilot in a real cockpit before stage 2.
+
+Still to check on stage 1: VoiceOver order of the log, the strip at accessibility type sizes, Hebrew mirroring.
+
 ## Typography
-SF Pro system text styles (Dynamic Type); numeric readouts monospaced. Roles live in `Core/DesignTokens.swift` (`TypeRole`):
-
-| Role | Style | Use |
-|---|---|---|
-| title | largeTitle rounded semibold | Airport identifier |
-| sectionHeader | caption bold, uppercase text | FREQUENCIES, RUNWAYS, BASE MAP |
-| label | footnote medium, secondary color | "Wind", "TWR": labels are quiet |
-| value | title3 monospaced-digit semibold | Frequencies, runway idents |
-| valueSmall | callout monospaced-digit medium | Decoded weather, runway size |
-| body / caption | subheadline / footnote | Prose, validity lines |
-
-Rule: value louder than label. Never `.tertiary` for text (below 4.5:1 on the material).
+Bundled faces through `TypeRole` (`Core/DesignTokens.swift`), scaled for Dynamic Type with `UIFontMetrics`; see Tokens. Rule: value louder than label. Never `.tertiary` for text (below 4.5:1).
 
 ## Tokens
 Defined in `efb-212/Core/DesignTokens.swift`.
@@ -41,46 +72,27 @@ Defined in `efb-212/Core/DesignTokens.swift`.
 | `Palette.cautionFill` | `.orange` | Solid amber chips and banners, always with black text (9:1) |
 | `Palette.accent` / `accentText` / `infoFill` | Kanaf navy, see Night palette | Buttons, links, notices; `accentText` is also the app tint (`AccentColor` asset) |
 | `Radius.xs/s/m/l` | 4 / 8 / 10 / 14 pt | Tags / rows and banners / controls and cards / panels. No literal radii in views |
-| `TypeRole.title`, `identifier`, `sectionHeader` | Expanded SF Pro, bold | Names and headings; values in sheets stay regular width |
-| `TypeRole.readout(size:)` | Condensed SF Pro, semibold, fixed-width digits | Instrument strip (32pt). Not SF Mono: width does not apply to it |
-| `mapControlSurface()` | Liquid Glass tinted `Palette.accent`, `onAccent` glyphs | Floating map controls. Never untinted glass: it turns olive over the sectional |
-| `panelSurface()` (`Palette.panelFill`, `panelHairline`) | Day #F2F2F7 at 0.88 with a 1pt `accent` hairline at 35%; night #1C1C1E at 0.9, no hairline; `Radius.l` | Instrument strip and NRST box. Solid, so the sectional's yellow no longer tints them |
-| `Palette.northMarker` | Day #FF9F94, night #FF8F86 | North arrow on the navy compass glass, >= 3:1 (see Kanaf look) |
+| `TypeRole.title`, `identifier`, `sectionHeader`, `label`, `body`, `caption` | Bundled Archivo (Condensed SemiBold for names, Medium / SemiBold for labels, Regular for prose), Dynamic Type through `UIFontMetrics`, Hebrew falls back to IBM Plex Sans Hebrew | Names, headings, labels, prose |
+| `TypeRole.value`, `valueSmall`, `data`, `dataEmphasis` | IBM Plex Mono | Frequencies, times, distances, log data |
+| `TypeRole.readout(size:)`, `nextTime`, `rowTime`, `rowIdent` | Archivo ExtraCondensed with tabular digits (`nextTime` ~100pt capped at 120, `rowTime` 44pt capped at 64) | Readouts in the NOW cell; the next thing's time-to; later rows |
+| `Palette.paper` / `paperSecondary` / `activeCell` / `rule` / `ink` / `inkSecondary` | Day #EEF0F2 / #E2E5E9 / #FFFFFF / #C3C8CE / #14191F / #4A535E; night #0D1013 / #232930 / #161A1F / #2A3037 / #C9C4BA / #8E9298 | The strip, its columns and the log stack |
+| `Palette.route` / `airspace` | Day #C2168D / #1B58A3; night #93407A / #86A3CB | Route glyphs and airport data blocks in the strip |
+| `StripMetrics` | width 400, rail 104, cell 60 | The iPad strip, the iPhone rail, every in-flight tap target |
+| `MapColor.trackRuler*` | Ink day #14191F, night #B6B0A3 | The minute-ruled track line, ticks and labels |
+| `Palette.northMarker` | Day #FF9F94, night #FF8F86 | North arrow on the navy north indicator, >= 3:1 (3.7:1 day, 3.9:1 night) |
 | `Palette.categoryMVFR` / `categoryLIFR` | systemBlue / #CC00CC day; #8FB5E0 / #E673E6 night | Flight-category dots (VFR `ok`, IFR `warning`) |
 | `MapColor.*` | The system colours the map layers already used | Ownship, airspace, weather dots, TFRs, replay track, NOTAM map highlight. Named only; recolouring ownship or airspace is a separate decision to make over the sectional |
 
-All are SwiftUI semantic colors, so the night-mode ticket can retheme in one place. Red = warning (the compass north marker, `Palette.northMarker`, is the one convention exception), amber = caution, magenta = route.
-
-## Kanaf look (PR #5)
-
-PR #5 (2026-11-02) gave the app its own look inside the HIG; the follow-ups (2026-11-03) finished it:
-
-- **Accent:** Kanaf navy (`Palette.accent`, `AccentColor` asset), #1556B8 by day (#0C4091 with Increase Contrast), #2E4A6E fill and #8FB4E0 text at night. Day systemBlue failed 4.5:1.
-- **Floating map controls:** `mapControlSurface()`, Liquid Glass tinted navy with white (night grey 85%) glyphs, 60pt. Measured over the official CAAI CVFR chart on the iPad simulator: glyphs 7.3:1 by day, 6.1:1 at night, so no change was needed. Screenshots (CAAI artwork) are kept out of git in `docs/design/screenshots/UX-IL-CAAI/`.
-- **Panels:** the instrument strip and NRST box moved from `.regularMaterial` to `panelSurface()`: a light solid panel with a navy hairline by day, the old dark panel at night. Material took on the sectional's yellow; the solid panel stays neutral grey. The panel is slightly see-through, so the GPS status chip (GPS LOST / STALE) sits on an opaque `Palette.statusChipBase` with an 8% tint: its amber or red text keeps >= 4.6:1 over any map.
-- **Type:** expanded SF Pro for names and headings (`TypeRole.title`, `identifier`, `sectionHeader`); condensed SF Pro with fixed-width digits for the 32pt readouts.
-- **North marker:** the red arrow on the compass glass was 2.1:1 by day and 2.5:1 at night (needs 3:1 as a graphical object). It is now a light red, measured on screen: 3.7:1 day, 3.9:1 night, 5.2:1 day / 4.1:1 night with Increase Contrast, 3.5:1 / 4.2:1 with Reduce Transparency. The arrow was also invisible: inside the controls' `GlassEffectContainer` it was a sibling over a separate glass view and was drawn under the glass; it is now the glass view's own content.
-- **Increase Contrast / Reduce Transparency** (simulator): the high-contrast navy applies to the map controls; the strip, NRST box and route bar stay legible with both settings, day and night. Still to do on a real iPad: VoiceOver and Reduce Transparency, which the simulator only approximates.
-
-Before (material panels) and after (solid panels), same position and time:
-
-| Where | Before (left) and after (right) |
-|---|---|
-| iPad, KPAO sectional, day | ![iPad at KPAO by day. Before: the instrument strip and NRST box take on the sectional's yellow through the material. After: neutral light-grey panels with a thin navy edge.](design/screenshots/KANAF/ipad-us-day.png) |
-| iPad, KPAO sectional, night | ![iPad at KPAO at night. Before and after look the same: the dark panel is unchanged.](design/screenshots/KANAF/ipad-us-night.png) |
-| iPhone 17e, KPAO sectional, day | ![iPhone at KPAO by day. Before: yellow-tinted strip and NRST box. After: neutral light-grey panels with a navy edge.](design/screenshots/KANAF/iphone-us-day.png) |
-| iPhone 17e, Israel street map, day | ![iPhone near LLHZ by day with an active route. After: the strip and NRST box are neutral light grey with a navy edge instead of see-through material.](design/screenshots/KANAF/iphone-il-day.png) |
-| iPhone 17e, Israel street map, night | ![iPhone near LLHZ at night with an active route. Before and after match: the dark panel is unchanged.](design/screenshots/KANAF/iphone-il-night.png) |
+Colors are dynamic (day / night by color scheme), so night retheming happens in one place. Red = warning (the north marker, `Palette.northMarker`, is the one convention exception), amber = caution, magenta = route. Kanaf navy (`Palette.accent`, `AccentColor` asset) is #1556B8 by day (#0C4091 with Increase Contrast), #2E4A6E fill and #8FB4E0 text at night; day systemBlue failed 4.5:1.
 
 ## Components
 | Component | Decision | Status |
 |---|---|---|
-| SectionHeader | One uppercase section heading, used by the airport sheet and layer panel | done |
+| SectionHeader | One uppercase section heading, used by the airport and layers columns | done |
 | Frequency row | 72pt label column, abbreviations (CTAF, UNICOM, ATIS, AWOS, ASOS, TWR, GND, CD, APP, DEP, CTR, FSS), value large | done |
 | DataAgeBadge | One freshness badge for every dated product: neutral fresh, amber OLD/EXPIRED with a triangle glyph, red only when unsafe; thresholds in `## Freshness thresholds` | done |
-| Layer panel | BASE MAP picker, SECTIONAL toggle + opacity, DATA LAYERS toggles, 300pt wide | done |
+| Layers column | Display and orientation, SECTIONAL toggle + opacity, DATA LAYERS toggles, in the strip column | done |
 | Map symbols | Ownship: dark halo, fill, white edge. Airports/navaids: dark ring | done |
-| Transcription panel | Sits in the map's bottom stack above the instrument strip, never over it | done |
 
 ## UX Audit Findings
 
@@ -105,7 +117,7 @@ charts; track-up toggle; pan away; zoom out; record; layer panel. Screenshots ar
 | F11 | Airport sheet: frequency type labels hyphenate ("AP-PROACH", "DEPAR-TURE"); the weather age badge is yellow text on yellow (low contrast); secondary text ("Asphalt") is too faint; the sheet is long, with charts, NOTAMs, PIREPs and winds below the fold. | H8 minimalist; contrast | 2 | Phase 4 (refactoring-ui): fixed label column, standard abbreviations (APP, DEP, GND, TWR), contrast ≥ 4.5:1, section order by flight-phase relevance. | fixed (efb-77r.4): 72pt label column with abbreviations, values emphasized, `.tertiary` text removed, badge text is primary on a tint, order is identity, weather + frequencies, runways, NOTAMs, charts, PIREPs, winds; opens at 62% |
 | F12 | Staleness is shown four different ways (yellow/red WeatherBadge text, "STALE", winds "Current / Not current", layer "Data age"). Yellow and red are used for age, not for caution and warning. | H4 consistency | 2 | One freshness component used everywhere: neutral when fresh, amber "OLD" when past the product's useful life, never red unless unsafe. | fixed (efb-77r.5): `DataAgeBadge` + `DataFreshness`, per-product thresholds in `## Freshness thresholds`; WeatherBadge and ChartExpirationBadge deleted |
 | F13 | At 70% opacity the sectional overpowers our data layers: cyan airport dots and the ownship chevron get lost on yellow city tint. | H8; V | 2 | Ownship with a halo/outline; airport symbols with a contrasting outline; default sectional opacity reviewed in the night/day palettes. | fixed (efb-77r.4): ownship has a dark halo + white edge, airport/navaid dots a dark ring. Opacity default review stays with the night-palette ticket |
-| F14 | The beta banner takes the top strip until dismissed. | H8 | 1 | Move to Settings / About after first dismissal (it already persists); shorten the copy. | fixed (efb-77r.8): one-line banner with a 44pt dismiss, the same line permanently in Settings > About |
+| F14 | The beta banner takes the top strip until dismissed. | H8 | 1 | Move to Settings / About after first dismissal (it already persists); shorten the copy. | fixed: no banner; the beta line lives only in Settings > About |
 | F15 | Map controls are 44pt and the zoom halves are 40pt tall: below the in-flight target size. | H5 (slips in turbulence) | 3 | ≥ 60pt in-flight controls (HIG pass, efb-77r.3). | fixed (efb-77r.3): every map control 60pt (`MapControlMetrics.size`); other tappables ≥ 44pt |
 | F16 | No night mode: a white UI at night destroys dark adaptation. | H5; context | 3 | Night palette and dimmed map (HIG pass, efb-77r.3). | fixed (efb-77r.3): Day / Night / Auto (sun elevation < -6°), 60pt map toggle, Settings picker, dimmed raster + muted dots, night accent tokens |
 | F17 | "Map Style: VFR" mixes the base map and the sectional, and the opacity slider only affects the sectional, which isn't obvious. | H2 match; E | 2 | Separate "Base map" (Street / Satellite / Terrain) from a "Sectional" toggle with opacity. | fixed (efb-77r.4): layer panel has BASE MAP and SECTIONAL groups; the sectional is an overlay on any base (`visibleLayers.contains(.sectional)`), opacity shows only while it is on |
@@ -119,7 +131,7 @@ only while ownship is on screen (F3). Search ✔. **Is my data current** fails (
 |---|---|---|---|
 | Freshness badge (`DataAgeBadge`) | Trigger: none (passive, glanceable). Rules: `DataFreshness.evaluate` per product (see Freshness thresholds); neutral fresh, amber OLD/EXPIRED, red only for unsafe. Feedback: text + triangle glyph when not fresh (never colour alone). Loops: re-evaluates on every redraw; layer rows tick with the 1 s map clock | F12: replaced WeatherBadge, winds "Current/Not current", layer "Data age" rows, ChartExpirationBadge | fixed |
 | Record button | Trigger: 60pt circle top-left. Rules: idle → start (asks for microphone once); recording → confirm → stop; countdown → cancel. Feedback: neutral idle glyph, accent stop square while recording, success haptic on start/stop, warning haptic on failure. Loops: auto-start countdown unchanged | F9: red mic at rest removed; pressed state added | fixed |
-| REC pill | Rules: shown only while recording. Feedback: "REC 00:12:34", flight phase, 5-segment input level meter (no pulse animation). Mode: visible, it is the only recording-state indicator | F9: replaces red pulsing dot + bare timer | fixed |
+| REC pill | Rules: shown only while recording. Feedback: in the strip header's REC cell, the stop glyph and 5-segment input level meter over the elapsed time "00:12:34" (no pulse animation). Mode: visible, it is the only recording-state indicator | F9: replaces red pulsing dot + bare timer | fixed |
 | Microphone denied | Rules: checked on start and every sync tick while recording (covers auto-start, Settings change). Feedback: amber "Microphone is off" notice with "Open Settings"; GPS track keeps recording | F9: previously silent (no audio, no message) | fixed |
 | Recording failure | Rules: start failure or mid-flight audio failure sets `lastError`. Feedback: amber dismissible notice; "Recording unavailable" chip when the recording database cannot open (previously the button silently vanished) | F9 | fixed |
 | Async states (airport weather, PIREPs, winds aloft, NOTAMs, charts, TFR / AIRMET layers, offline downloads) | loading spinner → loaded / empty sentence → error (amber, says what failed) with a 44pt Retry; stale is the freshness badge on loaded data. Weather shows cached data with its OLD/EXPIRED badge when a refresh fails | Red error text removed (red = warning); Retry added where it was missing (PIREPs, winds, weather, layers, failed offline packs) | fixed |
@@ -155,7 +167,7 @@ Night = the dark colour scheme set by `DisplayModeModifier` (Day / Night / Auto)
 | `accent` (NRST label, Direct, Recenter, Play, REC stop, Save, onboarding button) | Kanaf navy #1556B8 (Increase Contrast #0C4091) | #2E4A6E | with `onAccent`: day 6.9:1 (9.7:1 high contrast), night 6.4:1 |
 | `onAccent` | white | grey 85% | see above |
 | `accentText` (info glyphs, selected check, REC label; also the app-wide tint through the `AccentColor` asset) | #1556B8 (high contrast #0C4091) | #8FB4E0 (high contrast #B8D0EE) | day 6.2:1 on the #F2F2F7 panel; night 7.9:1 on #1C1C1E, ≥ 9:1 on black |
-| `infoFill` (beta banner, active transcript row) | navy 15% | #2E4A6E 35% | text stays `primaryText` |
+| `infoFill` (notices, active transcript row) | navy 15% | #2E4A6E 35% | text stays `primaryText` |
 
 Before the Kanaf navy change (2026-11-02) the day accent was systemBlue, documented here as 4.6:1 (white) and 4.5:1 (as text). Recomputed with the WCAG formula it was 3.5-4.0:1 as a button fill and 3.2-3.6:1 as text on the panel, so it failed 4.5:1; the navy fixes that. Night values were right (the 5.4:1 above was a low estimate: #D9D9D9 on #2E4A6E is 6.4:1).
 

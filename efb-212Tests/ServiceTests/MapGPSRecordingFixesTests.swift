@@ -55,7 +55,7 @@ struct ClearDirectToTests {
         #expect(appState.activeFlightPlan)
         #expect(appState.distanceToNext != nil)
         #expect(appState.estimatedTimeEnroute != nil)
-        #expect(ActiveNavigationBar.title(for: appState) == "DIRECT KSQL")
+        #expect(FlightLogStrip.routeTitle(for: appState) == "DIRECT KSQL")
 
         vm.clearDirectTo()
 
@@ -64,7 +64,7 @@ struct ClearDirectToTests {
         #expect(appState.distanceToNext == nil)
         #expect(appState.estimatedTimeEnroute == nil)
         #expect(!appState.hasActiveNavigation)
-        #expect(ActiveNavigationBar.title(for: appState) == nil)
+        #expect(FlightLogStrip.routeTitle(for: appState) == nil)
     }
 
     @Test func clearAlsoDropsARouteSummary() {
@@ -73,7 +73,7 @@ struct ClearDirectToTests {
         appState.activePlanDeparture = "KPAO"
         appState.activePlanDestination = "KSQL"
         appState.distanceToNext = 12
-        #expect(ActiveNavigationBar.title(for: appState) == "KPAO \u{2192} KSQL")
+        #expect(FlightLogStrip.routeTitle(for: appState) == "KPAO \u{2192} KSQL")
 
         appState.clearActiveNavigation()
 
