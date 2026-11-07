@@ -5,7 +5,7 @@
 //  Root view, Direction 2: no tab bar. The map screen (chart with the log strip at its leading
 //  edge) or the log stack (Next / Now / Flown, also the logbook). The map screen stays mounted
 //  under the log stack so its services (recording, route, location) survive the switch. The beta
-//  banner shows on the map screen only; after dismissal it lives in Settings > About.
+//  status lives in Settings > About only.
 //
 
 import SwiftUI
@@ -17,9 +17,6 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if appState.selectedScreen == .map {
-                BetaBanner()
-            }
             DatabaseUnavailableBanner()
             RemoteConfigBanner()
 

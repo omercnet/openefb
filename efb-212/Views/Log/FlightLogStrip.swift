@@ -8,10 +8,19 @@
 //  GS, TRK, ALT and VS over the altitude tape), FLOWN (departure and passed waypoints).
 //  iPad: a fixed 400pt column at the leading edge. iPhone: the NEXT rows fold into a 104pt
 //  rail (FlightLogRail) and the NOW cell moves under the chart at full width.
+//  Two persisted toggles in Layers (FlightLogVisibility, default on) hide parts of it for chart
+//  room: Flight log hides this column and the rail (the header then shows the next time-to);
+//  Instruments hides NOW (FLOWN takes its space; the header then carries Clear).
 //  No animation on value changes (pilot SA).
 //
 
 import SwiftUI
+
+/// UserDefaults keys for the map-screen panel toggles (Layers > Panels). Both default to on.
+enum FlightLogVisibility {
+    static let flightLogKey = "showsFlightLog"
+    static let instrumentsKey = "showsInstruments"
+}
 
 struct FlightLogStrip: View {
     let gpsStatus: GPSStatus
@@ -19,23 +28,27 @@ struct FlightLogStrip: View {
     let recordingViewModel: RecordingViewModel?
     let notices: FlightLogNotices
     let onClear: () -> Void
+    @AppStorage(FlightLogVisibility.instrumentsKey) private var showsInstruments = true
 
     /// NOW is pinned: the warnings and NEXT above it take their natural height and scroll only when the
     /// column is too short (warnings, large Dynamic Type); FLOWN scrolls in whatever space is left below.
+    /// With the instruments hidden NOW is omitted and Clear moves to the header.
     var body: some View {
         VStack(spacing: 0) {
-            FlightLogHeader(recordingViewModel: recordingViewModel)
+            FlightLogHeader(recordingViewModel: recordingViewModel, onClear: showsInstruments ? nil : onClear)
             ColumnRule()
             ViewThatFits(in: .vertical) {
                 aboveNow
                 ScrollView { aboveNow }
             }
             .layoutPriority(1)  // after NOW's fixed height, the region above gets the space before FLOWN
-            VStack(alignment: .leading, spacing: 0) {
-                FlightLogSectionLabel(title: "Now")
-                FlightLogNowCell(gpsStatus: gpsStatus, onClear: onClear)
+            if showsInstruments {
+                VStack(alignment: .leading, spacing: 0) {
+                    FlightLogSectionLabel(title: "Now")
+                    FlightLogNowCell(gpsStatus: gpsStatus, onClear: onClear)
+                }
+                .fixedSize(horizontal: false, vertical: true)
             }
-            .fixedSize(horizontal: false, vertical: true)
             ScrollView {
                 FlightLogFlown()
             }

@@ -25,7 +25,7 @@ No tab bar (Direction 2, `docs/DESIGN.md`). The map screen carries the flight lo
 - Every logbook action stays in the log stack: draft entries from recordings, sign/lock, manual entries, delete.
 - A draft logbook entry reads "Draft, sign" in neutral text, not amber or red: a draft is a to-do, not a warning (efb-77r.32).
 - Aircraft & Pilot is a row under Settings > Profiles. Non-current currency (medical, flight review, night) shows as an amber "n to renew" on that row.
-- Beta banner: map screen only; once dismissed, only the line under Settings > About remains (efb-77r.18).
+- No beta banner: the beta line and Send Feedback live under Settings > About.
 
 ### Design Review: Kanaf (T14 final cut, 2026-11-01)
 Evidence: the app walked cold on the iPad Pro 13-inch simulator (iOS 27, KPAO, `tools/fly.sh` route). Screenshots: `docs/design/screenshots/T14/`. **This review rests on documented assumptions: no pilot has used a build** (CUSTOMER.md evidence status). It has not been tried on a physical iPad or in a cockpit.

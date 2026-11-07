@@ -63,16 +63,32 @@ struct FlightLogCellButton: View {
 
 // MARK: - Header
 
-/// LOG, route title, SEARCH, BRIEF (Israel), REC. 60pt high. The controls keep their full cell width;
-/// the title takes what is left on one line.
+/// LOG, route title, SEARCH, BRIEF (Israel), CLEAR (instruments hidden), REC. 60pt high. The controls
+/// keep their full cell width; the title takes what is left on one line.
 struct FlightLogHeader: View {
     @Environment(AppState.self) private var appState
     let recordingViewModel: RecordingViewModel?
     /// iPhone and iPad Split View: the record control shows its glyph only.
     var compact: Bool = false
+    /// The flight log is hidden (no NEXT on screen): the title carries the next waypoint's time-to.
+    var showsNextTime: Bool = false
+    /// Fix state for the time-to; no time on a stale or missing fix.
+    var gpsStatus: GPSStatus? = nil
+    /// The instruments are hidden (no NOW cell): the header carries Clear while navigation is active.
+    var onClear: (() -> Void)? = nil
+
+    /// "9:12" to the next waypoint; nil when hidden, with no next waypoint, no ETE or a stale fix.
+    private var nextTime: (text: String, spoken: String)? {
+        guard showsNextTime, FlightLogStrip.nextIdent(for: appState) != nil,
+              let gpsStatus, !gpsStatus.isStale,
+              let ete = appState.estimatedTimeEnroute else { return nil }  // seconds
+        return (FlightLogStrip.timeToText(ete), FlightLogStrip.spokenDuration(ete))
+    }
 
     var body: some View {
-        let title = FlightLogStrip.routeTitle(for: appState)
+        let route = FlightLogStrip.routeTitle(for: appState)
+        let next = nextTime
+        let title = route.map { title in next.map { "\(title) \u{00B7} \($0.text)" } ?? title }
         HStack(spacing: 0) {
             FlightLogCellButton(title: "Log", systemImage: "list.bullet", accessibilityLabel: "Flight log") {
                 appState.selectedScreen = .log
@@ -87,7 +103,9 @@ struct FlightLogHeader: View {
                 .minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Space.s)
-                .accessibilityLabel(title.map { "Route \($0)" } ?? "No route")
+                .accessibilityLabel(route.map { title in
+                    "Route \(title)" + (next.map { ", next in \($0.spoken)" } ?? "")
+                } ?? "No route")
                 .accessibilityIdentifier(title == nil ? "no-route" : "active-navigation-bar")
 
             if appState.region.hasAirportData {
@@ -104,6 +122,12 @@ struct FlightLogHeader: View {
                 }
                 .accessibilityIdentifier("israel-briefing-button")
                 .fixedSize()
+            }
+            if let onClear, appState.hasActiveNavigation {
+                FlightLogCellButton(title: "Clear", systemImage: "xmark",
+                                    accessibilityLabel: "Clear \(route ?? "navigation")", action: onClear)
+                    .accessibilityIdentifier("clear-direct-to")
+                    .fixedSize()
             }
             if let recordingViewModel {
                 RecordButton(viewModel: recordingViewModel, compact: compact)

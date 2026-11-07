@@ -108,6 +108,9 @@ shots() {
   local sim=$1 device=$2
   shot "$sim" "$device" map-day us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK
   shot "$sim" "$device" map-night us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode night -OpenEFBDirectTo KOAK
+  # The bar toggles (Layers > Panels): flight log hidden, then both bars hidden. Launch arguments are not persisted.
+  shot "$sim" "$device" map-nolog us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -showsFlightLog NO
+  shot "$sim" "$device" map-chartonly us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -showsFlightLog NO -showsInstruments NO
   shot "$sim" "$device" map-noplan us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day
   shot "$sim" "$device" airport-KSQL us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn airport:KSQL -OpenEFBDisplayMode day
   shot "$sim" "$device" nearest us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn nearest -OpenEFBDisplayMode day
