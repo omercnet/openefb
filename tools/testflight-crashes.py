@@ -91,8 +91,8 @@ def main():
     args = parser.parse_args()
 
     load_local_env()
-    jwt = token()
     try:
+        jwt = token()
         limit = max(1, min(args.limit, 200))
         submissions = get(f"/apps/{args.app}/betaFeedbackCrashSubmissions?sort=-createdDate&limit={limit}", jwt)["data"]
         args.out.mkdir(parents=True, exist_ok=True)
@@ -108,8 +108,12 @@ def main():
                 continue
             (args.out / f"{sid}.crash").write_text(log)
             logs += 1
-    except urllib.error.HTTPError as e:
-        sys.exit(f"App Store Connect API: HTTP {e.code} {e.read().decode(errors='replace')}")
+    except urllib.error.HTTPError as e:  # status only: the CI log is public
+        sys.exit(f"App Store Connect API: HTTP {e.code}")
+    except subprocess.CalledProcessError as e:
+        sys.exit(f"openssl could not sign the token (exit {e.returncode})")
+    except (KeyError, TypeError, ValueError):
+        sys.exit("App Store Connect API: unexpected response")
     print(f"{len(submissions)} crash submissions, {logs} crash logs")
 
 
