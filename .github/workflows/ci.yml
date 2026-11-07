@@ -89,14 +89,15 @@ jobs:
 
   unit-tests:
     name: Unit tests (iPad simulator)
-    # GitHub-hosted macos-latest (macOS 26 arm64, Xcode 26.6) while the self-hosted Tart runners (label `tartelet`)
-    # are offline. To go back: runs-on fork PRs -> 'macos-26', else ["self-hosted", "macOS", "ARM64", "tartelet"]
-    # with Xcode 27.2 (see docs/CI.md).
+    # GitHub-hosted macos-latest while the self-hosted Tart runners (label `tartelet`) are offline, with the image's
+    # default Xcode (26.6 on macOS 26), so a move of the label to a newer image doesn't break the path.
+    # To go back: runs-on fork PRs -> 'macos-26', else ["self-hosted", "macOS", "ARM64", "tartelet"] with
+    # Xcode 27.2 (see docs/CI.md).
     runs-on: macos-latest
     timeout-minutes: 45
     env:
       # Set at job level, before checkout: /usr/bin/git is an xcrun shim and fails on a missing DEVELOPER_DIR.
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
       - name: Cache Swift packages
@@ -125,7 +126,7 @@ jobs:
     timeout-minutes: 45
     env:
       # Set at job level, before checkout: /usr/bin/git is an xcrun shim and fails on a missing DEVELOPER_DIR.
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
       - name: Cache Swift packages
