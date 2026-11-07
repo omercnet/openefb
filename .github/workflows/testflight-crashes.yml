@@ -1,0 +1,47 @@
+name: TestFlight crashes
+
+# Manual only. Fetches TestFlight crash submissions with the App Store Connect key from the `testflight` environment.
+# The repository is public and so are its artifacts, and a crash log carries tester and device details, so the log is
+# encrypted to the certificate passed in `recipient_cert` and nothing is printed. Use tools/testflight-crashes.sh.
+
+on:
+  workflow_dispatch:
+    inputs:
+      recipient_cert:
+        description: "Base64 of a PEM RSA certificate; the crash files are encrypted to it (CMS, AES-256)"
+        required: true
+      limit:
+        description: "Newest crash submissions to fetch"
+        default: "20"
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    name: Fetch and encrypt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v7
+      - name: Fetch crash logs
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          LIMIT: ${{ inputs.limit }}
+        run: python3 tools/testflight-crashes.py --limit "$LIMIT" --out "$RUNNER_TEMP/crashes"
+      - name: Encrypt
+        env:
+          RECIPIENT_CERT: ${{ inputs.recipient_cert }}
+        run: |
+          echo "$RECIPIENT_CERT" | base64 -d > "$RUNNER_TEMP/recipient.pem"
+          tar -C "$RUNNER_TEMP/crashes" -czf "$RUNNER_TEMP/crashes.tgz" .
+          openssl cms -encrypt -binary -aes256 -outform DER \
+            -in "$RUNNER_TEMP/crashes.tgz" -out "$RUNNER_TEMP/crashes.tgz.cms" "$RUNNER_TEMP/recipient.pem"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: crashes
+          path: ${{ runner.temp }}/crashes.tgz.cms
+          retention-days: 1

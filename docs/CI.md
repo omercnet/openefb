@@ -42,6 +42,10 @@ Repository variable `TESTFLIGHT_GROUPS` (comma-separated, now `Public Beta`, the
 
 The same lane runs on the owner's Mac (`bundle install`, then `bundle exec fastlane ios beta`, `upload:false` to stop after signing); see `dist-prep/TESTFLIGHT.md`.
 
+## Workflow: `.github/workflows/testflight-crashes.yml`
+
+Manual. Fetches the newest TestFlight crash submissions of the app (`GET /v1/apps/6829641724/betaFeedbackCrashSubmissions`, then each `crashLog`) with the `testflight` environment's App Store Connect key. The repository and its artifacts are public and a crash log carries tester and device details, so the job prints only counts and uploads a one-day artifact encrypted (CMS, AES-256) to a certificate you pass in. `tools/testflight-crashes.sh [limit]` does all of it from a shell: creates a key and certificate in `~/.config/kanaf` once, dispatches the workflow on `main`, waits, downloads and decrypts into `build/testflight-crashes/` (`<id>.crash` plus `<id>.json` with the tester's comment, device and build). The same fetch runs on a Mac with `tools/testflight-crashes.py` when the key is in `~/.appstoreconnect/`.
+
 ## Working with it
 
 ```bash
