@@ -777,14 +777,18 @@ final class MapService {
             return
         }
         let anchor = rulerLabelAnchor(trackTrue: lastTrackRuler?.trackTrue ?? 0)
-        let markers = events.map { event -> MLNPointFeature in
+        // Events met at the same moment sit at the same point: one diamond, one label, warning first.
+        let groups = Dictionary(grouping: events, by: \.secondsAhead).values
+            .map { $0.sorted { $0.severity > $1.severity } }
+        let markers = groups.compactMap { group -> MLNPointFeature? in
+            guard let event = group.first else { return nil }
             let marker = MLNPointFeature()
             marker.coordinate = event.coordinate
             marker.attributes = [
                 "icon": Self.predictionIconName(event.severity, night: predictionNight),
                 "color": Self.predictionColor(event.severity, night: predictionNight, fill: false),
                 "anchor": anchor,
-                "label": "\(FlightLogStrip.timeToText(event.secondsAhead)) \u{00B7} \(event.title)"
+                "label": "\(FlightLogStrip.timeToText(event.secondsAhead)) \u{00B7} \(group.map(\.title).joined(separator: " / "))"
             ]
             return marker
         }
