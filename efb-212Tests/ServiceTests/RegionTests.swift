@@ -213,6 +213,24 @@ struct RegionTests {
         #expect(!appState.visibleLayers.contains(.advisories))
     }
 
+    /// Switching region drops predictions made from the old region's airspace, even without a new fix.
+    @Test func regionChangeClearsPredictions() {
+        let appState = AppState()
+        let vm = MapViewModel(
+            appState: appState,
+            mapService: MapService(),
+            databaseService: PlaceholderDatabaseService()
+        )
+        appState.predictedEvents = [PredictedEvent(
+            volumeID: "SFO-B", kind: .floor, severity: .caution, secondsAhead: 110,
+            coordinate: CLLocationCoordinate2D(latitude: 37.5, longitude: -122.2), limitFeetMSL: 3000,
+            title: "B floor 3,000", assumption: "at 312\u{00B0}, +300 fpm"
+        )]
+        appState.region = .israel
+        vm.regionDidChange()
+        #expect(appState.predictedEvents.isEmpty)
+    }
+
     @Test func nrstAndSearchHaveAirportDataInBothRegions() {
         // Israel's data is the curated aerodrome table (IL-4), not the US airport layer.
         #expect(Region.israel.hasAirportData)

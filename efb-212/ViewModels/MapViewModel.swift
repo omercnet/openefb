@@ -422,6 +422,8 @@ final class MapViewModel {
     /// fly to the region's home view and reload the region's sources.
     func regionDidChange() {
         let region = appState.region
+        // Predictions were made from the old region's airspace; the next fix predicts afresh.
+        clearPredictions()
         mapService.israelChart.setActive(region == .israel)
         mapService.israelLSA.setActive(region == .israel)
         syncOfficialChart()
