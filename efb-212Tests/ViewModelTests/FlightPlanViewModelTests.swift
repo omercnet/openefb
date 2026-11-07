@@ -305,6 +305,43 @@ struct FlightPlanViewModelTests {
         #expect(h.appState.activePlanDestination == "KOAK")
     }
 
+    /// Opening the planner restores the last plan; it must not cancel a Direct-To being flown.
+    @Test func restoringTheLastPlanKeepsAnActiveDirectTo() throws {
+        let h = try Self.makeHarness(configure: false)
+        let saved = SchemaV1.FlightPlanRecord()
+        saved.departureICAO = "KPAO"; saved.destinationICAO = "KOAK"
+        h.context.insert(saved)
+        h.appState.directToAirport = Self.ksql
+        h.appState.activeFlightPlan = true
+        h.appState.distanceToNext = 4.2       // nautical miles, to KSQL
+        h.appState.bearingToNext = 295        // degrees true
+        h.appState.estimatedTimeEnroute = 168 // seconds
+
+        h.vm.configure(mapService: nil, modelContext: h.context)
+
+        #expect(h.appState.directToAirport?.icao == "KSQL")
+        #expect(h.appState.distanceToNext == 4.2)
+        #expect(h.appState.bearingToNext == 295)
+        #expect(h.appState.estimatedTimeEnroute == 168)
+        #expect(h.appState.activePlanDestination == "KOAK")
+    }
+
+    /// Picking a saved plan by hand does replace the Direct-To.
+    @Test func loadingAPlanByHandReplacesTheDirectTo() throws {
+        let h = try Self.makeHarness()
+        let saved = SchemaV1.FlightPlanRecord()
+        saved.departureICAO = "KPAO"; saved.destinationICAO = "KOAK"
+        h.context.insert(saved)
+        h.appState.directToAirport = Self.ksql
+        h.appState.activeFlightPlan = true
+
+        h.vm.loadPlan(saved)
+
+        #expect(h.appState.directToAirport == nil)
+        #expect(h.appState.activePlanDestination == "KOAK")
+        #expect(abs((h.appState.distanceToNext ?? 0) - Self.haversineNM(Self.kpao, Self.koak)) < 0.5)
+    }
+
     @Test func loadingPlanWhoseAirportIsGoneDoesNotPublishARoute() throws {
         let h = try Self.makeHarness()
         let record = SchemaV1.FlightPlanRecord()

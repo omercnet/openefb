@@ -17,6 +17,7 @@ struct FlightLogFooter: View {
     let nearestEntry: NearestAirportEntry?
     /// iPhone and iPad Split View: cells shrink, NRST keeps distance and bearing.
     var compact: Bool = false
+    @State private var zoomStepper = ZoomStepper()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -50,6 +51,8 @@ struct FlightLogFooter: View {
         // column height with the strip content. Fixed at its ideal height, the dividers match the cells.
         .fixedSize(horizontal: false, vertical: true)
         .background(Palette.paperSecondary)
+        // The camera settled or the pilot pinched: the next tap starts from the reported zoom.
+        .onChange(of: appState.mapZoom) { zoomStepper.reset() }
         .overlay(alignment: .top) { ColumnRule() }
     }
 
@@ -65,9 +68,9 @@ struct FlightLogFooter: View {
         appState.stripColumn = appState.stripColumn == column ? .log : column
     }
 
-    /// Zoom one level, clamped to 2...18.
+    /// Zoom one level, clamped to 2...18. Taps before the debounced `mapZoom` catches up add up.
     private func zoom(by step: Double) {
-        let newZoom = min(max(appState.mapZoom + step, 2), 18)
+        let newZoom = zoomStepper.step(step, from: appState.mapZoom)
         mapViewModel.mapService.mapView?.setZoomLevel(newZoom, animated: true)
     }
 
@@ -167,4 +170,21 @@ struct FlightLogFooter: View {
         if entry.isClosedByNotam { text += ", a NOTAM names this field closed" }
         return text
     }
+}
+
+/// The zoom level the footer last asked for. `AppState.mapZoom` updates only after the camera
+/// settles (debounced), so two quick taps would otherwise request the same level twice.
+nonisolated struct ZoomStepper: Sendable {
+    static let range: ClosedRange<Double> = 2...18
+    private(set) var target: Double?
+
+    /// The level for one tap of `step` from `current` (the camera's last reported zoom), clamped.
+    mutating func step(_ step: Double, from current: Double) -> Double {
+        let next = min(max((target ?? current) + step, Self.range.lowerBound), Self.range.upperBound)
+        target = next
+        return next
+    }
+
+    /// Forget the pending target once the camera reports a new zoom.
+    mutating func reset() { target = nil }
 }

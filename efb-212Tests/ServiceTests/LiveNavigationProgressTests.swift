@@ -129,4 +129,35 @@ struct LiveNavigationProgressTests {
         let ete = try #require(appState.estimatedTimeEnroute)
         #expect(abs(ete - distance / 90 * 3600) < 1)
     }
+
+    /// Without a fix, a new Direct-To must not inherit the previous plan's distance, bearing and time.
+    @Test func directToWithoutAFixShowsNoOldNumbers() {
+        let appState = AppState()
+        appState.distanceToNext = 18.4        // nautical miles, left from a previous plan
+        appState.bearingToNext = 341          // degrees true
+        appState.estimatedTimeEnroute = 676   // seconds
+        let vm = NearestAirportViewModel(appState: appState, databaseService: NearestAirportViewModelTests.makeMockDB())
+
+        vm.setDirectTo(airport: NearestAirportViewModelTests.ksql)
+
+        #expect(appState.distanceToNext == nil)
+        #expect(appState.bearingToNext == nil)
+        #expect(appState.estimatedTimeEnroute == nil)
+    }
+
+    /// A Direct-To taken during a route is the next waypoint everywhere it is shown.
+    @Test func directToIsTheNextWaypointOverAnActiveRoute() {
+        let appState = AppState()
+        appState.activeRoute = ActiveRoute(legs: [
+            ActiveRouteLeg(
+                segmentID: 1, fromCode: "AAAAA", toCode: "BBBBB",
+                fromLatitude: 32.00, fromLongitude: 34.80, toLatitude: 32.30, toLongitude: 34.80,
+                altitudeText: "2500", distanceNM: 18
+            ),
+        ])
+        appState.activeFlightPlan = true
+        appState.directToAirport = NearestAirportViewModelTests.ksql
+
+        #expect(FlightLogStrip.nextIdent(for: appState) == "KSQL")
+    }
 }
