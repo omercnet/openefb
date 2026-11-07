@@ -237,6 +237,9 @@ final class MapViewModel {
         lastOwnshipTimestamp = location.timestamp
 
         mapService.updateOwnship(location: location, heading: appState.track)
+        // Minute-ruled track ahead, drawn wherever ownship is (it moves with every fix, in or out of
+        // the region): track degrees true, ground speed knots; cleared below 30 kt by the service.
+        mapService.updateTrackRuler(origin: location.coordinate, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed)
 
         // A fix outside the selected region (e.g. a US simulator fix while viewing Israel) is
         // drawn but never pulls the camera away from the region's home view.
@@ -308,6 +311,8 @@ final class MapViewModel {
         if stale != lastAppliedStale {
             lastAppliedStale = stale
             mapService.setOwnshipStale(stale)
+            // A ruler from a frozen fix would read as current; the next live fix redraws it.
+            if stale { mapService.updateTrackRuler(origin: nil, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed) }
         }
     }
 
@@ -322,7 +327,7 @@ final class MapViewModel {
 
     func onAirportTapped(icao: String) {
         appState.selectedAirportID = icao
-        appState.isPresentingAirportInfo = true
+        appState.stripColumn = .airport
     }
 
     // MARK: - Layer Toggles

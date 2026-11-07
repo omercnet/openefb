@@ -135,7 +135,9 @@ final class FlightPlanViewModel {
 
     /// Calculate distance, ETE, fuel and draw route on map.
     /// Uses active aircraft profile for cruise speed and fuel burn if available.
-    func calculateAndDrawRoute() {
+    /// `replacesDirectTo` is false only for the automatic restore when the planner opens: an active
+    /// Direct-To then stays, with its live DTG, ETE and bearing.
+    func calculateAndDrawRoute(replacesDirectTo: Bool = true) {
         guard let dep = selectedDeparture, let dest = selectedDestination else { return }
 
         // Distance using existing CLLocationCoordinate2D extension -- nautical miles
@@ -169,16 +171,24 @@ final class FlightPlanViewModel {
             estimatedFuelGallons = nil
         }
 
+        // The automatic restore while a Direct-To is flown fills the planner only: no route line,
+        // no camera move, and the Direct-To's live numbers stay.
+        if !replacesDirectTo && appState.directToAirport != nil { return }
+
         // Draw route on map
         mapService?.updateRoute(departure: dep.coordinate, destination: dest.coordinate)
         mapService?.addRoutePins(departure: dep.coordinate, destination: dest.coordinate)
 
         // Update AppState display properties (critical for MapContainerView summary card overlay)
         appState.activeFlightPlan = true
+        appState.directToAirport = nil  // the plan replaces a Direct-To; live DTG/ETE follow its destination
         appState.distanceToNext = distanceNM
         appState.estimatedTimeEnroute = estimatedTimeSeconds
+        appState.bearingToNext = CLLocation(latitude: dep.latitude, longitude: dep.longitude)
+            .bearing(to: CLLocation(latitude: dest.latitude, longitude: dest.longitude))  // degrees true
         appState.activePlanDeparture = dep.icao
         appState.activePlanDestination = dest.icao
+        appState.activePlanDestinationCoordinate = dest.coordinate
         appState.activePlanFuelGallons = estimatedFuelGallons
 
         // Zoom map to show full route
@@ -243,7 +253,7 @@ final class FlightPlanViewModel {
     }
 
     /// Load a saved flight plan record, looking up airports from database.
-    func loadPlan(_ record: SchemaV1.FlightPlanRecord) {
+    func loadPlan(_ record: SchemaV1.FlightPlanRecord, replacesDirectTo: Bool = true) {
         // Look up airports from database for full Airport data
         selectedDeparture = try? databaseService.airport(byICAO: record.departureICAO)
         selectedDestination = try? databaseService.airport(byICAO: record.destinationICAO)
@@ -259,14 +269,14 @@ final class FlightPlanViewModel {
 
         // Recalculate and draw the route
         if selectedDeparture != nil && selectedDestination != nil {
-            calculateAndDrawRoute()
+            calculateAndDrawRoute(replacesDirectTo: replacesDirectTo)
         }
     }
 
-    /// Load the most recent saved plan (called on app launch).
+    /// Load the most recent saved plan (when the planner opens). Never cancels an active Direct-To.
     func loadMostRecentPlan() {
         guard let first = savedPlans.first else { return }
-        loadPlan(first)
+        loadPlan(first, replacesDirectTo: false)
     }
 
     /// Clear the active flight plan and reset all state.
@@ -284,12 +294,17 @@ final class FlightPlanViewModel {
 
         mapService?.clearRoute()
 
-        // Nil out all AppState display properties
-        appState.activeFlightPlan = false
-        appState.distanceToNext = nil
-        appState.estimatedTimeEnroute = nil
+        // Nil out the plan's AppState display properties. A Direct-To being flown is not the plan's:
+        // it keeps its navigation and live DTG, ETE and bearing.
+        if appState.directToAirport == nil {
+            appState.activeFlightPlan = false
+            appState.distanceToNext = nil
+            appState.estimatedTimeEnroute = nil
+            appState.bearingToNext = nil
+        }
         appState.activePlanDeparture = nil
         appState.activePlanDestination = nil
+        appState.activePlanDestinationCoordinate = nil
         appState.activePlanFuelGallons = nil
     }
 

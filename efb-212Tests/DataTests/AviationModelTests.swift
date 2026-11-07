@@ -263,24 +263,6 @@ struct AviationModelTests {
         #expect(AirspaceClass.allCases.contains(.tfr))
     }
 
-    // MARK: - AppTab Tests
-
-    @Test func appTabTitles() {
-        #expect(AppTab.map.title == "Map")
-        #expect(AppTab.flights.title == "Flights")
-        #expect(AppTab.settings.title == "Settings")
-    }
-
-    @Test func appTabSystemImages() {
-        #expect(AppTab.map.systemImage == "map")
-        #expect(AppTab.flights.systemImage == "airplane")
-        #expect(AppTab.settings.systemImage == "gear")
-    }
-
-    @Test func appTabAllCases() {
-        #expect(AppTab.allCases == [.map, .flights, .settings])
-    }
-
     // MARK: - MapMode Tests
 
     @Test func mapModeValues() {

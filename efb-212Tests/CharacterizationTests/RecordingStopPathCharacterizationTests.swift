@@ -131,7 +131,7 @@ struct RecordingCoordinatorStopPathCharacterizationTests {
         let summary = await coordinator.stopRecording()
 
         // stopRecording only knows about a started flight; the countdown is cancelled by
-        // cancelCountdown() (RecordingOverlayView routes .countdown taps there).
+        // cancelCountdown() (RecordButton routes .countdown taps there).
         #expect(summary == nil)
         #expect(coordinator.state.recordingStatus == .countdown(remaining: 2))
         #expect(coordinator.state.countdownRemaining == 2)

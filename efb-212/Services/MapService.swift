@@ -75,6 +75,7 @@ final class MapService {
         addTFRLayer(to: style)
         addAdvisoryLayer(to: style)
         addRouteLayer(to: style)
+        addTrackRulerLayers(to: style)
         if let mapView { airportDiagramOverlay.attach(style: style, mapView: mapView) }
         israelChart.attach(style: style)
         israelLSA.attach(style: style)
@@ -543,14 +544,18 @@ final class MapService {
         raiseRouteLayer()
     }
 
-    /// The Israel chart's route lines are added after the route layer and would hide it; put it back on top (below ownship).
+    /// The Israel chart's route lines are added after the route layer and would hide it; put the route and the
+    /// track ruler back on top (below ownship).
     private func raiseRouteLayer() {
-        guard let style = mapView?.style, let layer = style.layer(withIdentifier: "route-line-layer") else { return }
-        style.removeLayer(layer)
-        if let ownship = style.layer(withIdentifier: "ownship-symbol") {
-            style.insertLayer(layer, below: ownship)
-        } else {
-            style.addLayer(layer)
+        guard let style = mapView?.style else { return }
+        for id in ["route-line-layer"] + Self.trackRulerLayerIDs {
+            guard let layer = style.layer(withIdentifier: id) else { continue }
+            style.removeLayer(layer)
+            if let ownship = style.layer(withIdentifier: "ownship-symbol") {
+                style.insertLayer(layer, below: ownship)
+            } else {
+                style.addLayer(layer)
+            }
         }
     }
 
@@ -583,6 +588,96 @@ final class MapService {
 
         routeAnnotations = [depAnnotation, destAnnotation]
         mapView?.addAnnotations(routeAnnotations)
+    }
+
+    // MARK: - Track Ruler
+
+    /// Minutes ahead marked on the ruler; the line runs to the last one.
+    private static let trackRulerMinutes: [Double] = [1, 2, 3, 5, 10]
+    private static let trackRulerLayerIDs = ["track-ruler-line", "track-ruler-ticks"]
+    private static let trackRulerTickIcon = "track-ruler-tick"
+
+    private var trackRulerLineSource: MLNShapeSource?
+    private var trackRulerTickSource: MLNShapeSource?
+    /// Last ruler inputs, so a style reload re-seeds the ruler.
+    private var lastTrackRuler: (origin: CLLocationCoordinate2D?, trackTrue: Double, groundSpeedKnots: Double)?
+
+    private func addTrackRulerLayers(to style: MLNStyle) {
+        // 2 x 12 pt bar drawn across the track; a template image is an SDF icon, so `iconColor` tints it.
+        let tick = UIGraphicsImageRenderer(size: CGSize(width: 12, height: 2)).image { ctx in
+            UIColor.black.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 12, height: 2))
+        }.withRenderingMode(.alwaysTemplate)
+        style.setImage(tick, forName: Self.trackRulerTickIcon)
+
+        let lineSource = MLNShapeSource(identifier: "track-ruler-line", shape: nil, options: nil)
+        let tickSource = MLNShapeSource(identifier: "track-ruler-ticks", shape: nil, options: nil)
+        style.addSource(lineSource)
+        style.addSource(tickSource)
+        trackRulerLineSource = lineSource
+        trackRulerTickSource = tickSource
+
+        let line = MLNLineStyleLayer(identifier: "track-ruler-line", source: lineSource)
+        line.lineColor = NSExpression(forConstantValue: MapColor.trackRulerDay)
+        line.lineWidth = NSExpression(forConstantValue: 2.0)
+
+        let ticks = MLNSymbolStyleLayer(identifier: "track-ruler-ticks", source: tickSource)
+        ticks.iconImageName = NSExpression(forConstantValue: Self.trackRulerTickIcon)
+        ticks.iconColor = NSExpression(forConstantValue: MapColor.trackRulerDay)
+        ticks.iconRotation = NSExpression(forKeyPath: "track")
+        ticks.iconRotationAlignment = NSExpression(forConstantValue: "map")
+        ticks.iconAllowsOverlap = NSExpression(forConstantValue: true)
+        ticks.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+        ticks.text = NSExpression(forKeyPath: "label")
+        ticks.textFontNames = NSExpression(forConstantValue: ["Noto Sans Regular"])
+        ticks.textFontSize = NSExpression(forConstantValue: 12)
+        ticks.textColor = NSExpression(forConstantValue: MapColor.trackRulerDay)
+        ticks.textHaloColor = NSExpression(forConstantValue: MapColor.trackRulerHaloDay)
+        ticks.textHaloWidth = NSExpression(forConstantValue: 1.5)
+        ticks.textAnchor = NSExpression(forKeyPath: "anchor")
+        ticks.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0.7, dy: 0.7)))
+        ticks.textAllowsOverlap = NSExpression(forConstantValue: true)
+
+        if let ownship = style.layer(withIdentifier: "ownship-symbol") {
+            style.insertLayer(line, below: ownship)
+            style.insertLayer(ticks, below: ownship)
+        } else {
+            style.addLayer(line)
+            style.addLayer(ticks)
+        }
+
+        if let last = lastTrackRuler {
+            updateTrackRuler(origin: last.origin, trackTrue: last.trackTrue, groundSpeedKnots: last.groundSpeedKnots)
+        }
+    }
+
+    /// Straight line from ownship along `trackTrue` (degrees true) to the 10-minute point at `groundSpeedKnots`,
+    /// ticked and labelled at 1, 2, 3, 5 and 10 minutes. A nil origin (no fix or a stale fix) or a ground speed
+    /// below 30 kt clears it: a ruler from a frozen or taxiing position would mislead.
+    func updateTrackRuler(origin: CLLocationCoordinate2D?, trackTrue: Double, groundSpeedKnots: Double) {
+        lastTrackRuler = (origin, trackTrue, groundSpeedKnots)
+        guard let origin, groundSpeedKnots >= 30 else {
+            trackRulerLineSource?.shape = nil
+            trackRulerTickSource?.shape = nil
+            return
+        }
+        // Labels sit beside the ruler: right of a line that runs up/down the screen, below one that runs across.
+        let screenAngle = (trackTrue - (mapView?.direction ?? 0)).degreesToRadians
+        let anchor = abs(sin(screenAngle)) > 0.707 ? "top" : "left"
+        let ticks = Self.trackRulerMinutes.map { minutes -> MLNPointFeature in
+            let tick = MLNPointFeature()
+            // NM = knots * minutes / 60
+            tick.coordinate = origin.destination(distanceNM: groundSpeedKnots * minutes / 60, bearingDegrees: trackTrue)
+            tick.attributes = [
+                "track": trackTrue,
+                "anchor": anchor,
+                "label": minutes == 1 ? "1 min" : minutes == 10 ? "10 min" : String(Int(minutes))
+            ]
+            return tick
+        }
+        var line = [origin, ticks.last?.coordinate ?? origin]
+        trackRulerLineSource?.shape = MLNPolylineFeature(coordinates: &line, count: UInt(line.count))
+        trackRulerTickSource?.shape = MLNShapeCollectionFeature(shapes: ticks)
     }
 
     // MARK: - Replay Layers (on-demand, not in onStyleLoaded)
@@ -833,6 +928,16 @@ final class MapService {
         }
         if let route = style.layer(withIdentifier: "route-line-layer") as? MLNLineStyleLayer {
             route.lineColor = NSExpression(forConstantValue: night ? Palette.routeLineNight : Palette.routeLineDay)
+        }
+        for id in Self.trackRulerLayerIDs {
+            let ink = night ? MapColor.trackRulerNight : MapColor.trackRulerDay
+            if let line = style.layer(withIdentifier: id) as? MLNLineStyleLayer {
+                line.lineColor = NSExpression(forConstantValue: ink)
+            } else if let ticks = style.layer(withIdentifier: id) as? MLNSymbolStyleLayer {
+                ticks.iconColor = NSExpression(forConstantValue: ink)
+                ticks.textColor = NSExpression(forConstantValue: ink)
+                ticks.textHaloColor = NSExpression(forConstantValue: night ? MapColor.trackRulerHaloNight : MapColor.trackRulerHaloDay)
+            }
         }
         airportDiagramOverlay.applyDisplayMode(night: night)
         israelChart.applyDisplayMode(night: night)
