@@ -133,4 +133,12 @@ struct PredictionRowsTests {
         #expect(FlightLogStrip.spokenAssumption("at 312\u{00B0}, level") == "if you hold track 312 and stay level")
         #expect(FlightLogStrip.spokenTitle("CTR LLHA") == "CTR LLHA")
     }
+
+    @Test func spokenTitleOnlyNamesAirspaceClasses() {
+        #expect(FlightLogStrip.spokenTitle("D 5") == "D 5")
+        #expect(FlightLogStrip.spokenTitle("A") == "A")
+        #expect(FlightLogStrip.spokenTitle("D") == "Class D")
+        #expect(FlightLogStrip.spokenTitle("B floor 3,000") == "Class B floor 3,000 feet")
+        #expect(FlightLogStrip.spokenTitle("C ceiling 4,000") == "Class C ceiling 4,000 feet")
+    }
 }

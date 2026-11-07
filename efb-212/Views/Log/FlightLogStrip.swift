@@ -248,10 +248,12 @@ extension FlightLogStrip {
             + spokenAssumption(event.assumption)
     }
 
-    /// "B floor 3,000" is spoken "Class B floor 3,000 feet"; "CTR LLHA" and "P 4" as written.
+    /// "B floor 3,000" is spoken "Class B floor 3,000 feet"; "CTR LLHA", "P 4", danger area "D 5"
+    /// and alert area "A" as written. Only B, C and D standing alone or before floor/ceiling are classes.
     nonisolated static func spokenTitle(_ title: String) -> String {
         var words = title.components(separatedBy: " ")
-        if let first = words.first, ["A", "B", "C", "D", "E", "G"].contains(first) {
+        if let first = words.first, ["B", "C", "D"].contains(first),
+           words.count == 1 || ["floor", "ceiling"].contains(words[1]) {
             words[0] = "Class \(first)"
         }
         if words.count >= 3, ["floor", "ceiling"].contains(words[words.count - 2]) {

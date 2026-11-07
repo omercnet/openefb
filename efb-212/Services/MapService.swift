@@ -758,17 +758,14 @@ final class MapService {
         updatePredictionMarkers(lastPredictionEvents)
     }
 
-    /// Icon and text colors by severity: red = warning, amber = caution.
+    /// Icon and text color come from each feature (red = warning, amber = caution), so no match
+    /// expression is needed; night changes rebuild the features.
     private func stylePredictionMarkers(_ layer: MLNSymbolStyleLayer, night: Bool) {
-        layer.iconImageName = NSExpression(
-            format: "MGL_MATCH(severity, 'warning', %@, %@)",
-            Self.predictionIconName(.warning, night: night) as NSString, Self.predictionIconName(.caution, night: night) as NSString
-        )
-        layer.textColor = NSExpression(
-            format: "MGL_MATCH(severity, 'warning', %@, %@)",
-            Self.predictionColor(.warning, night: night, fill: false), Self.predictionColor(.caution, night: night, fill: false)
-        )
+        layer.iconImageName = NSExpression(forKeyPath: "icon")
+        layer.textColor = NSExpression(forKeyPath: "color")
         layer.textHaloColor = NSExpression(forConstantValue: night ? MapColor.trackRulerHaloNight : MapColor.trackRulerHaloDay)
+        predictionNight = night
+        updatePredictionMarkers(lastPredictionEvents)
     }
 
     /// One diamond per predicted entry at its coordinate, labelled "m:ss · title" beside the ruler.
@@ -784,7 +781,8 @@ final class MapService {
             let marker = MLNPointFeature()
             marker.coordinate = event.coordinate
             marker.attributes = [
-                "severity": event.severity == .warning ? "warning" : "caution",
+                "icon": Self.predictionIconName(event.severity, night: predictionNight),
+                "color": Self.predictionColor(event.severity, night: predictionNight, fill: false),
                 "anchor": anchor,
                 "label": "\(FlightLogStrip.timeToText(event.secondsAhead)) \u{00B7} \(event.title)"
             ]
@@ -792,6 +790,7 @@ final class MapService {
         }
         predictionMarkerSource?.shape = MLNShapeCollectionFeature(shapes: markers)
     }
+    private var predictionNight = false
 
     // MARK: - Replay Layers (on-demand, not in onStyleLoaded)
 

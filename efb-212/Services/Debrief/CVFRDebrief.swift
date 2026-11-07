@@ -46,7 +46,8 @@ nonisolated struct CVFRAltitudeAdherence: Sendable, Equatable {
 
 /// Passage of one reporting point on the route.
 nonisolated struct CVFRPointPassage: Identifiable, Sendable, Equatable {
-    var id: String { code }
+    /// Unique per visit: an out-and-back route passes the same point twice.
+    var id: String { "\(code)-\(time.timeIntervalSinceReferenceDate)" }
     let code: String
     let nameEnglish: String?
     let nameHebrew: String?
@@ -191,7 +192,8 @@ nonisolated enum CVFRDebriefBuilder {
 
         let passages = routeStops(of: legs).compactMap { stop -> CVFRPointPassage? in
             guard let point = points[stop.code],
-                  var found = passage(of: point, trackPoints: trackPoints, transcript: transcript, reportWindow: reportWindow)
+                  var found = passage(of: point, trackPoints: trackPoints, transcript: transcript,
+                                      reportWindow: reportWindow, during: stop.window)
             else { return nil }
             found.distanceAlongRouteNM = stop.distanceNM
             return found
@@ -288,12 +290,20 @@ nonisolated enum CVFRDebriefBuilder {
     }
 
     /// The reporting points along the debriefed legs, in order, without repeats of consecutive codes, each at its
-    /// leg boundary on the distance axis -- nautical miles.
-    static func routeStops(of legs: [CVFRLegDebrief]) -> [(code: String, distanceNM: Double)] {
-        var stops: [(code: String, distanceNM: Double)] = []
-        for leg in legs {
-            if stops.last?.code != leg.fromCode { stops.append((leg.fromCode, leg.startDistanceNM)) }
-            stops.append((leg.toCode, leg.endDistanceNM))
+    /// leg boundary on the distance axis -- nautical miles. `window` spans the legs that touch the stop (from the
+    /// start of the leg arriving there to the end of the leg leaving it; open-ended before the first leg and after
+    /// the last), so a point visited twice (out and back) gets one passage per visit.
+    static func routeStops(of legs: [CVFRLegDebrief]) -> [(code: String, distanceNM: Double, window: ClosedRange<Date>)] {
+        var stops: [(code: String, distanceNM: Double, window: ClosedRange<Date>)] = []
+        for (index, leg) in legs.enumerated() {
+            if let last = stops.last, last.code == leg.fromCode {
+                stops[stops.count - 1].window = last.window.lowerBound...max(last.window.upperBound, leg.endTime)
+            } else {
+                let lower = index == 0 ? Date.distantPast : leg.startTime
+                stops.append((leg.fromCode, leg.startDistanceNM, lower...leg.endTime))
+            }
+            let upper = index == legs.count - 1 ? Date.distantFuture : leg.endTime
+            stops.append((leg.toCode, leg.endDistanceNM, leg.startTime...upper))
         }
         return stops
     }
@@ -392,14 +402,17 @@ nonisolated enum CVFRDebriefBuilder {
 
     // MARK: Reporting points
 
+    /// Closest approach to `point` among the track points timed inside `window`, and whether a report naming it
+    /// was heard within `reportWindow` seconds of that time.
     static func passage(
         of point: IsraelReportingPoint,
         trackPoints: [TrackPointRecord],
         transcript: [TranscriptSegmentRecord],
-        reportWindow: TimeInterval = reportWindowSeconds
+        reportWindow: TimeInterval = reportWindowSeconds,
+        during window: ClosedRange<Date> = Date.distantPast...Date.distantFuture
     ) -> CVFRPointPassage? {
         var closest: (time: Date, distance: Double)?
-        for sample in trackPoints {
+        for sample in trackPoints where window.contains(sample.timestamp) {
             let coordinate = CLLocationCoordinate2D(latitude: sample.latitude, longitude: sample.longitude)
             let distance = IsraelRoutePlanner.haversineNM(coordinate, point.coordinate)
             if distance < (closest?.distance ?? .infinity) { closest = (sample.timestamp, distance) }
@@ -475,12 +488,17 @@ nonisolated enum CVFRDebriefBuilder {
     // MARK: Excursions
 
     /// The scored stretches of `debrief.profile` outside ±200 ft of the leg's published altitude, in order. A stretch
-    /// ends at a sample back inside the band, an excluded sample, a new leg, or a change of side.
+    /// ends at a sample back inside the band, an excluded sample, a new leg, a change of side, or a gap in the
+    /// track longer than `maxSampleWeightSeconds` (no data is not time outside the band).
     static func excursions(in debrief: CVFRDebrief) -> [CVFRAltitudeExcursion] {
         let published = debrief.legs.map { $0.publishedAltitude.map(publishedAltitudes) ?? [] }
         var result: [CVFRAltitudeExcursion] = []
         var open: CVFRAltitudeExcursion?
         for (index, sample) in debrief.profile.enumerated() {
+            if index > 0, sample.time.timeIntervalSince(debrief.profile[index - 1].time) > maxSampleWeightSeconds {
+                if let current = open { result.append(current) }
+                open = nil
+            }
             let reference = published.indices.contains(sample.legIndex) ? published[sample.legIndex] : []
             let deviation = reference.isEmpty || sample.excluded ? 0 : deviationFeet(altitude: sample.altitudeFeet, published: reference)
             guard abs(deviation) > tightBandFeet else {
@@ -621,7 +639,9 @@ nonisolated enum CVFRDebriefVerdict {
             : []
         let firsts = [lowLegs.first, notHeard.first].compactMap { $0 }
         let rest = lowLegs.dropFirst() + notHeard.dropFirst()
-        return Array((firsts + rest).prefix(maximumFindings))
+        // A point passed twice (out and back) and missed both times is one finding, not two.
+        var seen = Set<String>()
+        return Array((firsts + rest).filter { seen.insert($0).inserted }.prefix(maximumFindings))
     }
 
     /// "TAVOR to DESHE: 330 ft low, 4 min" from the leg's longest excursion; the ±300 ft share when it has none.
