@@ -89,14 +89,15 @@ jobs:
 
   unit-tests:
     name: Unit tests (iPad simulator)
-    # Pull requests from forks run on GitHub-hosted macos-26 (Xcode 26.6): untrusted code never reaches the
-    # self-hosted Tart runners. Pushes and same-repository pull requests run on the Tart runners
-    # (ghcr.io/cirruslabs/macos-runner:golden-gate), which carry Xcode 27.x only.
-    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'macos-26' || fromJSON('["self-hosted", "macOS", "ARM64", "tartelet"]') }}
+    # GitHub-hosted macos-latest while the self-hosted Tart runners (label `tartelet`) are offline, with the image's
+    # default Xcode (26.6 on macOS 26), so a move of the label to a newer image doesn't break the path.
+    # To go back: runs-on fork PRs -> 'macos-26', else ["self-hosted", "macOS", "ARM64", "tartelet"] with
+    # Xcode 27.2 (see docs/CI.md).
+    runs-on: macos-latest
     timeout-minutes: 45
     env:
       # Set at job level, before checkout: /usr/bin/git is an xcrun shim and fails on a missing DEVELOPER_DIR.
-      DEVELOPER_DIR: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && '/Applications/Xcode_26.6.app/Contents/Developer' || '/Applications/Xcode_27.2.app/Contents/Developer' }}
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
       - name: Cache Swift packages
@@ -120,14 +121,12 @@ jobs:
 
   simulation:
     name: Flight scenarios (iPad simulator)
-    # Pull requests from forks run on GitHub-hosted macos-26 (Xcode 26.6): untrusted code never reaches the
-    # self-hosted Tart runners. Pushes and same-repository pull requests run on the Tart runners
-    # (ghcr.io/cirruslabs/macos-runner:golden-gate), which carry Xcode 27.x only.
-    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && 'macos-26' || fromJSON('["self-hosted", "macOS", "ARM64", "tartelet"]') }}
+    # GitHub-hosted macos-latest while the Tart runners are offline; see the unit-tests job.
+    runs-on: macos-latest
     timeout-minutes: 45
     env:
       # Set at job level, before checkout: /usr/bin/git is an xcrun shim and fails on a missing DEVELOPER_DIR.
-      DEVELOPER_DIR: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) && '/Applications/Xcode_26.6.app/Contents/Developer' || '/Applications/Xcode_27.2.app/Contents/Developer' }}
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
     steps:
       - uses: actions/checkout@v7
       - name: Cache Swift packages
