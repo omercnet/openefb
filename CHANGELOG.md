@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/omercnet/openefb/compare/v1.1.0...v1.2.0) (2026-11-07)
+
+
+### Features
+
+* **telemetry:** anonymous usage signals and MetricKit crash summaries via TelemetryDeck ([#15](https://github.com/omercnet/openefb/issues/15)) ([9d74151](https://github.com/omercnet/openefb/commit/9d741512870fed851f17165c1245085f3da5fd1c))
+
+
+### Bug Fixes
+
+* **release:** keep decrypted TestFlight crash logs private (umask 077) ([#17](https://github.com/omercnet/openefb/issues/17)) ([c2a587a](https://github.com/omercnet/openefb/commit/c2a587a25eabe059f148a4f97af7036c2aee0fd6))
+* **release:** plain-text What to Test notes for TestFlight ([#11](https://github.com/omercnet/openefb/issues/11)) ([cf14942](https://github.com/omercnet/openefb/commit/cf14942766e06853d45baaf62a477e5f1fa68b97))
+
 ## [1.1.0](https://github.com/omercnet/openefb/compare/v1.0.0...v1.1.0) (2026-11-05)
 
 
