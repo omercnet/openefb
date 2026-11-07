@@ -103,16 +103,38 @@ struct FlightLogStrip: View {
     }
 
     /// Wall-clock time "15:41" (24 h) in the given zone.
-    static func clockText(_ date: Date, timeZone: TimeZone = .current) -> String {
+    nonisolated static func clockText(_ date: Date, timeZone: TimeZone = .current) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let parts = calendar.dateComponents([.hour, .minute], from: date)
         return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
     }
 
-    /// Local time in Israel, "03:36" (24 h, two digits: glanceable and unambiguous).
-    static func etaText(_ date: Date) -> String {
-        clockText(date, timeZone: TimeZone(identifier: "Asia/Jerusalem") ?? .current)
+    /// The NEXT data line, "18.4 NM \u{00B7} 341\u{00B0} \u{00B7} ETA 15:41". A missing value dashes; a stale fix
+    /// dashes all three so the last distance, bearing and ETA are never shown as current.
+    nonisolated static func nextDataText(
+        distanceNM: Double?, bearingTrue: Double?, eta: Date?, timeZone: TimeZone = .current, stale: Bool
+    ) -> String {
+        let distance = stale ? nil : distanceNM  // nautical miles
+        let bearing = stale ? nil : bearingTrue  // degrees true
+        let eta = stale ? nil : eta
+        return [
+            distance.map { String(format: "%.1f NM", $0) } ?? "--- NM",
+            bearing.map { String(format: "%03.0f\u{00B0}", $0) } ?? "---\u{00B0}",
+            "ETA \(eta.map { clockText($0, timeZone: timeZone) } ?? "---")",
+        ].joined(separator: " \u{00B7} ")
+    }
+
+    /// VoiceOver counterpart of `nextDataText`: the known values only, or ", stale" with no numbers on a stale fix.
+    nonisolated static func nextDataSpoken(
+        distanceNM: Double?, bearingTrue: Double?, eta: Date?, timeZone: TimeZone = .current, stale: Bool
+    ) -> String {
+        if stale { return "distance, bearing and ETA unavailable, stale" }
+        var parts: [String] = []
+        if let distanceNM { parts.append(String(format: "%.1f NM", distanceNM)) }   // nautical miles
+        if let bearingTrue { parts.append(String(format: "%03.0f\u{00B0}", bearingTrue)) }  // degrees true
+        if let eta { parts.append("ETA \(clockText(eta, timeZone: timeZone))") }
+        return parts.joined(separator: " \u{00B7} ")
     }
 
     /// "0.8 NM RIGHT OF ROUTE"; nil without a measurement.
@@ -221,7 +243,7 @@ struct FlightLogNext: View {
                     identText
                 }
             }
-            Text(dataParts.joined(separator: " \u{00B7} "))
+            Text(dataText)
                 .font(TypeRole.data)
                 .foregroundStyle(Palette.inkSecondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -237,22 +259,26 @@ struct FlightLogNext: View {
         return FlightLogStrip.timeToText(ete)
     }
 
-    /// "18.4 NM", "341\u{00B0}", "ETA 15:41".
-    private var dataParts: [String] {
-        var parts: [String] = []
-        if let distance = appState.distanceToNext { parts.append(String(format: "%.1f NM", distance)) }   // nautical miles
-        if let bearing = appState.bearingToNext { parts.append(String(format: "%03.0f\u{00B0}", bearing)) }  // degrees true
-        if let eta = etaText { parts.append("ETA \(eta)") }
-        return parts
-    }
-
-    private var etaText: String? {
+    private var etaDate: Date? {
         if let route {
-            // Israel: the route-following ETA in Israel time, as the route bar showed it.
-            return route.following.nextPointETA.map(FlightLogStrip.etaText)
+            // Israel: the route-following ETA, as the route bar showed it.
+            return route.following.nextPointETA
         }
         guard !isQuiet, let ete = appState.estimatedTimeEnroute else { return nil }
-        return FlightLogStrip.clockText(ScenarioHooks.now.addingTimeInterval(ete))
+        return ScenarioHooks.now.addingTimeInterval(ete)
+    }
+
+    /// Israel routes read their ETA in Israel time; Direct-To and US plans in device time.
+    private var etaTimeZone: TimeZone {
+        route != nil ? (TimeZone(identifier: "Asia/Jerusalem") ?? .current) : .current
+    }
+
+    /// "18.4 NM \u{00B7} 341\u{00B0} \u{00B7} ETA 15:41"; all dashed on a stale fix.
+    private var dataText: String {
+        FlightLogStrip.nextDataText(
+            distanceNM: appState.distanceToNext, bearingTrue: appState.bearingToNext,
+            eta: etaDate, timeZone: etaTimeZone, stale: gpsStatus.isStale
+        )
     }
 
     private func spokenLine(_ ident: String) -> String {
@@ -260,7 +286,11 @@ struct FlightLogNext: View {
         if !isQuiet, let ete = appState.estimatedTimeEnroute {
             parts.append("in \(FlightLogStrip.spokenDuration(ete))")
         }
-        parts += dataParts
+        let data = FlightLogStrip.nextDataSpoken(
+            distanceNM: appState.distanceToNext, bearingTrue: appState.bearingToNext,
+            eta: etaDate, timeZone: etaTimeZone, stale: gpsStatus.isStale
+        )
+        if !data.isEmpty { parts.append(data) }
         return parts.joined(separator: " \u{00B7} ")
     }
 

@@ -64,6 +64,41 @@ struct LogDraftMarker: View {
     }
 }
 
+/// Signed logbook entry, opened read-only: neutral ink, nothing to do.
+struct LogSignedEntryMarker: View {
+    var body: some View {
+        Label("Logbook", systemImage: "book.closed")
+            .font(TypeRole.dataEmphasis)
+            .foregroundStyle(Palette.ink)
+    }
+}
+
+/// What a recorded flight's row offers for its linked logbook entry.
+enum FlownEntryAction: Equatable {
+    /// Unsigned draft: open it to edit and sign.
+    case sign
+    /// Signed entry: open it read-only.
+    case review
+
+    /// The action for a flight's linked entry; nil when the flight has no entry.
+    static func forEntry(_ entry: SchemaV1.LogbookEntry?) -> FlownEntryAction? {
+        guard let entry else { return nil }
+        return entry.isConfirmed ? .review : .sign
+    }
+
+    /// Each recorded flight's logbook entry, keyed by flight ID. An unsigned draft wins over a
+    /// signed entry so a pending signature is never hidden; otherwise the first entry is kept.
+    static func entriesByFlight(_ entries: [SchemaV1.LogbookEntry]) -> [UUID: SchemaV1.LogbookEntry] {
+        var byFlight: [UUID: SchemaV1.LogbookEntry] = [:]
+        for entry in entries {
+            guard let flightID = entry.flightID else { continue }
+            if let current = byFlight[flightID], !current.isConfirmed || entry.isConfirmed { continue }
+            byFlight[flightID] = entry
+        }
+        return byFlight
+    }
+}
+
 /// "DEP ▸ ARR" idents; "---" when unknown.
 func logRouteText(_ departure: String?, _ arrival: String?) -> String {
     "\(departure ?? "---") \u{25B8} \(arrival ?? "---")"
@@ -76,16 +111,17 @@ func logRouteSpoken(_ departure: String?, _ arrival: String?) -> String {
 
 // MARK: - Flown: recorded flight
 
-/// A recorded flight: date, route idents, block time, health caution and, while its logbook
-/// draft waits for a signature, a Sign button opening the draft.
+/// A recorded flight: date, route idents, block time, health caution and its logbook entry:
+/// a Sign button while the entry is an unsigned draft, a read-only Logbook button once signed.
 struct FlownFlightRow: View {
     let record: SchemaV1.FlightRecord
-    /// The flight's logbook entry when it is an unsigned draft.
-    let draft: SchemaV1.LogbookEntry?
+    /// The flight's logbook entry, signed or not.
+    let entry: SchemaV1.LogbookEntry?
     let onOpen: () -> Void
-    let onSign: (SchemaV1.LogbookEntry) -> Void
+    let onOpenEntry: (SchemaV1.LogbookEntry) -> Void
 
     private var blockTime: String { LogbookViewModel.formatDurationHM(record.durationSeconds) }
+    private var routeSpoken: String { logRouteSpoken(record.departureICAO, record.arrivalICAO) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.xs) {
@@ -120,15 +156,20 @@ struct FlownFlightRow: View {
             .accessibilityHint("Opens flight details, debrief and replay")
             .accessibilityIdentifier("log-flight-row")
 
-            if let draft {
-                Button { onSign(draft) } label: {
-                    LogDraftMarker()
-                        .frame(minHeight: StripMetrics.cell)
-                        .contentShape(Rectangle())
+            if let entry, let action = FlownEntryAction.forEntry(entry) {
+                Button { onOpenEntry(entry) } label: {
+                    Group {
+                        switch action {
+                        case .sign: LogDraftMarker()
+                        case .review: LogSignedEntryMarker()
+                        }
+                    }
+                    .frame(minHeight: StripMetrics.cell)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Sign logbook draft, \(logRouteSpoken(record.departureICAO, record.arrivalICAO))")
-                .accessibilityIdentifier("log-sign-draft")
+                .accessibilityLabel(action == .sign ? "Sign logbook draft, \(routeSpoken)" : "Logbook entry, \(routeSpoken)")
+                .accessibilityIdentifier(action == .sign ? "log-sign-draft" : "log-open-entry")
             }
         }
         .logStripRow()
@@ -138,11 +179,15 @@ struct FlownFlightRow: View {
         var parts = [
             "Flight",
             record.startDate.formatted(date: .abbreviated, time: .shortened),
-            logRouteSpoken(record.departureICAO, record.arrivalICAO),
+            routeSpoken,
             "block time \(blockTime)"
         ]
         if let warning = record.healthWarning { parts.append("Caution, \(warning)") }
-        if draft != nil { parts.append("Logbook draft, not signed") }
+        switch FlownEntryAction.forEntry(entry) {
+        case .sign: parts.append("Logbook draft, not signed")
+        case .review: parts.append("Logbook entry signed")
+        case nil: break
+        }
         return parts.joined(separator: ", ")
     }
 }

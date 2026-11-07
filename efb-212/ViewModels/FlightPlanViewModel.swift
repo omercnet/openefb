@@ -171,19 +171,21 @@ final class FlightPlanViewModel {
             estimatedFuelGallons = nil
         }
 
+        // The automatic restore while a Direct-To is flown fills the planner only: no route line,
+        // no camera move, and the Direct-To's live numbers stay.
+        if !replacesDirectTo && appState.directToAirport != nil { return }
+
         // Draw route on map
         mapService?.updateRoute(departure: dep.coordinate, destination: dest.coordinate)
         mapService?.addRoutePins(departure: dep.coordinate, destination: dest.coordinate)
 
         // Update AppState display properties (critical for MapContainerView summary card overlay)
         appState.activeFlightPlan = true
-        if replacesDirectTo || appState.directToAirport == nil {
-            appState.directToAirport = nil  // an explicit plan choice replaces a Direct-To; live DTG/ETE follow its destination
-            appState.distanceToNext = distanceNM
-            appState.estimatedTimeEnroute = estimatedTimeSeconds
-            appState.bearingToNext = CLLocation(latitude: dep.latitude, longitude: dep.longitude)
-                .bearing(to: CLLocation(latitude: dest.latitude, longitude: dest.longitude))  // degrees true
-        }
+        appState.directToAirport = nil  // the plan replaces a Direct-To; live DTG/ETE follow its destination
+        appState.distanceToNext = distanceNM
+        appState.estimatedTimeEnroute = estimatedTimeSeconds
+        appState.bearingToNext = CLLocation(latitude: dep.latitude, longitude: dep.longitude)
+            .bearing(to: CLLocation(latitude: dest.latitude, longitude: dest.longitude))  // degrees true
         appState.activePlanDeparture = dep.icao
         appState.activePlanDestination = dest.icao
         appState.activePlanDestinationCoordinate = dest.coordinate

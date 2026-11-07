@@ -323,7 +323,8 @@ struct FlightPlanViewModelTests {
         #expect(h.appState.distanceToNext == 4.2)
         #expect(h.appState.bearingToNext == 295)
         #expect(h.appState.estimatedTimeEnroute == 168)
-        #expect(h.appState.activePlanDestination == "KOAK")
+        #expect(h.appState.activePlanDestination == nil)   // the plan is in the planner, not on the map
+        #expect(h.vm.selectedDestination?.icao == "KOAK")
     }
 
     /// Picking a saved plan by hand does replace the Direct-To.
