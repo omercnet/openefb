@@ -7,7 +7,11 @@
 //  Regular width: a fixed 400pt strip column. Compact width: a 104pt rail beside the chart,
 //  the NOW cell at full width under it, then the footer. The strip is layout, not an overlay;
 //  it sits on the leading edge, so a right-to-left locale mirrors it (the chart never mirrors).
-//  Nothing floats over the chart except the north indicator while rotated.
+//  Two persisted toggles in Layers (FlightLogVisibility) give the chart more room: with the
+//  flight log off, every width uses the compact layout without the rail (header, warnings,
+//  full-width chart, footer; the header shows the next time-to); with the instruments off, the
+//  NOW cell is omitted and the header carries Clear. REC, warnings, GPS state, NRST and Layers
+//  stay on screen either way. Nothing floats over the chart except the north indicator while rotated.
 //
 
 import SwiftUI
@@ -53,6 +57,8 @@ struct MapContainerView: View {
     // MARK: - Local UI State
 
     @AppStorage(IsraelChartHint.dismissedKey) private var israelChartHintDismissed = false
+    @AppStorage(FlightLogVisibility.flightLogKey) private var showsFlightLog = true
+    @AppStorage(FlightLogVisibility.instrumentsKey) private var showsInstruments = true
 
     private var showIsraelChartHint: Bool {
         IsraelChartHint.shouldShow(region: appState.region,
@@ -67,7 +73,9 @@ struct MapContainerView: View {
 
         Group {
             if let viewModel = mapViewModel, let nearestVM = nearestAirportVM {
-                if horizontalSizeClass == .compact {
+                // Flight log hidden: the compact layout at full width (no rail), so header, warnings
+                // and footer stay; appState.stripColumn carries over, so an open column stays open.
+                if horizontalSizeClass == .compact || !showsFlightLog {
                     compactLayout(viewModel, nearestVM)
                 } else {
                     regularLayout(viewModel, nearestVM)
@@ -319,22 +327,27 @@ extension MapContainerView {
         }
     }
 
-    /// iPhone and iPad Split View: header and warnings on top, the NEXT rail beside the chart, the NOW
-    /// cell at full width, then the footer. Other columns cover the area above the NOW cell (the map
-    /// stays alive); NOW and the footer stay visible under any opened column.
+    /// iPhone, iPad Split View, and any width with the flight log hidden: header and warnings on top,
+    /// the NEXT rail (flight log shown) beside the chart, the NOW cell (instruments shown) at full width,
+    /// then the footer. Other columns cover the area above the NOW cell (the map stays alive); NOW and
+    /// the footer stay visible under any opened column.
     private func compactLayout(_ viewModel: MapViewModel, _ nearestVM: NearestAirportViewModel) -> some View {
         VStack(spacing: 0) {
             ZStack {
                 VStack(spacing: 0) {
-                    FlightLogHeader(recordingViewModel: recordingViewModel, compact: true)
+                    FlightLogHeader(recordingViewModel: recordingViewModel, compact: horizontalSizeClass == .compact,
+                                    showsNextTime: !showsFlightLog, gpsStatus: viewModel.gpsStatus,
+                                    onClear: showsInstruments ? nil : clearNavigation)
                     ColumnRule()
                     notices(viewModel)
                     HStack(spacing: 0) {
-                        FlightLogRail(gpsStatus: viewModel.gpsStatus, nearestEntry: nearestVM.nearestEntry)
-                        Rectangle()
-                            .fill(Palette.rule)
-                            .frame(width: 1)
-                            .accessibilityHidden(true)
+                        if showsFlightLog {
+                            FlightLogRail(gpsStatus: viewModel.gpsStatus, nearestEntry: nearestVM.nearestEntry)
+                            Rectangle()
+                                .fill(Palette.rule)
+                                .frame(width: 1)
+                                .accessibilityHidden(true)
+                        }
                         chart(viewModel)
                     }
                 }
@@ -346,9 +359,11 @@ extension MapContainerView {
                         .background(Palette.paper.ignoresSafeArea())
                 }
             }
-            ColumnRule()
-            FlightLogNowCell(gpsStatus: viewModel.gpsStatus, onClear: clearNavigation, compact: true)
-                .background(Palette.paper)
+            if showsInstruments {
+                ColumnRule()
+                FlightLogNowCell(gpsStatus: viewModel.gpsStatus, onClear: clearNavigation, compact: true)
+                    .background(Palette.paper)
+            }
             FlightLogFooter(mapViewModel: viewModel, nearestEntry: nearestVM.nearestEntry, compact: true)
                 .background(Palette.paperSecondary.ignoresSafeArea(edges: .bottom))
         }

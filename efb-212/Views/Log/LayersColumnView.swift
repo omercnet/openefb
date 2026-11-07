@@ -14,6 +14,8 @@ struct LayersColumnView: View {
     private let mapViewModel: MapViewModel
     @Environment(AppState.self) private var appState
     @State private var offlineMaps = OfflineMapService.shared
+    @AppStorage(FlightLogVisibility.flightLogKey) private var showsFlightLog = true
+    @AppStorage(FlightLogVisibility.instrumentsKey) private var showsInstruments = true
 
     init(mapViewModel: MapViewModel) {
         self.mapViewModel = mapViewModel
@@ -56,6 +58,16 @@ struct LayersColumnView: View {
                         )
                         .accessibilityLabel("Map orientation")
                         .accessibilityIdentifier("Map orientation")
+                    }
+                    .padding(.horizontal, Space.l)
+
+                    // Panels: hide the flight log and the instruments to give the chart more room
+                    VStack(alignment: .leading, spacing: Space.xs) {
+                        ColumnSectionLabel("Panels")
+                        panelToggle("Flight log", caption: "Strip with next and flown waypoints",
+                                    isOn: $showsFlightLog, identifier: "toggle-flight-log")
+                        panelToggle("Instruments", caption: "Ground speed, track, altitude and the tape",
+                                    isOn: $showsInstruments, identifier: "toggle-instruments")
                     }
                     .padding(.horizontal, Space.l)
 
@@ -272,6 +284,32 @@ struct LayersColumnView: View {
                 .foregroundStyle(Palette.inkSecondary)
         }
         .padding(.horizontal, Space.l)
+    }
+
+    // MARK: - Panel Toggle Row
+
+    /// A 60pt toggle for a map-screen panel, with a one-line caption naming what it hides.
+    private func panelToggle(_ label: String, caption: String, isOn: Binding<Bool>, identifier: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Toggle(isOn: Binding(
+                get: { isOn.wrappedValue },
+                set: { Haptics.light(); isOn.wrappedValue = $0 }
+            )) {
+                Text(label)
+                    .font(TypeRole.body.weight(.medium))
+            }
+            .tint(Palette.accent)
+            .frame(minHeight: StripMetrics.cell)
+            .accessibilityValue(isOn.wrappedValue ? "On" : "Off")
+            .accessibilityHint(caption)
+            .accessibilityIdentifier(identifier)
+            Text(caption)
+                .font(TypeRole.caption)
+                .foregroundStyle(Palette.inkSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .accessibilityHidden(true)
+        }
     }
 
     // MARK: - Layer Toggle Row
