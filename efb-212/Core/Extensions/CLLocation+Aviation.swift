@@ -7,7 +7,7 @@
 
 import CoreLocation
 
-extension CLLocation {
+nonisolated extension CLLocation {
     /// Distance in nautical miles to another location
     func distanceInNM(to other: CLLocation) -> Double {
         self.distance(from: other) / 1852.0  // meters to NM
@@ -29,7 +29,7 @@ extension CLLocation {
     }
 }
 
-extension CLLocationCoordinate2D {
+nonisolated extension CLLocationCoordinate2D {
     /// Distance in nautical miles to another coordinate
     func distanceInNM(to other: CLLocationCoordinate2D) -> Double {
         let loc1 = CLLocation(latitude: self.latitude, longitude: self.longitude)
@@ -50,7 +50,7 @@ extension CLLocationCoordinate2D {
     }
 }
 
-extension Double {
+nonisolated extension Double {
     var degreesToRadians: Double { self * .pi / 180.0 }
     var radiansToDegrees: Double { self * 180.0 / .pi }
 

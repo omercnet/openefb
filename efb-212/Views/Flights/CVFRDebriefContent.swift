@@ -2,8 +2,8 @@
 //  CVFRDebriefContent.swift
 //  efb-212
 //
-//  The CVFR section of Flight Details (IL-DEBRIEF): per-leg altitude adherence against the published
-//  altitude, reporting-point passage and plain-language observations. All numbers come from
+//  The CVFR section of Flight Details (IL-DEBRIEF): the flight unrolled on one distance axis, per-leg altitude
+//  adherence against the published altitude, reporting-point passage and plain-language observations. All numbers come from
 //  CVFRDebriefBuilder, so the section shows even when Apple Intelligence is unavailable.
 //  Renders nothing for flights outside Israel.
 //
@@ -37,6 +37,8 @@ struct CVFRDebriefContent: View {
                 .accessibilityIdentifier("cvfr-observations")
             }
 
+            // The flight unrolled on one distance axis; the table below keeps the exact numbers.
+            CVFRDebriefProfileView(debrief: debrief)
             legsTable
             if !debrief.points.isEmpty { pointsTable }
         }

@@ -5,7 +5,8 @@
 //  Debrief of a recorded flight against the Israel CVFR route network (IL-DEBRIEF):
 //  - match the GPS track to route legs (the activated plan's legs, or the nearest segments);
 //  - per leg, time-weighted altitude adherence against the published altitude for the direction flown;
-//  - per reporting point on the route, the closest approach and whether a position report was heard.
+//  - per reporting point on the route, the closest approach and whether a position report was heard;
+//  - the flown altitude on one distance axis along the matched legs (the unrolled debrief) and its verdict.
 //
 //  Pure and nonisolated: every number here comes from code, never from the language model.
 //  Units: feet MSL, nautical miles, degrees true, seconds.
@@ -27,6 +28,9 @@ nonisolated struct CVFRLegDebrief: Identifiable, Sendable, Equatable {
     let endTime: Date
     /// nil when every point fell inside the aerodrome exclusion zones or no altitude is published.
     let adherence: CVFRAltitudeAdherence?
+    /// Where the leg starts and ends on the debrief's distance axis: cumulative along the matched legs -- nautical miles.
+    var startDistanceNM: Double = 0
+    var endDistanceNM: Double = 0
 }
 
 /// Time-weighted altitude adherence on one leg, outside the 3 NM aerodrome exclusion zones.
@@ -52,6 +56,39 @@ nonisolated struct CVFRPointPassage: Identifiable, Sendable, Equatable {
     let distanceNM: Double
     /// A transcript segment within ±2 min of `time` named the point (code, English or Hebrew name).
     let reported: Bool
+    /// Where the point sits on the debrief's distance axis (a leg boundary) -- nautical miles. nil when built outside
+    /// `CVFRDebriefBuilder.build`.
+    var distanceAlongRouteNM: Double? = nil
+    /// When the report naming the point was heard (the first matching transcript segment); nil when not heard.
+    var reportTime: Date? = nil
+}
+
+/// One track point on the debrief's distance axis.
+nonisolated struct CVFRProfileSample: Sendable, Equatable {
+    /// Along the matched legs, cumulative over legs -- nautical miles. Never decreases: an orbit stacks at one
+    /// distance instead of running the trace backwards.
+    let distanceNM: Double
+    /// Feet MSL.
+    let altitudeFeet: Double
+    /// Index into `CVFRDebrief.legs`.
+    let legIndex: Int
+    /// Inside the 3 NM aerodrome zone of the leg: not scored.
+    let excluded: Bool
+    let time: Date
+}
+
+/// A scored stretch of the profile flown outside ±200 ft of the published altitude, on one leg, one side.
+nonisolated struct CVFRAltitudeExcursion: Sendable, Equatable {
+    let legIndex: Int
+    /// Indices into `CVFRDebrief.profile`.
+    var sampleRange: ClosedRange<Int>
+    /// The largest deviation in the stretch, signed: positive = above -- feet.
+    var deviationFeet: Double
+    var startTime: Date
+    var endTime: Date
+
+    /// Seconds.
+    var seconds: TimeInterval { endTime.timeIntervalSince(startTime) }
 }
 
 /// The CVFR section of a flight debrief. `legs` is empty when the track never came within 1 NM of a route.
@@ -65,6 +102,8 @@ nonisolated struct CVFRDebrief: Sendable, Equatable {
     /// false when the flight has no transcript segments: position reports were then not checked, which is not the
     /// same as "not heard".
     var transcriptAvailable: Bool = true
+    /// The flown altitude on the distance axis, for the unrolled debrief.
+    var profile: [CVFRProfileSample] = []
 
     var isEmpty: Bool { legs.isEmpty }
 }
@@ -127,12 +166,35 @@ nonisolated enum CVFRDebriefBuilder {
         } else {
             matched = matchUnplanned(trackPoints: trackPoints, segments: segments)
         }
-        let legs = matched.map { legDebrief(for: $0) }
+        var legs: [CVFRLegDebrief] = []
+        var profile: [CVFRProfileSample] = []
+        profile.reserveCapacity(matched.reduce(0) { $0 + $1.points.count })
+        var furthest = 0.0   // NM along the route
+        for (index, run) in matched.enumerated() {
+            let leg = legDebrief(for: run, startDistanceNM: legs.last?.endDistanceNM ?? 0)
+            legs.append(leg)
+            let polyline = run.leg.polyline
+            let zones = aerodromeEnds(of: run.leg, polyline: polyline)
+            for point in run.points {
+                let coordinate = CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
+                // Clamped to the leg, so the axis never runs backwards across a leg boundary either.
+                furthest = max(furthest, leg.startDistanceNM + alongTrackNM(of: coordinate, polyline: polyline))
+                profile.append(CVFRProfileSample(
+                    distanceNM: furthest,
+                    altitudeFeet: point.altitudeFeet,
+                    legIndex: index,
+                    excluded: isInAerodromeZone(coordinate, zones: zones),
+                    time: point.timestamp
+                ))
+            }
+        }
 
-        let routeCodes = routePointCodes(of: matched.map(\.leg))
-        let passages = routeCodes.compactMap { code -> CVFRPointPassage? in
-            guard let point = points[code] else { return nil }
-            return passage(of: point, trackPoints: trackPoints, transcript: transcript, reportWindow: reportWindow)
+        let passages = routeStops(of: legs).compactMap { stop -> CVFRPointPassage? in
+            guard let point = points[stop.code],
+                  var found = passage(of: point, trackPoints: trackPoints, transcript: transcript, reportWindow: reportWindow)
+            else { return nil }
+            found.distanceAlongRouteNM = stop.distanceNM
+            return found
         }
 
         return CVFRDebrief(
@@ -140,7 +202,8 @@ nonisolated enum CVFRDebriefBuilder {
             legs: legs,
             points: passages,
             observations: observations(legs: legs, points: passages, transcriptAvailable: !transcript.isEmpty),
-            transcriptAvailable: !transcript.isEmpty
+            transcriptAvailable: !transcript.isEmpty,
+            profile: profile
         )
     }
 
@@ -224,19 +287,21 @@ nonisolated enum CVFRDebriefBuilder {
         return merged
     }
 
-    /// The reporting points along the matched legs, in order, without repeats of consecutive codes.
-    static func routePointCodes(of legs: [CVFRRouteLeg]) -> [String] {
-        var codes: [String] = []
+    /// The reporting points along the debriefed legs, in order, without repeats of consecutive codes, each at its
+    /// leg boundary on the distance axis -- nautical miles.
+    static func routeStops(of legs: [CVFRLegDebrief]) -> [(code: String, distanceNM: Double)] {
+        var stops: [(code: String, distanceNM: Double)] = []
         for leg in legs {
-            if codes.last != leg.fromCode { codes.append(leg.fromCode) }
-            codes.append(leg.toCode)
+            if stops.last?.code != leg.fromCode { stops.append((leg.fromCode, leg.startDistanceNM)) }
+            stops.append((leg.toCode, leg.endDistanceNM))
         }
-        return codes
+        return stops
     }
 
     // MARK: Altitude adherence
 
-    static func legDebrief(for matched: CVFRMatchedLeg) -> CVFRLegDebrief {
+    /// `startDistanceNM` places the leg on the distance axis; it ends one polyline length later -- nautical miles.
+    static func legDebrief(for matched: CVFRMatchedLeg, startDistanceNM: Double = 0) -> CVFRLegDebrief {
         let start = matched.points.first?.timestamp ?? Date.distantPast
         let end = matched.points.last?.timestamp ?? start
         let published = matched.leg.publishedAltitude
@@ -246,7 +311,9 @@ nonisolated enum CVFRDebriefBuilder {
             publishedAltitude: published,
             startTime: start,
             endTime: end,
-            adherence: published.flatMap { adherence(points: matched.points, leg: matched.leg, publishedText: $0) }
+            adherence: published.flatMap { adherence(points: matched.points, leg: matched.leg, publishedText: $0) },
+            startDistanceNM: startDistanceNM,
+            endDistanceNM: startDistanceNM + IsraelRoutePlanner.length(of: matched.leg.polyline)
         )
     }
 
@@ -255,17 +322,25 @@ nonisolated enum CVFRDebriefBuilder {
     static func adherence(points: [TrackPointRecord], leg: CVFRRouteLeg, publishedText: String) -> CVFRAltitudeAdherence? {
         let published = publishedAltitudes(publishedText)
         guard !published.isEmpty else { return nil }
-        let polyline = leg.polyline
-        let startAerodrome = isAerodromeCode(leg.fromCode) ? polyline.first : nil
-        let endAerodrome = isAerodromeCode(leg.toCode) ? polyline.last : nil
-
+        let zones = aerodromeEnds(of: leg, polyline: leg.polyline)
         let sampled = points.filter { point in
-            let coordinate = CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
-            if let startAerodrome, IsraelRoutePlanner.haversineNM(coordinate, startAerodrome) < aerodromeExclusionNM { return false }
-            if let endAerodrome, IsraelRoutePlanner.haversineNM(coordinate, endAerodrome) < aerodromeExclusionNM { return false }
-            return true
+            !isInAerodromeZone(CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude), zones: zones)
         }
         return adherence(samples: sampled, published: published)
+    }
+
+    /// The leg's aerodrome endpoints (none where both ends are route points). `polyline` is `leg.polyline`, passed
+    /// in so a reversed leg is not reversed again per point.
+    static func aerodromeEnds(of leg: CVFRRouteLeg, polyline: [CLLocationCoordinate2D]) -> [CLLocationCoordinate2D] {
+        var ends: [CLLocationCoordinate2D] = []
+        if isAerodromeCode(leg.fromCode), let first = polyline.first { ends.append(first) }
+        if isAerodromeCode(leg.toCode), let last = polyline.last { ends.append(last) }
+        return ends
+    }
+
+    /// Within 3 NM of one of `zones` (aerodrome endpoints): not scored.
+    static func isInAerodromeZone(_ coordinate: CLLocationCoordinate2D, zones: [CLLocationCoordinate2D]) -> Bool {
+        zones.contains { IsraelRoutePlanner.haversineNM(coordinate, $0) < aerodromeExclusionNM }
     }
 
     /// Core maths: each sample is weighted by the time to the next sample (capped), and compared against the
@@ -330,7 +405,7 @@ nonisolated enum CVFRDebriefBuilder {
             if distance < (closest?.distance ?? .infinity) { closest = (sample.timestamp, distance) }
         }
         guard let closest else { return nil }
-        let reported = transcript.contains { segment in
+        let report = transcript.first { segment in
             abs(segment.timestamp.timeIntervalSince(closest.time)) <= reportWindow
                 && TranscriptTextMatcher.mentions(point: point, in: segment.text)
         }
@@ -340,7 +415,8 @@ nonisolated enum CVFRDebriefBuilder {
             nameHebrew: point.nameHebrew,
             time: closest.time,
             distanceNM: closest.distance,
-            reported: reported
+            reported: report != nil,
+            reportTime: report?.timestamp
         )
     }
 
@@ -396,6 +472,39 @@ nonisolated enum CVFRDebriefBuilder {
         "\(Int((fraction * 100).rounded()))%"
     }
 
+    // MARK: Excursions
+
+    /// The scored stretches of `debrief.profile` outside ±200 ft of the leg's published altitude, in order. A stretch
+    /// ends at a sample back inside the band, an excluded sample, a new leg, or a change of side.
+    static func excursions(in debrief: CVFRDebrief) -> [CVFRAltitudeExcursion] {
+        let published = debrief.legs.map { $0.publishedAltitude.map(publishedAltitudes) ?? [] }
+        var result: [CVFRAltitudeExcursion] = []
+        var open: CVFRAltitudeExcursion?
+        for (index, sample) in debrief.profile.enumerated() {
+            let reference = published.indices.contains(sample.legIndex) ? published[sample.legIndex] : []
+            let deviation = reference.isEmpty || sample.excluded ? 0 : deviationFeet(altitude: sample.altitudeFeet, published: reference)
+            guard abs(deviation) > tightBandFeet else {
+                if let current = open { result.append(current) }
+                open = nil
+                continue
+            }
+            if var current = open, current.legIndex == sample.legIndex, (current.deviationFeet > 0) == (deviation > 0) {
+                current.sampleRange = current.sampleRange.lowerBound...index
+                current.endTime = sample.time
+                if abs(deviation) > abs(current.deviationFeet) { current.deviationFeet = deviation }
+                open = current
+            } else {
+                if let current = open { result.append(current) }
+                open = CVFRAltitudeExcursion(
+                    legIndex: sample.legIndex, sampleRange: index...index, deviationFeet: deviation,
+                    startTime: sample.time, endTime: sample.time
+                )
+            }
+        }
+        if let current = open { result.append(current) }
+        return result
+    }
+
     // MARK: Prompt facts
 
     /// The CVFR facts for `FlightSummaryBuilder`, so the AI debrief can mention them without inventing numbers.
@@ -430,14 +539,31 @@ nonisolated enum CVFRDebriefBuilder {
 
     /// The nearest polyline edge: its distance (NM) and bearing (degrees true, in polyline order).
     static func nearestEdge(from point: CLLocationCoordinate2D, polyline: [CLLocationCoordinate2D]) -> (distance: Double, bearing: Double) {
-        guard let first = polyline.first else { return (.infinity, 0) }
-        if polyline.count == 1 { return (IsraelRoutePlanner.haversineNM(point, first), 0) }
+        let edge = nearestEdgeProjection(from: point, polyline: polyline)
+        return (edge.distance, edge.bearing)
+    }
+
+    /// How far along `polyline` the point projects onto its nearest edge, 0...polyline length -- nautical miles.
+    static func alongTrackNM(of point: CLLocationCoordinate2D, polyline: [CLLocationCoordinate2D]) -> Double {
+        let edge = nearestEdgeProjection(from: point, polyline: polyline)
+        guard edge.index + 1 < polyline.count else { return 0 }
+        let before = (0..<edge.index).reduce(0.0) { $0 + IsraelRoutePlanner.haversineNM(polyline[$1], polyline[$1 + 1]) }
+        return before + edge.fraction * IsraelRoutePlanner.haversineNM(polyline[edge.index], polyline[edge.index + 1])
+    }
+
+    /// The nearest edge's distance (NM), bearing (degrees true), index (its first vertex) and the projection's
+    /// fraction along it (0...1).
+    private static func nearestEdgeProjection(
+        from point: CLLocationCoordinate2D, polyline: [CLLocationCoordinate2D]
+    ) -> (distance: Double, bearing: Double, index: Int, fraction: Double) {
+        guard let first = polyline.first else { return (.infinity, 0, 0, 0) }
+        if polyline.count == 1 { return (IsraelRoutePlanner.haversineNM(point, first), 0, 0, 0) }
         let cosLat = cos(point.latitude * .pi / 180)
         func project(_ c: CLLocationCoordinate2D) -> (x: Double, y: Double) {
             ((c.longitude - point.longitude) * 60 * cosLat, (c.latitude - point.latitude) * 60)
         }
-        var best: (distance: Double, bearing: Double) = (.infinity, 0)
-        for (a, b) in zip(polyline, polyline.dropFirst()) {
+        var best: (distance: Double, bearing: Double, index: Int, fraction: Double) = (.infinity, 0, 0, 0)
+        for (index, (a, b)) in zip(polyline, polyline.dropFirst()).enumerated() {
             let pa = project(a), pb = project(b)
             let dx = pb.x - pa.x, dy = pb.y - pa.y
             let lengthSquared = dx * dx + dy * dy
@@ -446,7 +572,7 @@ nonisolated enum CVFRDebriefBuilder {
             let distance = (cx * cx + cy * cy).squareRoot()
             if distance < best.distance {
                 let bearing = (atan2(dx, dy) * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)
-                best = (distance, bearing)
+                best = (distance, bearing, index, t)
             }
         }
         return best
@@ -467,5 +593,66 @@ nonisolated enum CVFRDebriefBuilder {
     static func angularDifference(_ a: Double, _ b: Double) -> Double {
         let diff = abs(a - b).truncatingRemainder(dividingBy: 360)
         return diff > 180 ? 360 - diff : diff
+    }
+}
+
+// MARK: - Verdict
+
+/// The one line above the unrolled debrief: at most two findings to look at, never an overall score.
+nonisolated enum CVFRDebriefVerdict {
+    /// A leg is low when less than this share of its measured time was within ±300 ft (the table's amber rule).
+    static let lowLegFraction = 0.8
+    static let maximumFindings = 2
+
+    /// Low legs (worst first) and points whose report was not heard (aerodromes are not reporting points; nothing
+    /// is "not heard" without a transcript). The worst leg and the first missed report come first, so two findings
+    /// of different kinds both show.
+    static func findings(_ debrief: CVFRDebrief) -> [String] {
+        let excursions = CVFRDebriefBuilder.excursions(in: debrief)
+        let lowLegs = debrief.legs.indices
+            .compactMap { index -> (index: Int, adherence: CVFRAltitudeAdherence)? in
+                guard let adherence = debrief.legs[index].adherence, adherence.fractionWithin300 < lowLegFraction else { return nil }
+                return (index, adherence)
+            }
+            .sorted { $0.adherence.fractionWithin300 < $1.adherence.fractionWithin300 }
+            .map { low in legFinding(debrief.legs[low.index], adherence: low.adherence, excursions: excursions.filter { $0.legIndex == low.index }) }
+        let notHeard = debrief.transcriptAvailable
+            ? debrief.points.filter { !$0.reported && !CVFRDebriefBuilder.isAerodromeCode($0.code) }.map { "\($0.code) report not heard" }
+            : []
+        let firsts = [lowLegs.first, notHeard.first].compactMap { $0 }
+        let rest = lowLegs.dropFirst() + notHeard.dropFirst()
+        return Array((firsts + rest).prefix(maximumFindings))
+    }
+
+    /// "TAVOR to DESHE: 330 ft low, 4 min" from the leg's longest excursion; the ±300 ft share when it has none.
+    static func legFinding(_ leg: CVFRLegDebrief, adherence: CVFRAltitudeAdherence, excursions: [CVFRAltitudeExcursion]) -> String {
+        let name = "\(leg.fromCode) to \(leg.toCode)"
+        guard let longest = longest(excursions) else {
+            return "\(name): \(CVFRDebriefBuilder.percent(adherence.fractionWithin300)) within 300 ft"
+        }
+        return "\(name): \(deviationText(longest.deviationFeet)), \(durationText(longest.seconds))"
+    }
+
+    /// The excursion that lasted longest; the larger deviation breaks a tie.
+    static func longest(_ excursions: [CVFRAltitudeExcursion]) -> CVFRAltitudeExcursion? {
+        excursions.max { ($0.seconds, abs($0.deviationFeet)) < ($1.seconds, abs($1.deviationFeet)) }
+    }
+
+    /// "330 ft low" / "250 ft high". Feet.
+    static func deviationText(_ deviationFeet: Double) -> String {
+        "\(Int(abs(deviationFeet).rounded())) ft \(deviationFeet < 0 ? "low" : "high")"
+    }
+
+    /// "4 min" from a minute up, "45 s" below. Seconds.
+    static func durationText(_ seconds: TimeInterval) -> String {
+        seconds >= 60 ? "\(Int((seconds / 60).rounded())) min" : "\(Int(seconds.rounded())) s"
+    }
+
+    static func headline(count: Int) -> String {
+        switch count {
+        case 0: "Nothing to look at."
+        case 1: "One thing to look at."
+        default: "Two things to look at."
+        }
     }
 }

@@ -33,6 +33,8 @@ final class MapViewModel {
     var airSigmetService: (any AirSigmetServiceProtocol)?
     /// Optional proximity alert service -- set by MapContainerView after creation.
     var proximityAlertService: ProximityAlertService?
+    /// Airspace entries predicted ahead of the aircraft (Direction 2 stage 2), run on every fix.
+    @ObservationIgnored private let predictionService = PredictionService()
 
     // MARK: - State
 
@@ -240,6 +242,11 @@ final class MapViewModel {
         // Minute-ruled track ahead, drawn wherever ownship is (it moves with every fix, in or out of
         // the region): track degrees true, ground speed knots; cleared below 30 kt by the service.
         mapService.updateTrackRuler(origin: location.coordinate, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed)
+        // Predicted airspace entries along the same track (Layers > Predictions); off or stale clears them.
+        let predictionsOn = (UserDefaults.standard.object(forKey: FlightLogVisibility.predictionsKey) as? Bool)
+            ?? FlightLogVisibility.predictionsDefault
+        predictionService.update(location: location, appState: appState, isStale: gpsStatus.isStale, enabled: predictionsOn)
+        mapService.updatePredictionMarkers(appState.predictedEvents)
 
         // A fix outside the selected region (e.g. a US simulator fix while viewing Israel) is
         // drawn but never pulls the camera away from the region's home view.
@@ -312,7 +319,12 @@ final class MapViewModel {
             lastAppliedStale = stale
             mapService.setOwnshipStale(stale)
             // A ruler from a frozen fix would read as current; the next live fix redraws it.
-            if stale { mapService.updateTrackRuler(origin: nil, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed) }
+            if stale {
+                mapService.updateTrackRuler(origin: nil, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed)
+                // Predictions from a frozen fix would read as current too.
+                predictionService.clear(appState: appState)
+                mapService.updatePredictionMarkers([])
+            }
         }
     }
 
