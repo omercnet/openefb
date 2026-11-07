@@ -17,17 +17,15 @@ Excludes: IFR, cloud sync, weight and balance, ADS-B In, anything needing a cert
 | Location denied says why and how to fix it | J1 | P2 | open (efb-77r.27) |
 | Direct-To can be cleared | J3 | P2 | open (efb-77r.28) |
 | Cut list below (banner, offline Satellite/Terrain, transcript bar, duplicate copy) | J1 | P3 | banner, offline packs, copy done (T22, efb-77r.18/.19/.21); transcript bar open (efb-77r.20) |
-| Tab and feature merges (Aircraft into Settings, Logbook into Flights) | J4 | P3 | done (T22, efb-77r.22-23); see "Tab bar decision" below |
+| Navigation: map with the flight log strip, log stack home, Aircraft under Settings | J4 | P3 | done (Direction 2 stage 1); see "Navigation" below |
 | Validate all of this with pilots | all | P2 | open (efb-77r.7, efb-77r.34) |
 
-### Tab bar decision (T22, 2026-11-01; superseded 2026-11-06)
-Superseded by Direction 2 stage 1 (`docs/DESIGN.md`): there is no tab bar. The map screen carries the flight log strip; the log stack is home and holds flights, plans, logbook entries and their totals; Settings is a link from the log stack. The draft rule below still holds: a draft logbook entry reads as a neutral to-do in the log stack, not amber.
-
-The tab bar was **Map / Flights / Settings** (was Map / Flights / Logbook / Aircraft / Settings). Screenshots: `docs/design/screenshots/T22/`.
-- Logbook is a section of Flights: the History / Logbook / Plans control sits in the Flights navigation bar (the old History / Plans control at the top of the content was hidden behind the iPadOS floating tab bar; T14 B08 shows no control at all). Every logbook screen stays: draft rows from recordings, confirm/lock, manual entries, delete. Flights did not get worse: one bar, three sections, and a recording's two outcomes (FlightRecord, draft logbook entry) now sit next to each other. The fourth-tab fallback (Map / Flights / Logbook / Settings) was not needed.
-- The draft count reads "Logbook (n)" in the segment, neutral text, not a red badge: a draft is a to-do, not a warning (efb-77r.32).
-- Aircraft & Pilot is a row under Settings > Profiles. Non-current currency (medical, flight review, night) shows as an amber "n to renew" on that row, replacing the old tab badge.
-- Beta banner: Map tab only; once dismissed, only the line under Settings > About remains (efb-77r.18).
+### Navigation
+No tab bar (Direction 2, `docs/DESIGN.md`). The map screen carries the flight log strip; its LOG button opens the log stack, which holds plans, flights, logbook entries and their totals, and links to Settings.
+- Every logbook action stays in the log stack: draft entries from recordings, sign/lock, manual entries, delete.
+- A draft logbook entry reads "Draft, sign" in neutral text, not amber or red: a draft is a to-do, not a warning (efb-77r.32).
+- Aircraft & Pilot is a row under Settings > Profiles. Non-current currency (medical, flight review, night) shows as an amber "n to renew" on that row.
+- Beta banner: map screen only; once dismissed, only the line under Settings > About remains (efb-77r.18).
 
 ### Design Review: Kanaf (T14 final cut, 2026-11-01)
 Evidence: the app walked cold on the iPad Pro 13-inch simulator (iOS 27, KPAO, `tools/fly.sh` route). Screenshots: `docs/design/screenshots/T14/`. **This review rests on documented assumptions: no pilot has used a build** (CUSTOMER.md evidence status). It has not been tried on a physical iPad or in a cockpit.

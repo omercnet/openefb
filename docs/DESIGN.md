@@ -13,61 +13,49 @@ Rules (the EFB lens):
 - Stale or unvalidated data is never shown as current.
 - No decorative animation in flight.
 
-## Direction 2: the log and the leading edge (2026-11-05; stage 1 built 2026-11-06)
+## Direction 2: the log and the leading edge
 
-The owner rejected four re-skins of today's layout (`docs/design/mocks/directions.html`) and asked for a reinvention. Fable and Opus each proposed one independently (`docs/design/mocks/fable.html`, `docs/design/mocks/opus.html`); the owner chose a merge of the two (Paseo Progress Q2 C). Merged mock: `docs/design/mocks/merge.html`. Stage 1 is in the app (pull request #13); where the older sections below describe the floating controls, instrument strip, NRST box or tab bar, this section wins.
-
-Stage 1 as built: the strip is layout beside the chart, not an overlay, so the map needs no camera padding; the app opens on the map (the in-flight screen) and the strip's LOG button opens the log stack; the CVFR debrief keeps its current screen until stage 2.
+Reference mock: `docs/design/mocks/merge.html` (stage 1 and stage 2 screens). Stage 1 is in the app.
 
 **The idea.** A VFR flight is a nav log, and the pilot's question is what comes next. Kanaf shows one object, the log, in three tenses: Next (planned), Now (flying), Flown (debrief and logbook). In flight the log reads forward: the next thing ahead gets the biggest type on the screen.
 
-From Fable (the skeleton):
-- The log is a strip pinned to the chart's edge (left; right edge in Hebrew). Waypoints are rows, legs are the space between them, the active leg's cell holds the live readouts.
-- The home screen is the log stack: planned flights, today's flight, past flights with per-leg grades, totals footer. The stack is also the logbook.
-- An airport opens in the strip's column; the chart stays live beside it. A debrief is the flight's own strip with the actuals written in.
+Structure:
+- The log is a strip beside the chart (layout, not an overlay) at the leading edge; it mirrors to the right edge in Hebrew, the chart never mirrors. Waypoints are rows, legs are the space between them, the active leg's cell holds the live readouts.
+- The home screen is the log stack: planned flights, today's flight, past flights, totals. The stack is also the logbook. The app opens on the map; the strip's LOG button opens the stack.
+- Airport, nearest, layers and search open in the strip's column; the chart stays live beside it. A debrief is the flight's own strip with the actuals written in (stage 2).
 - The wing (כנף) is both the ownship glyph and the marker on the active leg's gauge.
 
-From Opus (the reading order):
+Reading order:
 - Future is loud: time-to-next is the largest number. Present numbers (GS, TRK, ALT with VS) sit in the active cell at readout size, below it.
 - The chart is ruled in minutes along the track; the strip's row times and the map's minute ticks are the same times.
 - Predicted events (airspace floors, boundaries) are rows in the log, in time order, each stating its assumption ("at 312°, +300 fpm"). Stale input turns predictions off; it never shows them as current.
 - Night has no filled amber blocks: amber rule and amber type on near-black.
 - The debrief unrolls the line: strip map, profile against the ±200 ft band, and radio (heard / not heard) on one axis, with no overall score that hides a bad leg.
 
-Thrown away: the tab bar, floating round map buttons, the bottom instrument strip, the NRST box, the layer panel, bottom sheets, list-and-detail flight screens. Layers, night, zoom, NRST and GPS state become 60pt cells in the strip's footer, GPS state first. Direct-to is inserting a row.
+Not used: a tab bar, floating map buttons, a bottom instrument strip, an NRST box, a layer popover, bottom sheets, list-and-detail flight screens. Layers, zoom, NRST and GPS state are 60pt cells in the strip's footer, GPS state first.
 
-Type: one OFL system bundled with the app. Archivo (variable; condensed widths for readouts and idents, normal width for labels), IBM Plex Mono for times and log data, IBM Plex Sans Hebrew. Day chrome is cool paper; magenta = route, chart blue = airspace, red = warning, amber = caution, ink for everything else.
+Type: one OFL system bundled with the app. Archivo (condensed widths for readouts and idents, normal width for labels), IBM Plex Mono for times and log data, IBM Plex Sans Hebrew. Day chrome is cool paper; magenta = route, chart blue = airspace, red = warning, amber = caution, ink for everything else.
 
 The EFB rules above all still hold.
 
-### Stages
-| Stage | Ships | Needs |
-|---|---|---|
-| 1. The log | Strip and footer replace `InstrumentStripView`, `MapControlsView`, `NearestAirportHUD`, `LayerControlsView`, `ActiveNavigationBar` and `IsraelRouteFollowingBar`; the log stack replaces the three-tab `ContentView` and `FlightHistoryListView` / `LogbookListView`; airport in the strip column replaces `AirportInfoSheet`; minute ticks on the track line (`MapService` line layer, camera padding for the strip); new type and palette tokens in `Core/DesignTokens.swift` with fonts in `UIAppFonts`; night palette; iPhone rail; Hebrew mirroring. Next thing = next waypoint and its ETE. | Builds and simulator runs on a Mac (`tools/sim-test.sh`); Dynamic Type check of the strip at AX sizes; VoiceOver order of the log |
-| 2. The leading edge | Prediction rows (airspace floor and boundary times from track, GS and VS), the amber next-thing block, the compact altitude tape in the active cell; debrief unrolled bands | A prediction service with tests for noisy GPS, rules for suppressing jumpy or stale predictions, and an owner or CFI review before pilots see it |
-
-Riskiest assumptions: a strip that permanently takes a third of an iPad's width beats an edge-to-edge chart (Fable), and predictions from GPS in bumpy air stay steady enough to trust (Opus). Both need a pilot in a real cockpit before stage 2.
-
-### Decisions from the merged mock
-- **Only the next thing is loud.** The top row of the strip carries the one large time (about 100pt on iPad); later rows, waypoints or events, use about 44pt.
+### Rules
+- **Only the next thing is loud.** The top row carries the one large time (about 100pt on iPad); later rows use about 44pt. At most 3 later rows on iPad (2 on the iPhone rail), then "+N more to DEST".
+- **The NOW cell is always visible.** Only the rows above it scroll when the column is short.
 - **NRST opens the nearest list in the strip column; one tap on a row inserts the direct-to.** A one-tap insert of the nearest field could pick a heliport or a short strip (finding F1); two taps keeps the choice (F2).
-- **Footer: GPS state, NRST, layer, zoom in, zoom out.** Night moves into the layer cell's menu, so the footer is one row on iPad and fits the iPhone with NRST showing distance and bearing. After a pan, the zoom-in cell becomes Recenter until the chart follows ownship again (F3), so nothing floats over the chart.
+- **Footer: GPS state, NRST, layers, zoom in, zoom out, one row.** Night and orientation live in the layers column. After a pan, zoom in becomes Recenter until the chart follows ownship again (F3).
+- **A Direct-To wins.** It is the next waypoint everywhere while it is active; opening the planner does not cancel it.
+- **The strip is a fixed 400pt on iPad** (no collapsed mode): 34% of an 11" iPad and 29% of a 13" in landscape. The iPhone gets a 104pt rail with the NOW cell and footer under the chart.
 - **The debrief runs on distance.** The strip map, profile and radio bands share one distance axis; times are labels at the waypoints. Short legs may be drawn at a marked half scale.
-- **The strip is a fixed 400pt in flight on iPad** (owner, Paseo Progress Q3 A): no collapsed mode. That is 34% of an 11" iPad and 29% of a 13" in landscape; test it with a pilot in a cockpit before stage 2.
+
+### Stage 2: the leading edge
+Prediction rows (airspace floor and boundary times from track, GS and VS), the amber next-thing block, the floor on the altitude tape, the unrolled debrief. Needs a prediction service with tests for noisy GPS, rules for suppressing jumpy or stale predictions, and an owner or CFI review before pilots see it.
+
+Riskiest assumptions: a strip that permanently takes a third of an iPad's width beats an edge-to-edge chart, and predictions from GPS in bumpy air stay steady enough to trust. Both need a pilot in a real cockpit before stage 2.
+
+Still to check on stage 1: VoiceOver order of the log, the strip at accessibility type sizes, Hebrew mirroring.
 
 ## Typography
-SF Pro system text styles (Dynamic Type); numeric readouts monospaced. Roles live in `Core/DesignTokens.swift` (`TypeRole`):
-
-| Role | Style | Use |
-|---|---|---|
-| title | largeTitle rounded semibold | Airport identifier |
-| sectionHeader | caption bold, uppercase text | FREQUENCIES, RUNWAYS, BASE MAP |
-| label | footnote medium, secondary color | "Wind", "TWR": labels are quiet |
-| value | title3 monospaced-digit semibold | Frequencies, runway idents |
-| valueSmall | callout monospaced-digit medium | Decoded weather, runway size |
-| body / caption | subheadline / footnote | Prose, validity lines |
-
-Rule: value louder than label. Never `.tertiary` for text (below 4.5:1 on the material).
+Bundled faces through `TypeRole` (`Core/DesignTokens.swift`), scaled for Dynamic Type with `UIFontMetrics`; see Tokens. Rule: value louder than label. Never `.tertiary` for text (below 4.5:1).
 
 ## Tokens
 Defined in `efb-212/Core/DesignTokens.swift`.
@@ -88,44 +76,22 @@ Defined in `efb-212/Core/DesignTokens.swift`.
 | `TypeRole.readout(size:)`, `nextTime`, `rowTime`, `rowIdent` | Archivo ExtraCondensed with tabular digits (`nextTime` ~100pt capped at 120, `rowTime` 44pt capped at 64) | Readouts in the NOW cell; the next thing's time-to; later rows |
 | `Palette.paper` / `paperSecondary` / `activeCell` / `rule` / `ink` / `inkSecondary` | Day #EEF0F2 / #E2E5E9 / #FFFFFF / #C3C8CE / #14191F / #4A535E; night #0D1013 / #232930 / #161A1F / #2A3037 / #C9C4BA / #8E9298 | The strip, its columns and the log stack |
 | `Palette.route` / `airspace` | Day #C2168D / #1B58A3; night #93407A / #86A3CB | Route glyphs and airport data blocks in the strip |
-| `StripMetrics` | width 400, rail 104, cell 60 | The strip (owner decision Q3 A), the iPhone rail, every in-flight tap target |
+| `StripMetrics` | width 400, rail 104, cell 60 | The iPad strip, the iPhone rail, every in-flight tap target |
 | `MapColor.trackRuler*` | Ink day #14191F, night #B6B0A3 | The minute-ruled track line, ticks and labels |
-| `Palette.northMarker` | Day #FF9F94, night #FF8F86 | North arrow on the navy compass glass, >= 3:1 (see Kanaf look) |
+| `Palette.northMarker` | Day #FF9F94, night #FF8F86 | North arrow on the navy north indicator, >= 3:1 (3.7:1 day, 3.9:1 night) |
 | `Palette.categoryMVFR` / `categoryLIFR` | systemBlue / #CC00CC day; #8FB5E0 / #E673E6 night | Flight-category dots (VFR `ok`, IFR `warning`) |
 | `MapColor.*` | The system colours the map layers already used | Ownship, airspace, weather dots, TFRs, replay track, NOTAM map highlight. Named only; recolouring ownship or airspace is a separate decision to make over the sectional |
 
-All are SwiftUI semantic colors, so the night-mode ticket can retheme in one place. Red = warning (the compass north marker, `Palette.northMarker`, is the one convention exception), amber = caution, magenta = route.
-
-## Kanaf look (PR #5)
-
-PR #5 (2026-11-02) gave the app its own look inside the HIG; the follow-ups (2026-11-03) finished it:
-
-- **Accent:** Kanaf navy (`Palette.accent`, `AccentColor` asset), #1556B8 by day (#0C4091 with Increase Contrast), #2E4A6E fill and #8FB4E0 text at night. Day systemBlue failed 4.5:1.
-- **Floating map controls:** `mapControlSurface()`, Liquid Glass tinted navy with white (night grey 85%) glyphs, 60pt. Measured over the official CAAI CVFR chart on the iPad simulator: glyphs 7.3:1 by day, 6.1:1 at night, so no change was needed. Screenshots (CAAI artwork) are kept out of git in `docs/design/screenshots/UX-IL-CAAI/`.
-- **Panels:** the instrument strip and NRST box moved from `.regularMaterial` to `panelSurface()`: a light solid panel with a navy hairline by day, the old dark panel at night. Material took on the sectional's yellow; the solid panel stays neutral grey. The panel is slightly see-through, so the GPS status chip (GPS LOST / STALE) sits on an opaque `Palette.statusChipBase` with an 8% tint: its amber or red text keeps >= 4.6:1 over any map.
-- **Type:** expanded SF Pro for names and headings (`TypeRole.title`, `identifier`, `sectionHeader`); condensed SF Pro with fixed-width digits for the 32pt readouts.
-- **North marker:** the red arrow on the compass glass was 2.1:1 by day and 2.5:1 at night (needs 3:1 as a graphical object). It is now a light red, measured on screen: 3.7:1 day, 3.9:1 night, 5.2:1 day / 4.1:1 night with Increase Contrast, 3.5:1 / 4.2:1 with Reduce Transparency. The arrow was also invisible: inside the controls' `GlassEffectContainer` it was a sibling over a separate glass view and was drawn under the glass; it is now the glass view's own content.
-- **Increase Contrast / Reduce Transparency** (simulator): the high-contrast navy applies to the map controls; the strip, NRST box and route bar stay legible with both settings, day and night. Still to do on a real iPad: VoiceOver and Reduce Transparency, which the simulator only approximates.
-
-Before (material panels) and after (solid panels), same position and time:
-
-| Where | Before (left) and after (right) |
-|---|---|
-| iPad, KPAO sectional, day | ![iPad at KPAO by day. Before: the instrument strip and NRST box take on the sectional's yellow through the material. After: neutral light-grey panels with a thin navy edge.](design/screenshots/KANAF/ipad-us-day.png) |
-| iPad, KPAO sectional, night | ![iPad at KPAO at night. Before and after look the same: the dark panel is unchanged.](design/screenshots/KANAF/ipad-us-night.png) |
-| iPhone 17e, KPAO sectional, day | ![iPhone at KPAO by day. Before: yellow-tinted strip and NRST box. After: neutral light-grey panels with a navy edge.](design/screenshots/KANAF/iphone-us-day.png) |
-| iPhone 17e, Israel street map, day | ![iPhone near LLHZ by day with an active route. After: the strip and NRST box are neutral light grey with a navy edge instead of see-through material.](design/screenshots/KANAF/iphone-il-day.png) |
-| iPhone 17e, Israel street map, night | ![iPhone near LLHZ at night with an active route. Before and after match: the dark panel is unchanged.](design/screenshots/KANAF/iphone-il-night.png) |
+Colors are dynamic (day / night by color scheme), so night retheming happens in one place. Red = warning (the north marker, `Palette.northMarker`, is the one convention exception), amber = caution, magenta = route. Kanaf navy (`Palette.accent`, `AccentColor` asset) is #1556B8 by day (#0C4091 with Increase Contrast), #2E4A6E fill and #8FB4E0 text at night; day systemBlue failed 4.5:1.
 
 ## Components
 | Component | Decision | Status |
 |---|---|---|
-| SectionHeader | One uppercase section heading, used by the airport sheet and layer panel | done |
+| SectionHeader | One uppercase section heading, used by the airport and layers columns | done |
 | Frequency row | 72pt label column, abbreviations (CTAF, UNICOM, ATIS, AWOS, ASOS, TWR, GND, CD, APP, DEP, CTR, FSS), value large | done |
 | DataAgeBadge | One freshness badge for every dated product: neutral fresh, amber OLD/EXPIRED with a triangle glyph, red only when unsafe; thresholds in `## Freshness thresholds` | done |
-| Layer panel | BASE MAP picker, SECTIONAL toggle + opacity, DATA LAYERS toggles, 300pt wide | done |
+| Layers column | Display and orientation, SECTIONAL toggle + opacity, DATA LAYERS toggles, in the strip column | done |
 | Map symbols | Ownship: dark halo, fill, white edge. Airports/navaids: dark ring | done |
-| Transcription panel | Sits in the map's bottom stack above the instrument strip, never over it | done |
 
 ## UX Audit Findings
 
