@@ -294,11 +294,14 @@ final class FlightPlanViewModel {
 
         mapService?.clearRoute()
 
-        // Nil out all AppState display properties
-        appState.activeFlightPlan = false
-        appState.distanceToNext = nil
-        appState.estimatedTimeEnroute = nil
-        appState.bearingToNext = nil
+        // Nil out the plan's AppState display properties. A Direct-To being flown is not the plan's:
+        // it keeps its navigation and live DTG, ETE and bearing.
+        if appState.directToAirport == nil {
+            appState.activeFlightPlan = false
+            appState.distanceToNext = nil
+            appState.estimatedTimeEnroute = nil
+            appState.bearingToNext = nil
+        }
         appState.activePlanDeparture = nil
         appState.activePlanDestination = nil
         appState.activePlanDestinationCoordinate = nil

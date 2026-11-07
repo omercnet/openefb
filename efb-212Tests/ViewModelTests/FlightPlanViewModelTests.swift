@@ -327,6 +327,24 @@ struct FlightPlanViewModelTests {
         #expect(h.vm.selectedDestination?.icao == "KOAK")
     }
 
+    /// Clearing the planner while a Direct-To is flown leaves the Direct-To and its numbers alone.
+    @Test func clearingThePlannerKeepsAnActiveDirectTo() throws {
+        let h = try Self.makeHarness()
+        h.appState.directToAirport = Self.ksql
+        h.appState.activeFlightPlan = true
+        h.appState.distanceToNext = 4.2       // nautical miles
+        h.appState.bearingToNext = 295        // degrees true
+        h.appState.estimatedTimeEnroute = 168 // seconds
+
+        h.vm.clearPlan()
+
+        #expect(h.appState.directToAirport?.icao == "KSQL")
+        #expect(h.appState.activeFlightPlan)
+        #expect(h.appState.distanceToNext == 4.2)
+        #expect(h.appState.bearingToNext == 295)
+        #expect(h.appState.estimatedTimeEnroute == 168)
+    }
+
     /// Picking a saved plan by hand does replace the Direct-To.
     @Test func loadingAPlanByHandReplacesTheDirectTo() throws {
         let h = try Self.makeHarness()
