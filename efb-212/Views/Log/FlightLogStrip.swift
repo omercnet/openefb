@@ -25,6 +25,11 @@ enum FlightLogVisibility {
     static let instrumentsKey = "showsInstruments"
     static let predictionsKey = "showsPredictions"
     static let predictionsDefault = false  // pending Paseo Progress Q4
+
+    /// The predictions toggle as @AppStorage reads it: a stored Bool, or a "YES"/"NO" launch argument.
+    static func predictionsOn(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: predictionsKey) == nil ? predictionsDefault : defaults.bool(forKey: predictionsKey)
+    }
 }
 
 struct FlightLogStrip: View {

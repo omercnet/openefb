@@ -243,9 +243,9 @@ final class MapViewModel {
         // the region): track degrees true, ground speed knots; cleared below 30 kt by the service.
         mapService.updateTrackRuler(origin: location.coordinate, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed)
         // Predicted airspace entries along the same track (Layers > Predictions); off or stale clears them.
-        let predictionsOn = (UserDefaults.standard.object(forKey: FlightLogVisibility.predictionsKey) as? Bool)
-            ?? FlightLogVisibility.predictionsDefault
-        predictionService.update(location: location, appState: appState, isStale: gpsStatus.isStale, enabled: predictionsOn)
+        predictionService.update(
+            location: location, appState: appState, isStale: gpsStatus.isStale, enabled: FlightLogVisibility.predictionsOn()
+        )
         mapService.updatePredictionMarkers(appState.predictedEvents)
 
         // A fix outside the selected region (e.g. a US simulator fix while viewing Israel) is

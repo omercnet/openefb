@@ -141,4 +141,16 @@ struct PredictionRowsTests {
         #expect(FlightLogStrip.spokenTitle("B floor 3,000") == "Class B floor 3,000 feet")
         #expect(FlightLogStrip.spokenTitle("C ceiling 4,000") == "Class C ceiling 4,000 feet")
     }
+
+    /// The map reads the toggle the way the Layers switch stores it, and "YES" from a launch argument.
+    @MainActor @Test func predictionsToggleReadsStoredAndLaunchArgumentValues() throws {
+        let defaults = try #require(UserDefaults(suiteName: "PredictionRowsTests"))
+        defaults.removePersistentDomain(forName: "PredictionRowsTests")
+        #expect(FlightLogVisibility.predictionsOn(defaults) == FlightLogVisibility.predictionsDefault)
+        defaults.set("YES", forKey: FlightLogVisibility.predictionsKey)
+        #expect(FlightLogVisibility.predictionsOn(defaults))
+        defaults.set(false, forKey: FlightLogVisibility.predictionsKey)
+        #expect(!FlightLogVisibility.predictionsOn(defaults))
+        defaults.removePersistentDomain(forName: "PredictionRowsTests")
+    }
 }
