@@ -83,7 +83,10 @@ shot() {
     -OpenEFBScenarioSpeed 1 -OpenEFBScenarioStart "$start" "$@" >/dev/null || problems+=("launch failed or timed out")
   if [ ${#problems[@]} -eq 0 ]; then
     sleep "$WAIT"   # the map, the first frame and a few fixes
-    limited 60 xcrun simctl io "$sim" screenshot "$OUT/$device-$name.png" >/dev/null 2>&1 || problems+=("no screenshot")
+    # One retry: the first shot after a cold simulator boot on a hosted runner can hit the deadline.
+    limited 60 xcrun simctl io "$sim" screenshot "$OUT/$device-$name.png" >/dev/null 2>&1 \
+      || { sleep 10; limited 60 xcrun simctl io "$sim" screenshot "$OUT/$device-$name.png" >/dev/null 2>&1; } \
+      || problems+=("no screenshot")
     state=0
     app_running "$sim" || state=$?
     case $state in
