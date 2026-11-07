@@ -255,6 +255,10 @@ final class NearestAirportViewModel {
     func setDirectTo(airport: Airport) {
         appState.directToAirport = airport
         appState.activeFlightPlan = true
+        // Without a fix, the previous navigation's numbers must not show as this Direct-To's.
+        appState.distanceToNext = nil        // nautical miles
+        appState.bearingToNext = nil         // degrees true
+        appState.estimatedTimeEnroute = nil  // seconds
         appState.updateActiveRouteProgress()
     }
 

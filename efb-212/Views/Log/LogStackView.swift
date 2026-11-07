@@ -202,9 +202,9 @@ struct LogStackView: View {
         return activePlanText ?? "Flight"
     }
 
-    /// The next waypoint's ident.
+    /// The next waypoint's ident, with the strip's precedence (a Direct-To wins over the route).
     private var nextIdent: String? {
-        appState.activeRoute?.current?.toCode ?? appState.directToAirport?.icao ?? appState.activePlanDestination
+        FlightLogStrip.nextIdent(for: appState)
     }
 
     private var recordingText: String? {
