@@ -32,8 +32,8 @@ struct LogStackView: View {
 
     /// One row of the Flown section, in date order.
     private enum FlownItem: Identifiable {
-        /// A recorded flight and its logbook entry while that entry is an unsigned draft.
-        case flight(SchemaV1.FlightRecord, draft: SchemaV1.LogbookEntry?)
+        /// A recorded flight and its logbook entry (a draft to sign, or a signed entry to review).
+        case flight(SchemaV1.FlightRecord, entry: SchemaV1.LogbookEntry?)
         /// A logbook entry with no recorded flight (manual, or its recording was deleted).
         case entry(SchemaV1.LogbookEntry)
 
@@ -278,14 +278,11 @@ struct LogStackView: View {
 
     // MARK: - Flown
 
-    /// Recorded flights with their drafts, plus logbook entries that have no recorded flight, newest first.
+    /// Recorded flights with their logbook entries, plus logbook entries that have no recorded flight, newest first.
     private var flownItems: [FlownItem] {
         let flightIDs = Set(flights.map(\.id))
-        var draftsByFlight: [UUID: SchemaV1.LogbookEntry] = [:]
-        for entry in entries where !entry.isConfirmed {
-            if let flightID = entry.flightID { draftsByFlight[flightID] = draftsByFlight[flightID] ?? entry }
-        }
-        let flightItems = flights.map { FlownItem.flight($0, draft: draftsByFlight[$0.id]) }
+        let entriesByFlight = FlownEntryAction.entriesByFlight(entries)
+        let flightItems = flights.map { FlownItem.flight($0, entry: entriesByFlight[$0.id]) }
         let standalone = entries
             .filter { entry in entry.flightID.map { !flightIDs.contains($0) } ?? true }
             .map(FlownItem.entry)
@@ -309,16 +306,16 @@ struct LogStackView: View {
         } else {
             ForEach(items) { item in
                 switch item {
-                case .flight(let record, let draft):
+                case .flight(let record, let entry):
                     FlownFlightRow(
                         record: record,
-                        draft: draft,
+                        entry: entry,
                         onOpen: { path.append(.flight(record)) },
-                        onSign: { path.append(.entry($0)) }
+                        onOpenEntry: { path.append(.entry($0)) }
                     )
                     .swipeActions {
-                        if let draft {
-                            Button("Delete draft", role: .destructive) { delete(draft) }
+                        if let entry, !entry.isConfirmed {
+                            Button("Delete draft", role: .destructive) { delete(entry) }
                         }
                     }
                 case .entry(let entry):

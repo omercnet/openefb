@@ -44,7 +44,7 @@ The EFB rules above all still hold.
 - **NRST opens the nearest list in the strip column; one tap on a row inserts the direct-to.** A one-tap insert of the nearest field could pick a heliport or a short strip (finding F1); two taps keeps the choice (F2).
 - **Footer: GPS state, NRST, layers, zoom in, zoom out, one row.** Night and orientation live in the layers column. After a pan, zoom in becomes Recenter until the chart follows ownship again (F3).
 - **A Direct-To wins.** It is the next waypoint everywhere while it is active; opening the planner does not cancel it.
-- **The strip is a fixed 400pt on iPad** (no collapsed mode): 34% of an 11" iPad and 29% of a 13" in landscape. The iPhone gets a 104pt rail with the NOW cell and footer under the chart.
+- **The strip is a fixed 400pt on iPad** (no collapsed mode): 34% of an 11" iPad and 29% of a 13" in landscape. The iPhone gets a 104pt rail with the NOW cell and footer under the chart; an opened column (airport, nearest, layers, search) covers only the area above the NOW cell, so NOW stays visible under any opened column.
 - **The debrief runs on distance.** The strip map, profile and radio bands share one distance axis; times are labels at the waypoints. Short legs may be drawn at a marked half scale.
 
 ### Stage 2: the leading edge

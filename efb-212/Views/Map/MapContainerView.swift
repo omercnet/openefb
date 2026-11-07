@@ -320,7 +320,8 @@ extension MapContainerView {
     }
 
     /// iPhone and iPad Split View: header and warnings on top, the NEXT rail beside the chart, the NOW
-    /// cell at full width, then the footer. Other columns cover rail and chart (the map stays alive).
+    /// cell at full width, then the footer. Other columns cover the area above the NOW cell (the map
+    /// stays alive); NOW and the footer stay visible under any opened column.
     private func compactLayout(_ viewModel: MapViewModel, _ nearestVM: NearestAirportViewModel) -> some View {
         VStack(spacing: 0) {
             ZStack {
@@ -336,10 +337,8 @@ extension MapContainerView {
                             .accessibilityHidden(true)
                         chart(viewModel)
                     }
-                    ColumnRule()
-                    FlightLogNowCell(gpsStatus: viewModel.gpsStatus, onClear: clearNavigation, compact: true)
                 }
-                .background(Palette.paper.ignoresSafeArea())
+                .background(Palette.paper.ignoresSafeArea(edges: .top))
 
                 if appState.stripColumn != .log {
                     stripColumn(viewModel, nearestVM)
@@ -347,6 +346,9 @@ extension MapContainerView {
                         .background(Palette.paper.ignoresSafeArea())
                 }
             }
+            ColumnRule()
+            FlightLogNowCell(gpsStatus: viewModel.gpsStatus, onClear: clearNavigation, compact: true)
+                .background(Palette.paper)
             FlightLogFooter(mapViewModel: viewModel, nearestEntry: nearestVM.nearestEntry, compact: true)
                 .background(Palette.paperSecondary.ignoresSafeArea(edges: .bottom))
         }

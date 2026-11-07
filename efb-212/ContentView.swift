@@ -3,8 +3,9 @@
 //  efb-212
 //
 //  Root view, Direction 2: no tab bar. The map screen (chart with the log strip at its leading
-//  edge) or the log stack (Next / Now / Flown, also the logbook). The beta banner shows on the
-//  map screen only; after dismissal it lives in Settings > About.
+//  edge) or the log stack (Next / Now / Flown, also the logbook). The map screen stays mounted
+//  under the log stack so its services (recording, route, location) survive the switch. The beta
+//  banner shows on the map screen only; after dismissal it lives in Settings > About.
 //
 
 import SwiftUI
@@ -22,11 +23,16 @@ struct ContentView: View {
             DatabaseUnavailableBanner()
             RemoteConfigBanner()
 
-            switch appState.selectedScreen {
-            case .map:
+            ZStack {
+                // Always mounted: tearing it down would orphan an active recording and drop the route.
                 MapContainerView()
-            case .log:
-                LogStackView()
+                    .accessibilityHidden(appState.selectedScreen == .log)
+                    .allowsHitTesting(appState.selectedScreen == .map)
+
+                if appState.selectedScreen == .log {
+                    LogStackView()
+                        .background(Palette.paper.ignoresSafeArea())
+                }
             }
         }
         #if DEBUG
