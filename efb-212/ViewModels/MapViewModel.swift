@@ -322,10 +322,16 @@ final class MapViewModel {
             if stale {
                 mapService.updateTrackRuler(origin: nil, trackTrue: appState.track, groundSpeedKnots: appState.groundSpeed)
                 // Predictions from a frozen fix would read as current too.
-                predictionService.clear(appState: appState)
-                mapService.updatePredictionMarkers([])
+                clearPredictions()
             }
         }
+    }
+
+    /// Drops predicted events, their map diamonds and the debounce history (stale fix, or the
+    /// Predictions toggle turned off); the next enabled fix starts fresh.
+    func clearPredictions() {
+        predictionService.clear(appState: appState)
+        mapService.updatePredictionMarkers([])
     }
 
     // MARK: - First Location (legacy entry point)

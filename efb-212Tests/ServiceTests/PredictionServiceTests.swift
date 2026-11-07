@@ -199,6 +199,21 @@ struct PredictionServiceUpdateTests {
         #expect(appState.predictedEvents.isEmpty)
     }
 
+    /// Turning Predictions off clears at once (no fix needed) and forgets the debounce history.
+    @Test func clearDropsEventsAndRestartsDebounce() {
+        let appState = makeAppState()
+        let service = PredictionService()
+        service.update(location: fix(secondsAfterStart: 0), appState: appState, isStale: false, enabled: true)
+        service.update(location: fix(secondsAfterStart: 1), appState: appState, isStale: false, enabled: true)
+        #expect(!appState.predictedEvents.isEmpty)
+
+        service.clear(appState: appState)
+        #expect(appState.predictedEvents.isEmpty)
+
+        service.update(location: fix(secondsAfterStart: 2), appState: appState, isStale: false, enabled: true)
+        #expect(appState.predictedEvents.isEmpty)
+    }
+
     @Test func unknownCoursePredictsNothing() {
         let appState = makeAppState()
         let service = PredictionService()

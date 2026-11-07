@@ -74,6 +74,9 @@ struct LayersColumnView: View {
                                     caption: "Airspace ahead in the next 10 minutes, from track, speed and climb",
                                     isOn: $showsPredictions, identifier: "toggle-predictions")
                     }
+                    .onChange(of: showsPredictions) { _, on in
+                        if !on { mapViewModel.clearPredictions() }
+                    }
                     .padding(.horizontal, Space.l)
 
                     ColumnRule()
