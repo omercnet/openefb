@@ -11,6 +11,7 @@ import Foundation
 @testable import efb_212
 
 @Suite("Flown Entry Action Tests")
+@MainActor
 struct FlownEntryActionTests {
 
     private func entry(flightID: UUID?, confirmed: Bool) -> SchemaV1.LogbookEntry {
