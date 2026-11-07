@@ -81,7 +81,7 @@ struct PrivacyManifestTests {
         #expect(domains.isEmpty, "Tracking domains should be empty (no tracking)")
     }
 
-    @Test("Collected data types declare only Coarse Location")
+    @Test("Collected data types declare Coarse Location, Crash Data and Performance Data")
     func collectedDataTypes() throws {
         let manifest = try loadPrivacyManifest()
 
@@ -91,12 +91,16 @@ struct PrivacyManifestTests {
         }
 
         // Matches the App Store privacy label (Q13): map area and airport requests reach third-party hosts.
-        // Location and audio are otherwise processed on the device only.
+        // Location and audio are otherwise processed on the device only. Crash and hang summaries (MetricKit)
+        // go to TelemetryDeck; its SDK declares its own Product Interaction and Device ID entries.
         let dataTypeNames = collectedTypes.compactMap {
             $0["NSPrivacyCollectedDataType"] as? String
         }
-        #expect(dataTypeNames == ["NSPrivacyCollectedDataTypeCoarseLocation"],
-                "Must declare Coarse Location and nothing else")
+        #expect(dataTypeNames == [
+            "NSPrivacyCollectedDataTypeCoarseLocation",
+            "NSPrivacyCollectedDataTypeCrashData",
+            "NSPrivacyCollectedDataTypePerformanceData",
+        ], "Must declare Coarse Location, Crash Data and Performance Data and nothing else")
 
         // Verify neither is used for tracking
         for entry in collectedTypes {

@@ -92,6 +92,7 @@ final class IsraelChartStore {
             do {
                 let record = try await service.download(manifest, progress: reportProgress)
                 installed = record
+                Telemetry.signal("ChartPack.installed", parameters: ["product": record.product, "edition": record.edition])
             } catch is CancellationError {
                 // Pause: the partial file stays and the next start resumes it.
                 pausedProgress = downloadProgress

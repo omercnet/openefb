@@ -1,9 +1,10 @@
 # Kanaf privacy policy
 
-Last updated: 2026-11-02. Contact: kanaf@omer.io
+Last updated: 2026-11-07. Contact: kanaf@omer.io
 
-Kanaf is a free, open-source flight-planning app for iPad and iPhone. It has no account, no ads, no analytics and no
-tracking. The developer does not receive your location, audio, transcripts, flights or logbook.
+Kanaf is a free, open-source flight-planning app for iPad and iPhone. It has no account, no ads and no cross-app tracking. It
+sends anonymous usage and crash summaries (below), which you can turn off. The developer does not receive your
+location, audio, transcripts, flights or logbook.
 
 ## What stays on your device
 
@@ -27,11 +28,24 @@ tracking. The developer does not receive your location, audio, transcripts, flig
 | tiles.openfreemap.org, tiles.arcgis.com | Map tiles (Street, FAA sectional) | the map area on screen, your IP address |
 | openefb-notam-relay.omerc.workers.dev (Cloudflare, run by the developer) | Israel NOTAM feed | your IP address; the app asks for the whole-country feed and sends no position |
 | pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev (Cloudflare R2, run by the developer) | Israel chart and diagram packs | the file requested and your IP address |
+| nom.telemetrydeck.com (TelemetryDeck) | Anonymous usage and crash summaries (below) | the summaries, your IP address |
 
 Every host above sees your IP address, as any website does. Map tile hosts also see which map area you are looking at.
 Cloudflare operates the two hosts the developer runs; the relay code reads no request header and stores no data about
 you, but Cloudflare's own logs are outside the developer's control and are covered by Cloudflare's privacy policy.
 The app never sends your GPS coordinates to any host.
+
+## Anonymous usage and crash summaries
+
+Kanaf uses [TelemetryDeck](https://telemetrydeck.com/privacy/) to count how features are used and to learn about
+crashes and hangs. It sends short event names (for example "a recording started", "the Flights tab was opened"), the
+app version, iOS version, device model, the selected region (US or Israel) and the iOS vendor identifier, hashed on the
+device so it cannot be read back. Crash and hang summaries come from Apple MetricKit: the exception type and code,
+signal, hang duration and the top frames of the stack as binary names and offsets. No location, airport or route,
+aircraft, name, audio, transcript or other flight data is ever included.
+The data is not linked to you and is not used for tracking.
+
+Turn it off in Settings > Privacy > Share anonymous usage data. Sending stops at once.
 
 ## Permissions
 

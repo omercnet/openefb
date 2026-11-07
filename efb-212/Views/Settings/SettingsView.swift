@@ -15,6 +15,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var regionSaveError: String?
     @State private var remoteConfig = RemoteConfigStore.shared
+    @AppStorage(Telemetry.enabledKey) private var shareUsageData = true
 
     @Query(filter: #Predicate<SchemaV1.PilotProfile> { $0.isActive == true })
     private var activePilots: [SchemaV1.PilotProfile]
@@ -163,6 +164,18 @@ struct SettingsView: View {
                 // Section 4: NOTAM API
                 if appState.region.isAvailable(.notams) {
                     notamSection
+                }
+
+                Section {
+                    Toggle("Share anonymous usage data", isOn: $shareUsageData)
+                        .accessibilityIdentifier("share-usage-data-toggle")
+                        .onChange(of: shareUsageData) { _, enabled in
+                            Telemetry.setEnabled(enabled, region: appState.region)
+                        }
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    Text("Anonymous app usage and crash summaries. No location, no flight data.")
                 }
 
                 // Section 5: Legal
