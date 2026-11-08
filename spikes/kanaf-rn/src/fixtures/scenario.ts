@@ -7,7 +7,7 @@ export const scenario = {
   recording: { elapsed: '00:00:06' },
   gps: { label: 'GPS 3D', ok: true },
   altitudeTape: { minFt: 0, maxFt: 4000 },
-  map: { center: [-122.22, 37.55] as [number, number], zoom: 10.2 },
+  map: { center: [-122.1593, 37.4777] as [number, number], zoom: 10.0 },
   // 1, 2, 3, 5 minute ticks on the track ruler, from ownship along trkDeg
   trackRulerMinutes: [1, 2, 3, 5],
   airport: {

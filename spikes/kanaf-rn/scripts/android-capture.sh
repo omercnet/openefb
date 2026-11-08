@@ -3,9 +3,12 @@
 # result (the rn-spike workflow's android job, run inside reactivecircus/android-emulator-runner).
 #   APK=<app-release.apk> OUT=<dir> spikes/kanaf-rn/scripts/android-capture.sh
 # Env: APK (required), OUT (default /tmp/rn-spike-android), WAIT (seconds for non-map screens, default 10),
-# MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), RESULT_TIMEOUT (seconds, default 120).
+# MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), RESULT_TIMEOUT (seconds, default 120),
+# SCREENS (default "map airport night sheet"), FULL (1 = also run the animation and the self test, default 1; the
+# workflow's second emulator pass with another GPU mode sets FULL=0 SCREENS=map).
 # Writes OUT/screens/<screen>.png, OUT/map-status-<screen>.json and OUT/logcat-<screen>.txt, OUT/spike-result.json
-# and OUT/spike-anim.json (from logcat: a release build is not debuggable, so run-as cannot read the files).
+# and OUT/spike-anim.json (from logcat: a release build is not debuggable, so run-as cannot read the files), and
+# OUT/dumpsys-location.txt.
 set -euo pipefail
 
 APK=${APK:?set APK to the built release APK}
@@ -13,8 +16,11 @@ OUT=${OUT:-/tmp/rn-spike-android}
 WAIT=${WAIT:-10}
 MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}
+SCREENS=${SCREENS:-map airport night sheet}
+FULL=${FULL:-1}
 PKG=io.omer.efb.rnspike
 GEO="-122.2289 37.4876"   # longitude latitude: ownship over Redwood City (src/fixtures/scenario.ts)
+LATLON="37.4876,-122.2289"
 mkdir -p "$OUT/screens"
 
 stamp() { echo "[$(date +%H:%M:%S)] $*"; }
@@ -75,12 +81,14 @@ wait_map() {
   sleep 2   # symbol fade-in
 }
 
-for screen in map airport night sheet; do
+for screen in $SCREENS; do
   stamp "screen $screen"
   open_url "kanaf-rn://$screen"
   if [ "$screen" = sheet ]; then sleep "$WAIT"; else wait_map "$screen"; fi
   screenshot "$screen"
 done
+
+[ "$FULL" = 1 ] || exit 0
 
 stamp "map animation: 60 s at 10 Hz"
 open_url "kanaf-rn://map?animate=1"
@@ -88,17 +96,32 @@ sleep 70
 logged SPIKE_ANIM > "$OUT/spike-anim.json"
 
 stamp "self test"
-# The emulator reports one fix per `geo fix`; keep re-sending it so watchPositionAsync sees updates.
+# Location: make sure location is on, then feed two sources every second: the emulator's GNSS (`geo fix`, reaches the
+# gps provider unmocked) and a shell test provider for gps (fixes arrive with mocked=true), so the result's
+# `watchMocked` / `current.mocked` say which one expo-location's fused provider passed through.
+adb shell cmd location set-location-enabled true || true
+adb shell appops set com.android.shell android:mock_location allow || true
+adb shell cmd location providers add-test-provider gps || echo "android-capture: no gps test provider" >&2
+adb shell cmd location providers set-test-provider-enabled gps true || true
+adb shell settings get secure location_mode | sed 's/^/location_mode=/' || true
 # shellcheck disable=SC2086 # GEO is two arguments
-while true; do adb emu geo fix $GEO >/dev/null 2>&1 || true; sleep 1; done &
+while true; do
+  adb emu geo fix $GEO >/dev/null 2>&1 || true
+  adb shell cmd location providers set-test-provider-location gps --location "$LATLON" --accuracy 5 >/dev/null 2>&1 || true
+  sleep 1
+done &
 LOCATION_LOOP=$!
 open_url "kanaf-rn://selftest"
 waited=0
-until [ -n "$(logged SPIKE_RESULT)" ] || [ "$waited" -ge "$RESULT_TIMEOUT" ]; do
+until logged SPIKE_RESULT_END | grep -q . || [ "$waited" -ge "$RESULT_TIMEOUT" ]; do
   sleep 5; waited=$((waited + 5))
 done
 screenshot selftest
-logged SPIKE_RESULT > "$OUT/spike-result.json"
+adb shell dumpsys location > "$OUT/dumpsys-location.txt" 2>&1 || true
+adb shell cmd location providers remove-test-provider gps >/dev/null 2>&1 || true
+# The result is logged in numbered chunks (logcat truncates lines near 4 KB); reassemble them in order.
+adb logcat -d -s ReactNativeJS:V | grep -F 'SPIKE_RESULT_PART ' | sed 's/.*SPIKE_RESULT_PART //' | sort -n -k1,1 \
+  | cut -d' ' -f2- | tr -d '\n' > "$OUT/spike-result.json" || true
 if ! [ -s "$OUT/spike-result.json" ]; then
   echo "android-capture: no SPIKE_RESULT after ${RESULT_TIMEOUT}s" >&2
   exit 1

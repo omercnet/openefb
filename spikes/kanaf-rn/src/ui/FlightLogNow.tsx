@@ -118,7 +118,7 @@ export function AltitudeTape({ altitudeFt, vsFpm }: { altitudeFt: number; vsFpm:
   const half = labelWidth(altLabel) / 2;
   const altCenter = Math.min(Math.max(ax, x0 + half), x1 - half);
   const touches = (a0: number, a1: number) => a0 - Space.xs < altCenter + half && a1 + Space.xs > altCenter - half;
-  const labelTop = height - 6 - (11 * 1.088) / 2; // centered on labelY = height - 6 (Archivo line box 1.088 em)
+  const labelTop = height - 6 - (Type.stripLabel.lineHeight ?? 12) / 2; // label line box centered on labelY = height - 6
   const label = { position: 'absolute' as const, top: labelTop };
 
   return (

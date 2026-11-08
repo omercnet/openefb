@@ -41,13 +41,18 @@ function styleFor(night: boolean): StyleSpecification {
 
 type MapStatus = {
   platform: string; night: boolean; events: Record<string, number>; fullyRendered: boolean; failed: boolean; native: string[];
+  /** queryRenderedFeatures count per layer: a symbol layer at 0 was not placed (image / glyph problem); a count > 0
+   *  with nothing on screen means placed but not drawn (renderer / GPU problem). */
+  rendered?: Record<string, number | string>;
+  missingImages: string[];
 };
+
+const PROBED_LAYERS = ['ownship-symbol', 'track-ruler-ticks', 'track-ruler-line', 'airport-circles', 'street-place-label'];
 
 /** Records the first occurrence of a lifecycle event (ms since mount), then logs and persists the cumulative status. */
 function report(status: MapStatus, t0: number, event: string) {
   if (event in status.events) return; // render events repeat on every change; the first one is what CI waits for
   status.events[event] = Math.round(performance.now() - t0);
-  if (event === 'didFinishRenderingMapFully') status.fullyRendered = true;
   if (event === 'didFailLoadingMap') status.failed = true;
   console.log('SPIKE_MAP ' + JSON.stringify(status));
   writeResult(MAP_STATUS_FILE, status).catch((e) => console.warn('map status write failed', e));
@@ -57,7 +62,7 @@ export function MapSurface({ night }: { night: boolean }) {
   const mapRef = useRef<MapRef>(null);
   const mapStyle = useMemo(() => styleFor(night), [night]);
   const t0 = useRef(performance.now()).current;
-  const status = useRef<MapStatus>({ platform: Platform.OS, night, events: {}, fullyRendered: false, failed: false, native: [] }).current;
+  const status = useRef<MapStatus>({ platform: Platform.OS, night, events: {}, fullyRendered: false, failed: false, native: [], missingImages: [] }).current;
   const [position, setPosition] = useState(ORIGIN);
   const [airports, setAirports] = useState<GeoJSON.FeatureCollection>({ type: 'FeatureCollection', features: [] });
   const url = Linking.useURL();
@@ -148,7 +153,20 @@ export function MapSurface({ night }: { night: boolean }) {
       onWillStartLoadingMap={() => report(status, t0, 'willStartLoadingMap')}
       onDidFinishLoadingStyle={() => report(status, t0, 'didFinishLoadingStyle')}
       onDidFailLoadingMap={() => report(status, t0, 'didFailLoadingMap')}
-      onDidFinishRenderingMapFully={() => report(status, t0, 'didFinishRenderingMapFully')}
+      onDidFinishRenderingMapFully={() => {
+        if ('didFinishRenderingMapFully' in status.events) return;
+        report(status, t0, 'didFinishRenderingMapFully');
+        // Give symbol placement a moment, count what each layer placed, then tell CI the map is ready.
+        setTimeout(async () => {
+          const rendered: Record<string, number | string> = {};
+          for (const id of PROBED_LAYERS) {
+            rendered[id] = await mapRef.current?.queryRenderedFeatures({ layers: [id] }).then((f) => f.length, (e) => String(e)) ?? 'no map';
+          }
+          status.rendered = rendered;
+          status.fullyRendered = true;
+          report(status, t0, 'symbolsProbed');
+        }, 1000);
+      }}
       onDidFinishLoadingMap={() => {
         report(status, t0, 'didFinishLoadingMap');
         mapRef.current?.getBounds().then(loadAirports);
@@ -156,7 +174,10 @@ export function MapSurface({ night }: { night: boolean }) {
       onRegionDidChange={(e) => loadAirports(e.nativeEvent.bounds)}
     >
       <Camera initialViewState={{ center: scenario.map.center, zoom: scenario.map.zoom }} />
-      <Images images={{ 'ownship-chevron': require('./icons/ownship.png'), 'track-ruler-tick': { source: require('./icons/tick.png'), sdf: true } }} />
+      <Images
+        images={{ 'ownship-chevron': require('./icons/ownship.png'), 'track-ruler-tick': { source: require('./icons/tick.png'), sdf: true } }}
+        onImageMissing={(e) => status.missingImages.push(e.nativeEvent.image)}
+      />
       <GeoJSONSource id="airports" data={airports}>
         {/* Green flight-category dot with a white ring, as drawn over the sectional in the reference screenshots */}
         <Layer type="circle" id="airport-circles" paint={{ 'circle-radius': 8, 'circle-color': '#34C759', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFFFFF' }} />

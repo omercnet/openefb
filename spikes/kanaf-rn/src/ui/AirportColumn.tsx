@@ -41,9 +41,13 @@ export function AirportHeader() {
           <Text numberOfLines={1} style={[Type.title, { color: t.airspace }]}>
             {a.ident}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xs }}>
-            <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: t.categoryMVFR }} />
+          {/* Dot out of flow so the container's baseline is the "MVFR" text baseline (SwiftUI firstTextBaseline);
+              as a first child the dot's bottom edge became the baseline on iOS. 12pt dot + Space.xs. */}
+          <View style={{ paddingLeft: 12 + Space.xs }}>
             <Text style={[Type.systemHeadline, { color: t.primaryText }]}>{a.flightCategory}</Text>
+            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, justifyContent: 'center' }}>
+              <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: t.categoryMVFR }} />
+            </View>
           </View>
         </View>
         <Text numberOfLines={2} style={[Type.body, { color: t.inkSecondary }]}>
@@ -63,7 +67,7 @@ export function AirportColumn() {
       <Pressy
         accessibilityLabel={`Direct to ${a.ident}`}
         style={{
-          minHeight: StripMetrics.cell + 15, // borderedProminent adds 7.5pt above and below the 60pt label frame
+          minHeight: StripMetrics.cell + 14, // borderedProminent adds 7pt above and below the 60pt label frame (measured 74pt)
           borderRadius: 999,
           backgroundColor: t.accent,
           flexDirection: 'row',
@@ -73,7 +77,7 @@ export function AirportColumn() {
         }}
       >
         <ArrowUpRight color={t.onAccent} />
-        <Text style={[Type.label, { fontFamily: 'ArchivoRoman-SemiBold', color: t.onAccent }]}>Direct {a.ident}</Text>
+        <Text style={[Type.labelBold, { color: t.onAccent }]}>Direct {a.ident}</Text>
       </Pressy>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Space.s }}>
         <Chip icon={<ArrowUp color={t.ink} size={13} />} text={`${a.elevationFt}' MSL`} />
@@ -140,7 +144,7 @@ function Chip({ icon, text }: { icon: ReactNode; text: string }) {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: Space.xs + 1, // Space.xs plus the SF Symbol's side bearing
+        gap: Space.xs,
         paddingHorizontal: Space.m,
         paddingVertical: Space.s,
         borderRadius: 999,
@@ -207,7 +211,8 @@ function Weather() {
           <Chevron dir="down" color={t.inkSecondary} />
         </Pressy>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingTop: Space.xs }}>
+      {/* 15pt row: the caption-size SF triangle's frame (reference: the TAF row is 19.2pt with its 4pt top padding). */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingTop: Space.xs, minHeight: Space.xs + 15 }}>
         <WarningTriangle color={t.caution} bang={t.night ? '#000000' : '#FFFFFF'} />
         <Text style={[Type.caption, { color: t.caution }]}>TAF not loaded</Text>
       </View>

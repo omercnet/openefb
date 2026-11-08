@@ -47,13 +47,25 @@ jobs:
       - name: Pod install
         working-directory: spikes/kanaf-rn/ios
         run: pod install
-      - name: Build Release for the simulator
+      - name: Build Release for the simulator (ad-hoc signed)
+        # Ad-hoc ("Sign to Run Locally") signing, no team: an unsigned app (CODE_SIGNING_ALLOWED=NO) gets
+        # errSecMissingEntitlement from the Keychain, which broke expo-secure-store in run 2.
         run: |
           set -o pipefail
           mkdir -p "$OUT"
           xcodebuild build -workspace ios/KanafRNSpike.xcworkspace -scheme KanafRNSpike -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DD" \
-            CODE_SIGNING_ALLOWED=NO </dev/null 2>&1 | tee "$OUT/build.log" | xcbeautify --renderer github-actions
+            CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
+            </dev/null 2>&1 | tee "$OUT/build.log" | xcbeautify --renderer github-actions
+      - name: Show the app's signature and entitlements
+        run: |
+          APP="$DD/Build/Products/Release-iphonesimulator/KanafRNSpike.app"
+          { grep -E '^(CodeSign|ProcessProductPackaging).*KanafRNSpike' "$OUT/build.log" || echo "no CodeSign step for the app in the build log"
+            codesign -dvv "$APP" 2>&1 || true
+            echo "--- signed entitlements"; codesign -d --entitlements - --xml "$APP" 2>&1 || true
+            echo "--- simulated entitlements (__TEXT,__entitlements)"
+            xcrun otool -X -s __TEXT __entitlements "$APP/KanafRNSpike" 2>&1 | head -40 || true
+          } | tee "$OUT/signing.txt"
       - name: Capture screens and self test
         env:
           APP: /tmp/rn-dd/Build/Products/Release-iphonesimulator/KanafRNSpike.app
@@ -123,6 +135,25 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
           working-directory: spikes/kanaf-rn
           # The action runs each script line in its own shell, so all logic lives in the script.
+          script: bash scripts/android-capture.sh
+      - name: Map symbols under another GPU mode (diagnostic)
+        # Symbol layers did not draw under SwiftShader GLES in runs 1-2; the same APK on ANGLE-over-SwiftShader
+        # (swangle) separates a renderer problem from an app problem. Map screen only.
+        if: always()
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APK: ${{ github.workspace }}/spikes/kanaf-rn/android/app/build/outputs/apk/release/app-release.apk
+          OUT: /tmp/rn-spike-android/gpu-swangle
+          FULL: 0
+          SCREENS: map
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_tablet
+          disable-animations: true
+          emulator-options: -no-window -gpu swangle_indirect -no-snapshot -no-boot-anim -camera-back none -noaudio
+          working-directory: spikes/kanaf-rn
           script: bash scripts/android-capture.sh
       - name: Compare with the SwiftUI references
         if: always()

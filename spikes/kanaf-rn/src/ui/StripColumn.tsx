@@ -45,7 +45,7 @@ export function StripColumn({ screen, width }: { screen: StripScreen; width: num
                 <FlightLogNow />
               </View>
             )}
-            <FlightLogFooter bottomInset={bottom} />
+            <FlightLogFooter width={width} bottomInset={bottom} />
           </>
         ) : null}
       </View>

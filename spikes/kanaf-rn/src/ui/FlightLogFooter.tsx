@@ -1,18 +1,24 @@
 // FlightLogFooter (efb-212/Views/Log/FlightLogFooter.swift): one row of 60pt cells under the strip: GPS state,
 // the dark NRST cell, LAYERS, ZOOM + and ZOOM -. The paper and the NRST ink run into the bottom safe area.
-import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { scenario } from '../fixtures/scenario';
 import { Layers, Minus, Plus } from './Icons';
 import { CellButton, ColumnRule, Pressy, useTheme } from './Primitives';
-import { Space, StripMetrics, Type, tracked } from './tokens';
+import { Space, StripMetrics, Type, lineHeight, tracked } from './tokens';
 
 /** IBM Plex Mono advance width, em (every glyph). */
 const PLEX_ADVANCE = 0.6;
+const GPS_MAX_WIDTH = 120; // points
 
-export function FlightLogFooter({ bottomInset }: { bottomInset: number }) {
+/**
+ * GPS and NRST share what the three 60pt cells and four 1pt dividers leave, GPS capped at 120pt (SwiftUI: 108 / 108
+ * at 400pt). Computed rather than flex: Yoga on iOS split it 120 / 96 (iOS round 1), which also shrank NRST's text.
+ */
+export function FlightLogFooter({ width, bottomInset }: { width: number; bottomInset: number }) {
   const t = useTheme();
   const gps = scenario.gps;
+  const shared = width - 3 * StripMetrics.cell - 4;
+  const gpsWidth = Math.min(GPS_MAX_WIDTH, shared / 2);
   const divider = <View style={{ width: 1, height: StripMetrics.cell, backgroundColor: t.rule }} />;
   return (
     <View style={{ backgroundColor: t.paperSecondary }}>
@@ -21,9 +27,7 @@ export function FlightLogFooter({ bottomInset }: { bottomInset: number }) {
           accessible
           accessibilityLabel={gps.ok ? 'GPS 3D fix' : gps.label}
           style={{
-            flex: 1,
-            maxWidth: 120,
-            minWidth: StripMetrics.cell,
+            width: gpsWidth,
             height: StripMetrics.cell,
             paddingHorizontal: Space.s,
             flexDirection: 'row',
@@ -38,7 +42,7 @@ export function FlightLogFooter({ bottomInset }: { bottomInset: number }) {
           </Text>
         </View>
         {divider}
-        <NrstCell bottomInset={bottomInset} />
+        <NrstCell width={shared - gpsWidth} bottomInset={bottomInset} />
         {divider}
         <CellButton title="Layers" label="Map layers" accessibilityValue="Closed" icon={<Layers color={t.ink} />} />
         {divider}
@@ -53,24 +57,23 @@ export function FlightLogFooter({ bottomInset }: { bottomInset: number }) {
 
 /**
  * Dark ink cell: the emergency entry point. Like SwiftUI's lineLimit(1) + minimumScaleFactor(0.6), the
- * distance / bearing column shrinks when the 108pt cell cannot hold it at 15pt (it does on the iPad strip).
+ * distance / bearing column shrinks when the cell cannot hold it at 15pt (108pt on the iPad strip: 13.3pt).
  */
-function NrstCell({ bottomInset }: { bottomInset: number }) {
+function NrstCell({ width, bottomInset }: { width: number; bottomInset: number }) {
   const t = useTheme();
   const n = scenario.nearest;
-  const [cellWidth, setCellWidth] = useState(108);
   const dist = `${n.distNm.toFixed(1)} NM`; // nautical miles
   const brg = `${String(Math.round(n.brgDeg)).padStart(3, '0')}\u00B0`; // degrees true
-  const room = cellWidth - 2 * Space.s - Space.s - n.ident.length * PLEX_ADVANCE * 15;
+  const room = width - 2 * Space.s - Space.s - n.ident.length * PLEX_ADVANCE * 15;
   const need = Math.max(dist.length, brg.length) * PLEX_ADVANCE * 15;
   const dataSize = 15 * Math.max(0.6, Math.min(1, room / need));
+  const data = [Type.data, { fontSize: dataSize, lineHeight: lineHeight(dataSize, 1.3), color: t.paper }];
   return (
     <Pressy
       accessibilityLabel={`Nearest airport ${n.ident}, ${n.distNm.toFixed(1)} nautical miles, bearing ${brg.slice(0, 3)} degrees`}
       accessibilityHint="Opens the nearest airports list"
-      onLayout={(e) => setCellWidth(e.nativeEvent.layout.width)}
       style={{
-        flex: 1,
+        width,
         height: StripMetrics.cell + bottomInset,
         paddingBottom: bottomInset,
         paddingHorizontal: Space.s,
@@ -88,10 +91,10 @@ function NrstCell({ bottomInset }: { bottomInset: number }) {
         </Text>
       </View>
       <View>
-        <Text numberOfLines={1} style={[Type.data, { fontSize: dataSize, lineHeight: dataSize * 1.3, color: t.paper }]}>
+        <Text numberOfLines={1} style={data}>
           {dist}
         </Text>
-        <Text numberOfLines={1} style={[Type.data, { fontSize: dataSize, lineHeight: dataSize * 1.3, color: t.paper }]}>
+        <Text numberOfLines={1} style={data}>
           {brg}
         </Text>
       </View>

@@ -1,5 +1,6 @@
 // Native capability self test (kanaf-rn://selftest). Runs each check in turn, shows PASS/FAIL, writes one JSON blob
-// to <documents>/spike-result.json and logs it as a single "SPIKE_RESULT {...}" line for CI (logcat / simulator log).
+// to <documents>/spike-result.json and logs it as "SPIKE_RESULT {...}" plus numbered "SPIKE_RESULT_PART <i> <chunk>" lines
+// and "SPIKE_RESULT_END <n>" (Android logcat truncates a line near 4 KB; android-capture.sh reassembles the parts).
 // One failing or hanging check never stops the others: each is caught and bounded by a timeout.
 import Constants from 'expo-constants';
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, type AudioRecorder } from 'expo-audio';
@@ -9,7 +10,7 @@ import * as SecureStore from 'expo-secure-store';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import * as TaskManager from 'expo-task-manager';
 import { useEffect, useRef, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, PixelRatio, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Pdf from 'react-native-pdf';
 import { openAviationDb } from '../map/aviationDb';
 import { ANIMATION_FILE, SELFTEST_FILE, readResult, writeResult } from './resultFile';
@@ -102,15 +103,25 @@ async function checkSqlite(): Promise<Details> {
 // (b) location: foreground permission, 5 s of watchPositionAsync, then background updates through a TaskManager task.
 async function checkLocation(): Promise<Details> {
   const fg = await Location.requestForegroundPermissionsAsync();
+  // Which path answers: device settings, provider availability (Android: gps / network / passive), the cached fix,
+  // a one-shot fix and the 5 s watch. `mocked` is true on Android for test-provider fixes, false for emulator `geo fix`.
+  const servicesEnabled = await Location.hasServicesEnabledAsync().catch((e) => String(e));
+  const providers = await Location.getProviderStatusAsync().catch((e) => String(e));
+  const lastKnown = await Location.getLastKnownPositionAsync().then((l) => (l ? { mocked: l.mocked ?? null, ageMs: Date.now() - l.timestamp } : null), (e) => String(e));
   let updates = 0;
   let last: Location.LocationObjectCoords | null = null;
+  let watchMocked: boolean | null = null;
+  let current: unknown = null;
   if (fg.granted) {
     const sub = await Location.watchPositionAsync({ accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 0 }, (loc) => {
       updates += 1;
       last = loc.coords;
+      watchMocked = loc.mocked ?? null;
     });
     await sleep(5000);
     sub.remove();
+    current = await withTimeout(Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }), 10_000, 'getCurrentPositionAsync')
+      .then((l) => ({ lat: l.coords.latitude, lon: l.coords.longitude, mocked: l.mocked ?? null }), (e) => String(e));
   }
   const bg = await withTimeout(Location.requestBackgroundPermissionsAsync(), 15_000, 'background permission').catch((e) => ({ granted: false, status: String(e) }));
   let started = false;
@@ -129,7 +140,11 @@ async function checkLocation(): Promise<Details> {
   } catch (e) {
     startError = String(e);
   }
-  return { ok: fg.granted && updates > 0 && started, foreground: fg.status, background: bg.status, updates, last, started, taskFixes, startError };
+  return {
+    ok: fg.granted && updates > 0 && started,
+    foreground: fg.status, background: bg.status, servicesEnabled, providers, lastKnown,
+    updates, last, watchMocked, current, started, taskFixes, startError,
+  };
 }
 
 // (c) audio: microphone permission and a 2 s recording with expo-audio.
@@ -168,6 +183,20 @@ async function checkSpeech(): Promise<Details> {
     locales: typeof locales === 'string' ? locales : { count: locales.locales.length, installed: locales.installedLocales.length, enUS: locales.locales.includes('en-US') },
     services: Platform.OS === 'android' ? m.getSpeechRecognitionServices() : undefined,
     defaultService: Platform.OS === 'android' ? m.getDefaultRecognitionService().packageName : undefined,
+  };
+}
+
+/** Model, OS and screen (points and density) without expo-device: Platform.constants, Dimensions, PixelRatio. */
+function deviceInfo() {
+  const c = Platform.constants as unknown as Record<string, unknown>;
+  const screen = Dimensions.get('screen');
+  return {
+    // Android: Build.MANUFACTURER / MODEL; iOS: the simulator or device name and idiom (pad / phone)
+    model: Platform.OS === 'android' ? `${c.Manufacturer} ${c.Model}` : `${Constants.deviceName ?? 'unknown'} (${c.interfaceIdiom})`,
+    os: `${Platform.OS} ${Platform.OS === 'android' ? `${c.Release} (API ${Platform.Version})` : Platform.Version}`,
+    screenPt: { width: screen.width, height: screen.height },
+    scale: PixelRatio.get(),
+    fontScale: PixelRatio.getFontScale(),
   };
 }
 
@@ -217,7 +246,8 @@ export function SelfTestScreen() {
         app: 'kanaf-rn-spike',
         platform: Platform.OS,
         osVersion: Platform.Version,
-        rnVersion: Object.values(Platform.constants.reactNativeVersion).filter((v) => v != null).join('.'),
+        deviceInfo: deviceInfo(),
+        rnVersion: `${Platform.constants.reactNativeVersion.major}.${Platform.constants.reactNativeVersion.minor}.${Platform.constants.reactNativeVersion.patch}`,
         expoSdk: Constants.expoConfig?.sdkVersion ?? null,
         hermes: 'HermesInternal' in globalThis,
         // Fabric installs nativeFabricUIManager; bridgeless TurboModules install __turboModuleProxy (absent in some modes).
@@ -231,6 +261,9 @@ export function SelfTestScreen() {
       };
       const json = JSON.stringify(result);
       console.log('SPIKE_RESULT ' + json);
+      const parts = Math.ceil(json.length / 3000);
+      for (let i = 0; i < parts; i++) console.log(`SPIKE_RESULT_PART ${i} ${json.slice(i * 3000, (i + 1) * 3000)}`);
+      console.log(`SPIKE_RESULT_END ${parts}`);
       const path = await writeResult(SELFTEST_FILE, result).catch((e) => `write failed: ${String(e)}`);
       setSummary(`${result.allPassed ? 'ALL PASS' : 'FAILURES'}  -  ${path}`);
     })();

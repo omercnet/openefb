@@ -158,6 +158,53 @@ emulator: rAF p50 16.7 / p95 33 / max 623 ms, 10 Hz timer p50 117 / p95 140 / ma
 - **Self-test JSON** now includes `rnVersion` (Platform.constants), `expoSdk` (expo-constants), `hermes`
   (`HermesInternal`) and `newArch` (`nativeFabricUIManager`, `__turboModuleProxy`).
 
+## Round 2 (CI run 2) and fixes
+
+Both jobs passed. iOS now matches the SwiftUI screens closely (sectional, ownship, ruler labels, airport dots). iOS self
+test: sqlite, location (2 updates), audio, pdf PASS, speech on-device true; secureStore FAIL. Android: sqlite, audio,
+secureStore, pdf, speech PASS; location FAIL (0 updates); symbol layers missing on the map.
+
+- **iOS Keychain (`A required entitlement isn't present.`, errSecMissingEntitlement).** Cause: the simulator build was
+  unsigned (`CODE_SIGNING_ALLOWED=NO`), and the Keychain refuses unsigned apps. The build now signs ad hoc ("Sign to Run
+  Locally", no team): `CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=`. A new step
+  writes `signing.txt` (the CodeSign line from the build log, `codesign -dvv`, signed entitlements and the simulator's
+  `__TEXT,__entitlements` section). The entitlements file is the empty dict prebuild generates; no keychain access group
+  is declared. Untested: if the Keychain still refuses an ad-hoc app without a team, that is a harness limit (a real
+  device build has a team and the default access group), not an expo-secure-store problem.
+- **Android location, 0 updates.** Not resolved by reasoning. What is known: expo-location's legacy API uses Play
+  services' `FusedLocationProviderClient` (google_apis image), the foreground service and task started, no error, no
+  settings-resolution dialog in the screenshot. Changes to find out: the check now also reports `servicesEnabled`,
+  `getProviderStatusAsync` (gps / network / passive), `getLastKnownPositionAsync`, a 10 s `getCurrentPositionAsync`
+  (Balanced) and the `mocked` flag of each fix. The script turns location on (`cmd location set-location-enabled true`),
+  prints `location_mode`, and every second feeds both `adb emu geo fix` (GNSS, unmocked) and a shell gps test provider
+  (`cmd location providers set-test-provider-location`, mocked=true), so `watchMocked` / `current.mocked` tell which
+  source the fused provider passed through. `dumpsys location` is saved after the self test (`dumpsys-location.txt`).
+- **Android symbol layers (ownship, ruler ticks and labels, base-style place labels) not drawn; circles and lines are.**
+  Not resolved. Ruled out by reasoning: icons alone (the ownship is icon-only) and glyphs alone (place labels are
+  text-only, and `Noto Sans Regular` returns 200 from the style's glyph URL) cannot explain both; the style loads and
+  MapLibre logged no native warnings. The same code draws all of them on iOS. Remaining suspects: the emulator's
+  SwiftShader GLES renderer (maplibre-native issue #3939 reports symbol labels missing on an Android emulator while
+  fill and circle layers draw) or symbol placement. New diagnostics: after the first fully-rendered event the map
+  counts `queryRenderedFeatures` per layer (ownship, ruler ticks, ruler line, airport circles, place labels) and records
+  `onImageMissing`; a symbol layer with a count above 0 that is not visible was placed but not drawn (renderer). The
+  workflow also renders the map screen a second time on an emulator with `-gpu swangle_indirect` (ANGLE on SwiftShader)
+  into `gpu-swangle/`; symbols there and not in the main pass would pin it on the GLES path of the emulator, not the app.
+  The capture scripts now wait for this probe (`fullyRendered` is set after it).
+- **Camera.** Fitting four airport dots (KOAK, KHWD, KSQL, KPAO) in `reference/ipad-map-day.png` to web-mercator (512 px
+  tiles) gives zoom 10.00 and center -122.1593, 37.4777 for the 632 x 1376 pt map area (0.33 pt total residual; the same
+  projection puts run 2's iOS dots within 0.6 pt of where they were drawn). The parent updated `scenario.map`. The
+  reference's sixth dot is KNUQ (Moffett Federal), which the spike's public-airport query leaves out.
+- **iOS sheet.** On iPad (regular width) SwiftUI ignores detents and showed a small form sheet with squeezed rows. The
+  sheet now asks for `presentationSizing(.page)` (iOS 18+, passed as the `{ $type: 'presentationSizing', sizing: 'page' }`
+  modifier; importing `@expo/ui/swift-ui/modifiers` at runtime would call `requireNativeModule('ExpoUI')` on web), keeps
+  medium/large detents for iPhone and Android, wraps the content in a native `ScrollView`, and lays it out like the
+  SwiftUI airport panel: KSQL title and MVFR, name, chips (elevation, type, TPA), WEATHER with age badge, a fixed
+  92 pt label column, FREQUENCIES, RUNWAYS, Day palette from `src/ui/tokens.ts`. Untested until the next run.
+- **Result JSON.** Adds `deviceInfo` (model, OS, screen in points, scale, font scale from Platform.constants, Dimensions,
+  PixelRatio, expo-constants; no new dependency). `rnVersion` read the version fields in object order and printed
+  `88.1.0`; it now prints `major.minor.patch`. On Android the result is also logged as numbered
+  `SPIKE_RESULT_PART` chunks plus `SPIKE_RESULT_END`, which the script reassembles, because logcat truncates long lines.
+
 ## Compare script
 
 `node scripts/compare.mjs <shot.png> [reference.png] [--out dir]` or `--dir <screens>`: resizes both images to 1032x1376,
