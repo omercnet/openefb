@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/omercnet/openefb/compare/v1.2.0...v1.3.0) (2026-11-08)
+
+
+### Features
+
+* **map:** Direction 2 stage 1, the flight log strip ([#13](https://github.com/omercnet/openefb/issues/13)) ([08df310](https://github.com/omercnet/openefb/commit/08df3100cd4a895b04dacca8cc6b0bcceb79e4d4))
+* **map:** Direction 2 stage 2, predicted airspace ahead and unrolled debrief ([#18](https://github.com/omercnet/openefb/issues/18)) ([ecf2805](https://github.com/omercnet/openefb/commit/ecf28059c78b81d4f1814e8e08d7fd9633043205))
+
 ## [1.2.0](https://github.com/omercnet/openefb/compare/v1.1.0...v1.2.0) (2026-11-07)
 
 
