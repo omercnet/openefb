@@ -19,12 +19,13 @@
 import SwiftUI
 
 /// UserDefaults keys for the map-screen panel toggles (Layers > Panels). Flight log and
-/// instruments default to on; predictions default to `predictionsDefault` (owner decision Q4).
+/// instruments default to on. Predictions default to off: pilots opt in to the preview until
+/// an owner or CFI review in flight (docs/DESIGN.md, Stage 2).
 enum FlightLogVisibility {
     static let flightLogKey = "showsFlightLog"
     static let instrumentsKey = "showsInstruments"
     static let predictionsKey = "showsPredictions"
-    static let predictionsDefault = false  // pending Paseo Progress Q4
+    static let predictionsDefault = false
 
     /// The predictions toggle as @AppStorage reads it: a stored Bool, or a "YES"/"NO" launch argument.
     static func predictionsOn(_ defaults: UserDefaults = .standard) -> Bool {

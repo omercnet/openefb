@@ -49,9 +49,11 @@ The EFB rules above all still hold.
 - **The debrief runs on distance.** The strip map, profile and radio bands share one distance axis; times are labels at the waypoints. Short legs may be drawn at a marked half scale.
 
 ### Stage 2: the leading edge
-Prediction rows (airspace floor and boundary times from track, GS and VS), the amber next-thing block, the floor on the altitude tape, the unrolled debrief. Needs a prediction service with tests for noisy GPS, rules for suppressing jumpy or stale predictions, and an owner or CFI review before pilots see it.
+Prediction rows (airspace floor and boundary times from track, GS and VS), the amber next-thing block, the floor on the altitude tape, the unrolled debrief. The engine (`Services/Prediction/AirspacePredictor.swift`) samples 10 minutes ahead every 5 s; an event shows only after it repeats on a second fix; a stale fix, unknown course, missing altitude or ground speed under 30 kt predicts nothing; floors and ceilings that are not MSL (AGL, FL) are treated as surface and unlimited.
 
-Riskiest assumptions: a strip that permanently takes a third of an iPad's width beats an edge-to-edge chart, and predictions from GPS in bumpy air stay steady enough to trust. Both need a pilot in a real cockpit before stage 2.
+**Predictions ship off by default** behind Layers > Panels > Predictions (preview), until an owner or CFI review in flight. The CVFR debrief is not gated.
+
+Riskiest assumptions: a strip that permanently takes a third of an iPad's width beats an edge-to-edge chart, and predictions from GPS in bumpy air stay steady enough to trust. Both need a pilot in a real cockpit; the second gates turning predictions on by default.
 
 Still to check on stage 1: VoiceOver order of the log, the strip at accessibility type sizes, Hebrew mirroring.
 
