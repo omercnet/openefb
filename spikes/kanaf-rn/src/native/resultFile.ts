@@ -4,10 +4,11 @@ import { File, Paths } from 'expo-file-system';
 
 export const SELFTEST_FILE = 'spike-result.json';
 export const ANIMATION_FILE = 'spike-anim.json';
+export const MAP_STATUS_FILE = 'map-status.json';
 
 export async function writeResult(name: string, value: unknown): Promise<string> {
   const file = new File(Paths.document, name);
-  if (!file.exists) file.create();
+  if (!file.exists) file.create({ overwrite: true }); // overwrite: a concurrent writer may have created it meanwhile
   await file.write(JSON.stringify(value, null, 2));
   return file.uri;
 }

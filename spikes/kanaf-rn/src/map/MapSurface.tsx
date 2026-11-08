@@ -1,14 +1,16 @@
 // Native chart: MapLibre React Native v11 with the SwiftUI app's base-style.json (street vector map plus the
 // FAA VFR sectional raster from zoom 8), airport dots from aviation.sqlite (R-tree bbox on the visible region),
 // the track ruler and the ownship chevron. Layer order and paints follow efb-212/Services/MapService.swift.
-// kanaf-rn://map?animate=1 moves the ownship along its track at 10 Hz for 60 s and records JS frame pacing.
-import { Camera, GeoJSONSource, Images, Layer, Map, type MapRef, type StyleSpecification } from '@maplibre/maplibre-react-native';
+// kanaf-rn://map?animate=1 (Android) or `-KanafAnimate 1` (iOS launch argument) moves the ownship along its track at
+// 10 Hz for 60 s and records JS frame pacing. Map lifecycle events and MapLibre native warnings are logged as
+// "SPIKE_MAP {...}" and written to map-status.json so CI can wait for a fully rendered map before a screenshot.
+import { Camera, GeoJSONSource, Images, Layer, LogManager, Map, type MapRef, type StyleSpecification } from '@maplibre/maplibre-react-native';
 import * as Linking from 'expo-linking';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Settings } from 'react-native';
 import baseStyle from '../../assets/base-style.json';
 import { scenario } from '../fixtures/scenario';
-import { ANIMATION_FILE, writeResult } from '../native/resultFile';
+import { ANIMATION_FILE, MAP_STATUS_FILE, writeResult } from '../native/resultFile';
 import { airportsInBox, openAviationDb } from './aviationDb';
 import { destination, pacing, trackRuler } from './geo';
 
@@ -22,22 +24,60 @@ const INK = { day: '#14191F', night: '#B6B0A3' };
 const HALO = { day: '#FFFFFF', night: '#0D1013' };
 const NIGHT_RASTER = { 'raster-brightness-max': 0.55, 'raster-saturation': -0.35 };
 
-/** base-style.json with the sectional dimmed and desaturated at night (MapService.applyDisplayMode). */
+/**
+ * base-style.json with the FAA sectional shown, dimmed and desaturated at night (MapService.applyDisplayMode).
+ * The style ships the sectional with `visibility: none`; the SwiftUI app turns it on at runtime in
+ * MapService.setMapStyle(_:sectional:) (`isVisible = sectional`), so a plain copy of the style shows no chart.
+ */
 function styleFor(night: boolean): StyleSpecification {
   const style = baseStyle as unknown as StyleSpecification;
-  if (!night) return style;
   return {
     ...style,
-    layers: style.layers.map((l) => (l.id === 'base-vfr-sectional' && l.type === 'raster' ? { ...l, paint: { ...l.paint, ...NIGHT_RASTER } } : l)),
+    layers: style.layers.map((l) => (l.id === 'base-vfr-sectional' && l.type === 'raster'
+      ? { ...l, layout: { ...l.layout, visibility: 'visible' }, paint: night ? { ...l.paint, ...NIGHT_RASTER } : l.paint }
+      : l)),
   };
+}
+
+type MapStatus = {
+  platform: string; night: boolean; events: Record<string, number>; fullyRendered: boolean; failed: boolean; native: string[];
+};
+
+/** Records the first occurrence of a lifecycle event (ms since mount), then logs and persists the cumulative status. */
+function report(status: MapStatus, t0: number, event: string) {
+  if (event in status.events) return; // render events repeat on every change; the first one is what CI waits for
+  status.events[event] = Math.round(performance.now() - t0);
+  if (event === 'didFinishRenderingMapFully') status.fullyRendered = true;
+  if (event === 'didFailLoadingMap') status.failed = true;
+  console.log('SPIKE_MAP ' + JSON.stringify(status));
+  writeResult(MAP_STATUS_FILE, status).catch((e) => console.warn('map status write failed', e));
 }
 
 export function MapSurface({ night }: { night: boolean }) {
   const mapRef = useRef<MapRef>(null);
   const mapStyle = useMemo(() => styleFor(night), [night]);
+  const t0 = useRef(performance.now()).current;
+  const status = useRef<MapStatus>({ platform: Platform.OS, night, events: {}, fullyRendered: false, failed: false, native: [] }).current;
   const [position, setPosition] = useState(ORIGIN);
   const [airports, setAirports] = useState<GeoJSON.FeatureCollection>({ type: 'FeatureCollection', features: [] });
-  const animate = /[?&]animate=1\b/.test(Linking.useURL() ?? '');
+  const url = Linking.useURL();
+  const animate = Platform.OS === 'ios' ? String(Settings.get('KanafAnimate') ?? '') === '1' : /[?&]animate=1\b/.test(url ?? '');
+
+  // MapLibre native warnings and errors (tile, glyph, sprite and style failures) into the status file.
+  useEffect(() => {
+    LogManager.onLog(({ level, tag, message }) => {
+      // Capped so the SPIKE_MAP logcat line stays under Android's ~4 KB limit.
+      if (status.native.length < 12) status.native.push(`${level} ${tag} ${message}`.slice(0, 200));
+      return false; // keep MapLibre's own console output
+    });
+    LogManager.start();
+    // Persist late native messages too, and mark a map that never reached "fully rendered" within 40 s.
+    const snapshot = setTimeout(() => report(status, t0, 'snapshot40s'), 40_000);
+    return () => {
+      clearTimeout(snapshot);
+      LogManager.stop();
+    };
+  }, [status, t0]);
 
   const loadAirports = async (bounds: [number, number, number, number]) => {
     try {
@@ -81,6 +121,7 @@ export function MapSurface({ night }: { night: boolean }) {
         targetUpdateMs: UPDATE_MS,
         rafDeltaMs: pacing(frames),
         updateDeltaMs: pacing(updates),
+        map: status,
       };
       console.log('SPIKE_ANIM ' + JSON.stringify(result));
       writeResult(ANIMATION_FILE, result).catch((e) => console.warn('animation result write failed', e));
@@ -89,7 +130,7 @@ export function MapSurface({ night }: { night: boolean }) {
       clearInterval(timer);
       cancelAnimationFrame(raf);
     };
-  }, [animate]);
+  }, [animate, status]);
 
   const ruler = useMemo(() => trackRuler(position, ownship.trkDeg, ownship.gsKt, scenario.trackRulerMinutes), [position]);
   const ownshipShape = useMemo<GeoJSON.FeatureCollection>(
@@ -104,7 +145,14 @@ export function MapSurface({ night }: { night: boolean }) {
       style={{ flex: 1 }}
       mapStyle={mapStyle}
       compass={false}
-      onDidFinishLoadingMap={() => mapRef.current?.getBounds().then(loadAirports)}
+      onWillStartLoadingMap={() => report(status, t0, 'willStartLoadingMap')}
+      onDidFinishLoadingStyle={() => report(status, t0, 'didFinishLoadingStyle')}
+      onDidFailLoadingMap={() => report(status, t0, 'didFailLoadingMap')}
+      onDidFinishRenderingMapFully={() => report(status, t0, 'didFinishRenderingMapFully')}
+      onDidFinishLoadingMap={() => {
+        report(status, t0, 'didFinishLoadingMap');
+        mapRef.current?.getBounds().then(loadAirports);
+      }}
       onRegionDidChange={(e) => loadAirports(e.nativeEvent.bounds)}
     >
       <Camera initialViewState={{ center: scenario.map.center, zoom: scenario.map.zoom }} />

@@ -103,19 +103,60 @@ Triggers on pushes to `spike/react-native` touching `spikes/kanaf-rn/**` or the 
 - **ios** (macos-26, Xcode 26.6 as in ci.yml): node 24, `npm ci`, `expo prebuild -p ios`, `pod install`, `xcodebuild` Release for
   `iphonesimulator` into `/tmp/rn-dd`, then `scripts/ios-capture.sh`: creates/boots an `iPad Pro 13-inch (M5)` on the newest iOS
   runtime (selection as in `tools/sim-test.sh`), installs, grants location, location-always and microphone, sets the location to
-  37.4876,-122.2289, cold-starts each of map, airport, night, sheet by `simctl openurl` and screenshots it, runs
-  `map?animate=1` for 70 s, then the self test, polling the data container for `Documents/spike-result.json` for up to 120 s.
+  37.4876,-122.2289, then starts each of map, airport, night, sheet with `simctl launch --terminate-running-process ...
+  -KanafScreen <screen>`, waits for the map's fully-rendered status (45 s cap) and screenshots it, runs `-KanafAnimate 1` for
+  70 s, then the self test (re-sending the simulator location every second), polling `Documents/spike-result.json` in the data
+  container for up to 120 s. The app log and result files are collected even when the script fails.
 - **android** (ubuntu-latest): node 24, JDK 21 (temurin), `npm ci`, `expo prebuild -p android`, `./gradlew assembleRelease`
   (the Expo template signs release with the debug keystore), KVM udev rule, then `reactivecircus/android-emulator-runner@v2`
   (API 35, google_apis, x86_64, `pixel_tablet`) running `scripts/android-capture.sh`: install, `pm grant` location,
-  background location, RECORD_AUDIO and POST_NOTIFICATIONS, `adb emu geo fix`, portrait lock, the same screens via
-  `am start -a VIEW -d kanaf-rn://...`, `screencap`, the animation, then the self test from logcat (`SPIKE_RESULT`).
+  background location, RECORD_AUDIO and POST_NOTIFICATIONS, `adb emu geo fix`, the same screens via
+  `am start -a VIEW -d kanaf-rn://...` with portrait re-asserted and checked before each `screencap`, waiting for the map's
+  `SPIKE_MAP` fully-rendered line, the animation, then the self test from logcat (`SPIKE_RESULT`) with `geo fix` re-sent every
+  second.
 - Both jobs then run `scripts/compare.mjs --dir <screens>` (map, night, airport against the references; sheet and selftest have
   none) and upload screens, results, compare output and the build log tail as `rn-spike-ios` / `rn-spike-android`.
 
-Untested until CI: the whole workflow. Most likely first failures: pod install / precompiled-module resolution, the Release
-simulator build (expo-dev-client in Release), the Android emulator boot time, the portrait lock command, and whether a
-custom-scheme `simctl openurl` cold start shows a confirmation prompt.
+Run 1 (see "CI run 1 and fixes" below) built both platforms. Remaining risks: the Android symbol layers (below) and the
+speech recognizer on the simulator.
+
+## CI run 1 and fixes
+
+Android ran end to end: sqlite PASS (`rtree` and `fts5` true, 31 Bay airports, KSQL first), audio PASS (26 KB m4a),
+secureStore PASS, pdf PASS, speech available (on-device true, 31 locales); location FAIL with 0 updates. Animation on the
+emulator: rAF p50 16.7 / p95 33 / max 623 ms, 10 Hz timer p50 117 / p95 140 / max 650 ms. iOS built but captured nothing.
+
+- **`simctl openurl` cannot drive a headless iOS run.** Opening a custom-scheme URL shows a system "Open in Kanaf RN
+  Spike?" alert that nothing in CI can accept, so the app never launched and every iPad screenshot was the home screen.
+  iOS now uses launch arguments like the SwiftUI app's capture hooks: `simctl launch --terminate-running-process <sim>
+  io.omer.efb.rnspike -KanafScreen map [-KanafAnimate 1]`. Launch arguments land in NSUserDefaults' argument domain, which
+  React Native's `Settings.get` reads (App.tsx for the screen, MapSurface for the animation). Android and web keep URLs.
+  Results are read from `get_app_container ... data`/Documents, which is where expo-file-system's `Paths.document` points.
+- **No sectional chart: the base style hides it.** `assets/base-style.json` ships `base-vfr-sectional` with
+  `layout.visibility: none`; the SwiftUI app turns it on at runtime (`MapService.setMapStyle(_:sectional:)` sets
+  `isVisible = sectional`). The RN map used the style verbatim, so the raster was never drawn. Nothing was wrong with the
+  tile source (the ArcGIS URL returns 200 with `application/octet-stream` for curl, okhttp and MapLibre user agents alike).
+  `styleFor` now sets the layer visible (and still dims it at night). Untested until the next run.
+- **Map status.** MapSurface logs `SPIKE_MAP {...}` and writes `map-status.json` at the first `willStartLoadingMap`,
+  `didFinishLoadingStyle`, `didFinishLoadingMap`, `didFailLoadingMap`, `didFinishRenderingMapFully` and a 40 s snapshot,
+  with up to 12 MapLibre native warnings/errors from `LogManager` (tile, glyph and sprite failures show up there). The
+  scripts wait for `fullyRendered` or `failed` (45 s cap), print the status and keep `map-status-<screen>.json` (plus
+  `logcat-<screen>.txt` on Android). The animation result carries the same status.
+- **Android symbol layers missing (open).** In run 1 the ruler line and airport circles drew, but no symbol layer did:
+  no ownship chevron, no ruler ticks or labels, no base-style place labels. Icon-only (ownship) and text-only (place labels)
+  symbols both missing points away from glyphs or the `Images` component alone; a SwiftShader rendering problem or a
+  capture before symbol placement are candidates. Not diagnosed: run 1 cleared logcat before the self test, so no map logs
+  survived. The new native log capture and render wait should settle it.
+- **Screen orientation.** All run-1 Android screenshots were already 1600x2560 portrait: the Pixel Tablet is
+  landscape-natural, so portrait is user rotation 1 (rotation 0 would be landscape). The script now re-asserts rotation 1
+  before every launch and prints and checks each screenshot's size.
+- **Location 0 updates on Android.** The emulator emits a fix only when `geo fix` is sent. Both scripts now re-send the
+  position every second during the self test. If Android still reports 0, the next suspect is the provider: on google_apis
+  images expo-location uses Play services' fused provider, which may not pass emulator fixes through; untested.
+- **Android result file.** `run-as` on a non-debuggable build printed its error to stdout, which the script took as the
+  result. It now reads `SPIKE_RESULT` from logcat only.
+- **Self-test JSON** now includes `rnVersion` (Platform.constants), `expoSdk` (expo-constants), `hermes`
+  (`HermesInternal`) and `newArch` (`nativeFabricUIManager`, `__turboModuleProxy`).
 
 ## Compare script
 

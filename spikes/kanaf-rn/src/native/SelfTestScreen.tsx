@@ -1,6 +1,7 @@
 // Native capability self test (kanaf-rn://selftest). Runs each check in turn, shows PASS/FAIL, writes one JSON blob
 // to <documents>/spike-result.json and logs it as a single "SPIKE_RESULT {...}" line for CI (logcat / simulator log).
 // One failing or hanging check never stops the others: each is caught and bounded by a timeout.
+import Constants from 'expo-constants';
 import { RecordingPresets, requestRecordingPermissionsAsync, setAudioModeAsync, useAudioRecorder, type AudioRecorder } from 'expo-audio';
 import { File } from 'expo-file-system';
 import * as Location from 'expo-location';
@@ -216,6 +217,11 @@ export function SelfTestScreen() {
         app: 'kanaf-rn-spike',
         platform: Platform.OS,
         osVersion: Platform.Version,
+        rnVersion: Object.values(Platform.constants.reactNativeVersion).filter((v) => v != null).join('.'),
+        expoSdk: Constants.expoConfig?.sdkVersion ?? null,
+        hermes: 'HermesInternal' in globalThis,
+        // Fabric installs nativeFabricUIManager; bridgeless TurboModules install __turboModuleProxy (absent in some modes).
+        newArch: { fabric: 'nativeFabricUIManager' in globalThis, turboModuleProxy: '__turboModuleProxy' in globalThis },
         finishedAt: new Date().toISOString(),
         durationMs: elapsed(t0),
         allPassed: done.every((c) => c.ok),
