@@ -49,7 +49,7 @@ The EFB rules above all still hold.
 - **The debrief runs on distance.** The strip map, profile and radio bands share one distance axis; times are labels at the waypoints. Short legs may be drawn at a marked half scale.
 
 ### Stage 2: the leading edge
-Prediction rows (airspace floor and boundary times from track, GS and VS), the amber next-thing block, the floor on the altitude tape, the unrolled debrief. The engine (`Services/Prediction/AirspacePredictor.swift`) samples 10 minutes ahead every 5 s; an event shows only after it repeats on a second fix; a stale fix, unknown course, missing altitude or ground speed under 30 kt predicts nothing; floors and ceilings that are not MSL (AGL, FL) are treated as surface and unlimited.
+Prediction rows (airspace floor and boundary times from track, GS and VS), the amber next-thing block, the floor on the altitude tape, the unrolled debrief. The engine (`Services/Prediction/AirspacePredictor.swift`) samples 10 minutes ahead every 5 s; an event shows only after it repeats on a second fix; a stale fix, unknown course, missing altitude or ground speed under 30 kt predicts nothing. A floor that is not MSL (AGL, FL) is read as 0 ft MSL and a ceiling that is not MSL as unlimited. 0 ft MSL is not the local surface: below sea level (the Dead Sea, Death Valley) the airplane can enter such a volume without a prediction.
 
 **Predictions ship off by default** behind Layers > Panels > Predictions (preview), until an owner or CFI review in flight. The CVFR debrief is not gated.
 
