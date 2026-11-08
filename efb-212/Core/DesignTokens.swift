@@ -15,7 +15,8 @@ import SwiftUI
 // MARK: - Spacing
 
 /// 4-point spacing scale. Spacing between groups must exceed spacing within a group.
-enum Space {
+/// Plain constants, so drawing code (Canvas layout helpers) can read them off the main actor.
+nonisolated enum Space {
     static let xs: CGFloat = 4      // icon + label, tight coupling
     static let s: CGFloat = 8       // related rows
     static let m: CGFloat = 12      // control padding

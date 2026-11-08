@@ -16,6 +16,7 @@ struct LayersColumnView: View {
     @State private var offlineMaps = OfflineMapService.shared
     @AppStorage(FlightLogVisibility.flightLogKey) private var showsFlightLog = true
     @AppStorage(FlightLogVisibility.instrumentsKey) private var showsInstruments = true
+    @AppStorage(FlightLogVisibility.predictionsKey) private var showsPredictions = FlightLogVisibility.predictionsDefault
 
     init(mapViewModel: MapViewModel) {
         self.mapViewModel = mapViewModel
@@ -61,13 +62,20 @@ struct LayersColumnView: View {
                     }
                     .padding(.horizontal, Space.l)
 
-                    // Panels: hide the flight log and the instruments to give the chart more room
+                    // Panels: hide the flight log and the instruments to give the chart more room, and the
+                    // stage 2 airspace predictions (preview, pending owner and CFI review)
                     VStack(alignment: .leading, spacing: Space.xs) {
                         ColumnSectionLabel("Panels")
                         panelToggle("Flight log", caption: "Strip with next and flown waypoints",
                                     isOn: $showsFlightLog, identifier: "toggle-flight-log")
                         panelToggle("Instruments", caption: "Ground speed, track, altitude and the tape",
                                     isOn: $showsInstruments, identifier: "toggle-instruments")
+                        panelToggle("Predictions (preview)",
+                                    caption: "Airspace ahead in the next 10 minutes, from track, speed and climb",
+                                    isOn: $showsPredictions, identifier: "toggle-predictions")
+                    }
+                    .onChange(of: showsPredictions) { _, on in
+                        if !on { mapViewModel.clearPredictions() }
                     }
                     .padding(.horizontal, Space.l)
 

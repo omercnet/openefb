@@ -95,6 +95,9 @@ final class AppState {
     var distanceToNext: Double?        // nautical miles
     var estimatedTimeEnroute: TimeInterval?  // seconds
     var bearingToNext: Double?         // degrees true, ownship to the next waypoint
+    /// Predicted airspace entries ahead (Direction 2 stage 2), soonest first; empty when predictions
+    /// are off, the fix is stale, or nothing is ahead. Written by PredictionService on each fix.
+    var predictedEvents: [PredictedEvent] = []
     var directToAirport: Airport?
     var activePlanDeparture: String?     // ICAO of departure for summary card
     var activePlanDestination: String?   // ICAO of destination for summary card

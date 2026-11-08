@@ -3,8 +3,9 @@
 //  efb-212Tests
 //
 //  IL-DEBRIEF: route matching (planned and unplanned), time-weighted altitude adherence with aerodrome
-//  exclusion zones and two-number altitudes, reporting-point passage, and Hebrew/English position-report
-//  matching. Hand-made routes plus the bundled LLHZ -> LLIB route.
+//  exclusion zones and two-number altitudes, reporting-point passage, Hebrew/English position-report
+//  matching, and the unrolled profile (distance axis, excluded zones, verdict). Hand-made routes plus the
+//  bundled LLHZ -> LLIB route.
 //
 
 import Testing
@@ -390,6 +391,165 @@ struct CVFRDebriefTests {
         #expect(!plain.contains("CVFR"))
         let with = FlightSummaryBuilder.buildPrompt(trackPoints: [], transcriptSegments: [], phaseMarkers: [], metadata: meta, cvfrFacts: "[CVFR ROUTE] Leg A-B")
         #expect(with.contains("[CVFR ROUTE] Leg A-B"))
+    }
+
+    // MARK: Unrolled profile and verdict
+
+    private static let alpha = reportingPoint(code: "ALPHA", en: "Alpha", he: "אלפא", lon: 34.8)
+    private static let bravo = reportingPoint(code: "BRAVO", en: "Bravo", he: "ברבו", lon: 35.0)
+    private static let charlie = reportingPoint(code: "CHARL", en: "Charlie", he: "צ'רלי", lon: 35.2)
+
+    /// ALPHA -> BRAVO -> CHARL eastbound on lat 32.0 (published 1500 both legs), flown at 1 Hz for 400 s; BRAVO is
+    /// passed at about 200 s. `altitude` is per sample index, feet MSL.
+    private static func threePointDebrief(
+        transcript: [TranscriptSegmentRecord], altitude: @escaping (Int) -> Double = { _ in 1500 }
+    ) -> CVFRDebrief {
+        let legs = [
+            CVFRRouteLeg(segment: segment(1, "ALPHA", "BRAVO", lon0: 34.8, lon1: 35.0), forward: true),
+            CVFRRouteLeg(segment: segment(2, "BRAVO", "CHARL", lon0: 35.0, lon1: 35.2), forward: true),
+        ]
+        return CVFRDebriefBuilder.build(
+            trackPoints: eastbound(lon0: 34.8, lon1: 35.2, count: 400, altitude: altitude),
+            transcript: transcript, plannedLegs: legs, segments: legs.map(\.segment),
+            points: ["ALPHA": alpha, "BRAVO": bravo, "CHARL": charlie]
+        )
+    }
+
+    @Test func profileDistancesAreMonotonicAndCumulativeAcrossLegs() throws {
+        let debrief = Self.threePointDebrief(transcript: [])
+        let legLength = IsraelRoutePlanner.length(of: [Self.coordinate(32.0, 34.8), Self.coordinate(32.0, 35.0)])   // NM
+        #expect(debrief.legs.count == 2)
+        #expect(debrief.legs[0].startDistanceNM == 0)
+        #expect(abs(debrief.legs[0].endDistanceNM - legLength) < 1e-9)
+        #expect(debrief.legs[1].startDistanceNM == debrief.legs[0].endDistanceNM)
+        #expect(abs(debrief.legs[1].endDistanceNM - 2 * legLength) < 1e-9)
+
+        #expect(debrief.profile.count == 400)
+        let distances = debrief.profile.map(\.distanceNM)
+        #expect(zip(distances, distances.dropFirst()).allSatisfy { $0 <= $1 })
+        let first = try #require(distances.first), last = try #require(distances.last)
+        #expect(first < 0.01)
+        #expect(abs(last - 2 * legLength) < 0.01)
+        // Leg 2's samples sit beyond leg 1's length: the axis is cumulative, not per leg.
+        let second = debrief.profile.filter { $0.legIndex == 1 }
+        #expect(!second.isEmpty)
+        #expect(second.allSatisfy { $0.distanceNM >= legLength - 1e-9 && $0.distanceNM <= 2 * legLength + 1e-9 })
+        #expect(debrief.profile.allSatisfy { !$0.excluded })   // no aerodrome on this route
+    }
+
+    @Test func profileSamplesInsideAnAerodromeZoneAreExcluded() {
+        let legs = [
+            CVFRRouteLeg(segment: Self.segment(1, "LLHZ", "ALPHA", lon0: 34.8, lon1: 35.0), forward: true),
+            CVFRRouteLeg(segment: Self.segment(2, "ALPHA", "BRAVO", lon0: 35.0, lon1: 35.2), forward: true),
+        ]
+        let debrief = CVFRDebriefBuilder.build(
+            trackPoints: Self.eastbound(lon0: 34.8, lon1: 35.2, count: 400), transcript: [],
+            plannedLegs: legs, segments: legs.map(\.segment), points: [:])
+        let excluded = debrief.profile.filter(\.excluded)
+        #expect(!excluded.isEmpty)
+        // Only the first 3 NM of the leg leaving LLHZ; the en-route leg is scored throughout.
+        #expect(excluded.allSatisfy { $0.legIndex == 0 && $0.distanceNM < CVFRDebriefBuilder.aerodromeExclusionNM + 0.05 })
+        let scoredOnFirstLeg = debrief.profile.filter { $0.legIndex == 0 && !$0.excluded }
+        #expect(!scoredOnFirstLeg.isEmpty)
+        #expect(scoredOnFirstLeg.allSatisfy { $0.distanceNM > CVFRDebriefBuilder.aerodromeExclusionNM - 0.05 })
+        #expect(debrief.profile.filter { $0.legIndex == 1 }.allSatisfy { !$0.excluded })
+    }
+
+    @Test func aPointSitsAtItsLegBoundaryAlongTheRoute() throws {
+        let debrief = Self.threePointDebrief(transcript: [])
+        try #require(debrief.points.map(\.code) == ["ALPHA", "BRAVO", "CHARL"])
+        #expect(debrief.points[0].distanceAlongRouteNM == 0)
+        #expect(debrief.points[1].distanceAlongRouteNM == debrief.legs[0].endDistanceNM)
+        #expect(debrief.points[2].distanceAlongRouteNM == debrief.legs[1].endDistanceNM)
+        // The passage itself is still the closest approach, not the axis position.
+        #expect(debrief.points[1].distanceNM < 0.1)
+    }
+
+    @Test func verdictPicksTheLowLegAndTheReportNotHeard() {
+        // Leg 2 flown 330 ft low for 120 samples (250...369 s): 40% within ±300 ft. CHARL never named on the radio.
+        let debrief = Self.threePointDebrief(
+            transcript: [Self.transcript("Alpha, four x-ray", at: 0), Self.transcript("Bravo, four x-ray", at: 200)],
+            altitude: { (250..<370).contains($0) ? 1170 : 1500 })
+        #expect(debrief.points.first { $0.code == "BRAVO" }?.reportTime == Self.t0.addingTimeInterval(200))
+        let findings = CVFRDebriefVerdict.findings(debrief)
+        #expect(findings == ["BRAVO to CHARL: 330 ft low, 2 min", "CHARL report not heard"])
+        #expect(CVFRDebriefVerdict.headline(count: findings.count) == "Two things to look at.")
+        let excursions = CVFRDebriefBuilder.excursions(in: debrief)
+        #expect(excursions.count == 1)
+        #expect(excursions.first?.legIndex == 1)
+        #expect(excursions.first?.seconds == 119)
+    }
+
+    @Test func verdictIsEmptyWhenEveryLegHeldAndEveryReportWasHeard() {
+        let debrief = Self.threePointDebrief(transcript: [
+            Self.transcript("Alpha", at: 0), Self.transcript("Bravo", at: 200), Self.transcript("Charlie", at: 399),
+        ])
+        #expect(CVFRDebriefVerdict.findings(debrief).isEmpty)
+        #expect(CVFRDebriefVerdict.headline(count: 0) == "Nothing to look at.")
+        // Without a transcript nothing is "not heard": the radio was not checked.
+        #expect(CVFRDebriefVerdict.findings(Self.threePointDebrief(transcript: [])).isEmpty)
+    }
+
+    /// HOME -> XRAY -> HOME: out east along lat 32.0 (0...199 s), back west along lat 32.03 (200...399 s), 1.8 NM
+    /// apart so each run matches only its own leg; 1500 ft published and flown both ways. HOME sits on the outbound
+    /// line at lon 34.8, XRAY between the two lines at lon 35.0. One position report naming XRAY at 200 s.
+    private static func outAndBackDebrief(home: IsraelReportingPoint) -> CVFRDebrief {
+        let legs = [
+            CVFRRouteLeg(segment: segment(1, home.code, "XRAY", lon0: 34.8, lon1: 35.0), forward: true),
+            CVFRRouteLeg(segment: segment(2, home.code, "XRAY", lon0: 34.8, lon1: 35.0, lat: 32.03, reverse: "1500"),
+                         forward: false),
+        ]
+        let out = eastbound(lon0: 34.8, lon1: 35.0, count: 200)
+        let back = (0..<200).map { i in
+            point(lat: 32.03, lon: 35.0 - 0.2 * Double(i) / 199, second: 200 + Double(i), course: 270)
+        }
+        let xray = IsraelReportingPoint(id: 2, code: "XRAY", nameEnglish: "Xray", nameHebrew: nil, kind: .compulsory,
+                                        latitude: 32.015, longitude: 35.0)
+        return CVFRDebriefBuilder.build(
+            trackPoints: out + back, transcript: [transcript("Xray, four x-ray", at: 200)],
+            plannedLegs: legs, segments: legs.map(\.segment), points: [home.code: home, "XRAY": xray])
+    }
+
+    @Test func anOutAndBackRouteGivesOnePassagePerVisitOfTheHomePoint() throws {
+        let home = IsraelReportingPoint(id: 1, code: "LLHZ", nameEnglish: "Herzliya", nameHebrew: "הרצליה", kind: .arp,
+                                        latitude: 32.0, longitude: 34.8)
+        let debrief = Self.outAndBackDebrief(home: home)
+        try #require(debrief.legs.count == 2)
+        try #require(debrief.points.map(\.code) == ["LLHZ", "XRAY", "LLHZ"])
+        let departure = debrief.points[0], arrival = debrief.points[2]
+        #expect(departure.time == Self.t0)
+        // The return leg ends back over LLHZ's longitude: the last visit is the end of the track, not the departure.
+        #expect(arrival.time == Self.t0.addingTimeInterval(399))
+        #expect(departure.time != arrival.time)
+        #expect(abs(arrival.distanceNM - 1.8) < 0.05)
+        #expect(Set(debrief.points.map(\.id)).count == debrief.points.count)
+    }
+
+    @Test func aPointMissedOnBothVisitsIsOneFinding() throws {
+        let debrief = Self.outAndBackDebrief(home: Self.reportingPoint(code: "ALPHA", en: "Alpha", he: "אלפא", lon: 34.8))
+        try #require(debrief.points.map(\.code) == ["ALPHA", "XRAY", "ALPHA"])
+        #expect(debrief.points.map(\.reported) == [false, true, false])
+        let findings = CVFRDebriefVerdict.findings(debrief)
+        #expect(findings == ["ALPHA report not heard"])
+        #expect(Set(findings).count == findings.count)
+    }
+
+    @Test func aTrackGapClosesAnExcursion() {
+        // Two low stretches (1100 ft against 1500, 5 s sampling) separated by a 5-minute gap in the track.
+        let seconds: [Double] = [0, 5, 10, 310, 315, 320]
+        let debrief = CVFRDebrief(
+            fromPlan: true,
+            legs: [CVFRLegDebrief(fromCode: "ALPHA", toCode: "BRAVO", publishedAltitude: "1500",
+                                  startTime: Self.t0, endTime: Self.t0.addingTimeInterval(320), adherence: nil)],
+            points: [], observations: [],
+            profile: seconds.enumerated().map { index, second in
+                CVFRProfileSample(distanceNM: Double(index), altitudeFeet: 1100, legIndex: 0, excluded: false,
+                                  time: Self.t0.addingTimeInterval(second))
+            })
+        let excursions = CVFRDebriefBuilder.excursions(in: debrief)
+        #expect(excursions.count == 2)
+        #expect(excursions.map(\.sampleRange) == [0...2, 3...5])
+        #expect(excursions.map(\.seconds) == [10, 10])
     }
 
     // MARK: Bundled network

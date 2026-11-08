@@ -76,6 +76,7 @@ struct FlightLogHeader: View {
     var gpsStatus: GPSStatus? = nil
     /// The instruments are hidden (no NOW cell): the header carries Clear while navigation is active.
     var onClear: (() -> Void)? = nil
+    @AppStorage(FlightLogVisibility.predictionsKey) private var showsPredictions = FlightLogVisibility.predictionsDefault
 
     /// "9:12" to the next waypoint; nil when hidden, with no next waypoint, no ETE or a stale fix.
     private var nextTime: (text: String, spoken: String)? {
@@ -85,10 +86,37 @@ struct FlightLogHeader: View {
         return (FlightLogStrip.timeToText(ete), FlightLogStrip.spokenDuration(ete))
     }
 
+    /// The predicted entry the title carries instead of the waypoint time when it comes first
+    /// ("B floor 3,000 \u{00B7} 1:50"); nil when the log is shown, predictions are off or the fix is stale.
+    private var soonestEvent: PredictedEvent? {
+        guard showsNextTime, showsPredictions, let gpsStatus, !gpsStatus.isStale else { return nil }
+        let waypointTimes: [TimeInterval?] = FlightLogStrip.nextIdent(for: appState) == nil
+            ? [] : [appState.estimatedTimeEnroute]  // seconds
+        guard case .event(let event) = FlightLogStrip.nextItems(
+            events: appState.predictedEvents, waypoints: waypointTimes
+        ).first else { return nil }
+        return event
+    }
+
+    /// Route title in ink, then the next time, or the predicted entry in amber (red for a warning).
+    private func titleText(route: String?, next: (text: String, spoken: String)?, event: PredictedEvent?) -> Text? {
+        if let event {
+            let tone = event.severity == .warning ? Palette.warning : Palette.caution
+            let part = Text("\(event.title) \u{00B7} \(FlightLogStrip.timeToText(event.secondsAhead))").foregroundStyle(tone)
+            return route.map { Text("\($0) \u{00B7} ").foregroundStyle(Palette.ink) + part } ?? part
+        }
+        return route.map { title in Text(next.map { "\(title) \u{00B7} \($0.text)" } ?? title).foregroundStyle(Palette.ink) }
+    }
+
     var body: some View {
         let route = FlightLogStrip.routeTitle(for: appState)
-        let next = nextTime
-        let title = route.map { title in next.map { "\(title) \u{00B7} \($0.text)" } ?? title }
+        let event = soonestEvent
+        let next = event == nil ? nextTime : nil
+        let title = titleText(route: route, next: next, event: event)
+        let spoken = [
+            route.map { title in "Route \(title)" + (next.map { ", next in \($0.spoken)" } ?? "") },
+            event.map(FlightLogStrip.spokenEvent),
+        ].compactMap { $0 }.joined(separator: ", ")
         HStack(spacing: 0) {
             FlightLogCellButton(title: "Log", systemImage: "list.bullet", accessibilityLabel: "Flight log") {
                 appState.selectedScreen = .log
@@ -96,16 +124,13 @@ struct FlightLogHeader: View {
             .accessibilityIdentifier("flight-log-button")
             .fixedSize()
 
-            Text(title ?? "No route")
+            (title ?? Text("No route").foregroundStyle(Palette.inkSecondary))
                 .font(TypeRole.dataEmphasis)
-                .foregroundStyle(title == nil ? Palette.inkSecondary : Palette.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Space.s)
-                .accessibilityLabel(route.map { title in
-                    "Route \(title)" + (next.map { ", next in \($0.spoken)" } ?? "")
-                } ?? "No route")
+                .accessibilityLabel(spoken.isEmpty ? "No route" : spoken)
                 .accessibilityIdentifier(title == nil ? "no-route" : "active-navigation-bar")
 
             if appState.region.hasAirportData {
@@ -213,6 +238,7 @@ struct FlightLogNowCell: View {
     let onClear: () -> Void
     /// iPhone: full width under the chart, readouts at 38pt.
     var compact: Bool = false
+    @AppStorage(FlightLogVisibility.predictionsKey) private var showsPredictions = FlightLogVisibility.predictionsDefault
 
     // Readouts keep exact point sizes but scale with Dynamic Type.
     @ScaledMetric(relativeTo: .largeTitle) private var readoutSize: CGFloat = 42      // points
@@ -231,7 +257,8 @@ struct FlightLogNowCell: View {
             readouts
             AltitudeTape(
                 altitudeFeet: hasFix && hasAltitude && !isStale ? appState.altitude : nil,
-                verticalSpeedFPM: appState.verticalSpeed
+                verticalSpeedFPM: appState.verticalSpeed,
+                floor: showsPredictions && !isStale ? FlightLogStrip.tapeFloor(appState.predictedEvents) : nil
             )
             cautions
             controls
@@ -500,24 +527,41 @@ private struct LegProgressBar: View {
 // MARK: - Altitude tape
 
 /// Altitude left to right on a 0 to 4,000 ft scale (wider above 3,500 ft), the ownship marker
-/// and an arrow to where one minute at the current vertical speed puts the aircraft.
+/// and an arrow to where one minute at the current vertical speed puts the aircraft. With a predicted
+/// airspace floor ahead (stage 2): the airspace hatched from its floor up, its label, the time to it in
+/// amber under the floor, and a dashed amber line from the arrow tip to the floor.
 struct AltitudeTape: View {
     /// Feet MSL; nil when there is no current vertical fix (nothing is drawn as current).
     let altitudeFeet: Double?
     let verticalSpeedFPM: Double  // feet per minute
+    /// The soonest predicted floor: feet MSL, seconds to it, label ("B floor 3,000"). Drawn only with a current altitude.
+    var floor: (feet: Double, secondsAhead: TimeInterval, label: String)? = nil
 
-    /// Top of the scale in feet: 4,000, or twice the altitude rounded up to 1,000 ft once above 3,500.
-    static func scaleTop(for altitude: Double?) -> Double {
-        guard let altitude, altitude > 3500 else { return 4000 }
-        return (altitude * 2 / 1000).rounded(.up) * 1000
+    /// Top of the scale in feet: 4,000, or twice the altitude rounded up to 1,000 ft once above 3,500; raised
+    /// so a floor sits at least 500 ft below the top (the hatched airspace always shows).
+    nonisolated static func scaleTop(for altitude: Double?, floor: Double? = nil) -> Double {
+        var top = 4000.0  // feet
+        if let altitude, altitude > 3500 { top = (altitude * 2 / 1000).rounded(.up) * 1000 }
+        if let floor { top = max(top, ((floor + 500) / 1000).rounded(.up) * 1000) }
+        return top
+    }
+
+    private var shownFloor: (feet: Double, secondsAhead: TimeInterval, label: String)? {
+        altitudeFeet == nil ? nil : floor
     }
 
     var body: some View {
-        let top = Self.scaleTop(for: altitudeFeet)
+        let floor = shownFloor
+        let top = Self.scaleTop(for: altitudeFeet, floor: floor?.feet)
         Canvas { context, size in
             let x0: CGFloat = 8, x1 = size.width - 8
             let barY: CGFloat = 20, barHeight: CGFloat = 16
             func x(_ feet: Double) -> CGFloat { x0 + (x1 - x0) * CGFloat(min(max(feet, 0), top) / top) }
+            /// Two horizontal spans closer than Space.xs.
+            func touches(_ a: (minX: CGFloat, maxX: CGFloat), _ b: (minX: CGFloat, maxX: CGFloat)?) -> Bool {
+                guard let b else { return false }
+                return a.minX - Space.xs < b.maxX && a.maxX + Space.xs > b.minX
+            }
 
             context.fill(Path(roundedRect: CGRect(x: x0, y: barY, width: x1 - x0, height: barHeight), cornerRadius: 3),
                          with: .color(Palette.paperSecondary))
@@ -528,35 +572,74 @@ struct AltitudeTape: View {
                 context.stroke(tick, with: .color(Palette.rule), lineWidth: 1.5)
             }
 
-            // Labels under the bar: the scale ends, and the current altitude centred under the marker but
-            // kept inside the tape. An end label the altitude label would touch is not drawn.
+            let floorX = floor.map { x($0.feet) }
+            if let floorX {
+                // The airspace from its floor to the top of the scale, hatched, and a 3pt line at the floor.
+                let block = CGRect(x: floorX, y: barY, width: x1 - floorX, height: barHeight)
+                context.fill(Path(block), with: .color(Palette.airspace.opacity(0.15)))
+                var hatch = context
+                hatch.clip(to: Path(block))
+                var lines = Path()
+                for start in stride(from: floorX - barHeight, to: x1, by: 7) {
+                    lines.move(to: CGPoint(x: start, y: barY + barHeight))
+                    lines.addLine(to: CGPoint(x: start + barHeight, y: barY))
+                }
+                hatch.stroke(lines, with: .color(Palette.airspace.opacity(0.6)), lineWidth: 1.5)
+                var line = Path()
+                line.move(to: CGPoint(x: floorX, y: barY - 4))
+                line.addLine(to: CGPoint(x: floorX, y: barY + barHeight + 4))
+                context.stroke(line, with: .color(Palette.airspace), lineWidth: 3)
+            }
+
+            // Labels under the bar: the scale ends, the current altitude centred under the marker and the
+            // time to the floor under the floor, each kept inside the tape. The altitude wins: a floor time it
+            // would touch moves up beside the floor label, an end label either would touch is not drawn.
             let labelY = size.height - 6
             let zeroLabel = context.resolve(Text("0").font(TypeRole.stripLabel).foregroundStyle(Palette.inkSecondary))
             let topLabel = context.resolve(Text(Int(top).formatted()).font(TypeRole.stripLabel).foregroundStyle(Palette.inkSecondary))
             let zeroMaxX = x0 + zeroLabel.measure(in: size).width
             let topMinX = x1 - topLabel.measure(in: size).width
-            var altitudeLabel: (text: GraphicsContext.ResolvedText, centerX: CGFloat, minX: CGFloat, maxX: CGFloat)?
-            if let altitude = altitudeFeet {
-                let text = context.resolve(Text(Int((altitude / 10).rounded() * 10).formatted())
-                    .font(TypeRole.stripLabel).foregroundStyle(Palette.ink))
+            func centered(_ text: GraphicsContext.ResolvedText, at centerX: CGFloat)
+                -> (text: GraphicsContext.ResolvedText, centerX: CGFloat, minX: CGFloat, maxX: CGFloat) {
                 let half = text.measure(in: size).width / 2
-                let centerX = min(max(x(altitude), x0 + half), x1 - half)
-                altitudeLabel = (text, centerX, centerX - half, centerX + half)
+                let clamped = min(max(centerX, x0 + half), x1 - half)
+                return (text, clamped, clamped - half, clamped + half)
             }
-            if zeroMaxX + Space.xs < altitudeLabel?.minX ?? .infinity {
+            let altitudeLabel = altitudeFeet.map { altitude in
+                centered(context.resolve(Text(Int((altitude / 10).rounded() * 10).formatted())
+                    .font(TypeRole.stripLabel).foregroundStyle(Palette.ink)), at: x(altitude))
+            }
+            let timeLabel = floor.map { floor in
+                centered(context.resolve(Text(FlightLogStrip.timeToText(floor.secondsAhead))
+                    .font(TypeRole.stripLabel).foregroundStyle(Palette.caution)), at: x(floor.feet))
+            }
+            let altitudeSpan = altitudeLabel.map { (minX: $0.minX, maxX: $0.maxX) }
+            let timeMovesUp = timeLabel.map { touches(($0.minX, $0.maxX), altitudeSpan) } ?? false
+            let timeSpan = timeMovesUp ? nil : timeLabel.map { (minX: $0.minX, maxX: $0.maxX) }
+            if !touches((x0, zeroMaxX), altitudeSpan) && !touches((x0, zeroMaxX), timeSpan) {
                 context.draw(zeroLabel, at: CGPoint(x: x0, y: labelY), anchor: .leading)
             }
-            if topMinX - Space.xs > altitudeLabel?.maxX ?? -.infinity {
+            if !touches((topMinX, x1), altitudeSpan) && !touches((topMinX, x1), timeSpan) {
                 context.draw(topLabel, at: CGPoint(x: x1, y: labelY), anchor: .trailing)
+            }
+            if let timeLabel, !timeMovesUp {
+                context.draw(timeLabel.text, at: CGPoint(x: timeLabel.centerX, y: labelY), anchor: .center)
             }
 
             guard let altitude = altitudeFeet else { return }
             let ax = x(altitude)
             let midY = barY + barHeight / 2
+            let target = x(altitude + verticalSpeedFPM)  // one minute ahead
+            if let floorX, verticalSpeedFPM >= 100, target < floorX - 4 {
+                // Climbing toward the floor: dashed amber from the arrow tip to it.
+                var dash = Path()
+                dash.move(to: CGPoint(x: target, y: midY))
+                dash.addLine(to: CGPoint(x: floorX - 4, y: midY))
+                context.stroke(dash, with: .color(Palette.caution), style: StrokeStyle(lineWidth: 3, dash: [4, 4]))
+            }
             if abs(verticalSpeedFPM) >= 100 {
                 // One minute at the current vertical speed. The arrow carries no text: the VS value is
                 // printed beside ALT, and a label here collided with the marker.
-                let target = x(altitude + verticalSpeedFPM)
                 let direction: CGFloat = target >= ax ? 1 : -1
                 var shaft = Path()
                 shaft.move(to: CGPoint(x: ax, y: midY))
@@ -578,6 +661,32 @@ struct AltitudeTape: View {
             if let altitudeLabel {
                 context.draw(altitudeLabel.text, at: CGPoint(x: altitudeLabel.centerX, y: labelY), anchor: .center)
             }
+
+            // Above the bar: the floor label at the right end (with the time when it moved up), else beside
+            // the ownship marker on whichever side it fits; not drawn when neither side fits.
+            if let floor {
+                let label = context.resolve(Text(floor.label).font(TypeRole.stripLabel).foregroundStyle(Palette.airspace))
+                let moved = timeMovesUp ? timeLabel : nil
+                let width = label.measure(in: size).width + (moved.map { $0.maxX - $0.minX + Space.xs } ?? 0)
+                let markerSpan = (minX: ax - 7, maxX: ax + 7)
+                var maxX: CGFloat? = x1
+                if touches((x1 - width, x1), markerSpan) {
+                    if markerSpan.minX - Space.xs - width >= x0 {
+                        maxX = markerSpan.minX - Space.xs
+                    } else if markerSpan.maxX + Space.xs + width <= x1 {
+                        maxX = markerSpan.maxX + Space.xs + width
+                    } else {
+                        maxX = nil
+                    }
+                }
+                if let maxX {
+                    let topY: CGFloat = 9
+                    context.draw(label, at: CGPoint(x: maxX, y: topY), anchor: .trailing)
+                    if let moved {
+                        context.draw(moved.text, at: CGPoint(x: maxX - width, y: topY), anchor: .leading)
+                    }
+                }
+            }
         }
         .frame(height: 56)
         .accessibilityElement(children: .ignore)
@@ -588,8 +697,13 @@ struct AltitudeTape: View {
     private var spokenValue: String {
         guard let altitudeFeet else { return "No current altitude" }
         let altitude = "\(Int((altitudeFeet / 10).rounded() * 10)) feet"
-        guard abs(verticalSpeedFPM) >= 100 else { return "\(altitude), level" }
-        return "\(altitude), \(verticalSpeedFPM > 0 ? "climbing" : "descending") \(Int(abs(verticalSpeedFPM))) feet per minute"
+        let vertical = abs(verticalSpeedFPM) >= 100
+            ? "\(verticalSpeedFPM > 0 ? "climbing" : "descending") \(Int(abs(verticalSpeedFPM))) feet per minute"
+            : "level"
+        let ahead = shownFloor.map {
+            ", \(FlightLogStrip.spokenTitle($0.label)) in \(FlightLogStrip.spokenDuration($0.secondsAhead))"
+        } ?? ""
+        return "\(altitude), \(vertical)\(ahead)"
     }
 }
 

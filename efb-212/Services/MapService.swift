@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import SwiftUI
 import MapLibre
 
 @MainActor
@@ -76,6 +77,7 @@ final class MapService {
         addAdvisoryLayer(to: style)
         addRouteLayer(to: style)
         addTrackRulerLayers(to: style)
+        addPredictionMarkerLayer(to: style)
         if let mapView { airportDiagramOverlay.attach(style: style, mapView: mapView) }
         israelChart.attach(style: style)
         israelLSA.attach(style: style)
@@ -548,7 +550,7 @@ final class MapService {
     /// track ruler back on top (below ownship).
     private func raiseRouteLayer() {
         guard let style = mapView?.style else { return }
-        for id in ["route-line-layer"] + Self.trackRulerLayerIDs {
+        for id in ["route-line-layer"] + Self.trackRulerLayerIDs + [Self.predictionMarkerLayerID] {
             guard let layer = style.layer(withIdentifier: id) else { continue }
             style.removeLayer(layer)
             if let ownship = style.layer(withIdentifier: "ownship-symbol") {
@@ -661,9 +663,7 @@ final class MapService {
             trackRulerTickSource?.shape = nil
             return
         }
-        // Labels sit beside the ruler: right of a line that runs up/down the screen, below one that runs across.
-        let screenAngle = (trackTrue - (mapView?.direction ?? 0)).degreesToRadians
-        let anchor = abs(sin(screenAngle)) > 0.707 ? "top" : "left"
+        let anchor = rulerLabelAnchor(trackTrue: trackTrue)
         let ticks = Self.trackRulerMinutes.map { minutes -> MLNPointFeature in
             let tick = MLNPointFeature()
             // NM = knots * minutes / 60
@@ -679,6 +679,122 @@ final class MapService {
         trackRulerLineSource?.shape = MLNPolylineFeature(coordinates: &line, count: UInt(line.count))
         trackRulerTickSource?.shape = MLNShapeCollectionFeature(shapes: ticks)
     }
+
+    /// Labels sit beside the ruler: right of a line that runs up/down the screen, below one that runs across.
+    private func rulerLabelAnchor(trackTrue: Double) -> String {
+        let screenAngle = (trackTrue - (mapView?.direction ?? 0)).degreesToRadians
+        return abs(sin(screenAngle)) > 0.707 ? "top" : "left"
+    }
+
+    // MARK: - Prediction Markers
+
+    /// Diamonds on the track ruler where a predicted airspace entry happens (Direction 2 stage 2).
+    private static let predictionMarkerLayerID = "prediction-markers-symbol"
+    private var predictionMarkerSource: MLNShapeSource?
+    /// Last events drawn, so a style reload re-seeds the diamonds.
+    private var lastPredictionEvents: [PredictedEvent] = []
+
+    private static func predictionIconName(_ severity: PredictedEvent.Severity, night: Bool) -> String {
+        "prediction-diamond-\(severity == .warning ? "warning" : "caution")-\(night ? "night" : "day")"
+    }
+
+    /// Severity colors from the design tokens, resolved for the map (MapLibre takes a fixed color).
+    /// `fill` is the diamond by day: amber is `cautionFill`; amber text uses `caution`.
+    private static func predictionColor(_ severity: PredictedEvent.Severity, night: Bool, fill: Bool) -> UIColor {
+        let traits = UITraitCollection(userInterfaceStyle: night ? .dark : .light)
+        let token = severity == .warning ? Palette.warning : (fill && !night ? Palette.cautionFill : Palette.caution)
+        return UIColor(token).resolvedColor(with: traits)
+    }
+
+    /// 16 pt diamond. Day: filled with a white edge so it reads on the chart. Night: outline only (no filled amber).
+    private static func predictionDiamond(_ severity: PredictedEvent.Severity, night: Bool) -> UIImage {
+        UIGraphicsImageRenderer(size: CGSize(width: 16, height: 16)).image { _ in
+            let path = UIBezierPath()
+            path.move(to: CGPoint(x: 8, y: 1.5))
+            path.addLine(to: CGPoint(x: 14.5, y: 8))
+            path.addLine(to: CGPoint(x: 8, y: 14.5))
+            path.addLine(to: CGPoint(x: 1.5, y: 8))
+            path.close()
+            path.lineWidth = 2
+            if night {
+                predictionColor(severity, night: true, fill: true).setStroke()
+                path.stroke()
+            } else {
+                predictionColor(severity, night: false, fill: true).setFill()
+                UIColor.white.setStroke()
+                path.fill()
+                path.stroke()
+            }
+        }
+    }
+
+    private func addPredictionMarkerLayer(to style: MLNStyle) {
+        for severity in [PredictedEvent.Severity.caution, .warning] {
+            for night in [false, true] {
+                style.setImage(Self.predictionDiamond(severity, night: night), forName: Self.predictionIconName(severity, night: night))
+            }
+        }
+        let source = MLNShapeSource(identifier: "prediction-markers", shape: nil, options: nil)
+        style.addSource(source)
+        predictionMarkerSource = source
+
+        let layer = MLNSymbolStyleLayer(identifier: Self.predictionMarkerLayerID, source: source)
+        layer.iconAllowsOverlap = NSExpression(forConstantValue: true)
+        layer.iconIgnoresPlacement = NSExpression(forConstantValue: true)
+        layer.text = NSExpression(forKeyPath: "label")
+        layer.textFontNames = NSExpression(forConstantValue: ["Noto Sans Regular"])
+        layer.textFontSize = NSExpression(forConstantValue: 12)
+        layer.textHaloWidth = NSExpression(forConstantValue: 1.5)
+        layer.textAnchor = NSExpression(forKeyPath: "anchor")
+        layer.textOffset = NSExpression(forConstantValue: NSValue(cgVector: CGVector(dx: 0.9, dy: 0.9)))
+        layer.textAllowsOverlap = NSExpression(forConstantValue: true)
+        stylePredictionMarkers(layer, night: false)
+
+        if let ownship = style.layer(withIdentifier: "ownship-symbol") {
+            style.insertLayer(layer, below: ownship)
+        } else {
+            style.addLayer(layer)
+        }
+        updatePredictionMarkers(lastPredictionEvents)
+    }
+
+    /// Icon and text color come from each feature (red = warning, amber = caution), so no match
+    /// expression is needed; night changes rebuild the features.
+    private func stylePredictionMarkers(_ layer: MLNSymbolStyleLayer, night: Bool) {
+        layer.iconImageName = NSExpression(forKeyPath: "icon")
+        layer.textColor = NSExpression(forKeyPath: "color")
+        layer.textHaloColor = NSExpression(forConstantValue: night ? MapColor.trackRulerHaloNight : MapColor.trackRulerHaloDay)
+        predictionNight = night
+        updatePredictionMarkers(lastPredictionEvents)
+    }
+
+    /// One diamond per predicted entry at its coordinate, labelled "m:ss · title" beside the ruler.
+    /// An empty array clears them.
+    func updatePredictionMarkers(_ events: [PredictedEvent]) {
+        lastPredictionEvents = events
+        guard !events.isEmpty else {
+            predictionMarkerSource?.shape = nil
+            return
+        }
+        let anchor = rulerLabelAnchor(trackTrue: lastTrackRuler?.trackTrue ?? 0)
+        // Events met at the same moment sit at the same point: one diamond, one label, warning first.
+        let groups = Dictionary(grouping: events, by: \.secondsAhead).values
+            .map { $0.sorted { $0.severity > $1.severity } }
+        let markers = groups.compactMap { group -> MLNPointFeature? in
+            guard let event = group.first else { return nil }
+            let marker = MLNPointFeature()
+            marker.coordinate = event.coordinate
+            marker.attributes = [
+                "icon": Self.predictionIconName(event.severity, night: predictionNight),
+                "color": Self.predictionColor(event.severity, night: predictionNight, fill: false),
+                "anchor": anchor,
+                "label": "\(FlightLogStrip.timeToText(event.secondsAhead)) \u{00B7} \(group.map(\.title).joined(separator: " / "))"
+            ]
+            return marker
+        }
+        predictionMarkerSource?.shape = MLNShapeCollectionFeature(shapes: markers)
+    }
+    private var predictionNight = false
 
     // MARK: - Replay Layers (on-demand, not in onStyleLoaded)
 
@@ -938,6 +1054,9 @@ final class MapService {
                 ticks.textColor = NSExpression(forConstantValue: ink)
                 ticks.textHaloColor = NSExpression(forConstantValue: night ? MapColor.trackRulerHaloNight : MapColor.trackRulerHaloDay)
             }
+        }
+        if let markers = style.layer(withIdentifier: Self.predictionMarkerLayerID) as? MLNSymbolStyleLayer {
+            stylePredictionMarkers(markers, night: night)
         }
         airportDiagramOverlay.applyDisplayMode(night: night)
         israelChart.applyDisplayMode(night: night)

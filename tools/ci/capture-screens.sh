@@ -83,7 +83,10 @@ shot() {
     -OpenEFBScenarioSpeed 1 -OpenEFBScenarioStart "$start" "$@" >/dev/null || problems+=("launch failed or timed out")
   if [ ${#problems[@]} -eq 0 ]; then
     sleep "$WAIT"   # the map, the first frame and a few fixes
-    limited 60 xcrun simctl io "$sim" screenshot "$OUT/$device-$name.png" >/dev/null 2>&1 || problems+=("no screenshot")
+    # One retry: the first shot after a cold simulator boot on a hosted runner can hit the deadline.
+    limited 60 xcrun simctl io "$sim" screenshot "$OUT/$device-$name.png" >/dev/null 2>&1 \
+      || { sleep 10; limited 60 xcrun simctl io "$sim" screenshot "$OUT/$device-$name.png" >/dev/null 2>&1; } \
+      || problems+=("no screenshot")
     state=0
     app_running "$sim" || state=$?
     case $state in
@@ -111,6 +114,9 @@ shots() {
   # The bar toggles (Layers > Panels): flight log hidden, then both bars hidden. Launch arguments are not persisted.
   shot "$sim" "$device" map-nolog us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -showsFlightLog NO
   shot "$sim" "$device" map-chartonly us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -showsFlightLog NO -showsInstruments NO
+  # Stage 2: predicted airspace ahead (Layers > Panels > Predictions), day and night.
+  shot "$sim" "$device" map-predictions us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -showsPredictions YES
+  shot "$sim" "$device" map-predictions-night us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode night -OpenEFBDirectTo KOAK -showsPredictions YES
   shot "$sim" "$device" map-noplan us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day
   shot "$sim" "$device" airport-KSQL us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn airport:KSQL -OpenEFBDisplayMode day
   shot "$sim" "$device" nearest us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn nearest -OpenEFBDisplayMode day
@@ -126,6 +132,7 @@ prepare "$IPAD"
 shots "$IPAD" ipad
 # Herzliya to Rosh Pina from 600 s: on the CVFR route at 1500 ft.
 shot "$IPAD" ipad il-map-day il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day
+shot "$IPAD" ipad il-map-predictions il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -showsPredictions YES
 echo "::endgroup::"
 
 echo "::group::iPhone"
