@@ -40,11 +40,11 @@ enum SeedDataHook {
         guard let profile = defaults.string(forKey: seedKey) else { return }
         let trackPoints = profile == "small" ? 300 : 3_600
         do {
-            try seedSwiftData(container.mainContext)
+            try seedSwiftData(container.mainContext, trackPoints: trackPoints)
             try seedRecording(trackPoints: trackPoints)
             seedDefaults(defaults)
-            seedKeychain()
-            try writeReport(container: container, profile: profile, trackPoints: trackPoints)
+            let keychainWrites = seedKeychain()
+            try writeReport(container: container, profile: profile, trackPoints: trackPoints, keychainWrites: keychainWrites)
             log.notice("Seed data written (\(profile, privacy: .public))")
         } catch {
             log.error("Seed failed: \(String(describing: error), privacy: .public)")
@@ -56,7 +56,7 @@ enum SeedDataHook {
     // MARK: - SwiftData
 
     @MainActor
-    private static func seedSwiftData(_ context: ModelContext) throws {
+    private static func seedSwiftData(_ context: ModelContext, trackPoints: Int) throws {
         try context.delete(model: SchemaV1.UserSettings.self)
         try context.delete(model: SchemaV1.AircraftProfile.self)
         try context.delete(model: SchemaV1.PilotProfile.self)
@@ -164,7 +164,7 @@ enum SeedDataHook {
             f.durationSeconds = i == 10 ? 0 : 3_600
             f.audioFileURL = i == 1 ? "seed-audio-1.m4a" : nil
             f.audioQuality = i % 2 == 0 ? "high" : "standard"
-            f.trackPointCount = i == 1 ? 3_600 : 0
+            f.trackPointCount = i == 1 ? trackPoints : 0
             f.transcriptSegmentCount = i == 1 ? 12 : 0
             f.aircraftProfileID = uuid(Kind.aircraft, (i % 3) + 1).uuidString
             f.pilotProfileID = uuid(Kind.pilot, (i % 2) + 1).uuidString
@@ -262,10 +262,19 @@ enum SeedDataHook {
 
     // MARK: - Keychain (placeholder values, never real credentials)
 
-    private static func seedKeychain() {
+    private static func seedKeychain() -> [String: String] {
         let store = KeychainStore(service: "quartermint.efb-212.faa-notam-api")
-        try? store.setString("SEED-PLACEHOLDER-ID", forAccount: "client_id")
-        try? store.setString("SEED-PLACEHOLDER-SECRET", forAccount: "client_secret")
+        var results: [String: String] = [:]
+        for (account, value) in [("client_id", "SEED-PLACEHOLDER-ID"), ("client_secret", "SEED-PLACEHOLDER-SECRET")] {
+            do {
+                try store.setString(value, forAccount: account)
+                results[account] = "ok"
+            } catch {
+                log.error("Keychain write failed for \(account, privacy: .public): \(String(describing: error), privacy: .public)")
+                results[account] = "failed: \(String(describing: error))"
+            }
+        }
+        return results
     }
 
     /// Attributes only (service, account, accessibility, access group); never the stored value.
@@ -302,7 +311,7 @@ enum SeedDataHook {
     }
 
     @MainActor
-    private static func writeReport(container: ModelContainer, profile: String, trackPoints: Int) throws {
+    private static func writeReport(container: ModelContainer, profile: String, trackPoints: Int, keychainWrites: [String: String]) throws {
         let fm = FileManager.default
         let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         var files: [[String: Any]] = []
@@ -335,6 +344,7 @@ enum SeedDataHook {
             "applicationSupportFiles": files,
             "modelCounts": counts,
             "userDefaultsDomain": domain.mapValues { jsonSafe($0) },
+            "keychainWrites": keychainWrites,
             "keychainItems": keychainItems()
         ]
         let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])

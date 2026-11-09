@@ -138,15 +138,14 @@ struct ScenarioGoldenExport {
             "altitudeCautionLegs": run.altitudeCautionLegs.sorted(),
             "recordedTrackPoints": try run.recordingDB.trackPoints(forFlight: run.flightID).count
         ]
-        if let debrief = try? run.cvfrDebrief() {
-            summary["debrief"] = [
-                "fromPlan": debrief.fromPlan,
-                "legs": debrief.legs.count,
-                "fractionWithin300": debrief.legs.map { $0.adherence.map { r($0.fractionWithin300) } ?? -1 },
-                "points": debrief.points.count,
-                "maxPointDistanceNM": r(debrief.points.map(\.distanceNM).max() ?? 0)
-            ] as [String: Any]
-        }
+        let debrief = try run.cvfrDebrief()   // propagate: an incomplete export must not pass the byte-equality check
+        summary["debrief"] = [
+            "fromPlan": debrief.fromPlan,
+            "legs": debrief.legs.count,
+            "fractionWithin300": debrief.legs.map { $0.adherence.map { r($0.fractionWithin300) } ?? -1 },
+            "points": debrief.points.count,
+            "maxPointDistanceNM": r(debrief.points.map(\.distanceNM).max() ?? 0)
+        ] as [String: Any]
         let doc: [String: Any] = [
             "format": "kanaf-scenario-golden/1",
             "scenario": run.scenario.name,
