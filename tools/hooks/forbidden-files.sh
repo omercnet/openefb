@@ -10,6 +10,8 @@ for f in "$@"; do
   case "$f" in
     *.p8 | *.p12 | *.mobileprovision | *.xcarchive | *.xcarchive/* | *TmpTests.swift)
       echo "forbidden file: $f" >&2; fail=1; continue ;;
+    private-key.pem | */private-key.pem | public-key.pem | */public-key.pem)
+      echo "forbidden file (signing key material, never committed): $f" >&2; fail=1; continue ;;
     .env.example | */.env.example) ;;
     .env* | */.env*)
       echo "forbidden file (env): $f" >&2; fail=1; continue ;;

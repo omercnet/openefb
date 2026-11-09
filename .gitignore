@@ -85,3 +85,4 @@ __pycache__/
 *.pyc
 
 .beads.gate.lock
+web/ota/**/*.pem

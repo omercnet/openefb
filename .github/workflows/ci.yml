@@ -57,7 +57,7 @@ jobs:
       - name: Pre-commit checks over the whole tree, full-history secret scan
         # The web jobs cover web/*; swift-format is report-only (about 4,400 known findings).
         env:
-          LEFTHOOK_EXCLUDE: web-interviews,web-relay,web-charts,swift-format
+          LEFTHOOK_EXCLUDE: web-interviews,web-relay,web-charts,web-ota,swift-format
         run: tools/check.sh
 
   web:
@@ -72,6 +72,8 @@ jobs:
             commands: npm test && npm run typecheck
           - package: charts
             commands: npm test
+          - package: ota
+            commands: npm test && npm run typecheck
           - package: interviews
             commands: npm run lint
     defaults:

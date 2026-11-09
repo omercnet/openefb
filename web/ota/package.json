@@ -1,0 +1,19 @@
+{
+  "name": "ota",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker + R2: read-only Expo Updates (protocol v1) server and offline-signing publisher for the Kanaf RN spike",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev --port 8787 --local",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}
