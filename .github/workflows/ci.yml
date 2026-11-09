@@ -55,7 +55,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: tools/hooks/commit-msg.sh --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
       - name: Pre-commit checks over the whole tree, full-history secret scan
-        # The web jobs cover web/*, the app workflow covers app/; swift-format is report-only (about 4,400 known findings).
+        # The web jobs cover web/*, the app job covers app/; swift-format is report-only (about 4,400 known findings).
         env:
           LEFTHOOK_EXCLUDE: web-interviews,web-relay,web-charts,web-ota,app,swift-format
         run: tools/check.sh
@@ -88,6 +88,27 @@ jobs:
           cache-dependency-path: web/${{ matrix.package }}/package-lock.json
       - run: npm ci
       - run: ${{ matrix.commands }}
+
+  app:
+    name: App (tsc, lint, jest)
+    # The React Native app's Linux checks on every pull request, so the gate covers them (rn-rewrite-plan.md 6.1). The
+    # device builds and captures stay in app.yml, which only runs when app/ or web/ota/ changes.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
 
   unit-tests:
     name: Unit tests (iPad simulator)
@@ -182,7 +203,7 @@ jobs:
   gate:
     name: CI gate
     if: always()
-    needs: [lint, web, unit-tests, simulation]
+    needs: [lint, web, app, unit-tests, simulation]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to pass

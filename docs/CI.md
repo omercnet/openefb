@@ -67,7 +67,7 @@ After the scenarios, the same job runs `tools/ci/capture-screens.sh`: it launche
 
 ## React Native app
 
-`.github/workflows/app.yml` builds and tests `app/`. It runs only for pull requests that touch `app/**`, `web/ota/**` or the workflow, so it is not a required check (a required check behind a path filter never reports on other pull requests). The `checks` job (ubuntu: `tsc`, ESLint with Prettier, Jest) runs first; the iOS (macos-26) and Android (emulator) jobs build Release variants with `KANAF_VARIANT=dev` (`io.omer.efb.dev`), capture screens and run the OTA smoke test. `tools/check.sh` skips the `app` hook in the lint job because the checks job covers it.
+`.github/workflows/app.yml` builds and tests `app/`. It runs only for pull requests that touch `app/**`, `web/ota/**` or the workflow, so it is not a required check (a required check behind a path filter never reports on other pull requests). The `checks` job (ubuntu: `tsc`, ESLint with Prettier, Jest) runs first and the iOS (macos-26) and Android (emulator) jobs wait for it; they build Release variants with `KANAF_VARIANT=dev` (`io.omer.efb.dev`), capture screens and run the OTA smoke test. The same Linux checks also run in `ci.yml`'s `App (tsc, lint, jest)` job on every pull request, which is in the `CI gate`, so a failing app check blocks the merge. `tools/check.sh` skips the `app` hook in the lint job because that job covers it.
 
 ## Not done
 

@@ -67,9 +67,10 @@ pre-commit:
       run: npm test
 
     - name: app
-      # Needs `npm ci` in app/ once. CI runs the same checks in the app workflow (checks job).
+      # Needs `npm ci` in app/ once. CI runs the same checks in ci.yml's app job (in the gate).
       root: app/
-      glob: "app/**/*"
+      # app/** (not app/**/*): the default matcher needs a directory for **/*, so app/app.config.ts would be skipped.
+      glob: "app/**"
       exclude: ["app/assets/**", "app/reference/**"]
       run: npm run typecheck && npm run lint && npm test
 

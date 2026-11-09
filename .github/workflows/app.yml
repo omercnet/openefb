@@ -8,7 +8,8 @@ name: App
 # launch, signed update A, tampered update B refused, roll back to embedded, other channel ignored. The signing keys are
 # generated per run under /tmp and never leave the runner; nothing is deployed to Cloudflare.
 # Runs only for pull requests that touch app/, web/ota/ or this file (not a required check: a path-filtered
-# required check that never reports would block unrelated pull requests, see ci.yml).
+# required check that never reports would block unrelated pull requests, see ci.yml). The same tsc, lint and jest run
+# in ci.yml's app job, which is in the required gate; the checks job here is what the device builds wait for.
 on:
   pull_request:
     paths:
@@ -47,6 +48,7 @@ jobs:
 
   ios:
     name: iOS (iPad simulator, Release)
+    needs: checks # a failed check stops the long device builds
     runs-on: macos-26
     timeout-minutes: 90
     env:
@@ -158,6 +160,7 @@ jobs:
 
   android:
     name: Android (Pixel Tablet API 35 emulator, Release)
+    needs: checks # a failed check stops the long device builds
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
