@@ -1,0 +1,434 @@
+{
+  "durationSeconds" : 2641,
+  "events" : [
+    {
+      "detail" : "SFC–2000 FT",
+      "id" : "area-31",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 0,
+      "title" : "In Herzliya CTR: contact TWR 122.2",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "LLHZ",
+      "leg" : 0,
+      "t" : 0,
+      "to" : "BAZRA",
+      "type" : "leg"
+    },
+    {
+      "status" : "ok",
+      "t" : 0,
+      "type" : "gps"
+    },
+    {
+      "detail" : "Transponder on for the whole flight, unless the AIP or ATC says otherwise",
+      "id" : "squawk",
+      "kind" : "squawk",
+      "severity" : "caution",
+      "t" : 78,
+      "title" : "Squawk 5100 (CVFR)",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "squawk",
+      "t" : 144,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "BAZRA",
+      "leg" : 1,
+      "t" : 180,
+      "to" : "DEROR",
+      "type" : "leg"
+    },
+    {
+      "id" : "area-31",
+      "t" : 204,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "DEROR",
+      "leg" : 2,
+      "t" : 266,
+      "to" : "SHARO",
+      "type" : "leg"
+    },
+    {
+      "from" : "SHARO",
+      "leg" : 3,
+      "t" : 410,
+      "to" : "ZYAAR",
+      "type" : "leg"
+    },
+    {
+      "from" : "ZYAAR",
+      "leg" : 4,
+      "t" : 598,
+      "to" : "HADRA",
+      "type" : "leg"
+    },
+    {
+      "from" : "HADRA",
+      "leg" : 5,
+      "t" : 724,
+      "to" : "EIRON",
+      "type" : "leg"
+    },
+    {
+      "from" : "EIRON",
+      "leg" : 6,
+      "t" : 930,
+      "to" : "ZMGID",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–6000 FT",
+      "id" : "area-93",
+      "kind" : "prohibited",
+      "severity" : "caution",
+      "t" : 1056,
+      "title" : "Entering prohibited area LLP171 Judea and Samaria North",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-93",
+      "t" : 1080,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–6000 FT",
+      "id" : "area-93",
+      "kind" : "prohibited",
+      "severity" : "caution",
+      "t" : 1086,
+      "title" : "Entering prohibited area LLP171 Judea and Samaria North",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-93",
+      "t" : 1134,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–6000 FT",
+      "id" : "area-93",
+      "kind" : "prohibited",
+      "severity" : "caution",
+      "t" : 1152,
+      "title" : "Entering prohibited area LLP171 Judea and Samaria North",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-93",
+      "t" : 1156,
+      "type" : "alert_off"
+    },
+    {
+      "status" : "lost",
+      "t" : 1156,
+      "type" : "gps"
+    },
+    {
+      "t" : 1156,
+      "type" : "alerts_suspended"
+    },
+    {
+      "status" : "ok",
+      "t" : 1200,
+      "type" : "gps"
+    },
+    {
+      "t" : 1200,
+      "type" : "alerts_resumed"
+    },
+    {
+      "detail" : "SFC–10000 FT · MIL",
+      "id" : "area-37",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 1206,
+      "title" : "Entering Ramat David CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "ZMGID",
+      "leg" : 7,
+      "t" : 1312,
+      "to" : "AFULA",
+      "type" : "leg"
+    },
+    {
+      "id" : "area-37",
+      "t" : 1326,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "AFULA",
+      "leg" : 8,
+      "t" : 1492,
+      "to" : "TAVOR",
+      "type" : "leg"
+    },
+    {
+      "detail" : " FT",
+      "id" : "area-136",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 1500,
+      "title" : "Entering restricted area LLR31 LLR31",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-136",
+      "t" : 1518,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : " FT",
+      "id" : "area-136",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 1524,
+      "title" : "Entering restricted area LLR31 LLR31",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–10000 FT",
+      "id" : "area-119",
+      "kind" : "prohibited",
+      "severity" : "caution",
+      "t" : 1614,
+      "title" : "Entering prohibited area LLP33 LLP33",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-119",
+      "t" : 1626,
+      "type" : "alert_off"
+    },
+    {
+      "id" : "area-136",
+      "t" : 1632,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : " FT",
+      "id" : "area-136",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 1638,
+      "title" : "Inside restricted area LLR31 LLR31",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-136",
+      "t" : 1770,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "TAVOR",
+      "leg" : 9,
+      "t" : 1818,
+      "to" : "DESHE",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–6000 FT",
+      "id" : "area-32",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2232,
+      "title" : "Entering Rosh Pina CTR: contact TWR 118.45",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "DESHE",
+      "leg" : 10,
+      "t" : 2260,
+      "to" : "AMNON",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–6000 FT",
+      "id" : "area-32",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2358,
+      "title" : "In Rosh Pina CTR: contact TWR 118.45",
+      "type" : "alert_changed"
+    },
+    {
+      "from" : "AMNON",
+      "leg" : 11,
+      "t" : 2358,
+      "to" : "LLIB",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–11000 FT",
+      "id" : "area-60",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 2376,
+      "title" : "Entering danger area LLD37 Mahanaim West Parachuting",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–11000 FT",
+      "id" : "area-61",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 2424,
+      "title" : "Entering danger area LLD38 Mahanaim East Parachuting",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-60",
+      "t" : 2430,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "Two-way radio and a working transponder required",
+      "id" : "north-33",
+      "kind" : "northOf33",
+      "severity" : "caution",
+      "t" : 2460,
+      "title" : "Track crosses 33°00′N in 2 min",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-61",
+      "t" : 2478,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–11000 FT",
+      "id" : "area-60",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 2496,
+      "title" : "Inside danger area LLD37 Mahanaim West Parachuting",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "north-33",
+      "t" : 2544,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–11000 FT",
+      "id" : "area-61",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 2550,
+      "title" : "Entering danger area LLD38 Mahanaim East Parachuting",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-61",
+      "t" : 2568,
+      "type" : "alert_off"
+    }
+  ],
+  "format" : "kanaf-scenario-golden\/1",
+  "route" : [
+    {
+      "from" : "LLHZ",
+      "to" : "BAZRA"
+    },
+    {
+      "from" : "BAZRA",
+      "to" : "DEROR"
+    },
+    {
+      "from" : "DEROR",
+      "to" : "SHARO"
+    },
+    {
+      "from" : "SHARO",
+      "to" : "ZYAAR"
+    },
+    {
+      "from" : "ZYAAR",
+      "to" : "HADRA"
+    },
+    {
+      "from" : "HADRA",
+      "to" : "EIRON"
+    },
+    {
+      "from" : "EIRON",
+      "to" : "ZMGID"
+    },
+    {
+      "from" : "ZMGID",
+      "to" : "AFULA"
+    },
+    {
+      "from" : "AFULA",
+      "to" : "TAVOR"
+    },
+    {
+      "from" : "TAVOR",
+      "to" : "DESHE"
+    },
+    {
+      "from" : "DESHE",
+      "to" : "AMNON"
+    },
+    {
+      "from" : "AMNON",
+      "to" : "LLIB"
+    }
+  ],
+  "scenario" : "il-gps-loss",
+  "strideSeconds" : 2,
+  "summary" : {
+    "altitudeCautionLegs" : [
+
+    ],
+    "debrief" : {
+      "fractionWithin300" : [
+        1,
+        0.98799999999999999,
+        0.97199999999999998,
+        1,
+        0.92700000000000005,
+        0.94199999999999995,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "fromPlan" : true,
+      "legs" : 12,
+      "maxPointDistanceNM" : 0.024,
+      "points" : 13
+    },
+    "failedToDeliver" : 0,
+    "fixesDelivered" : 1299,
+    "legSequence" : [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "offRouteLegs" : [
+
+    ],
+    "recordedTrackPoints" : 1299,
+    "samples" : 1321
+  }
+}

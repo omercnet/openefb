@@ -1,0 +1,67 @@
+{
+  "applicationSupport" : "<container>/Library/Application Support",
+  "applicationSupportFiles" : [
+    {
+      "bytes" : 102400,
+      "path" : "default.store"
+    },
+    {
+      "bytes" : 32768,
+      "path" : "default.store-shm"
+    },
+    {
+      "bytes" : 78312,
+      "path" : "default.store-wal"
+    },
+    {
+      "bytes" : 114688,
+      "path" : "efb-212/recording.sqlite"
+    },
+    {
+      "bytes" : 32768,
+      "path" : "efb-212/recording.sqlite-shm"
+    },
+    {
+      "bytes" : 0,
+      "path" : "efb-212/recording.sqlite-wal"
+    }
+  ],
+  "bundleID" : "io.omer.efb",
+  "keychainItems" : [
+    {
+      "status" : "-34018"
+    }
+  ],
+  "keychainWrites" : {
+    "client_id" : "failed: unexpectedStatus(-34018)",
+    "client_secret" : "failed: unexpectedStatus(-34018)"
+  },
+  "modelCounts" : {
+    "AircraftProfile" : 3,
+    "FlightPlanRecord" : 5,
+    "FlightRecord" : 10,
+    "LogbookEntry" : 20,
+    "PilotProfile" : 2,
+    "UserSettings" : 1
+  },
+  "profile" : "small",
+  "swiftDataStoreURL" : "<container>/Library/Application Support/default.store",
+  "trackPoints" : 300,
+  "userDefaultsDomain" : {
+    "displayMode" : "night",
+    "hasSeenOnboarding" : true,
+    "israel.routeNetwork.00000001-0000-4000-8000-000000000001" : "cvfr",
+    "israel.routeNetwork.00000001-0000-4000-8000-000000000002" : "lsa",
+    "israelChartHintDismissed" : true,
+    "israelNotamReadKeys" : [
+      "seed-notam-a",
+      "seed-notam-b"
+    ],
+    "israelOffRouteThresholdNM" : 2.5,
+    "showAirportDiagrams" : false,
+    "showsFlightLog" : false,
+    "showsInstruments" : false,
+    "showsPredictions" : true,
+    "telemetryEnabled" : false
+  }
+}

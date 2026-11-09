@@ -1,0 +1,574 @@
+{
+  "durationSeconds" : 3115,
+  "events" : [
+    {
+      "detail" : "SFC–11000 FT · MIL",
+      "id" : "area-29",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 0,
+      "title" : "In Hazerim CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–2000 FT · MIL",
+      "id" : "area-34",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 0,
+      "title" : "In Nevatim CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "LLBS",
+      "leg" : 0,
+      "t" : 0,
+      "to" : "NASIH",
+      "type" : "leg"
+    },
+    {
+      "status" : "ok",
+      "t" : 0,
+      "type" : "gps"
+    },
+    {
+      "detail" : "Transponder on for the whole flight, unless the AIP or ATC says otherwise",
+      "id" : "squawk",
+      "kind" : "squawk",
+      "severity" : "caution",
+      "t" : 78,
+      "title" : "Squawk 5100 (CVFR)",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "squawk",
+      "t" : 144,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "NASIH",
+      "leg" : 1,
+      "t" : 174,
+      "to" : "MINGV",
+      "type" : "leg"
+    },
+    {
+      "id" : "area-29",
+      "t" : 216,
+      "type" : "alert_off"
+    },
+    {
+      "id" : "area-34",
+      "t" : 216,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "MINGV",
+      "leg" : 2,
+      "t" : 288,
+      "to" : "BKAMA",
+      "type" : "leg"
+    },
+    {
+      "from" : "BKAMA",
+      "leg" : 3,
+      "t" : 525,
+      "to" : "MACHZ",
+      "type" : "leg"
+    },
+    {
+      "from" : "MACHZ",
+      "leg" : 4,
+      "t" : 720,
+      "to" : "MKGAT",
+      "type" : "leg"
+    },
+    {
+      "from" : "MKGAT",
+      "leg" : 5,
+      "t" : 966,
+      "to" : "NAHLA",
+      "type" : "leg"
+    },
+    {
+      "from" : "NAHLA",
+      "leg" : 6,
+      "t" : 1125,
+      "to" : "NAHEM",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–11000 FT · MIL",
+      "id" : "area-24",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 1314,
+      "title" : "Entering Tel Nof CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "NAHEM",
+      "leg" : 7,
+      "t" : 1371,
+      "to" : "GEFEN",
+      "type" : "leg"
+    },
+    {
+      "id" : "area-24",
+      "t" : 1404,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–3000 FT",
+      "id" : "area-88",
+      "kind" : "prohibited",
+      "severity" : "caution",
+      "t" : 1422,
+      "title" : "Entering prohibited area LLP12 Fire Zone 209 Future",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "GEFEN",
+      "leg" : 8,
+      "t" : 1482,
+      "to" : "ZHRYA",
+      "type" : "leg"
+    },
+    {
+      "id" : "area-88",
+      "t" : 1512,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "ZHRYA",
+      "leg" : 9,
+      "t" : 1695,
+      "to" : "BSEMS",
+      "type" : "leg"
+    },
+    {
+      "from" : "BSEMS",
+      "leg" : 10,
+      "t" : 1872,
+      "to" : "NCSHN",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–12000 FT · MIL",
+      "id" : "area-25",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2070,
+      "title" : "Entering Tel Nof CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "NCSHN",
+      "leg" : 11,
+      "t" : 2094,
+      "to" : "LTRUN",
+      "type" : "leg"
+    },
+    {
+      "id" : "area-25",
+      "t" : 2124,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–2000 FT",
+      "id" : "area-23",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2220,
+      "title" : "Entering Tel Aviv \/ Ben Gurion CTR: contact TWR 134.6",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-23",
+      "t" : 2262,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "LTRUN",
+      "leg" : 12,
+      "t" : 2265,
+      "to" : "AYLON",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–6000 FT",
+      "id" : "area-94",
+      "kind" : "prohibited",
+      "severity" : "caution",
+      "t" : 2274,
+      "title" : "Entering prohibited area LLP172 Judea and Samaria Center",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-94",
+      "t" : 2298,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "AYLON",
+      "leg" : 13,
+      "t" : 2400,
+      "to" : "NSHRM",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–2000 FT",
+      "id" : "area-23",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2424,
+      "title" : "Entering Tel Aviv \/ Ben Gurion CTR: contact TWR 134.6",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "NSHRM",
+      "leg" : 14,
+      "t" : 2556,
+      "to" : "SIRNI",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–12000 FT · MIL",
+      "id" : "area-25",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2580,
+      "title" : "Entering Tel Nof CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-23",
+      "t" : 2586,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–12000 FT · MIL",
+      "id" : "area-25",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2598,
+      "title" : "In Tel Nof CTR: get clearance",
+      "type" : "alert_changed"
+    },
+    {
+      "detail" : "SFC–2000 FT",
+      "id" : "area-23",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2610,
+      "title" : "Entering Tel Aviv \/ Ben Gurion CTR: contact TWR 134.6",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–2000 FT",
+      "id" : "area-23",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2652,
+      "title" : "In Tel Aviv \/ Ben Gurion CTR: contact TWR 134.6",
+      "type" : "alert_changed"
+    },
+    {
+      "id" : "area-25",
+      "t" : 2658,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "SIRNI",
+      "leg" : 15,
+      "t" : 2712,
+      "to" : "IANES",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–12000 FT · MIL",
+      "id" : "area-25",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2736,
+      "title" : "Entering Tel Nof CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–4000 FT · MIL",
+      "id" : "area-21",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2778,
+      "title" : "Entering LL59 CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-25",
+      "t" : 2784,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–12000 FT · MIL",
+      "id" : "area-25",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2796,
+      "title" : "In Tel Nof CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "IANES",
+      "leg" : 16,
+      "t" : 2796,
+      "to" : "BOVED",
+      "type" : "leg"
+    },
+    {
+      "id" : "area-23",
+      "t" : 2802,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–4000 FT",
+      "id" : "area-149",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 2826,
+      "title" : "Entering restricted area LLR82 Fire Zone 24 South",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "BOVED",
+      "leg" : 17,
+      "t" : 2853,
+      "to" : "SOREK",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–1200 FT · MIL",
+      "id" : "area-22",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2874,
+      "title" : "Entering LL59 CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-149",
+      "t" : 2880,
+      "type" : "alert_off"
+    },
+    {
+      "id" : "area-21",
+      "t" : 2880,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–4000 FT · MIL",
+      "id" : "area-21",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2886,
+      "title" : "In LL59 CTR: get clearance",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-25",
+      "t" : 2892,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–UNL FT",
+      "id" : "area-132",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 2904,
+      "title" : "Entering restricted area LLR24 Fire Zone 24 North",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–1200 FT · MIL",
+      "id" : "area-22",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2904,
+      "title" : "In LL59 CTR: get clearance",
+      "type" : "alert_changed"
+    },
+    {
+      "id" : "area-21",
+      "t" : 2910,
+      "type" : "alert_off"
+    },
+    {
+      "from" : "SOREK",
+      "leg" : 18,
+      "t" : 2925,
+      "to" : "LLRS",
+      "type" : "leg"
+    },
+    {
+      "detail" : "SFC–2000 FT",
+      "id" : "area-23",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 2946,
+      "title" : "Entering Tel Aviv \/ Ben Gurion CTR: contact TWR 134.6",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-132",
+      "t" : 2946,
+      "type" : "alert_off"
+    },
+    {
+      "id" : "area-23",
+      "t" : 3042,
+      "type" : "alert_off"
+    }
+  ],
+  "format" : "kanaf-scenario-golden\/1",
+  "route" : [
+    {
+      "from" : "LLBS",
+      "to" : "NASIH"
+    },
+    {
+      "from" : "NASIH",
+      "to" : "MINGV"
+    },
+    {
+      "from" : "MINGV",
+      "to" : "BKAMA"
+    },
+    {
+      "from" : "BKAMA",
+      "to" : "MACHZ"
+    },
+    {
+      "from" : "MACHZ",
+      "to" : "MKGAT"
+    },
+    {
+      "from" : "MKGAT",
+      "to" : "NAHLA"
+    },
+    {
+      "from" : "NAHLA",
+      "to" : "NAHEM"
+    },
+    {
+      "from" : "NAHEM",
+      "to" : "GEFEN"
+    },
+    {
+      "from" : "GEFEN",
+      "to" : "ZHRYA"
+    },
+    {
+      "from" : "ZHRYA",
+      "to" : "BSEMS"
+    },
+    {
+      "from" : "BSEMS",
+      "to" : "NCSHN"
+    },
+    {
+      "from" : "NCSHN",
+      "to" : "LTRUN"
+    },
+    {
+      "from" : "LTRUN",
+      "to" : "AYLON"
+    },
+    {
+      "from" : "AYLON",
+      "to" : "NSHRM"
+    },
+    {
+      "from" : "NSHRM",
+      "to" : "SIRNI"
+    },
+    {
+      "from" : "SIRNI",
+      "to" : "IANES"
+    },
+    {
+      "from" : "IANES",
+      "to" : "BOVED"
+    },
+    {
+      "from" : "BOVED",
+      "to" : "SOREK"
+    },
+    {
+      "from" : "SOREK",
+      "to" : "LLRS"
+    }
+  ],
+  "scenario" : "il-lsa-llbs-llrs",
+  "strideSeconds" : 3,
+  "summary" : {
+    "altitudeCautionLegs" : [
+
+    ],
+    "debrief" : {
+      "fractionWithin300" : [
+        -1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        0.055,
+        -1,
+        0,
+        -1
+      ],
+      "fromPlan" : false,
+      "legs" : 21,
+      "maxPointDistanceNM" : 7.0410000000000004,
+      "points" : 26
+    },
+    "failedToDeliver" : 0,
+    "fixesDelivered" : 1039,
+    "legSequence" : [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "offRouteLegs" : [
+
+    ],
+    "recordedTrackPoints" : 1039,
+    "samples" : 1039
+  }
+}
