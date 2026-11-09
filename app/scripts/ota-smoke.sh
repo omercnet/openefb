@@ -26,7 +26,7 @@ WRANGLER_LOG=${WRANGLER_LOG:-$OUT/ota/wrangler.log}
 SETTLE_TIMEOUT=${SETTLE_TIMEOUT:-120}
 SIM_NAME=${SIM_NAME:-KanafEFBDev}
 BUNDLE=io.omer.efb.dev
-OTA_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../web/ota" && pwd)
+OTA_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../web/ota" && pwd)
 RV=$(tr -d '[:space:]' < "$RV_FILE")
 mkdir -p "$OUT/ota/screens"
 
