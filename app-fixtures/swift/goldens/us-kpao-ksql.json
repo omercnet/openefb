@@ -1,0 +1,40 @@
+{
+  "durationSeconds" : 438,
+  "events" : [
+    {
+      "status" : "ok",
+      "t" : 0,
+      "type" : "gps"
+    }
+  ],
+  "format" : "kanaf-scenario-golden\/1",
+  "route" : [
+
+  ],
+  "scenario" : "us-kpao-ksql",
+  "strideSeconds" : 2,
+  "summary" : {
+    "altitudeCautionLegs" : [
+
+    ],
+    "debrief" : {
+      "fractionWithin300" : [
+
+      ],
+      "fromPlan" : false,
+      "legs" : 0,
+      "maxPointDistanceNM" : 0,
+      "points" : 0
+    },
+    "failedToDeliver" : 0,
+    "fixesDelivered" : 220,
+    "legSequence" : [
+
+    ],
+    "offRouteLegs" : [
+
+    ],
+    "recordedTrackPoints" : 220,
+    "samples" : 220
+  }
+}

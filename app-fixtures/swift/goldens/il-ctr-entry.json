@@ -1,0 +1,122 @@
+{
+  "durationSeconds" : 977,
+  "events" : [
+    {
+      "from" : "LLES",
+      "leg" : 0,
+      "t" : 0,
+      "to" : "32.6580,35.0130",
+      "type" : "leg"
+    },
+    {
+      "status" : "ok",
+      "t" : 0,
+      "type" : "gps"
+    },
+    {
+      "detail" : "Transponder on for the whole flight, unless the AIP or ATC says otherwise",
+      "id" : "squawk",
+      "kind" : "squawk",
+      "severity" : "caution",
+      "t" : 78,
+      "title" : "Squawk 5100 (CVFR)",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "squawk",
+      "t" : 144,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–UNL FT",
+      "id" : "area-127",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 354,
+      "title" : "Entering restricted area LLR100 Fire Zone 100",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–UNL FT",
+      "id" : "area-127",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 474,
+      "title" : "Inside restricted area LLR100 Fire Zone 100",
+      "type" : "alert_changed"
+    },
+    {
+      "from" : "32.6580,35.0130",
+      "leg" : 1,
+      "t" : 526,
+      "to" : "LLHA",
+      "type" : "leg"
+    },
+    {
+      "id" : "area-127",
+      "t" : 624,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "SFC–3000\/3500 FT",
+      "id" : "area-28",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 630,
+      "title" : "Entering Haifa CTR: contact TWR 133",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–3000\/3500 FT",
+      "id" : "area-28",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 750,
+      "title" : "In Haifa CTR: contact TWR 133",
+      "type" : "alert_changed"
+    }
+  ],
+  "format" : "kanaf-scenario-golden\/1",
+  "route" : [
+    {
+      "from" : "LLES",
+      "to" : "32.6580,35.0130"
+    },
+    {
+      "from" : "32.6580,35.0130",
+      "to" : "LLHA"
+    }
+  ],
+  "scenario" : "il-ctr-entry",
+  "strideSeconds" : 2,
+  "summary" : {
+    "altitudeCautionLegs" : [
+
+    ],
+    "debrief" : {
+      "fractionWithin300" : [
+        0,
+        0,
+        1,
+        0,
+        -1,
+        -1
+      ],
+      "fromPlan" : false,
+      "legs" : 6,
+      "maxPointDistanceNM" : 6.1130000000000004,
+      "points" : 9
+    },
+    "failedToDeliver" : 0,
+    "fixesDelivered" : 489,
+    "legSequence" : [
+      0,
+      1
+    ],
+    "offRouteLegs" : [
+
+    ],
+    "recordedTrackPoints" : 489,
+    "samples" : 489
+  }
+}

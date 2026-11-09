@@ -1,0 +1,176 @@
+{
+  "durationSeconds" : 1056,
+  "events" : [
+    {
+      "detail" : "SFC–6000 FT",
+      "id" : "area-32",
+      "kind" : "ctr",
+      "severity" : "caution",
+      "t" : 0,
+      "title" : "In Rosh Pina CTR: contact TWR 118.45",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "SFC–11000 FT",
+      "id" : "area-60",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 0,
+      "title" : "Inside danger area LLD37 Mahanaim West Parachuting",
+      "type" : "alert_on"
+    },
+    {
+      "from" : "LLIB",
+      "leg" : 0,
+      "t" : 0,
+      "to" : "33.3000,35.5700",
+      "type" : "leg"
+    },
+    {
+      "status" : "ok",
+      "t" : 0,
+      "type" : "gps"
+    },
+    {
+      "detail" : "SFC–11000 FT",
+      "id" : "area-61",
+      "kind" : "restricted",
+      "severity" : "caution",
+      "t" : 30,
+      "title" : "Inside danger area LLD38 Mahanaim East Parachuting",
+      "type" : "alert_on"
+    },
+    {
+      "id" : "area-60",
+      "t" : 36,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "Two-way radio and a working transponder required",
+      "id" : "north-33",
+      "kind" : "northOf33",
+      "severity" : "caution",
+      "t" : 72,
+      "title" : "Track crosses 33°00′N in 2 min",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "Transponder on for the whole flight, unless the AIP or ATC says otherwise",
+      "id" : "squawk",
+      "kind" : "squawk",
+      "severity" : "caution",
+      "t" : 78,
+      "title" : "Squawk 5100 (CVFR)",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "Two-way radio and a working transponder required",
+      "id" : "north-33",
+      "kind" : "northOf33",
+      "severity" : "caution",
+      "t" : 120,
+      "title" : "North of 33°00′N",
+      "type" : "alert_changed"
+    },
+    {
+      "id" : "area-61",
+      "t" : 138,
+      "type" : "alert_off"
+    },
+    {
+      "id" : "squawk",
+      "t" : 144,
+      "type" : "alert_off"
+    },
+    {
+      "deviationFeet" : -480,
+      "leg" : 0,
+      "t" : 216,
+      "type" : "altitude_caution_on"
+    },
+    {
+      "deviationFeet" : -300,
+      "leg" : 0,
+      "t" : 238,
+      "type" : "altitude_caution_off"
+    },
+    {
+      "id" : "area-32",
+      "t" : 264,
+      "type" : "alert_off"
+    },
+    {
+      "detail" : "Border from public-domain data, about 1 km accurate",
+      "id" : "border-Lebanon",
+      "kind" : "border",
+      "severity" : "caution",
+      "t" : 492,
+      "title" : "Track enters Lebanon border buffer in 2 min",
+      "type" : "alert_on"
+    },
+    {
+      "detail" : "No flight allowed · Border from public-domain data, about 1 km accurate",
+      "id" : "border-Lebanon",
+      "kind" : "border",
+      "severity" : "warning",
+      "t" : 612,
+      "title" : "Inside Lebanon border buffer (3 km)",
+      "type" : "alert_changed"
+    },
+    {
+      "from" : "33.3000,35.5700",
+      "leg" : 1,
+      "t" : 748,
+      "to" : "LLKS",
+      "type" : "leg"
+    },
+    {
+      "detail" : "Border from public-domain data, about 1 km accurate",
+      "id" : "border-Lebanon",
+      "kind" : "border",
+      "severity" : "caution",
+      "t" : 960,
+      "title" : "0.0 NM from Lebanon border buffer",
+      "type" : "alert_changed"
+    }
+  ],
+  "format" : "kanaf-scenario-golden\/1",
+  "route" : [
+    {
+      "from" : "LLIB",
+      "to" : "33.3000,35.5700"
+    },
+    {
+      "from" : "33.3000,35.5700",
+      "to" : "LLKS"
+    }
+  ],
+  "scenario" : "il-border-approach",
+  "strideSeconds" : 2,
+  "summary" : {
+    "altitudeCautionLegs" : [
+      0
+    ],
+    "debrief" : {
+      "fractionWithin300" : [
+        -1,
+        -1
+      ],
+      "fromPlan" : false,
+      "legs" : 2,
+      "maxPointDistanceNM" : 4.6429999999999998,
+      "points" : 4
+    },
+    "failedToDeliver" : 0,
+    "fixesDelivered" : 529,
+    "legSequence" : [
+      0,
+      1
+    ],
+    "offRouteLegs" : [
+
+    ],
+    "recordedTrackPoints" : 529,
+    "samples" : 529
+  }
+}
