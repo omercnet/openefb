@@ -53,7 +53,7 @@ use it before a deploy is approved.
 ```
 cd web/ota && npm ci
 node cli/ota.mjs publish --dist <expo export dir> --platform ios --channel production \
-  --runtime-version "$(npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)" \
+  --runtime-version "$(cd ../../spikes/kanaf-rn && npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)" \
   --key ~/.config/kanaf/ota/private-key.pem --base-url https://<worker-host> [--dry-run]
 node cli/ota.mjs rollback --embedded --platform ios --channel production --runtime-version <rv> --key <pem>
 node cli/ota.mjs rollback --to <updateId> --certificate <pem> --platform ios --channel production --runtime-version <rv> --key <pem>

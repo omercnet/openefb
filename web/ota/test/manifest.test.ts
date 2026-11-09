@@ -7,7 +7,7 @@ import { newKeyPair } from "./keys.js";
 const dist = "test/fixtures/dist";
 const a = newKeyPair();
 const b = newKeyPair();
-const build = () => buildManifest({ files: readExport(dist, "ios"), runtimeVersion: "rv1", baseUrl: "http://localhost:8787", expoClient: { name: "Kanaf" } });
+const build = (extra = {}) => buildManifest({ files: readExport(dist, "ios"), runtimeVersion: "rv1", baseUrl: "http://localhost:8787", expoClient: { name: "Kanaf" }, ...extra });
 
 describe("buildManifest", () => {
   it("describes the launch bundle and assets with sha256 hash, md5 key and content-addressed urls", () => {
@@ -41,7 +41,7 @@ describe("signing", () => {
 });
 
 describe("republish (rollback --to)", () => {
-  const body = build();
+  const body = build({ createdAt: "2026-01-01T00:00:00.000Z" }); // fixed, so "later" cannot tie within one millisecond
   const old = { kind: "manifest", body, signature: signatureHeader(body, a.privateKey), createdAt: "2026-01-01T00:00:00.000Z" };
 
   it("keeps the assets under a new id and a later createdAt, and verifies", () => {
