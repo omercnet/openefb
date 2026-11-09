@@ -1,7 +1,7 @@
 // Native chart: MapLibre React Native v11 with the SwiftUI app's base-style.json (street vector map plus the
 // FAA VFR sectional raster from zoom 8), airport dots from aviation.sqlite (R-tree bbox on the visible region),
 // the track ruler and the ownship chevron. Layer order and paints follow efb-212/Services/MapService.swift.
-// kanaf-rn://map?animate=1 (Android) or `-KanafAnimate 1` (iOS launch argument) moves the ownship along its track at
+// kanaf-dev://map?animate=1 (Android) or `-KanafAnimate 1` (iOS launch argument) moves the ownship along its track at
 // 10 Hz for 60 s and records JS frame pacing. Map lifecycle events and MapLibre native warnings are logged as
 // "SPIKE_MAP {...}" and written to map-status.json so CI can wait for a fully rendered map before a screenshot.
 import { Camera, GeoJSONSource, Images, Layer, LogManager, Map, type MapRef, type StyleSpecification } from '@maplibre/maplibre-react-native';

@@ -1,7 +1,7 @@
 # ota: self-hosted Expo Updates for the React Native spike
 
 Status: spike. Deployed 2026-11-09 to `https://openefb-ota.omerc.workers.dev` (bucket `openefb-ota`, nothing published yet).
-The end-to-end client tests run against `wrangler dev` with the local R2 simulator in CI (`.github/workflows/rn-spike.yml`).
+The end-to-end client tests run against `wrangler dev` with the local R2 simulator in CI (`.github/workflows/app.yml`).
 
 A read-only Cloudflare Worker serves Expo Updates protocol v1 from an R2 bucket (`openefb-ota`, binding `OTA_BUCKET`).
 The publisher CLI (`cli/ota.mjs`) signs on the publisher's machine and writes R2 directly, so the Worker has no upload
@@ -53,7 +53,7 @@ Default mode is `--local` (nothing leaves the machine). `--remote` writes the re
 ```
 cd web/ota && npm ci
 node cli/ota.mjs publish --dist <expo export dir> --platform ios --channel production \
-  --runtime-version "$(cd ../../spikes/kanaf-rn && npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)" \
+  --runtime-version "$(cd ../../app && npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)" \
   --key ~/.config/kanaf/ota/private-key.pem --base-url https://<worker-host> [--dry-run]
 node cli/ota.mjs rollback --embedded --platform ios --channel production --runtime-version <rv> --key <pem>
 node cli/ota.mjs rollback --to <updateId> --certificate <pem> --platform ios --channel production --runtime-version <rv> --key <pem>

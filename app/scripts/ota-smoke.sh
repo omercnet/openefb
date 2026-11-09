@@ -3,12 +3,12 @@
 # against web/ota running under `wrangler dev`, publishing with the web/ota CLI (its documented output lines are the
 # only interface used here), and checks the five steps of docs: embedded -> update A -> tampered B rejected ->
 # rollback to embedded -> other channel ignored.
-#   PLATFORM=ios|android OUT=<dir> KEYDIR=<dir> EXPORT_A=<dir> EXPORT_B=<dir> spikes/kanaf-rn/scripts/ota-smoke.sh
+#   PLATFORM=ios|android OUT=<dir> KEYDIR=<dir> EXPORT_A=<dir> EXPORT_B=<dir> app/scripts/ota-smoke.sh
 # Env: PLATFORM (required), KEYDIR (required: good/private-key.pem and bad/private-key.pem), EXPORT_A / EXPORT_B
 # (`expo export` output dirs for this platform), OUT (default /tmp/rn-spike-$PLATFORM), RV_FILE (default
 # $OUT/runtime-version.txt), BASE_URL (default http://127.0.0.1:8787), CHANNEL (default ci; must match the app's
 # KANAF_OTA_CHANNEL), WRANGLER_LOG (default $OUT/ota/wrangler.log), SETTLE_TIMEOUT (seconds, default 120),
-# iOS: APP (optional .app to install, default: already installed), SIM_NAME (default KanafRNSpike). Android: APK
+# iOS: APP (optional .app to install, default: already installed), SIM_NAME (default KanafEFBDev). Android: APK
 # (optional, installed first).
 # Writes OUT/ota/<n>-<step>.json (the settled app result), OUT/ota/publish-<n>.log, OUT/ota/screens/<n>-<step>.png.
 # Needs jq. Any failed assertion exits 1 after saving what it has.
@@ -24,8 +24,8 @@ BASE_URL=${BASE_URL:-http://127.0.0.1:8787}
 CHANNEL=${CHANNEL:-ci}
 WRANGLER_LOG=${WRANGLER_LOG:-$OUT/ota/wrangler.log}
 SETTLE_TIMEOUT=${SETTLE_TIMEOUT:-120}
-SIM_NAME=${SIM_NAME:-KanafRNSpike}
-BUNDLE=io.omer.efb.rnspike
+SIM_NAME=${SIM_NAME:-KanafEFBDev}
+BUNDLE=io.omer.efb.dev
 OTA_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../web/ota" && pwd)
 RV=$(tr -d '[:space:]' < "$RV_FILE")
 mkdir -p "$OUT/ota/screens"
@@ -51,7 +51,7 @@ esac
 
 collect() {
   if [ "$PLATFORM" = ios ]; then
-    xcrun simctl spawn "$SIM" log show --last 15m --style compact --predicate 'process == "KanafRNSpike"' > "$OUT/ota/app.log" 2>&1 || true
+    xcrun simctl spawn "$SIM" log show --last 15m --style compact --predicate 'process == "KanafEFBDev"' > "$OUT/ota/app.log" 2>&1 || true
   else
     adb logcat -d > "$OUT/ota/logcat.txt" 2>/dev/null || true
   fi
@@ -66,7 +66,7 @@ launch_ota() {
   else
     adb shell am force-stop "$BUNDLE"
     adb logcat -c
-    adb shell am start -W -a android.intent.action.VIEW -d kanaf-rn://ota "$BUNDLE" >/dev/null
+    adb shell am start -W -a android.intent.action.VIEW -d kanaf-dev://ota "$BUNDLE" >/dev/null
   fi
 }
 

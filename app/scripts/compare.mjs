@@ -18,7 +18,7 @@ const W = 1032;
 const H = 1376;
 const STRIP = 400;
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-// Screen name -> reference file, for screenshots named after the kanaf-rn://<screen> route.
+// Screen name -> reference file, for screenshots named after the kanaf-dev://<screen> route.
 const REFERENCE_FOR = { map: 'ipad-map-day.png', night: 'ipad-map-night.png', airport: 'ipad-airport-KSQL.png' };
 
 async function rgba(path, width) {

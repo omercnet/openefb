@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the Release simulator build of the RN spike on an iPad simulator, screenshot each screen and collect the
 # self-test result (the rn-spike workflow's ios job). Simulator selection follows tools/sim-test.sh.
-#   APP=<path/KanafRNSpike.app> OUT=<dir> spikes/kanaf-rn/scripts/ios-capture.sh
+#   APP=<path/KanafEFBDev.app> OUT=<dir> app/scripts/ios-capture.sh
 # Env: APP (required), OUT (default /tmp/rn-spike-ios), WAIT (seconds for non-map screens, default 10),
 # MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), SIM_DEVICE (default "iPad Pro 13-inch (M5)"),
 # RESULT_TIMEOUT (seconds, default 120).
@@ -17,8 +17,8 @@ WAIT=${WAIT:-10}
 MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}
 SIM_DEVICE=${SIM_DEVICE:-iPad Pro 13-inch (M5)}
-BUNDLE=io.omer.efb.rnspike
-SIM_NAME="KanafRNSpike"
+BUNDLE=io.omer.efb.dev
+SIM_NAME="KanafEFBDev"
 LOCATION=37.4876,-122.2289   # ownship over Redwood City (src/fixtures/scenario.ts)
 mkdir -p "$OUT/screens"
 
@@ -36,7 +36,7 @@ LOCATION_LOOP=""
 # Always keep what was learned: the app's log and every result file the app wrote.
 collect() {
   [ -n "$LOCATION_LOOP" ] && kill "$LOCATION_LOOP" 2>/dev/null || true
-  xcrun simctl spawn "$SIM" log show --last 15m --style compact --predicate 'process == "KanafRNSpike"' > "$OUT/app.log" 2>&1 || true
+  xcrun simctl spawn "$SIM" log show --last 15m --style compact --predicate 'process == "KanafEFBDev"' > "$OUT/app.log" 2>&1 || true
   if [ -n "$DOCS" ]; then
     cp "$DOCS"/spike-result.json "$DOCS"/spike-anim.json "$OUT/" 2>/dev/null || true
   fi

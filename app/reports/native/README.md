@@ -1,7 +1,7 @@
 # Native checks (T03)
 
 Native half of the React Native spike: the MapLibre map, the capability self test, the native bottom sheet, the
-Expo config and the CI workflow (`.github/workflows/rn-spike.yml`). This machine is Linux with no Xcode, Android SDK
+Expo config and the CI workflow (`.github/workflows/app.yml`). This machine is Linux with no Xcode, Android SDK
 or KVM, so no native build or run happened here. Everything marked "untested until CI" has only been
 type-checked or statically inspected.
 
@@ -12,7 +12,7 @@ type-checked or statically inspected.
 | TypeScript | `npx tsc --noEmit` | passes |
 | Expo config | `npx expo prebuild --no-install --clean` (both platforms) | succeeds; outputs below |
 | Shell scripts | `shellcheck scripts/*.sh` (0.11.0) | clean |
-| Workflow | `actionlint .github/workflows/rn-spike.yml` | clean |
+| Workflow | `actionlint .github/workflows/app.yml` | clean |
 | Comparison script | `node scripts/compare.mjs reference/ipad-map-day.png reference/ipad-map-day.png` | SSIM 1, diff share 0 (strip and frame); night vs day reference gives SSIM 0.03 strip / 0.32 frame, so it discriminates |
 | Self-test SQL | the exact SQL strings from `src/native/SelfTestScreen.tsx` and `src/map/aviationDb.ts` run with Python's sqlite3 (3.46.1) against `assets/aviation.sqlite` | Bay R-tree count 31; FTS5 `"san"* "carlos"*` -> KSQL first (then P13); KSQL runway `12/30` 2621 x 75 ft asphalt; map bbox around the scenario -> KHAF KSFO KSQL KOAK KHWD KPAO KSJC |
 | R-tree finding | compiled expo-sqlite's vendored `sqlite3.c` (3.53.3) with gcc, once with the stock flags from `ExpoSQLite.podspec` / `android/build.gradle`, once adding `-DSQLITE_ENABLE_RTREE=1`, and ran the queries | stock: `ENABLE_FTS5` only, R-tree query fails with `no such module: rtree`, FTS5 works; with the flag: `ENABLE_FTS5 ENABLE_RTREE`, count 31 |
@@ -39,7 +39,7 @@ type-checked or statically inspected.
 - **AndroidManifest** (`android/app/src/main/AndroidManifest.xml`): `ACCESS_FINE/COARSE/BACKGROUND_LOCATION`,
   `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_LOCATION` (expo-location), `RECORD_AUDIO`, `FOREGROUND_SERVICE_MICROPHONE`
   (added in app.config.ts; expo-audio's plugin does not add it), `POST_NOTIFICATIONS`, the expo-audio
-  `AudioRecordingService` (`foregroundServiceType="microphone"`), the `kanaf-rn` scheme, and the speech-service `<queries>`.
+  `AudioRecordingService` (`foregroundServiceType="microphone"`), the `kanaf-dev` scheme (dev variant; production is `kanaf`), and the speech-service `<queries>`.
   Background playback is off, so no media-playback service. `targetSdkVersion=36`; compileSdk stays at the RN 0.88 default
   of 37 (the task allowed 35 or 36, but going below the React Native default risks AAR metadata failures; not tested);
   minSdk is the default 24. Fonts are copied to `android/app/src/main/assets/fonts`.
@@ -61,7 +61,7 @@ app's R-tree bbox query on every `onRegionDidChange` (and once after load), impo
 Night: the sectional raster gets `raster-brightness-max 0.55` and `raster-saturation -0.35` (NightPalette) and the ruler
 switches to the night ink and halo.
 
-`kanaf-rn://map?animate=1` moves the ownship along its track at 10 Hz (96 kt) for 60 s, then logs
+`kanaf-dev://map?animate=1` moves the ownship along its track at 10 Hz (96 kt) for 60 s, then logs
 `SPIKE_ANIM {...}` and writes `spike-anim.json` with requestAnimationFrame deltas and 10 Hz timer deltas (n, p50, p95,
 max in ms). The self test embeds that file as `animation`.
 
@@ -69,7 +69,7 @@ Untested until CI: everything visual (tiles render, icon scale, label placement,
 night look), whether `onRegionDidChange` fires on the first camera set (the load-time `getBounds` covers it), and frame
 pacing numbers.
 
-## The self test (`src/native/SelfTestScreen.tsx`, `kanaf-rn://selftest`)
+## The self test (`src/native/SelfTestScreen.tsx`, `kanaf-dev://selftest`)
 
 Runs in order, each wrapped in try/catch and a 45 s timeout, shows PASS/FAIL in large type, then writes
 `<documents>/spike-result.json` and logs one `SPIKE_RESULT {...}` line.
@@ -88,7 +88,7 @@ emulator runs without `-noaudio`, but a headless runner may still give silence o
 recognizer may report unavailable; Android logcat truncates lines near 4 KB, so the script checks the JSON parses
 (release builds are not debuggable, so `run-as` to read the file usually fails).
 
-## The sheet (`src/native/SheetScreen.tsx`, `kanaf-rn://sheet`)
+## The sheet (`src/native/SheetScreen.tsx`, `kanaf-dev://sheet`)
 
 `@expo/ui`'s universal `BottomSheet` covers both platforms, so no react-native-screens fallback was needed: on iOS it is
 a SwiftUI `.sheet` with `medium`/`large` detents (system Liquid Glass chrome on iOS 26), on Android a Material 3
@@ -96,9 +96,9 @@ a SwiftUI `.sheet` with `medium`/`large` detents (system Liquid Glass chrome on 
 from `scenario.airport` (category, elevation and TPA, weather, runway, frequencies) in Archivo and IBM Plex Mono (PostScript
 names on iOS, asset file names on Android). Untested until CI: the look, font resolution on both platforms.
 
-## CI (`.github/workflows/rn-spike.yml`)
+## CI (`.github/workflows/app.yml`)
 
-Triggers on pushes to `spike/react-native` touching `spikes/kanaf-rn/**` or the workflow, and on `workflow_dispatch`.
+Triggers on pull requests touching `app/**`, `web/ota/**` or the workflow, and on `workflow_dispatch`. CI builds use the dev variant (`KANAF_VARIANT=dev`, `io.omer.efb.dev`).
 
 - **ios** (macos-26, Xcode 26.6 as in ci.yml): node 24, `npm ci`, `expo prebuild -p ios`, `pod install`, `xcodebuild` Release for
   `iphonesimulator` into `/tmp/rn-dd`, then `scripts/ios-capture.sh`: creates/boots an `iPad Pro 13-inch (M5)` on the newest iOS
@@ -111,11 +111,11 @@ Triggers on pushes to `spike/react-native` touching `spikes/kanaf-rn/**` or the 
   (the Expo template signs release with the debug keystore), KVM udev rule, then `reactivecircus/android-emulator-runner@v2`
   (API 35, google_apis, x86_64, `pixel_tablet`) running `scripts/android-capture.sh`: install, `pm grant` location,
   background location, RECORD_AUDIO and POST_NOTIFICATIONS, `adb emu geo fix`, the same screens via
-  `am start -a VIEW -d kanaf-rn://...` with portrait re-asserted and checked before each `screencap`, waiting for the map's
+  `am start -a VIEW -d kanaf-dev://...` with portrait re-asserted and checked before each `screencap`, waiting for the map's
   `SPIKE_MAP` fully-rendered line, the animation, then the self test from logcat (`SPIKE_RESULT`) with `geo fix` re-sent every
   second.
 - Both jobs then run `scripts/compare.mjs --dir <screens>` (map, night, airport against the references; sheet and selftest have
-  none) and upload screens, results, compare output and the build log tail as `rn-spike-ios` / `rn-spike-android`.
+  none) and upload screens, results, compare output and the build log tail as `app-ios` / `app-android`.
 
 Run 1 (see "CI run 1 and fixes" below) built both platforms. Remaining risks: the Android symbol layers (below) and the
 speech recognizer on the simulator.
@@ -129,7 +129,7 @@ emulator: rAF p50 16.7 / p95 33 / max 623 ms, 10 Hz timer p50 117 / p95 140 / ma
 - **`simctl openurl` cannot drive a headless iOS run.** Opening a custom-scheme URL shows a system "Open in Kanaf RN
   Spike?" alert that nothing in CI can accept, so the app never launched and every iPad screenshot was the home screen.
   iOS now uses launch arguments like the SwiftUI app's capture hooks: `simctl launch --terminate-running-process <sim>
-  io.omer.efb.rnspike -KanafScreen map [-KanafAnimate 1]`. Launch arguments land in NSUserDefaults' argument domain, which
+  io.omer.efb.dev -KanafScreen map [-KanafAnimate 1]`. Launch arguments land in NSUserDefaults' argument domain, which
   React Native's `Settings.get` reads (App.tsx for the screen, MapSurface for the animation). Android and web keep URLs.
   Results are read from `get_app_container ... data`/Documents, which is where expo-file-system's `Paths.document` points.
 - **No sectional chart: the base style hides it.** `assets/base-style.json` ships `base-vfr-sectional` with

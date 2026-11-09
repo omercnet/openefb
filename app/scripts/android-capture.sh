@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the Release APK of the RN spike on the running emulator, screenshot each screen and collect the self-test
 # result (the rn-spike workflow's android job, run inside reactivecircus/android-emulator-runner).
-#   APK=<app-release.apk> OUT=<dir> spikes/kanaf-rn/scripts/android-capture.sh
+#   APK=<app-release.apk> OUT=<dir> app/scripts/android-capture.sh
 # Env: APK (required), OUT (default /tmp/rn-spike-android), WAIT (seconds for non-map screens, default 10),
 # MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), RESULT_TIMEOUT (seconds, default 120),
 # SCREENS (default "map airport night sheet"), FULL (1 = also run the animation and the self test, default 1; the
@@ -18,7 +18,7 @@ MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}
 SCREENS=${SCREENS:-map airport night sheet}
 FULL=${FULL:-1}
-PKG=io.omer.efb.rnspike
+PKG=io.omer.efb.dev
 GEO="-122.2289 37.4876"   # longitude latitude: ownship over Redwood City (src/fixtures/scenario.ts)
 LATLON="37.4876,-122.2289"
 mkdir -p "$OUT/screens"
@@ -83,7 +83,7 @@ wait_map() {
 
 for screen in $SCREENS; do
   stamp "screen $screen"
-  open_url "kanaf-rn://$screen"
+  open_url "kanaf-dev://$screen"
   if [ "$screen" = sheet ]; then sleep "$WAIT"; else wait_map "$screen"; fi
   screenshot "$screen"
 done
@@ -91,7 +91,7 @@ done
 [ "$FULL" = 1 ] || exit 0
 
 stamp "map animation: 60 s at 10 Hz"
-open_url "kanaf-rn://map?animate=1"
+open_url "kanaf-dev://map?animate=1"
 sleep 70
 logged SPIKE_ANIM > "$OUT/spike-anim.json"
 
@@ -111,7 +111,7 @@ while true; do
   sleep 1
 done &
 LOCATION_LOOP=$!
-open_url "kanaf-rn://selftest"
+open_url "kanaf-dev://selftest"
 waited=0
 until logged SPIKE_RESULT_END | grep -q . || [ "$waited" -ge "$RESULT_TIMEOUT" ]; do
   sleep 5; waited=$((waited + 5))

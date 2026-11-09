@@ -10,7 +10,7 @@ import { MapScreen } from './src/screens/MapScreen';
 type Route = 'map' | 'airport' | 'night' | 'selftest' | 'sheet' | 'ota';
 const ROUTES: Route[] = ['map', 'airport', 'night', 'selftest', 'sheet', 'ota'];
 
-// Screen is chosen so CI can drive it: kanaf-rn://airport (Android), ?screen=airport (web preview), and on iOS the
+// Screen is chosen so CI can drive it: kanaf-dev://airport (Android), ?screen=airport (web preview), and on iOS the
 // launch argument `-KanafScreen airport` (NSUserDefaults), because `simctl openurl` with a custom scheme stops at a
 // system "Open in ...?" confirmation that cannot be accepted headlessly.
 function parse(url: string | null): Route {

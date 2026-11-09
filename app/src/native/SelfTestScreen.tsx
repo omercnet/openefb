@@ -1,4 +1,4 @@
-// Native capability self test (kanaf-rn://selftest). Runs each check in turn, shows PASS/FAIL, writes one JSON blob
+// Native capability self test (kanaf-dev://selftest). Runs each check in turn, shows PASS/FAIL, writes one JSON blob
 // to <documents>/spike-result.json and logs it as "SPIKE_RESULT {...}" plus numbered "SPIKE_RESULT_PART <i> <chunk>" lines
 // and "SPIKE_RESULT_END <n>" (Android logcat truncates a line near 4 KB; android-capture.sh reassembles the parts).
 // One failing or hanging check never stops the others: each is caught and bounded by a timeout.
@@ -243,7 +243,7 @@ export function SelfTestScreen() {
       }
       setRunning(null);
       const result = {
-        app: 'kanaf-rn-spike',
+        app: 'kanaf-efb',
         platform: Platform.OS,
         osVersion: Platform.Version,
         deviceInfo: deviceInfo(),
@@ -256,7 +256,7 @@ export function SelfTestScreen() {
         durationMs: elapsed(t0),
         allPassed: done.every((c) => c.ok),
         checks: done,
-        // Written by kanaf-rn://map?animate=1 (MapSurface) when CI ran it before the self test.
+        // Written by kanaf-dev://map?animate=1 (MapSurface) when CI ran it before the self test.
         animation: await readResult(ANIMATION_FILE).catch((e) => ({ error: String(e) })),
       };
       const json = JSON.stringify(result);

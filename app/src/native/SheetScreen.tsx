@@ -1,4 +1,4 @@
-// Native bottom sheet demo (kanaf-rn://sheet, iOS: -KanafScreen sheet): @expo/ui's universal BottomSheet presents a
+// Native bottom sheet demo (kanaf-dev://sheet, iOS: -KanafScreen sheet): @expo/ui's universal BottomSheet presents a
 // real SwiftUI sheet on iOS (medium/large detents on iPhone; a page-sized sheet on iPad via presentationSizing, iOS 18+;
 // Liquid Glass chrome on iOS 26) and a Material 3 ModalBottomSheet on Android. The content is native SwiftUI / Compose
 // (ScrollView, Column, Row, Text), laid out like the SwiftUI airport panel (reference/ipad-airport-KSQL.png).

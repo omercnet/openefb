@@ -1,6 +1,6 @@
-// Expo app config for the React Native spike (replaces app.json so options can carry comments).
+// Expo app config for Kanaf EFB (replaces app.json so options can carry comments).
 // Mirrors the SwiftUI app's Info.plist at the repo root: UIBackgroundModes location + audio, the same usage
-// strings, and the bundled fonts. No secrets here; nothing is published from this spike.
+// strings, and the bundled fonts. No secrets here.
 import { withInfoPlist, type ConfigPlugin } from 'expo/config-plugins';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
@@ -22,6 +22,14 @@ const withOnlyLocationAudioBackground: ConfigPlugin = (c) =>
     return mod;
   });
 
+// Build variant. Production is the store identity io.omer.efb (same bundle id as the SwiftUI app, so iOS upgrades in
+// place). KANAF_VARIANT=dev builds io.omer.efb.dev with its own scheme and name, installable next to production; CI
+// smoke and OTA smoke builds use it.
+const VARIANT = process.env.KANAF_VARIANT ?? 'production';
+if (VARIANT !== 'production' && VARIANT !== 'dev') throw new Error(`KANAF_VARIANT must be dev or production, got ${VARIANT}`);
+const DEV = VARIANT === 'dev';
+const BUNDLE_ID = DEV ? 'io.omer.efb.dev' : 'io.omer.efb';
+
 // OTA updates (web/ota) are built in only when KANAF_OTA_URL is set; otherwise the app has no update config.
 //   KANAF_OTA_URL     manifest endpoint, e.g. https://ota.example.com/manifest
 //   KANAF_OTA_CERT    code-signing certificate path (required with the URL: an unsigned-updates build is never made)
@@ -34,22 +42,22 @@ const OTA_SMOKE = process.env.KANAF_OTA_SMOKE === '1';
 
 export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioBackground({
   ...config,
-  name: 'Kanaf RN Spike',
-  slug: 'kanaf-rn',
-  scheme: 'kanaf-rn',
+  name: DEV ? 'Kanaf EFB Dev' : 'Kanaf EFB',
+  slug: 'kanaf',
+  scheme: DEV ? 'kanaf-dev' : 'kanaf',
   version: '1.0.0',
   orientation: 'default',
   userInterfaceStyle: 'automatic',
   icon: './assets/splash-icon.png',
   ios: {
-    bundleIdentifier: 'io.omer.efb.rnspike',
+    bundleIdentifier: BUNDLE_ID,
     supportsTablet: true,
     // MapLibre Native needs iOS 15.5+; Expo SDK 58 modules (expo-sqlite podspec) already require 16.4.
     deploymentTarget: '16.4',
     infoPlist: { ITSAppUsesNonExemptEncryption: false },
   },
   android: {
-    package: 'io.omer.efb.rnspike',
+    package: BUNDLE_ID,
     adaptiveIcon: {
       backgroundColor: '#E6F4FE',
       foregroundImage: './assets/android-icon-foreground.png',

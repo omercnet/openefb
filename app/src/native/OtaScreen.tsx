@@ -1,4 +1,4 @@
-// OTA smoke screen (kanaf-rn://ota, -KanafScreen ota). On each launch: record what is running, ask the update server
+// OTA smoke screen (kanaf-dev://ota, -KanafScreen ota). On each launch: record what is running, ask the update server
 // once, fetch and reload when there is an update or a roll-back-to-embedded directive, and settle. Every phase goes to
 // <documents>/spike-ota.json (iOS reads it) and to one "SPIKE_OTA {json}" log line (Android reads logcat).
 // A launch that follows our own reload never fetches again, so a persistent directive cannot loop.
