@@ -8,10 +8,10 @@ import { Camera, GeoJSONSource, Images, Layer, LogManager, Map, type MapRef, typ
 import * as Linking from 'expo-linking';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Settings } from 'react-native';
-import baseStyle from '../../assets/base-style.json';
-import { scenario } from '../fixtures/scenario';
-import { ANIMATION_FILE, MAP_STATUS_FILE, writeResult } from '../native/resultFile';
-import { airportsInBox, openAviationDb } from './aviationDb';
+import baseStyle from '../../../assets/base-style.json';
+import { scenario } from '../../fixtures/scenario';
+import { ANIMATION_FILE, MAP_STATUS_FILE, writeResult } from '../../adapters/resultFile';
+import { airportsInBox, openAviationDb } from '../../adapters/aviationDb';
 import { destination, pacing, trackRuler } from './geo';
 
 const { ownship } = scenario;

@@ -6,7 +6,7 @@
 # MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), SIM_DEVICE (default "iPad Pro 13-inch (M5)"),
 # RESULT_TIMEOUT (seconds, default 120).
 # Screens are chosen with launch arguments (-KanafScreen <screen>, -KanafAnimate 1; read through NSUserDefaults by
-# App.tsx), not `simctl openurl`: a custom-scheme URL stops at an "Open in ...?" system alert nobody can accept here.
+# src/app/index.tsx), not `simctl openurl`: a custom-scheme URL stops at an "Open in ...?" system alert nobody can accept here.
 # Writes OUT/screens/<screen>.png, OUT/map-status-<screen>.json, OUT/spike-result.json, OUT/spike-anim.json and
 # OUT/app.log (the log and whatever files exist are collected even when the script fails).
 set -euo pipefail

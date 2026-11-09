@@ -1,7 +1,7 @@
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { MapSurface } from '../map/MapSurface';
-import { StripColumn, type StripScreen } from '../ui/StripColumn';
+import { StripColumn, type StripScreen } from '../StripColumn';
 
 export const STRIP_WIDTH_PT = 400; // matches the SwiftUI strip (docs/DESIGN.md)
 

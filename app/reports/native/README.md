@@ -14,7 +14,7 @@ type-checked or statically inspected.
 | Shell scripts | `shellcheck scripts/*.sh` (0.11.0) | clean |
 | Workflow | `actionlint .github/workflows/app.yml` | clean |
 | Comparison script | `node scripts/compare.mjs reference/ipad-map-day.png reference/ipad-map-day.png` | SSIM 1, diff share 0 (strip and frame); night vs day reference gives SSIM 0.03 strip / 0.32 frame, so it discriminates |
-| Self-test SQL | the exact SQL strings from `src/native/SelfTestScreen.tsx` and `src/map/aviationDb.ts` run with Python's sqlite3 (3.46.1) against `assets/aviation.sqlite` | Bay R-tree count 31; FTS5 `"san"* "carlos"*` -> KSQL first (then P13); KSQL runway `12/30` 2621 x 75 ft asphalt; map bbox around the scenario -> KHAF KSFO KSQL KOAK KHWD KPAO KSJC |
+| Self-test SQL | the exact SQL strings from `src/ui/screens/SelfTestScreen.tsx` and `src/adapters/aviationDb.ts` run with Python's sqlite3 (3.46.1) against `assets/aviation.sqlite` | Bay R-tree count 31; FTS5 `"san"* "carlos"*` -> KSQL first (then P13); KSQL runway `12/30` 2621 x 75 ft asphalt; map bbox around the scenario -> KHAF KSFO KSQL KOAK KHWD KPAO KSJC |
 | R-tree finding | compiled expo-sqlite's vendored `sqlite3.c` (3.53.3) with gcc, once with the stock flags from `ExpoSQLite.podspec` / `android/build.gradle`, once adding `-DSQLITE_ENABLE_RTREE=1`, and ran the queries | stock: `ENABLE_FTS5` only, R-tree query fails with `no such module: rtree`, FTS5 works; with the flag: `ENABLE_FTS5 ENABLE_RTREE`, count 31 |
 | Minimal PDF | the generator in `SelfTestScreen.tsx` run under Node; xref offsets, `startxref` and stream `/Length` checked byte-exactly | consistent (578 bytes, 5 objects); no PDF renderer was available here |
 | Web bundle | fetched the running web dev server's bundle | builds; contains the sheet screen, no expo-sqlite or react-native-pdf (SelfTestScreen.web.tsx and MapSurface.web.tsx are placeholders) |
@@ -49,13 +49,13 @@ type-checked or statically inspected.
 - `expo prebuild` rewrites the `android` / `ios` scripts in package.json to `expo run:*`. They were restored after each local run;
   in CI it does not matter.
 
-## The map (`src/map/MapSurface.tsx`)
+## The map (`src/ui/map/MapSurface.tsx`)
 
 MapLibre React Native v11 (`Map`, `Camera`, `GeoJSONSource`, `Layer`, `Images`) with `assets/base-style.json` as the style
 object, camera from `scenario.map`. Layers added on top of the base style in MapService order: airport circles,
 track-ruler line, track-ruler ticks (SDF tick icon rotated to track, labels `1 min`, `2`, `3`, `5`, Noto Sans from the style's
 glyph server, anchor rule from `rulerLabelAnchor`), ownship chevron (the same 32 pt path and strokes as
-`createOwnshipChevron`, rendered to PNG at 1x/2x/3x in `src/map/icons`). Airport dots come from `aviation.sqlite` with the
+`createOwnshipChevron`, rendered to PNG at 1x/2x/3x in `src/ui/map/icons`). Airport dots come from `aviation.sqlite` with the
 app's R-tree bbox query on every `onRegionDidChange` (and once after load), imported from the bundled asset on first use
 (`importDatabaseFromAssetAsync`, kept afterwards). The dots are green with a white ring to match the reference screenshots.
 Night: the sectional raster gets `raster-brightness-max 0.55` and `raster-saturation -0.35` (NightPalette) and the ruler
@@ -69,7 +69,7 @@ Untested until CI: everything visual (tiles render, icon scale, label placement,
 night look), whether `onRegionDidChange` fires on the first camera set (the load-time `getBounds` covers it), and frame
 pacing numbers.
 
-## The self test (`src/native/SelfTestScreen.tsx`, `kanaf-dev://selftest`)
+## The self test (`src/ui/screens/SelfTestScreen.tsx`, `kanaf-dev://selftest`)
 
 Runs in order, each wrapped in try/catch and a 45 s timeout, shows PASS/FAIL in large type, then writes
 `<documents>/spike-result.json` and logs one `SPIKE_RESULT {...}` line.
@@ -88,7 +88,7 @@ emulator runs without `-noaudio`, but a headless runner may still give silence o
 recognizer may report unavailable; Android logcat truncates lines near 4 KB, so the script checks the JSON parses
 (release builds are not debuggable, so `run-as` to read the file usually fails).
 
-## The sheet (`src/native/SheetScreen.tsx`, `kanaf-dev://sheet`)
+## The sheet (`src/ui/screens/SheetScreen.tsx`, `kanaf-dev://sheet`)
 
 `@expo/ui`'s universal `BottomSheet` covers both platforms, so no react-native-screens fallback was needed: on iOS it is
 a SwiftUI `.sheet` with `medium`/`large` detents (system Liquid Glass chrome on iOS 26), on Android a Material 3
@@ -130,7 +130,7 @@ emulator: rAF p50 16.7 / p95 33 / max 623 ms, 10 Hz timer p50 117 / p95 140 / ma
   Spike?" alert that nothing in CI can accept, so the app never launched and every iPad screenshot was the home screen.
   iOS now uses launch arguments like the SwiftUI app's capture hooks: `simctl launch --terminate-running-process <sim>
   io.omer.efb.dev -KanafScreen map [-KanafAnimate 1]`. Launch arguments land in NSUserDefaults' argument domain, which
-  React Native's `Settings.get` reads (App.tsx for the screen, MapSurface for the animation). Android and web keep URLs.
+  React Native's `Settings.get` reads (src/app/index.tsx for the screen, MapSurface for the animation). Android and web keep URLs.
   Results are read from `get_app_container ... data`/Documents, which is where expo-file-system's `Paths.document` points.
 - **No sectional chart: the base style hides it.** `assets/base-style.json` ships `base-vfr-sectional` with
   `layout.visibility: none`; the SwiftUI app turns it on at runtime (`MapService.setMapStyle(_:sectional:)` sets

@@ -6,8 +6,8 @@ import { BottomSheet, Column, Row, ScrollView, Text } from '@expo/ui';
 import type { ModifierConfig } from '@expo/ui/swift-ui/modifiers';
 import { useState } from 'react';
 import { Platform, Pressable, Text as RNText, View } from 'react-native';
-import { scenario } from '../fixtures/scenario';
-import { Day } from '../ui/tokens';
+import { scenario } from '../../fixtures/scenario';
+import { Day } from '../tokens';
 
 const apt = scenario.airport;
 // iOS resolves embedded fonts by PostScript name; Android (ReactFontManager) by assets/fonts file name.

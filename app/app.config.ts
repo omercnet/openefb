@@ -81,6 +81,7 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
   } : { enabled: false },
   web: { favicon: './assets/favicon.png' },
   plugins: [
+    'expo-router',
     '@maplibre/maplibre-react-native',
     // Stock expo-sqlite compiles FTS5 but not R-tree; aviation.sqlite has R-tree virtual tables
     // (airports_rtree, navaids_rtree, airspaces_rtree). Setting any flag also makes Android build

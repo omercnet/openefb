@@ -5,7 +5,7 @@
 import * as Updates from 'expo-updates';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { OTA_FILE, OTA_RELOAD_FILE, clearResult, readResult, writeResult } from './resultFile';
+import { OTA_FILE, OTA_RELOAD_FILE, clearResult, readResult, writeResult } from '../../adapters/resultFile';
 
 type Phase = 'launch' | 'fetched' | 'settled';
 type Check = { isAvailable: boolean; isRollBackToEmbedded: boolean; reason?: string };

@@ -12,8 +12,8 @@ import * as TaskManager from 'expo-task-manager';
 import { useEffect, useRef, useState } from 'react';
 import { Dimensions, PixelRatio, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Pdf from 'react-native-pdf';
-import { openAviationDb } from '../map/aviationDb';
-import { ANIMATION_FILE, SELFTEST_FILE, readResult, writeResult } from './resultFile';
+import { openAviationDb } from '../../adapters/aviationDb';
+import { ANIMATION_FILE, SELFTEST_FILE, readResult, writeResult } from '../../adapters/resultFile';
 
 const LOCATION_TASK = 'kanaf-spike-location';
 let taskFixes = 0;

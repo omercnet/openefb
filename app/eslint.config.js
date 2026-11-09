@@ -50,7 +50,7 @@ module.exports = [
   {
     // Spike code kept as is until the map track rewrites it: it reads refs and the clock during render on purpose
     // (render timing diagnostics). Do not copy the pattern into new code.
-    files: ['src/map/MapSurface.tsx'],
+    files: ['src/ui/map/MapSurface.tsx'],
     rules: { 'react-hooks/refs': 'off', 'react-hooks/purity': 'off' },
   },
 ];
