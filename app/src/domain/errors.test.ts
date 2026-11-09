@@ -22,4 +22,12 @@ describe('Result', () => {
     const failure = new AppFailure({ kind: 'databaseMigrationFailed', cause });
     expect(failure.cause).toBe(cause);
   });
+
+  it('names the kind and the payload in the message, not the cause', () => {
+    const failure = new AppFailure({ kind: 'airportNotFound', icao: 'LLXX' });
+    expect(failure.message).toContain('airportNotFound');
+    expect(failure.message).toContain('LLXX');
+    const wrapped = new AppFailure({ kind: 'databaseMigrationFailed', cause: new Error('disk full') });
+    expect(wrapped.message).not.toContain('disk full');
+  });
 });

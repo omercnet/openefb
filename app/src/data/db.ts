@@ -1,5 +1,5 @@
-// The only database surface the repositories use. The expo-sqlite adapter (src/adapters) implements it in the app and
-// a Node sqlite adapter (tests/support) in Jest, so repositories and their tests run on Linux with no device.
+// The only database surface the repositories use. A Node sqlite adapter (tests/support) implements it in Jest, so
+// repositories and their tests run on Linux with no device. An expo-sqlite adapter in src/adapters is planned for the app.
 export type SqlValue = string | number | null | Uint8Array;
 export type SqlParams = readonly SqlValue[];
 export type SqlRow = Record<string, SqlValue>;

@@ -26,7 +26,12 @@ export type AppError =
 /** The thrown form of an AppError, for code paths where returning a Result is awkward. */
 export class AppFailure extends Error {
   constructor(readonly error: AppError) {
-    super(error.kind, 'cause' in error ? { cause: error.cause } : undefined);
+    // Payload fields (icao, region, reason, ...) go into the message so a logged failure says what failed.
+    const detail = Object.entries(error)
+      .filter(([key, value]) => key !== 'kind' && key !== 'cause' && value !== undefined)
+      .map(([key, value]) => `${key}=${String(value)}`)
+      .join(' ');
+    super(detail ? `${error.kind}: ${detail}` : error.kind, 'cause' in error ? { cause: error.cause } : undefined);
     this.name = 'AppFailure';
   }
 }

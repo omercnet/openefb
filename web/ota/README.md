@@ -52,8 +52,12 @@ Default mode is `--local` (nothing leaves the machine). `--remote` writes the re
 
 ```
 cd web/ota && npm ci
-node cli/ota.mjs publish --dist <expo export dir> --platform ios --channel production \
-  --runtime-version "$(cd ../../app && npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)" \
+# Resolve with the same build variables as the binary: the app config is part of the fingerprint, so a missing
+# KANAF_OTA_URL / KANAF_OTA_CERT or another KANAF_VARIANT (dev or production, default production) gives a runtime
+# version the binary never requests.
+RV=$(cd ../../app && KANAF_VARIANT=production KANAF_OTA_URL=<manifest url> KANAF_OTA_CERT=<certificate.pem> \
+  npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)
+node cli/ota.mjs publish --dist <expo export dir> --platform ios --channel production --runtime-version "$RV" \
   --key ~/.config/kanaf/ota/private-key.pem --base-url https://<worker-host> [--dry-run]
 node cli/ota.mjs rollback --embedded --platform ios --channel production --runtime-version <rv> --key <pem>
 node cli/ota.mjs rollback --to <updateId> --certificate <pem> --platform ios --channel production --runtime-version <rv> --key <pem>
