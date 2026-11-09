@@ -1,0 +1,19 @@
+# Legacy spike files keep their original formatting (no drive-by reformat). Remove a line when its file is rewritten.
+node_modules/
+ios/
+android/
+.expo/
+dist/
+ota/
+reports/
+reference/
+assets/
+package-lock.json
+app.config.ts
+App.tsx
+scripts/compare.mjs
+src/fixtures/
+src/map/
+src/native/
+src/screens/
+src/ui/
