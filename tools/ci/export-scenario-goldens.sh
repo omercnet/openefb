@@ -14,9 +14,13 @@ for pass in 1 2; do
   export TEST_RUNNER_OPENEFB_GOLDEN_DIR="$OUT/run$pass"
   tools/sim-test.sh test -only-testing:efb-212Tests/ScenarioGoldenExport
 done
-count=$(find "$OUT/run1" -name '*.json' | wc -l | tr -d ' ')
-expected=$(find tools/flight-sim/scenarios -maxdepth 1 -name '*.json' | wc -l | tr -d ' ')
-[ "$count" -eq "$expected" ] || { echo "export-scenario-goldens: $expected scenario files in tools/flight-sim/scenarios but $count goldens exported (add the scenario to goldenScenarios in ScenarioGoldenExport.swift?)" >&2; exit 1; }
+names() { (cd "$1" && find . -maxdepth 1 -name '*.json' -exec basename {} \; | sort); }
+count=$(names "$OUT/run1" | wc -l | tr -d ' ')
+diff <(names tools/flight-sim/scenarios) <(names "$OUT/run1") >/dev/null || {
+  echo "export-scenario-goldens: goldens do not match tools/flight-sim/scenarios one to one (is the scenario in goldenScenarios in ScenarioGoldenExport.swift?)" >&2
+  diff <(names tools/flight-sim/scenarios) <(names "$OUT/run1") >&2 || true
+  exit 1
+}
 diff -r "$OUT/run1" "$OUT/run2" || { echo "export-scenario-goldens: two runs differ" >&2; exit 1; }
 mkdir -p "$OUT/goldens"
 cp "$OUT/run1"/*.json "$OUT/goldens/"
