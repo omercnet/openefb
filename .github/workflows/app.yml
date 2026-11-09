@@ -1,22 +1,24 @@
-name: RN spike
+name: App
 
-# React Native feasibility spike (spikes/kanaf-rn): Release builds for the iPad simulator and an Android tablet
-# emulator, screenshots of each screen compared with the SwiftUI references, and the native self-test result.
-# Build-and-capture only: nothing is signed for distribution, published or deployed.
+# Kanaf EFB React Native app (app/): Release builds for the iPad simulator and an Android tablet emulator,
+# screenshots of each screen compared with the SwiftUI references, and the native self-test result.
+# Build-and-capture only: nothing is signed for distribution, published or deployed. CI builds use the dev variant
+# (KANAF_VARIANT=dev, io.omer.efb.dev) so they can never be confused with the production identity io.omer.efb.
 # It also proves OTA updates (web/ota) end to end against `wrangler dev` on the runner (scripts/ota-smoke.sh): embedded
 # launch, signed update A, tampered update B refused, roll back to embedded, other channel ignored. The signing keys are
 # generated per run under /tmp and never leave the runner; nothing is deployed to Cloudflare.
+# Runs only for pull requests that touch app/, web/ota/ or this file (not a required check: a path-filtered
+# required check that never reports would block unrelated pull requests, see ci.yml).
 on:
-  push:
-    branches: [spike/react-native]
+  pull_request:
     paths:
-      - spikes/kanaf-rn/**
+      - app/**
       - web/ota/**
-      - .github/workflows/rn-spike.yml
+      - .github/workflows/app.yml
   workflow_dispatch:
 
 concurrency:
-  group: rn-spike-${{ github.ref }}
+  group: app-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -24,7 +26,7 @@ permissions:
 
 defaults:
   run:
-    working-directory: spikes/kanaf-rn
+    working-directory: app
 
 jobs:
   ios:
@@ -35,24 +37,25 @@ jobs:
       # Set at job level, before checkout: /usr/bin/git is an xcrun shim (see ci.yml). Same Xcode as ci.yml.
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       DD: /tmp/rn-dd
-      OUT: /tmp/rn-spike-ios
-      # OTA build config (spikes/kanaf-rn/app.config.ts): URL and certificate go into the binary, cleartext is allowed
+      OUT: /tmp/app-ios
+      # OTA build config (app/app.config.ts): URL and certificate go into the binary, cleartext is allowed
       # for this smoke build only, and the embedded bundle carries the mark "embedded". Exports use mark A and B.
       KANAF_OTA_URL: http://127.0.0.1:8787/manifest
       KANAF_OTA_CERT: ./ota/certificate.pem
       KANAF_OTA_CHANNEL: ci
       KANAF_OTA_SMOKE: '1'
+      KANAF_VARIANT: dev
       EXPO_PUBLIC_OTA_MARK: embedded
       KEYDIR: /tmp/ota-keys
     steps:
       - uses: actions/checkout@v7
-      - name: Use the app's bundled aviation database (not committed in the spike)
-        run: cp ../../efb-212/Resources/aviation.sqlite assets/aviation.sqlite
+      - name: Use the app's bundled aviation database (not committed)
+        run: cp ../efb-212/Resources/aviation.sqlite assets/aviation.sqlite
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: spikes/kanaf-rn/package-lock.json
+          cache-dependency-path: app/package-lock.json
       - run: npm ci
       - name: Generate ephemeral OTA signing keys (never committed)
         run: |
@@ -66,7 +69,7 @@ jobs:
       - name: Prebuild (ios)
         run: npx expo prebuild -p ios --no-install --clean
       - name: Pod install
-        working-directory: spikes/kanaf-rn/ios
+        working-directory: app/ios
         run: pod install
       - name: Build Release for the simulator (ad-hoc signed)
         # Ad-hoc ("Sign to Run Locally") signing, no team: an unsigned app (CODE_SIGNING_ALLOWED=NO) gets
@@ -74,18 +77,18 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p "$OUT"
-          xcodebuild build -workspace ios/KanafRNSpike.xcworkspace -scheme KanafRNSpike -configuration Release \
+          xcodebuild build -workspace ios/KanafEFBDev.xcworkspace -scheme KanafEFBDev -configuration Release \
             -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$DD" \
             CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= \
             </dev/null 2>&1 | tee "$OUT/build.log" | xcbeautify --renderer github-actions
       - name: Show the app's signature and entitlements
         run: |
-          APP="$DD/Build/Products/Release-iphonesimulator/KanafRNSpike.app"
-          { grep -E '^(CodeSign|ProcessProductPackaging).*KanafRNSpike' "$OUT/build.log" || echo "no CodeSign step for the app in the build log"
+          APP="$DD/Build/Products/Release-iphonesimulator/KanafEFBDev.app"
+          { grep -E '^(CodeSign|ProcessProductPackaging).*KanafEFBDev' "$OUT/build.log" || echo "no CodeSign step for the app in the build log"
             codesign -dvv "$APP" 2>&1 || true
             echo "--- signed entitlements"; codesign -d --entitlements - --xml "$APP" 2>&1 || true
             echo "--- simulated entitlements (__TEXT,__entitlements)"
-            xcrun otool -X -s __TEXT __entitlements "$APP/KanafRNSpike" 2>&1 | head -40 || true
+            xcrun otool -X -s __TEXT __entitlements "$APP/KanafEFBDev" 2>&1 | head -40 || true
           } | tee "$OUT/signing.txt"
       - name: OTA server, runtime version check and update exports
         id: ota_prep
@@ -94,7 +97,7 @@ jobs:
           mkdir -p "$OUT/ota"
           # The binary holds the sentinel file:fingerprint; the real value is EXUpdates.bundle/fingerprint
           # (expo-updates UpdatesConfig.swift reads it from there).
-          FP=$(find "$DD/Build/Products/Release-iphonesimulator/KanafRNSpike.app" -path '*EXUpdates.bundle*' -name fingerprint | head -1)
+          FP=$(find "$DD/Build/Products/Release-iphonesimulator/KanafEFBDev.app" -path '*EXUpdates.bundle*' -name fingerprint | head -1)
           BIN=$(tr -d '[:space:]' < "${FP:?no EXUpdates.bundle/fingerprint in the app}")
           RES=$(npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)
           echo "binary $BIN resolve $RES" | tee "$OUT/ota/runtime-version-check.txt"
@@ -105,14 +108,14 @@ jobs:
             # extra.expoClient in the manifest (Constants.expoConfig on an OTA launch), as Expo's reference server does
             npx expo config --json --type public > "/tmp/ota-export-$m/expoConfig.json"
           done
-          npm --prefix ../../web/ota ci
-          cd ../../web/ota
+          npm --prefix ../web/ota ci
+          cd ../web/ota
           nohup npx --no-install wrangler dev --port 8787 --ip 127.0.0.1 --local > "$OUT/ota/wrangler.log" 2>&1 &
           for _ in $(seq 60); do curl -fs http://127.0.0.1:8787/health && exit 0; sleep 2; done
           cat "$OUT/ota/wrangler.log"; exit 1
       - name: Capture screens and self test
         env:
-          APP: /tmp/rn-dd/Build/Products/Release-iphonesimulator/KanafRNSpike.app
+          APP: /tmp/rn-dd/Build/Products/Release-iphonesimulator/KanafEFBDev.app
         run: scripts/ios-capture.sh
       - name: OTA smoke (embedded, update, tampered update, rollback, other channel)
         if: always() && steps.ota_prep.outcome == 'success'
@@ -131,10 +134,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: rn-spike-ios
+          name: app-ios
           path: |
-            /tmp/rn-spike-ios
-            !/tmp/rn-spike-ios/build.log
+            /tmp/app-ios
+            !/tmp/app-ios/build.log
           retention-days: 14
 
   android:
@@ -142,24 +145,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
-      OUT: /tmp/rn-spike-android
-      # OTA build config (spikes/kanaf-rn/app.config.ts): URL and certificate go into the binary, cleartext is allowed
+      OUT: /tmp/app-android
+      # OTA build config (app/app.config.ts): URL and certificate go into the binary, cleartext is allowed
       # for this smoke build only, and the embedded bundle carries the mark "embedded". Exports use mark A and B.
       KANAF_OTA_URL: http://127.0.0.1:8787/manifest
       KANAF_OTA_CERT: ./ota/certificate.pem
       KANAF_OTA_CHANNEL: ci
       KANAF_OTA_SMOKE: '1'
+      KANAF_VARIANT: dev
       EXPO_PUBLIC_OTA_MARK: embedded
       KEYDIR: /tmp/ota-keys
     steps:
       - uses: actions/checkout@v7
-      - name: Use the app's bundled aviation database (not committed in the spike)
-        run: cp ../../efb-212/Resources/aviation.sqlite assets/aviation.sqlite
+      - name: Use the app's bundled aviation database (not committed)
+        run: cp ../efb-212/Resources/aviation.sqlite assets/aviation.sqlite
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: spikes/kanaf-rn/package-lock.json
+          cache-dependency-path: app/package-lock.json
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -177,7 +181,7 @@ jobs:
       - name: Prebuild (android)
         run: npx expo prebuild -p android --no-install --clean
       - name: Build Release APK (signed with the template's debug keystore)
-        working-directory: spikes/kanaf-rn/android
+        working-directory: app/android
         run: |
           set -o pipefail
           mkdir -p "$OUT"
@@ -197,8 +201,8 @@ jobs:
             EXPO_PUBLIC_OTA_MARK=$m npx expo export --platform android --output-dir "/tmp/ota-export-$m"
             npx expo config --json --type public > "/tmp/ota-export-$m/expoConfig.json"
           done
-          npm --prefix ../../web/ota ci
-          cd ../../web/ota
+          npm --prefix ../web/ota ci
+          cd ../web/ota
           nohup npx --no-install wrangler dev --port 8787 --ip 127.0.0.1 --local > "$OUT/ota/wrangler.log" 2>&1 &
           for _ in $(seq 60); do curl -fs http://127.0.0.1:8787/health && exit 0; sleep 2; done
           cat "$OUT/ota/wrangler.log"; exit 1
@@ -212,7 +216,7 @@ jobs:
       - name: Capture screens and self test
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          APK: ${{ github.workspace }}/spikes/kanaf-rn/android/app/build/outputs/apk/release/app-release.apk
+          APK: ${{ github.workspace }}/app/android/app/build/outputs/apk/release/app-release.apk
         with:
           api-level: 35
           target: google_apis
@@ -221,14 +225,14 @@ jobs:
           disable-animations: true
           # The action's defaults add -noaudio; the self test records from the emulated microphone.
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none
-          working-directory: spikes/kanaf-rn
+          working-directory: app
           # The action runs each script line in its own shell, so all logic lives in the script.
           script: bash scripts/android-capture.sh
       - name: OTA smoke (embedded, update, tampered update, rollback, other channel)
         if: always() && steps.ota_prep.outcome == 'success'
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          APK: ${{ github.workspace }}/spikes/kanaf-rn/android/app/build/outputs/apk/release/app-release.apk
+          APK: ${{ github.workspace }}/app/android/app/build/outputs/apk/release/app-release.apk
           PLATFORM: android
           EXPORT_A: /tmp/ota-export-A
           EXPORT_B: /tmp/ota-export-B
@@ -239,7 +243,7 @@ jobs:
           profile: pixel_tablet
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none -noaudio
-          working-directory: spikes/kanaf-rn
+          working-directory: app
           # One shell per line: the device reaches wrangler dev on the runner through the reverse tunnel.
           script: |
             adb wait-for-device
@@ -251,8 +255,8 @@ jobs:
         if: always()
         uses: reactivecircus/android-emulator-runner@v2
         env:
-          APK: ${{ github.workspace }}/spikes/kanaf-rn/android/app/build/outputs/apk/release/app-release.apk
-          OUT: /tmp/rn-spike-android/gpu-swangle
+          APK: ${{ github.workspace }}/app/android/app/build/outputs/apk/release/app-release.apk
+          OUT: /tmp/app-android/gpu-swangle
           FULL: 0
           SCREENS: map
         with:
@@ -262,7 +266,7 @@ jobs:
           profile: pixel_tablet
           disable-animations: true
           emulator-options: -no-window -gpu swangle_indirect -no-snapshot -no-boot-anim -camera-back none -noaudio
-          working-directory: spikes/kanaf-rn
+          working-directory: app
           script: bash scripts/android-capture.sh
       - name: Compare with the SwiftUI references
         if: always()
@@ -274,8 +278,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: rn-spike-android
+          name: app-android
           path: |
-            /tmp/rn-spike-android
-            !/tmp/rn-spike-android/build.log
+            /tmp/app-android
+            !/tmp/app-android/build.log
           retention-days: 14
