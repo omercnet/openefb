@@ -16,6 +16,9 @@ struct efb_212App: App {
 
     init() {
         Telemetry.start(region: RegionStore.load(from: modelContainer.mainContext))
+        #if DEBUG
+        SeedDataHook.runIfRequested(container: modelContainer)
+        #endif
     }
 
     /// Whether we are running inside a unit test host (XCTest bundle loaded).

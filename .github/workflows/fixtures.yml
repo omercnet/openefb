@@ -1,0 +1,85 @@
+name: Swift fixtures and goldens
+
+# Ground truth from the Swift app for the React Native rewrite: the seeded on-disk data (ticket D1) and the flight-sim
+# scenario goldens (ticket S0). Manual, and on pull requests that touch the generators. Not part of the CI gate.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/fixtures.yml
+      - tools/ci/make-fixtures.sh
+      - tools/ci/export-scenario-goldens.sh
+      - tools/ci/swift-store-schema.py
+      - efb-212/Services/Simulation/SeedDataHook.swift
+      - efb-212Tests/Simulation/ScenarioGoldenExport.swift
+
+concurrency:
+  group: fixtures-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fixtures:
+    name: Seed the Swift store (iPad simulator)
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v7
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: /tmp/efb-dd-${{ github.event.repository.name }}/SourcePackages
+          key: spm-${{ hashFiles('efb-212.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+      - name: Build the DEBUG app
+        run: |
+          set -o pipefail
+          tools/sim-test.sh build 2>&1 | xcbeautify --renderer github-actions
+      - name: Seed and collect
+        env:
+          OUT: ${{ runner.temp }}/fixtures
+        run: tools/ci/make-fixtures.sh
+      - name: Schema discovery
+        env:
+          OUT: ${{ runner.temp }}/fixtures
+        run: |
+          python3 tools/ci/swift-store-schema.py "$OUT/full" > "$OUT/swift-store-layout.md"
+          python3 tools/ci/swift-store-schema.py "$OUT/small" > "$OUT/swift-store-layout-small.md"
+      - name: Upload fixtures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: swift-store-fixtures
+          path: ${{ runner.temp }}/fixtures
+          retention-days: 30
+
+  goldens:
+    name: Scenario goldens (iPad simulator)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v7
+      - name: Cache Swift packages
+        uses: actions/cache@v6
+        with:
+          path: /tmp/efb-dd-${{ github.event.repository.name }}/SourcePackages
+          key: spm-${{ hashFiles('efb-212.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+      - name: Export the goldens twice and compare
+        env:
+          OUT: ${{ runner.temp }}/goldens
+          RESULT: ${{ runner.temp }}/goldens.xcresult
+        run: |
+          set -o pipefail
+          tools/ci/export-scenario-goldens.sh 2>&1 | xcbeautify --renderer github-actions
+      - name: Upload goldens
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: scenario-goldens
+          path: ${{ runner.temp }}/goldens
+          retention-days: 30
