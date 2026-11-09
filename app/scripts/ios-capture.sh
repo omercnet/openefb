@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install the Release simulator build of the RN spike on an iPad simulator, screenshot each screen and collect the
-# self-test result (the rn-spike workflow's ios job). Simulator selection follows tools/sim-test.sh.
+# self-test result (the app workflow's ios job). Simulator selection follows tools/sim-test.sh.
 #   APP=<path/KanafEFBDev.app> OUT=<dir> app/scripts/ios-capture.sh
-# Env: APP (required), OUT (default /tmp/rn-spike-ios), WAIT (seconds for non-map screens, default 10),
+# Env: APP (required), OUT (default /tmp/app-ios), WAIT (seconds for non-map screens, default 10),
 # MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), SIM_DEVICE (default "iPad Pro 13-inch (M5)"),
 # RESULT_TIMEOUT (seconds, default 120).
 # Screens are chosen with launch arguments (-KanafScreen <screen>, -KanafAnimate 1; read through NSUserDefaults by
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 APP=${APP:?set APP to the built .app}
-OUT=${OUT:-/tmp/rn-spike-ios}
+OUT=${OUT:-/tmp/app-ios}
 WAIT=${WAIT:-10}
 MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}

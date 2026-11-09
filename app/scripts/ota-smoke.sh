@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# OTA smoke scenario for the RN spike (the rn-spike workflow, after the capture step). Drives the app's `ota` screen
+# OTA smoke scenario for the app (the app workflow, after the capture step). Drives the app's `ota` screen
 # against web/ota running under `wrangler dev`, publishing with the web/ota CLI (its documented output lines are the
 # only interface used here), and checks the five steps of docs: embedded -> update A -> tampered B rejected ->
 # rollback to embedded -> other channel ignored.
 #   PLATFORM=ios|android OUT=<dir> KEYDIR=<dir> EXPORT_A=<dir> EXPORT_B=<dir> app/scripts/ota-smoke.sh
 # Env: PLATFORM (required), KEYDIR (required: good/private-key.pem and bad/private-key.pem), EXPORT_A / EXPORT_B
-# (`expo export` output dirs for this platform), OUT (default /tmp/rn-spike-$PLATFORM), RV_FILE (default
+# (`expo export` output dirs for this platform), OUT (default /tmp/app-$PLATFORM), RV_FILE (default
 # $OUT/runtime-version.txt), BASE_URL (default http://127.0.0.1:8787), CHANNEL (default ci; must match the app's
 # KANAF_OTA_CHANNEL), WRANGLER_LOG (default $OUT/ota/wrangler.log), SETTLE_TIMEOUT (seconds, default 120),
 # iOS: APP (optional .app to install, default: already installed), SIM_NAME (default KanafEFBDev). Android: APK
@@ -18,7 +18,7 @@ PLATFORM=${PLATFORM:?set PLATFORM to ios or android}
 KEYDIR=${KEYDIR:?set KEYDIR}
 EXPORT_A=${EXPORT_A:?set EXPORT_A}
 EXPORT_B=${EXPORT_B:?set EXPORT_B}
-OUT=${OUT:-/tmp/rn-spike-$PLATFORM}
+OUT=${OUT:-/tmp/app-$PLATFORM}
 RV_FILE=${RV_FILE:-$OUT/runtime-version.txt}
 BASE_URL=${BASE_URL:-http://127.0.0.1:8787}
 CHANNEL=${CHANNEL:-ci}

@@ -28,7 +28,7 @@ type-checked or statically inspected.
   xcframework (only expo-modules-core, expo-modules-jsi, expo-font and expo-file-system do), so ExpoSQLite compiles from source
   and the flag applies. If a later expo-sqlite ships a prebuilt, add it to `expo.autolinking.buildFromSource` or the flag is
   silently ignored. The self test reports `rtree` from `PRAGMA compile_options` to catch exactly that.
-- **Info.plist** (`ios/KanafRNSpike/Info.plist`): `UIBackgroundModes = [location, audio]`, the same as the SwiftUI app.
+- **Info.plist** (`ios/KanafEFBDev/Info.plist`): `UIBackgroundModes = [location, audio]`, the same as the SwiftUI app.
   expo-task-manager adds `fetch`; a small `withInfoPlist` mod in `app.config.ts` resets the list. Usage strings:
   `NSLocationWhenInUse/AlwaysAndWhenInUse/Always` (Kanaf wording), `NSMicrophoneUsageDescription` and
   `NSSpeechRecognitionUsageDescription` copied from the root Info.plist. `NSMotionUsageDescription` and the full-accuracy

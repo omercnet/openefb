@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Install the Release APK of the RN spike on the running emulator, screenshot each screen and collect the self-test
-# result (the rn-spike workflow's android job, run inside reactivecircus/android-emulator-runner).
+# result (the app workflow's android job, run inside reactivecircus/android-emulator-runner).
 #   APK=<app-release.apk> OUT=<dir> app/scripts/android-capture.sh
-# Env: APK (required), OUT (default /tmp/rn-spike-android), WAIT (seconds for non-map screens, default 10),
+# Env: APK (required), OUT (default /tmp/app-android), WAIT (seconds for non-map screens, default 10),
 # MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), RESULT_TIMEOUT (seconds, default 120),
 # SCREENS (default "map airport night sheet"), FULL (1 = also run the animation and the self test, default 1; the
 # workflow's second emulator pass with another GPU mode sets FULL=0 SCREENS=map).
@@ -12,7 +12,7 @@
 set -euo pipefail
 
 APK=${APK:?set APK to the built release APK}
-OUT=${OUT:-/tmp/rn-spike-android}
+OUT=${OUT:-/tmp/app-android}
 WAIT=${WAIT:-10}
 MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}
