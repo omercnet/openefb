@@ -1,6 +1,7 @@
 # ota: self-hosted Expo Updates for the React Native spike
 
-Status: spike, not deployed. Everything is proven against `wrangler dev` with the local R2 simulator.
+Status: spike. Deployed 2026-11-09 to `https://openefb-ota.omerc.workers.dev` (bucket `openefb-ota`, nothing published yet).
+The end-to-end client tests run against `wrangler dev` with the local R2 simulator in CI (`.github/workflows/rn-spike.yml`).
 
 A read-only Cloudflare Worker serves Expo Updates protocol v1 from an R2 bucket (`openefb-ota`, binding `OTA_BUCKET`).
 The publisher CLI (`cli/ota.mjs`) signs on the publisher's machine and writes R2 directly, so the Worker has no upload
@@ -47,8 +48,7 @@ npx expo-updates codesigning:generate --key-output-directory ~/.config/kanaf/ota
 
 ## Publish and roll back
 
-Default mode is `--local` (nothing leaves the machine). `--remote` writes the real bucket and needs `wrangler login`; do not
-use it before a deploy is approved.
+Default mode is `--local` (nothing leaves the machine). `--remote` writes the real bucket and needs `wrangler login`.
 
 ```
 cd web/ota && npm ci

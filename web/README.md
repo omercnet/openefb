@@ -4,7 +4,7 @@
 |---|---|---|---|
 | `interviews/` | Pilot interviews (Next.js 16, OpenAI realtime, daily reap cron) | **Vercel Hobby** | daily cron and small Blob use fit the free plan |
 | `notam-relay/` | Israel NOTAM relay: scrapes IAA every 15 min, serves `notams.json` | **Cloudflare Worker** (Cron Trigger + KV) | Hobby crons run once a day at most |
-| `ota/` | Expo Updates (OTA) server for the React Native spike: read-only Worker over R2 plus an offline-signing publisher CLI | **Cloudflare Worker + R2** (spike, not deployed) | signing key never leaves the publisher; R2 egress is free |
+| `ota/` | Expo Updates (OTA) server for the React Native spike: read-only Worker over R2 plus an offline-signing publisher CLI | **Cloudflare Worker + R2** (spike, deployed, no updates published) | signing key never leaves the publisher; R2 egress is free |
 | `charts/` | Chart pack hosting (official CAAI CVFR MBTiles, Israel data packs) + publish script | **Cloudflare R2** | R2 egress is free; Blob's 10 GB/month transfer is ~50 pack downloads |
 
 Each folder has its own `package.json` and lockfile (no workspace tooling) and its own README with details.
@@ -18,7 +18,7 @@ Vercel (Hobby, personal non-commercial use only) and Cloudflare (free; R2 needs 
 |---|---|---|
 | `notam-relay/` | `https://openefb-notam-relay.omerc.workers.dev` (`/notams.json`, `/health`, `/config.json`, `POST /run`) | Live. KV namespace `NOTAM_KV` is bound in `wrangler.toml`; the `*/15` Cron Trigger runs; `/health` returned 200 with 125 rows. `/config.json` (remote app config, serial 1) deployed 2026-11-02, version `63635dff`. The app's built-in default feed URL is this one (`IsraelNotamService.defaultFeedURL`); the `israelNotamFeedURL` default overrides it. |
 | `charts/` | R2 bucket `openefb-charts`, public dev URL `https://pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev` | Live, with CORS from `cors.json`. Published: `israel-cvfr` (latest edition 2025-02) and `il-diagrams` (latest 2026-08b). The app's built-in base URL is this one (`IsraelChartConfig.defaultBaseURL`); the `israelChartBaseURL` default overrides it. The dev URL is rate-limited: attach a custom domain before pilots depend on it. |
-| `ota/` | Local only (`wrangler dev`, local R2) | Not deployed (spike). Bucket `openefb-ota` does not exist on the account. |
+| `ota/` | `https://openefb-ota.omerc.workers.dev` (`/manifest`, `/assets/<sha256>`, `/health`) | Live since 2026-11-09, version `134938c5`, bucket `openefb-ota` (empty: nothing published to any channel). Smoke-tested live on a throwaway `smoke` channel (signed publish, wrong-key update failing verify, rollback directive), then the test objects were deleted. Production signing key: owner machine `~/.config/kanaf/ota/`, never on Cloudflare. No app build points at it yet. |
 | `interviews/` | Vercel project `openefb-interviews`, `https://openefb-interviews.vercel.app` | Live. Git-connected to `omercnet/openefb` (production branch `main`) with Root Directory `web/interviews`, so a push to `main` deploys it. |
 
 The IAA answered the Worker's Cloudflare addresses on 2026-11-02, with one earlier HTTP 403 that the relay's backoff recovered from (`docs/RELIABILITY.md`). If the IAA starts blocking it, see the fallback in `notam-relay/README.md`.
@@ -33,7 +33,7 @@ The project's Ignored Build Step is `if [ -n "$VERCEL_GIT_PREVIOUS_SHA" ] && git
 2. **charts:** `cd web/charts && npm ci && npx wrangler r2 bucket create openefb-charts`, then `r2 bucket cors set` and
    `r2 bucket dev-url enable` (commands in its README). Publish with `web/charts/publish.sh ... --remote`; `--approve` is the owner's go-ahead.
    CAAI approved in-app use of the chart and diagram artwork (chart base map (c) Mapa Ltd, used under that approval).
-3. **ota (spike, only after the owner approves a deploy):** `cd web/ota && npm ci && npx wrangler r2 bucket create openefb-ota && npx wrangler deploy`; publish with `node cli/ota.mjs publish ... --remote` (see its README).
+3. **ota:** `cd web/ota && npm ci && npx wrangler r2 bucket create openefb-ota && npx wrangler deploy`; publish with `node cli/ota.mjs publish ... --remote` (see its README).
 4. **interviews:** `cd web/interviews && npx vercel login && npx vercel link` (Root Directory `web/interviews`), create the
    private Blob store, add the env vars listed in its README, `npx vercel --prod`. The standalone `~/dev/pilot-interviews` repo is retired.
 

@@ -2,7 +2,7 @@ name = "openefb-ota"
 main = "src/index.ts"
 compatibility_date = "2026-10-01"
 
-# Not deployed (spike). Create the bucket first: wrangler r2 bucket create openefb-ota
+# Bucket created 2026-11-09 on account omercnet (wrangler r2 bucket create openefb-ota)
 [[r2_buckets]]
 binding = "OTA_BUCKET"
 bucket_name = "openefb-ota"
