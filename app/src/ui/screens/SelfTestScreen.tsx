@@ -28,10 +28,12 @@ type CheckResult = { name: string; ok: boolean; ms: number; details?: Record<str
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const elapsed = (t0: number) => Math.round((performance.now() - t0) * 10) / 10;
 
+/** Rejects with "<what> timed out after <ms> ms" when p has not settled in time. */
 function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
   return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${what} timed out after ${ms} ms`)), ms))]);
 }
 
+/** Runs fn and returns its value with the elapsed milliseconds. */
 async function timed<T>(fn: () => Promise<T>): Promise<[T, number]> {
   const t0 = performance.now();
   const value = await fn();
@@ -200,6 +202,7 @@ function deviceInfo() {
   };
 }
 
+/** Runs the native capability checks in turn and writes the result for CI (see the file header). */
 export function SelfTestScreen() {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [results, setResults] = useState<CheckResult[]>([]);

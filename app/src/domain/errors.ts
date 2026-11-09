@@ -38,7 +38,9 @@ export class AppFailure extends Error {
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AppError };
 
+/** A successful Result. */
 export const ok = <T>(value: T): Result<T> => ({ ok: true, value });
+/** A failed Result. */
 export const err = (error: AppError): Result<never> => ({ ok: false, error });
 
 /** The value of an ok Result; throws AppFailure for an error Result. */

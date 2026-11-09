@@ -58,6 +58,7 @@ function report(status: MapStatus, t0: number, event: string) {
   writeResult(MAP_STATUS_FILE, status).catch((e) => console.warn('map status write failed', e));
 }
 
+/** The MapLibre chart with ownship, track ruler and airport dots; reports render status for CI. */
 export function MapSurface({ night }: { night: boolean }) {
   const mapRef = useRef<MapRef>(null);
   const mapStyle = useMemo(() => styleFor(night), [night]);

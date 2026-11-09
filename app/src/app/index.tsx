@@ -10,6 +10,7 @@ import { MapScreen } from '../ui/screens/MapScreen';
 // resolves straight to its route, so this screen only sees launches without a URL.
 const LAUNCH_SCREENS = ['airport', 'night', 'selftest', 'sheet', 'ota'];
 
+/** The screen requested at launch without a deep link (iOS launch argument, web query), if any. */
 function launchScreen(): string | null {
   const raw =
     Platform.OS === 'web'
@@ -20,6 +21,7 @@ function launchScreen(): string | null {
   return raw && LAUNCH_SCREENS.includes(raw) ? raw : null;
 }
 
+/** Root route: the map, or the screen requested at launch (also after an Android OTA reload). */
 export default function Index() {
   const router = useRouter();
   const [screen] = useState(launchScreen);

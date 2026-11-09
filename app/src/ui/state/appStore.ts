@@ -17,6 +17,7 @@ export interface AppState {
   clearDatabaseError: () => void;
 }
 
+/** A fresh store; tests create their own so state never leaks between them. */
 export const createAppStore = () =>
   createStore<AppState>()((set) => ({
     stripColumn: 'log',
@@ -30,4 +31,5 @@ export const createAppStore = () =>
 
 export const appStore = createAppStore();
 
+/** Subscribes a component to the selected slice of the app store. */
 export const useAppStore = <T>(selector: (state: AppState) => T): T => useStore(appStore, selector);

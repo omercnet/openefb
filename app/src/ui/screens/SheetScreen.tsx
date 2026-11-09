@@ -45,6 +45,7 @@ function Chip({ text }: { text: string }) {
   );
 }
 
+/** Presents the airport summary in a native bottom sheet (see the file header). */
 export function SheetScreen() {
   const [presented, setPresented] = useState(true);
   return (

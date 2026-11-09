@@ -5,6 +5,7 @@ import { StripColumn, type StripScreen } from '../StripColumn';
 
 export const STRIP_WIDTH_PT = 400; // matches the SwiftUI strip (docs/DESIGN.md)
 
+/** The map-first layout: strip column beside the chart; screen picks the column and day or night. */
 export function MapScreen({ screen }: { screen: StripScreen }) {
   const { width } = useWindowDimensions();
   const stripWidth = width < 600 ? 104 : STRIP_WIDTH_PT; // iPhone rail is 104pt; the spike targets iPad

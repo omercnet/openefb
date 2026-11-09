@@ -8,6 +8,7 @@ export const MAP_STATUS_FILE = 'map-status.json';
 export const OTA_FILE = 'spike-ota.json';
 export const OTA_RELOAD_FILE = 'ota-reload.json'; // present between the OTA reload request and the relaunch
 
+/** Writes value as pretty JSON to <documents>/<name>, replacing any previous file; returns its URI. */
 export async function writeResult(name: string, value: unknown): Promise<string> {
   const file = new File(Paths.document, name);
   if (!file.exists) file.create({ overwrite: true }); // overwrite: a concurrent writer may have created it meanwhile
@@ -15,11 +16,13 @@ export async function writeResult(name: string, value: unknown): Promise<string>
   return file.uri;
 }
 
+/** The parsed JSON in <documents>/<name>, or null when the file does not exist. */
 export async function readResult(name: string): Promise<unknown> {
   const file = new File(Paths.document, name);
   return file.exists ? JSON.parse(await file.text()) : null;
 }
 
+/** Deletes <documents>/<name> if it exists. */
 export function clearResult(name: string): void {
   const file = new File(Paths.document, name);
   if (file.exists) file.delete();

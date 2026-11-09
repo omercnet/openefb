@@ -21,6 +21,7 @@ export const AIRPORTS_IN_BOX_SQL = `
   WHERE r.min_lat <= ? AND r.max_lat >= ? AND r.min_lon <= ? AND r.max_lon >= ?
     AND a.type = 'airport' AND a.ownership = 'public'`;
 
+/** Public airports whose R-tree box intersects [west, south, east, north] (degrees). */
 export function airportsInBox(db: SQLiteDatabase, [west, south, east, north]: [number, number, number, number]) {
   return db.getAllAsync<AirportDot>(AIRPORTS_IN_BOX_SQL, [north, south, east, west]);
 }

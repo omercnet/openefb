@@ -17,6 +17,7 @@ type Result = {
   logs?: string[];
 };
 
+/** Drives one OTA check per launch and reports each phase (see the file header). */
 export function OtaScreen() {
   const [result, setResult] = useState<Result | null>(null);
 
