@@ -102,7 +102,7 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 - **Needs the internet:** weather, TFRs, AIRMET/SIGMET, PIREPs, winds aloft, NOTAMs, FAA charts and any map area you haven't downloaded. Works offline: the airport database, downloaded map regions and charts you have already opened.
 - **Debrief** needs a device that supports Apple Foundation Models.
 - **NOTAMs** need your own free FAA API key.
-- iOS 26 or later; iPad is the primary device, iPhone is supported in portrait. No IFR procedures, ADS-B traffic, weight and balance, or cloud sync.
+- iOS 26 or later; iPad is the primary device, iPhone is supported in portrait. The iPad app is also offered on Apple Silicon Macs and Apple Vision Pro ("Designed for iPad"), unmodified: they have no GPS, so there it is for planning and briefing. Flights recorded on an iPad stay on that iPad (no sync or transfer). No IFR procedures, ADS-B traffic, weight and balance, or cloud sync.
 
 **Israel mode**
 
@@ -119,7 +119,7 @@ ForeFlight costs $120-360/yr. The data it uses -- FAA airports, VFR sectional ch
 
 | Component | Technology |
 |-----------|-----------|
-| Platform | iPad and iPhone, iOS 26.0 |
+| Platform | iPad and iPhone, iOS 26.0; Apple Silicon Mac and Apple Vision Pro as "Designed for iPad" |
 | Language | Swift 6.0 language mode, SwiftUI |
 | Architecture | MVVM with the Observation framework (`@Observable`); one root `AppState` |
 | Map Engine | MapLibre Native iOS (open-source, no API fees) |
