@@ -1,0 +1,132 @@
+{
+  "version": 8,
+  "name": "Kanaf Base",
+  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "sources": {
+    "openmaptiles": {
+      "type": "vector",
+      "url": "https://tiles.openfreemap.org/planet",
+      "attribution": "© OpenFreeMap © OpenMapTiles © OpenStreetMap contributors"
+    },
+    "vfr-sectional": {
+      "type": "raster",
+      "tiles": ["https://tiles.arcgis.com/tiles/ssFJjBXIUyZDrSYZ/arcgis/rest/services/VFR_Sectional/MapServer/tile/{z}/{y}/{x}"],
+      "tileSize": 256,
+      "minzoom": 8,
+      "maxzoom": 12,
+      "attribution": "VFR Sectional © FAA Aeronautical Information Services"
+    }
+  },
+  "layers": [
+    {
+      "id": "offline-background",
+      "type": "background",
+      "paint": { "background-color": "#EEF0EA" }
+    },
+    {
+      "id": "street-landcover-wood",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landcover",
+      "filter": ["==", ["get", "class"], "wood"],
+      "paint": { "fill-color": "#D8E6C8", "fill-opacity": 0.7 }
+    },
+    {
+      "id": "street-landuse-residential",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "landuse",
+      "filter": ["in", ["get", "class"], ["literal", ["residential", "suburb", "neighbourhood"]]],
+      "paint": { "fill-color": "#E4E2DC", "fill-opacity": 0.8 }
+    },
+    {
+      "id": "street-park",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "park",
+      "paint": { "fill-color": "#D4E8C4", "fill-opacity": 0.6 }
+    },
+    {
+      "id": "street-water",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "water",
+      "paint": { "fill-color": "#A9CDE6" }
+    },
+    {
+      "id": "street-waterway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "waterway",
+      "paint": { "line-color": "#A9CDE6", "line-width": 1 }
+    },
+    {
+      "id": "street-aeroway-area",
+      "type": "fill",
+      "source": "openmaptiles",
+      "source-layer": "aeroway",
+      "filter": ["==", ["geometry-type"], "Polygon"],
+      "paint": { "fill-color": "#DCDCE4" }
+    },
+    {
+      "id": "street-aeroway-runway",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "aeroway",
+      "minzoom": 10,
+      "filter": ["all", ["==", ["geometry-type"], "LineString"], ["==", ["get", "class"], "runway"]],
+      "paint": {
+        "line-color": "#8A8A99",
+        "line-width": ["interpolate", ["exponential", 1.5], ["zoom"], 10, 1.5, 15, 20]
+      }
+    },
+    {
+      "id": "street-road-minor",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "minzoom": 12,
+      "filter": ["in", ["get", "class"], ["literal", ["minor", "service", "tertiary"]]],
+      "paint": { "line-color": "#FFFFFF", "line-width": 1 }
+    },
+    {
+      "id": "street-road-major",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "transportation",
+      "filter": ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary"]]],
+      "paint": {
+        "line-color": "#F2C46D",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 6, 0.5, 12, 2.5]
+      }
+    },
+    {
+      "id": "street-boundary-state",
+      "type": "line",
+      "source": "openmaptiles",
+      "source-layer": "boundary",
+      "filter": ["all", ["<=", ["get", "admin_level"], 4], ["!=", ["get", "maritime"], 1]],
+      "paint": { "line-color": "#A08CA8", "line-width": 1, "line-dasharray": [3, 2] }
+    },
+    {
+      "id": "street-place-label",
+      "type": "symbol",
+      "source": "openmaptiles",
+      "source-layer": "place",
+      "filter": ["in", ["get", "class"], ["literal", ["city", "town"]]],
+      "layout": {
+        "text-field": ["coalesce", ["get", "name:en"], ["get", "name"]],
+        "text-font": ["Noto Sans Regular"],
+        "text-size": ["match", ["get", "class"], "city", 14, 11]
+      },
+      "paint": { "text-color": "#555555", "text-halo-color": "#FFFFFF", "text-halo-width": 1.2 }
+    },
+    {
+      "id": "base-vfr-sectional",
+      "type": "raster",
+      "source": "vfr-sectional",
+      "layout": { "visibility": "none" },
+      "paint": { "raster-opacity": 0.7 }
+    }
+  ]
+}

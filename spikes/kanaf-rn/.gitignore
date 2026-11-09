@@ -1,0 +1,8 @@
+node_modules/
+ios/
+android/
+.expo/
+dist/
+reports/out/
+assets/aviation.sqlite
+ota/

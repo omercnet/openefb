@@ -53,7 +53,7 @@ case "$step" in
       # shellcheck disable=SC2086
       changed+=$'\n'"$(git diff --name-only $r 2>/dev/null)"
     done
-    for pkg in notam-relay charts; do
+    for pkg in notam-relay charts ota; do
       if printf '%s\n' "$changed" | grep -q "^web/$pkg/"; then
         echo "pre-push: npm test in web/$pkg"
         (cd "web/$pkg" && npm test) || exit 1
