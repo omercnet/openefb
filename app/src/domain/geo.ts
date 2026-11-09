@@ -6,8 +6,8 @@ export interface Coordinate {
   lon: number;
 }
 
-/** Mean Earth radius in nautical miles (6371.0088 km / 1.852). */
-export const EARTH_RADIUS_NM = 3440.0695;
+/** Earth radius in nautical miles: 3440.065, the value every Swift service uses, so ported tests compare exactly. */
+export const EARTH_RADIUS_NM = 3440.065;
 
 const toRad = (deg: number): number => (deg * Math.PI) / 180;
 

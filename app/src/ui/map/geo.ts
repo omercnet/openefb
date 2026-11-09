@@ -1,7 +1,8 @@
 // Great-circle helpers and the track-ruler geometry (port of MapService.updateTrackRuler).
 // Units: distances in NM, bearings in degrees true, speeds in knots, positions [lon, lat] degrees.
 
-const EARTH_RADIUS_NM = 3440.065;
+import { EARTH_RADIUS_NM } from '../../domain/geo';
+
 const rad = (d: number) => (d * Math.PI) / 180;
 const deg = (r: number) => (r * 180) / Math.PI;
 

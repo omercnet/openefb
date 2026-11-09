@@ -1,4 +1,4 @@
-import { distanceNm, type Coordinate } from './geo';
+import { EARTH_RADIUS_NM, distanceNm, type Coordinate } from './geo';
 
 const LLHZ: Coordinate = { lat: 32.1809, lon: 34.8319 };
 const LLBG: Coordinate = { lat: 32.0114, lon: 34.8867 };
@@ -23,6 +23,6 @@ describe('distanceNm', () => {
   });
 
   it('does not return NaN for antipodal positions', () => {
-    expect(distanceNm({ lat: 0, lon: 0 }, { lat: 0, lon: 180 })).toBeCloseTo(Math.PI * 3440.0695, 3);
+    expect(distanceNm({ lat: 0, lon: 0 }, { lat: 0, lon: 180 })).toBeCloseTo(Math.PI * EARTH_RADIUS_NM, 3);
   });
 });
