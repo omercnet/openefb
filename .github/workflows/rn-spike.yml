@@ -92,8 +92,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$OUT/ota"
-          # The binary holds the sentinel file:fingerprint; the real value is a file next to the app code.
-          BIN=$(cat "$DD/Build/Products/Release-iphonesimulator/KanafRNSpike.app/fingerprint" | tr -d '[:space:]')
+          # The binary holds the sentinel file:fingerprint; the real value is EXUpdates.bundle/fingerprint
+          # (expo-updates UpdatesConfig.swift reads it from there).
+          FP=$(find "$DD/Build/Products/Release-iphonesimulator/KanafRNSpike.app" -path '*EXUpdates.bundle*' -name fingerprint | head -1)
+          BIN=$(tr -d '[:space:]' < "${FP:?no EXUpdates.bundle/fingerprint in the app}")
           RES=$(npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)
           echo "binary $BIN resolve $RES" | tee "$OUT/ota/runtime-version-check.txt"
           test -n "$BIN" && test "$BIN" = "$RES"
