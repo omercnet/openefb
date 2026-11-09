@@ -65,6 +65,10 @@ Run the simulator scenarios locally with `tools/sim-test.sh build` then `tools/c
 
 After the scenarios, the same job runs `tools/ci/capture-screens.sh`: it launches the DEBUG app on the iPad simulator and on an `iPhone 17 Pro` simulator flying `us-kpao-ksql`, puts it on each screen with DEBUG launch arguments (`-OpenEFBScreen`, `-OpenEFBStripColumn`, `-OpenEFBDisplayMode`, `-OpenEFBDirectTo`; `efb-212/Services/Simulation/ScreenCaptureHooks.swift`) and saves `ipad-<shot>.png` and `iphone-<shot>.png` for map-day, map-night, map-nolog and map-chartonly (the bar toggles off, `-showsFlightLog NO`, `-showsInstruments NO`), map-noplan, airport-KSQL, nearest, layers, search and log, plus `ipad-il-map-day.png` on the Israel route. They are in the `screens/` folder of the `scenario-captures` artifact. The step fails only when the app stops running or crashes; image content is reviewed by eye. Locally: `tools/sim-test.sh build` then `tools/ci/capture-screens.sh` (`OUT=<dir>`, default `/tmp/efb-screens`; `WAIT=<seconds>`, default 12).
 
+## React Native app
+
+`.github/workflows/app.yml` builds and tests `app/`. It runs only for pull requests that touch `app/**`, `web/ota/**` or the workflow, so it is not a required check (a required check behind a path filter never reports on other pull requests). The `checks` job (ubuntu: `tsc`, ESLint with Prettier, Jest) runs first; the iOS (macos-26) and Android (emulator) jobs build Release variants with `KANAF_VARIANT=dev` (`io.omer.efb.dev`), capture screens and run the OTA smoke test. `tools/check.sh` skips the `app` hook in the lint job because the checks job covers it.
+
 ## Not done
 
 - Actions are referenced by major version tag, not commit SHA.
