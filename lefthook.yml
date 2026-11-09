@@ -1,6 +1,6 @@
 # lefthook hooks for Kanaf. Install: `mise use -g lefthook@latest && lefthook install` (see tools/hooks/README.md).
 # Same pre-commit checks without git: tools/check.sh (the integrator's commit-tree bypasses hooks).
-# Skip jobs:   LEFTHOOK_EXCLUDE=swift-format,web-relay git commit ...      Skip all: git commit --no-verify
+# Skip jobs:   LEFTHOOK_EXCLUDE=swift-format,app,web-relay git commit ...      Skip all: git commit --no-verify
 min_version: 1.10.0
 
 pre-commit:
@@ -65,6 +65,14 @@ pre-commit:
       root: web/ota/
       glob: "web/ota/**/*"
       run: npm test
+
+    - name: app
+      # Needs `npm ci` in app/ once. CI runs the same checks in ci.yml's app job (in the gate).
+      root: app/
+      # app/** (not app/**/*): the default matcher needs a directory for **/*, so app/app.config.ts would be skipped.
+      glob: "app/**"
+      exclude: ["app/assets/**", "app/reference/**"]
+      run: npm run typecheck && npm run lint && npm test
 
 pre-push:
   # Heavier. Skip: LEFTHOOK_EXCLUDE=pre-push-commits,pre-push-gitleaks,pre-push-build,pre-push-web git push   (or --no-verify)
