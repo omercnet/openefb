@@ -16,21 +16,21 @@ import Testing
 import Foundation
 @testable import efb_212
 
+/// Same scenarios, strides and NOTAM feed as ScenarioFlightTests.
+private let goldenScenarios: [(name: String, stride: Double, notams: Bool)] = [
+    ("il-cvfr-llhz-llib-nominal", 2, false), ("il-cvfr-llhz-llib-deviations", 2, false), ("il-ctr-entry", 2, false),
+    ("il-border-approach", 2, false), ("il-closed-leg", 2, true), ("il-lsa-llbs-llrs", 3, false),
+    ("il-gps-loss", 2, false), ("us-kpao-ksql", 2, false)
+]
+
 @MainActor
 @Suite("Scenario golden export", .serialized)
 struct ScenarioGoldenExport {
 
-    /// Same scenarios, strides and NOTAM feed as ScenarioFlightTests.
-    static let scenarios: [(name: String, stride: Double, notams: Bool)] = [
-        ("il-cvfr-llhz-llib-nominal", 2, false), ("il-cvfr-llhz-llib-deviations", 2, false), ("il-ctr-entry", 2, false),
-        ("il-border-approach", 2, false), ("il-closed-leg", 2, true), ("il-lsa-llbs-llrs", 3, false),
-        ("il-gps-loss", 2, false), ("us-kpao-ksql", 2, false)
-    ]
-
-    @Test(arguments: scenarios.map(\.name))
+    @Test(arguments: goldenScenarios.map(\.name))
     func exportGolden(_ name: String) async throws {
         guard let dir = ProcessInfo.processInfo.environment["OPENEFB_GOLDEN_DIR"], !dir.isEmpty else { return }
-        let spec = try #require(Self.scenarios.first { $0.name == name })
+        let spec = try #require(goldenScenarios.first { $0.name == name })
         let run = try await ScenarioRun.fly(name, stride: spec.stride,
                                             notamFixture: spec.notams ? ScenarioRun.notamFixturePath : nil)
         let json = try Self.golden(for: run, stride: spec.stride)
