@@ -1,5 +1,5 @@
 {
-  "applicationSupport" : "\/Users\/runner\/Library\/Developer\/CoreSimulator\/Devices\/E986E058-E8C8-4FD1-A214-2DF87CBEE226\/data\/Containers\/Data\/Application\/A413487D-C722-4532-BF8F-DA45866DDD5D\/Library\/Application Support",
+  "applicationSupport" : "<container>/Library/Application Support",
   "applicationSupportFiles" : [
     {
       "bytes" : 102400,
@@ -15,15 +15,15 @@
     },
     {
       "bytes" : 114688,
-      "path" : "efb-212\/recording.sqlite"
+      "path" : "efb-212/recording.sqlite"
     },
     {
       "bytes" : 32768,
-      "path" : "efb-212\/recording.sqlite-shm"
+      "path" : "efb-212/recording.sqlite-shm"
     },
     {
       "bytes" : 0,
-      "path" : "efb-212\/recording.sqlite-wal"
+      "path" : "efb-212/recording.sqlite-wal"
     }
   ],
   "bundleID" : "io.omer.efb",
@@ -45,7 +45,7 @@
     "UserSettings" : 1
   },
   "profile" : "small",
-  "swiftDataStoreURL" : "\/Users\/runner\/Library\/Developer\/CoreSimulator\/Devices\/E986E058-E8C8-4FD1-A214-2DF87CBEE226\/data\/Containers\/Data\/Application\/A413487D-C722-4532-BF8F-DA45866DDD5D\/Library\/Application Support\/default.store",
+  "swiftDataStoreURL" : "<container>/Library/Application Support/default.store",
   "trackPoints" : 300,
   "userDefaultsDomain" : {
     "displayMode" : "night",

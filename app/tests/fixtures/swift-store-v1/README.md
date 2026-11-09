@@ -29,3 +29,4 @@ Ids are deterministic (`<kind>-0000-4000-8000-<n>`); dates are offsets from 2025
 - Keychain: the unsigned simulator build cannot use the keychain (`errSecMissingEntitlement`, -34018) for writes or
   queries, so no keychain fixture exists; `seed-report*.json` records the write results. The service name and account
   names come from the code (`quartermint.efb-212.faa-notam-api`, `client_id`, `client_secret`) and need a device check (D3).
+- `seed-report-small.json` has the runner's container path replaced by `<container>`; the zip keeps the raw report.

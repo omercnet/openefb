@@ -38,6 +38,12 @@ enum SeedDataHook {
     @MainActor
     static func runIfRequested(container: ModelContainer, defaults: UserDefaults = .standard) {
         guard let profile = defaults.string(forKey: seedKey) else { return }
+        guard profile == "small" || profile == "full" else {
+            log.error("Unknown -OpenEFBSeed profile: \(profile, privacy: .public) (use small or full)")
+            let message = "unknown profile '\(profile)'; use small or full".replacingOccurrences(of: "\"", with: "'")
+            try? "{\"error\": \"\(message)\"}".write(to: reportURL, atomically: true, encoding: .utf8)
+            return
+        }
         let trackPoints = profile == "small" ? 300 : 3_600
         do {
             try seedSwiftData(container.mainContext, trackPoints: trackPoints)
