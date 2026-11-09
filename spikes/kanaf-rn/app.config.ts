@@ -22,6 +22,16 @@ const withOnlyLocationAudioBackground: ConfigPlugin = (c) =>
     return mod;
   });
 
+// OTA updates (web/ota) are built in only when KANAF_OTA_URL is set; otherwise the app has no update config.
+//   KANAF_OTA_URL     manifest endpoint, e.g. https://ota.example.com/manifest
+//   KANAF_OTA_CERT    code-signing certificate path (required with the URL: an unsigned-updates build is never made)
+//   KANAF_OTA_CHANNEL channel header, default production
+//   KANAF_OTA_SMOKE   1 = allow cleartext HTTP (the CI smoke test talks to wrangler dev on localhost)
+const OTA_URL = process.env.KANAF_OTA_URL;
+const OTA_CERT = process.env.KANAF_OTA_CERT;
+if (OTA_URL && !OTA_CERT) throw new Error('KANAF_OTA_URL is set without KANAF_OTA_CERT: refusing to build unsigned updates');
+const OTA_SMOKE = process.env.KANAF_OTA_SMOKE === '1';
+
 export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioBackground({
   ...config,
   name: 'Kanaf RN Spike',
@@ -51,6 +61,16 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
     // microphone foreground-service type (API 34+) for background cockpit recording is added here.
     permissions: ['android.permission.FOREGROUND_SERVICE_MICROPHONE'],
   },
+  // A binary only receives updates built from the same native code (web/ota README: what needs a store release).
+  runtimeVersion: { policy: 'fingerprint' },
+  updates: OTA_URL ? {
+    url: OTA_URL,
+    enabled: true,
+    checkAutomatically: 'NEVER', // the ota screen drives the check, so the smoke scenario is deterministic
+    requestHeaders: { 'expo-channel-name': process.env.KANAF_OTA_CHANNEL ?? 'production' },
+    codeSigningCertificate: OTA_CERT,
+    codeSigningMetadata: { keyid: 'main', alg: 'rsa-v1_5-sha256' },
+  } : { enabled: false },
   web: { favicon: './assets/favicon.png' },
   plugins: [
     '@maplibre/maplibre-react-native',
@@ -75,8 +95,9 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
     ['expo-font', { fonts: FONTS }],
     ['expo-build-properties', {
       // compileSdk stays at the RN 0.88 default (37, react-native/gradle/libs.versions.toml); targetSdk pinned.
-      android: { targetSdkVersion: 36 },
+      android: { targetSdkVersion: 36, ...(OTA_SMOKE ? { usesCleartextTraffic: true } : {}) },
     }],
+    'expo-updates',
     'react-native-blob-util',
   ],
 });

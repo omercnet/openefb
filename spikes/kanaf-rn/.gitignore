@@ -5,3 +5,4 @@ android/
 dist/
 reports/out/
 assets/aviation.sqlite
+ota/
