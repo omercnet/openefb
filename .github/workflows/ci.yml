@@ -55,9 +55,9 @@ jobs:
         if: github.event_name == 'pull_request'
         run: tools/hooks/commit-msg.sh --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
       - name: Pre-commit checks over the whole tree, full-history secret scan
-        # The web jobs cover web/*; swift-format is report-only (about 4,400 known findings).
+        # The web jobs cover web/*, the app workflow covers app/; swift-format is report-only (about 4,400 known findings).
         env:
-          LEFTHOOK_EXCLUDE: web-interviews,web-relay,web-charts,web-ota,swift-format
+          LEFTHOOK_EXCLUDE: web-interviews,web-relay,web-charts,web-ota,app,swift-format
         run: tools/check.sh
 
   web:
