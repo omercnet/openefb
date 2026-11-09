@@ -3,11 +3,15 @@ name: RN spike
 # React Native feasibility spike (spikes/kanaf-rn): Release builds for the iPad simulator and an Android tablet
 # emulator, screenshots of each screen compared with the SwiftUI references, and the native self-test result.
 # Build-and-capture only: nothing is signed for distribution, published or deployed.
+# It also proves OTA updates (web/ota) end to end against `wrangler dev` on the runner (scripts/ota-smoke.sh): embedded
+# launch, signed update A, tampered update B refused, roll back to embedded, other channel ignored. The signing keys are
+# generated per run under /tmp and never leave the runner; nothing is deployed to Cloudflare.
 on:
   push:
     branches: [spike/react-native]
     paths:
       - spikes/kanaf-rn/**
+      - web/ota/**
       - .github/workflows/rn-spike.yml
   workflow_dispatch:
 
@@ -32,6 +36,14 @@ jobs:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
       DD: /tmp/rn-dd
       OUT: /tmp/rn-spike-ios
+      # OTA build config (spikes/kanaf-rn/app.config.ts): URL and certificate go into the binary, cleartext is allowed
+      # for this smoke build only, and the embedded bundle carries the mark "embedded". Exports use mark A and B.
+      KANAF_OTA_URL: http://127.0.0.1:8787/manifest
+      KANAF_OTA_CERT: ./ota/certificate.pem
+      KANAF_OTA_CHANNEL: ci
+      KANAF_OTA_SMOKE: '1'
+      EXPO_PUBLIC_OTA_MARK: embedded
+      KEYDIR: /tmp/ota-keys
     steps:
       - uses: actions/checkout@v7
       - name: Use the app's bundled aviation database (not committed in the spike)
@@ -42,6 +54,15 @@ jobs:
           cache: npm
           cache-dependency-path: spikes/kanaf-rn/package-lock.json
       - run: npm ci
+      - name: Generate ephemeral OTA signing keys (never committed)
+        run: |
+          for k in good bad; do
+            npx expo-updates codesigning:generate --key-output-directory "$KEYDIR/$k" \
+              --certificate-output-directory "$KEYDIR/$k-cert" --certificate-validity-duration-years 1 \
+              --certificate-common-name "Kanaf CI $k"
+          done
+          mkdir -p ota
+          cp "$KEYDIR/good-cert/certificate.pem" ota/certificate.pem
       - name: Prebuild (ios)
         run: npx expo prebuild -p ios --no-install --clean
       - name: Pod install
@@ -66,10 +87,38 @@ jobs:
             echo "--- simulated entitlements (__TEXT,__entitlements)"
             xcrun otool -X -s __TEXT __entitlements "$APP/KanafRNSpike" 2>&1 | head -40 || true
           } | tee "$OUT/signing.txt"
+      - name: OTA server, runtime version check and update exports
+        id: ota_prep
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT/ota"
+          # The binary holds the sentinel file:fingerprint; the real value is a file next to the app code.
+          BIN=$(cat "$DD/Build/Products/Release-iphonesimulator/KanafRNSpike.app/fingerprint" | tr -d '[:space:]')
+          RES=$(npx expo-updates runtimeversion:resolve --platform ios | jq -r .runtimeVersion)
+          echo "binary $BIN resolve $RES" | tee "$OUT/ota/runtime-version-check.txt"
+          test -n "$BIN" && test "$BIN" = "$RES"
+          echo "$BIN" > "$OUT/runtime-version.txt"
+          for m in A B; do
+            EXPO_PUBLIC_OTA_MARK=$m npx expo export --platform ios --output-dir "/tmp/ota-export-$m"
+            # extra.expoClient in the manifest (Constants.expoConfig on an OTA launch), as Expo's reference server does
+            npx expo config --json --type public > "/tmp/ota-export-$m/expoConfig.json"
+          done
+          npm --prefix ../../web/ota ci
+          cd ../../web/ota
+          nohup npx --no-install wrangler dev --port 8787 --ip 127.0.0.1 --local > "$OUT/ota/wrangler.log" 2>&1 &
+          for _ in $(seq 60); do curl -fs http://127.0.0.1:8787/health && exit 0; sleep 2; done
+          cat "$OUT/ota/wrangler.log"; exit 1
       - name: Capture screens and self test
         env:
           APP: /tmp/rn-dd/Build/Products/Release-iphonesimulator/KanafRNSpike.app
         run: scripts/ios-capture.sh
+      - name: OTA smoke (embedded, update, tampered update, rollback, other channel)
+        if: always() && steps.ota_prep.outcome == 'success'
+        env:
+          PLATFORM: ios
+          EXPORT_A: /tmp/ota-export-A
+          EXPORT_B: /tmp/ota-export-B
+        run: scripts/ota-smoke.sh
       - name: Compare with the SwiftUI references
         if: always()
         run: node scripts/compare.mjs --dir "$OUT/screens" --out "$OUT/compare" | tee "$OUT/compare.json"
@@ -92,6 +141,14 @@ jobs:
     timeout-minutes: 90
     env:
       OUT: /tmp/rn-spike-android
+      # OTA build config (spikes/kanaf-rn/app.config.ts): URL and certificate go into the binary, cleartext is allowed
+      # for this smoke build only, and the embedded bundle carries the mark "embedded". Exports use mark A and B.
+      KANAF_OTA_URL: http://127.0.0.1:8787/manifest
+      KANAF_OTA_CERT: ./ota/certificate.pem
+      KANAF_OTA_CHANNEL: ci
+      KANAF_OTA_SMOKE: '1'
+      EXPO_PUBLIC_OTA_MARK: embedded
+      KEYDIR: /tmp/ota-keys
     steps:
       - uses: actions/checkout@v7
       - name: Use the app's bundled aviation database (not committed in the spike)
@@ -106,6 +163,15 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      - name: Generate ephemeral OTA signing keys (never committed)
+        run: |
+          for k in good bad; do
+            npx expo-updates codesigning:generate --key-output-directory "$KEYDIR/$k" \
+              --certificate-output-directory "$KEYDIR/$k-cert" --certificate-validity-duration-years 1 \
+              --certificate-common-name "Kanaf CI $k"
+          done
+          mkdir -p ota
+          cp "$KEYDIR/good-cert/certificate.pem" ota/certificate.pem
       - name: Prebuild (android)
         run: npx expo prebuild -p android --no-install --clean
       - name: Build Release APK (signed with the template's debug keystore)
@@ -114,6 +180,26 @@ jobs:
           set -o pipefail
           mkdir -p "$OUT"
           ./gradlew assembleRelease --no-daemon 2>&1 | tee "$OUT/build.log"
+      - name: OTA server, runtime version check and update exports
+        id: ota_prep
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUT/ota"
+          # The binary holds the sentinel file:fingerprint; the real value is a file next to the app code.
+          BIN=$(unzip -p android/app/build/outputs/apk/release/app-release.apk assets/fingerprint | tr -d '[:space:]')
+          RES=$(npx expo-updates runtimeversion:resolve --platform android | jq -r .runtimeVersion)
+          echo "binary $BIN resolve $RES" | tee "$OUT/ota/runtime-version-check.txt"
+          test -n "$BIN" && test "$BIN" = "$RES"
+          echo "$BIN" > "$OUT/runtime-version.txt"
+          for m in A B; do
+            EXPO_PUBLIC_OTA_MARK=$m npx expo export --platform android --output-dir "/tmp/ota-export-$m"
+            npx expo config --json --type public > "/tmp/ota-export-$m/expoConfig.json"
+          done
+          npm --prefix ../../web/ota ci
+          cd ../../web/ota
+          nohup npx --no-install wrangler dev --port 8787 --ip 127.0.0.1 --local > "$OUT/ota/wrangler.log" 2>&1 &
+          for _ in $(seq 60); do curl -fs http://127.0.0.1:8787/health && exit 0; sleep 2; done
+          cat "$OUT/ota/wrangler.log"; exit 1
       - name: Enable KVM
         # As documented by reactivecircus/android-emulator-runner for Linux runners.
         working-directory: .
@@ -136,6 +222,27 @@ jobs:
           working-directory: spikes/kanaf-rn
           # The action runs each script line in its own shell, so all logic lives in the script.
           script: bash scripts/android-capture.sh
+      - name: OTA smoke (embedded, update, tampered update, rollback, other channel)
+        if: always() && steps.ota_prep.outcome == 'success'
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APK: ${{ github.workspace }}/spikes/kanaf-rn/android/app/build/outputs/apk/release/app-release.apk
+          PLATFORM: android
+          EXPORT_A: /tmp/ota-export-A
+          EXPORT_B: /tmp/ota-export-B
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_tablet
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-boot-anim -camera-back none -noaudio
+          working-directory: spikes/kanaf-rn
+          # One shell per line: the device reaches wrangler dev on the runner through the reverse tunnel.
+          script: |
+            adb wait-for-device
+            adb reverse tcp:8787 tcp:8787
+            bash scripts/ota-smoke.sh
       - name: Map symbols under another GPU mode (diagnostic)
         # Symbol layers did not draw under SwiftShader GLES in runs 1-2; the same APK on ANGLE-over-SwiftShader
         # (swangle) separates a renderer problem from an app problem. Map screen only.
