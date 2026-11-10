@@ -180,6 +180,24 @@ describe('Characterization: RecordingCoordinator stop path', () => {
   });
 });
 
+describe('startRecording rollback', () => {
+  // Not in Swift: startTracking cannot throw there; JS collaborators can reject.
+  test('startTracking rejection rolls state back and rethrows', async () => {
+    const { coordinator, tracker } = make();
+    const boom = new Error('tracker failed');
+    tracker.startTracking = async () => {
+      throw boom;
+    };
+    await expect(coordinator.startRecording()).rejects.toBe(boom);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+    expect(await coordinator.stopRecording()).toBeNull();
+    tracker.startTracking = async () => {};
+    await coordinator.startRecording();
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'recording' });
+    await coordinator.stopRecording();
+  });
+});
+
 describe('AutoStart (coordinator)', () => {
   test('cancelCountdownResetsToIdle', () => {
     const { coordinator } = make();
