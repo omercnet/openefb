@@ -117,3 +117,36 @@ export const WarningTriangle = ({ color, bang }: P & { bang: string }) => (
     <Circle cx={8} cy={11} r={1.05} fill={bang} />
   </Svg>
 );
+
+/** xmark (.footnote) */
+export const Xmark = ({ color, size = 13 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 13 13">
+    <Path d="M1.5 1.5L11.5 11.5M11.5 1.5L1.5 11.5" stroke={color} strokeWidth={1.7} {...line} />
+  </Svg>
+);
+
+/** xmark.circle.fill: a filled disc with the cross knocked out in `cross`. */
+export const XmarkCircleFill = ({ color, cross, size = 17 }: P & { cross: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 17 17">
+    <Circle cx={8.5} cy={8.5} r={8.5} fill={color} />
+    <Path d="M5.6 5.6L11.4 11.4M11.4 5.6L5.6 11.4" stroke={cross} strokeWidth={1.6} {...line} />
+  </Svg>
+);
+
+/** info.circle */
+export const InfoCircle = ({ color, size = 17 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 17 17">
+    <Circle cx={8.5} cy={8.5} r={7.6} stroke={color} strokeWidth={1.3} fill="none" />
+    <Circle cx={8.5} cy={5} r={0.95} fill={color} />
+    <Path d="M8.5 7.6V12.6" stroke={color} strokeWidth={1.5} {...line} />
+  </Svg>
+);
+
+/** exclamationmark.octagon.fill (.title3) */
+export const OctagonWarning = ({ color, bang, size = 20 }: P & { bang: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 20 20">
+    <Path d="M6.2 1H13.8L19 6.2V13.8L13.8 19H6.2L1 13.8V6.2Z" fill={color} />
+    <Path d="M10 5.4V11" stroke={bang} strokeWidth={1.8} {...line} />
+    <Circle cx={10} cy={14} r={1.1} fill={bang} />
+  </Svg>
+);

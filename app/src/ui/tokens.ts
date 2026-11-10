@@ -94,7 +94,33 @@ export type Theme = {
   /** Color.primary / Color.secondary (iOS label / secondaryLabel). */
   primaryText: string;
   secondaryText: string;
+  /** Palette.onWarning: text on a warning fill. */
+  onWarning: string;
+  /** Palette.cautionFill (Color.orange). */
+  cautionFill: string;
+  /** Palette.northMarker. */
+  northMarker: string;
+  /** Palette.fill: Color.secondary.opacity(0.12), i.e. 0.12 x the 0.6 secondaryLabel alpha. */
+  fill: string;
+  /** Palette.routeLine (map route line; the strip uses `route`). */
+  routeLine: string;
+  /** Palette.infoFill: accent at 15% (day) / 35% (night). */
+  infoFill: string;
+  categoryLIFR: string;
+  /** Map layer toggle tints (Palette.layer*), >= 3:1 against the panel material. */
+  layerSectional: string;
+  layerAirports: string;
+  layerAirspace: string;
+  layerAdvisory: string;
+  layerWeather: string;
+  layerDiagrams: string;
 };
+
+/** Palette.accent under Increase Contrast (day only). */
+export const AccentDayHighContrast = '#0C4091';
+
+/** MapControlMetrics: square map control buttons. */
+export const MapControlMetrics = { size: 60, cornerRadius: Radius.l } as const;
 
 export const Day: Theme = {
   night: false,
@@ -114,6 +140,19 @@ export const Day: Theme = {
   categoryMVFR: '#007AFF', // systemBlue
   primaryText: '#000000',
   secondaryText: 'rgba(60,60,67,0.6)',
+  onWarning: '#FFFFFF',
+  cautionFill: '#FF9500', // systemOrange, light
+  northMarker: '#FF9F94',
+  fill: 'rgba(60,60,67,0.072)',
+  routeLine: '#D100D1',
+  infoFill: 'rgba(21,86,184,0.15)',
+  categoryLIFR: '#CC00CC',
+  layerSectional: '#007AFF', // systemBlue
+  layerAirports: '#006E8C',
+  layerAirspace: '#B45800',
+  layerAdvisory: '#963CC8',
+  layerWeather: '#147832',
+  layerDiagrams: '#007882',
 };
 
 export const Night: Theme = {
@@ -134,4 +173,17 @@ export const Night: Theme = {
   categoryMVFR: '#8FB5E0',
   primaryText: '#FFFFFF',
   secondaryText: 'rgba(235,235,245,0.6)',
+  onWarning: '#000000',
+  cautionFill: '#FF9F0A', // systemOrange, dark
+  northMarker: '#FF8F86',
+  fill: 'rgba(235,235,245,0.072)',
+  routeLine: '#F26BF2',
+  infoFill: 'rgba(46,74,110,0.35)',
+  categoryLIFR: '#E673E6',
+  layerSectional: '#4678BE',
+  layerAirports: '#64D2FF', // systemCyan, dark
+  layerAirspace: '#FF9F0A', // systemOrange, dark
+  layerAdvisory: '#BF5AF2', // systemPurple, dark
+  layerWeather: '#30D158', // systemGreen, dark
+  layerDiagrams: '#6AC4DC', // systemTeal, dark
 };
