@@ -26,8 +26,10 @@ jobs:
     name: Changed areas
     # Decides whether the Swift app's macOS jobs must run. A pull request whose every changed file is under app/
     # (the React Native app), docs/, web/ or tools/port/, or is app.yml, cannot change the Swift build or its scenario
-    # runs, so unit-tests, simulation and build-release-xcode are skipped. Pushes to main and manual runs always run
-    # everything; an empty or failed diff runs everything too.
+    # runs, so unit-tests, simulation and build-release-xcode are skipped. Exception: files the Swift tests read
+    # (SWIFT_INPUTS; keep it in sync when a Swift test starts reading another file from those trees) always run them.
+    # Renames count both paths (--no-renames). Pushes to main and manual runs always run everything; an empty or
+    # failed diff runs everything too.
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -45,8 +47,12 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           if [ "$EVENT" != pull_request ]; then echo swift=true >> "$GITHUB_OUTPUT"; exit 0; fi
-          files=$(git diff --name-only "$BASE...$HEAD")
+          # Files under the skip-eligible trees that efb-212Tests reads (RemoteConfigTests, IsraelNotamServiceTests).
+          SWIFT_INPUTS='^(web/notam-relay/config/|docs/research/israel-cvfr-samples/)'
+          files=$(git diff --no-renames --name-only "$BASE...$HEAD")
           other=$(printf '%s\n' "$files" | grep -v -E '^(app/|docs/|web/|tools/port/|\.github/workflows/app\.yml$)' || true)
+          inputs=$(printf '%s\n' "$files" | grep -E "$SWIFT_INPUTS" || true)
+          other=$(printf '%s\n%s\n' "$other" "$inputs" | sed '/^$/d')
           if [ -n "$files" ] && [ -z "$other" ]; then swift=false; else swift=true; fi
           echo "swift=$swift"
           printf 'files that may affect the Swift app:\n%s\n' "${other:-(none)}"
