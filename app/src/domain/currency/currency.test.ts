@@ -29,6 +29,20 @@ describe('CurrencyService Tests', () => {
     expect(medicalStatus(addDays(30), NOW)).toBe('warning');
   });
 
+  // Owner decision 2026-11-10: expired as soon as the expiry time has passed (not in Swift).
+  test('medicalWarningJustBeforeExpiry', () => {
+    expect(medicalStatus(NOW + 1, NOW)).toBe('warning');
+  });
+  test('medicalWarningExactlyAtExpiry', () => {
+    expect(medicalStatus(NOW, NOW)).toBe('warning');
+  });
+  test('medicalExpiredOneMillisecondAfterExpiry', () => {
+    expect(medicalStatus(NOW - 1, NOW)).toBe('expired');
+  });
+  test('medicalExpiredOneHourAfterExpiry', () => {
+    expect(medicalStatus(NOW - 3_600_000, NOW)).toBe('expired');
+  });
+
   // Flight Review Status (FAR 61.56)
   test('flightReviewCurrentWhenRecent', () => {
     expect(flightReviewStatus(addMonths(-12), NOW)).toBe('current');

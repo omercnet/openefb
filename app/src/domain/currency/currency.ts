@@ -26,9 +26,10 @@ function addMonths(epochMs: number, months: number): number {
 /** > 30 days remaining = current, 0..30 = warning, past or missing = expired. */
 export function medicalStatus(expiryDate: number | null | undefined, now: number): CurrencyStatus {
   if (expiryDate == null) return 'expired';
-  // dateComponents([.day]) yields whole days, truncated toward zero.
+  // Owner decision 2026-11-10 (differs from Swift): once the expiry instant has passed it is expired at once.
+  // Swift truncated the day count toward zero, so 0-24 h past expiry read warning.
+  if (expiryDate < now) return 'expired';
   const daysRemaining = Math.trunc((expiryDate - now) / DAY_MS);
-  if (daysRemaining < 0) return 'expired';
   if (daysRemaining <= 30) return 'warning';
   return 'current';
 }
