@@ -7,3 +7,4 @@ export * from './freshness';
 export * from './metarVisibility';
 export * from './tileFailureTracker';
 export * from './tafValidity';
+export * from './errorInfo';
