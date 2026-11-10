@@ -1,8 +1,9 @@
 name: CI
 
 # Every change to main goes through a pull request; these jobs are its required checks (see docs/CI.md).
-# The repo is public, so GitHub-hosted macOS minutes are free. No path filters: a skipped required check
-# never reports and would block the pull request.
+# The repo is public, so GitHub-hosted macOS minutes are free, but hosted macOS runners are scarce. No workflow path
+# filters (a skipped required check never reports and would block the pull request); instead the `changes` job skips
+# the Swift app's macOS jobs on pull requests that cannot affect it, and the gate accepts exactly that skip.
 on:
   pull_request:
   push:
@@ -21,6 +22,36 @@ env:
   DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
 
 jobs:
+  changes:
+    name: Changed areas
+    # Decides whether the Swift app's macOS jobs must run. A pull request whose every changed file is under app/
+    # (the React Native app), docs/, web/ or tools/port/, or is app.yml, cannot change the Swift build or its scenario
+    # runs, so unit-tests, simulation and build-release-xcode are skipped. Pushes to main and manual runs always run
+    # everything; an empty or failed diff runs everything too.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      swift: ${{ steps.diff.outputs.swift }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0 # the diff needs the base and head commits
+      - id: diff
+        name: Does the change touch the Swift app?
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then echo swift=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(git diff --name-only "$BASE...$HEAD")
+          other=$(printf '%s\n' "$files" | grep -v -E '^(app/|docs/|web/|tools/port/|\.github/workflows/app\.yml$)' || true)
+          if [ -n "$files" ] && [ -z "$other" ]; then swift=false; else swift=true; fi
+          echo "swift=$swift"
+          printf 'files that may affect the Swift app:\n%s\n' "${other:-(none)}"
+          echo "swift=$swift" >> "$GITHUB_OUTPUT"
+
   lint:
     name: Lint and secrets
     runs-on: ubuntu-latest
@@ -112,6 +143,8 @@ jobs:
 
   unit-tests:
     name: Unit tests (iPad simulator)
+    needs: changes
+    if: needs.changes.outputs.swift == 'true'
     # GitHub-hosted macos-latest while the self-hosted Tart runners (label `tartelet`) are offline, with the image's
     # default Xcode (26.6 on macOS 26), so a move of the label to a newer image doesn't break the path.
     # To go back: runs-on fork PRs -> 'macos-26', else ["self-hosted", "macOS", "ARM64", "tartelet"] with
@@ -144,6 +177,8 @@ jobs:
 
   simulation:
     name: Flight scenarios (iPad simulator)
+    needs: changes
+    if: needs.changes.outputs.swift == 'true'
     # GitHub-hosted macos-latest while the Tart runners are offline; see the unit-tests job.
     runs-on: macos-latest
     timeout-minutes: 60
@@ -177,14 +212,15 @@ jobs:
           path: ${{ runner.temp }}/scenarios
           retention-days: 7
 
-  # The one required check: it passes only when every job above passed, so job names can change
-  # without touching the branch ruleset.
   # Advisory: the PR jobs above build with Xcode 27.2 (the Tart image has no 26.6), while release.yml archives with
   # 26.6. This compiles the app and tests with 26.6 on a hosted runner so a 26.6-only error shows before a release.
   # Not in the gate: hosted macOS capacity runs out, and a cancelled job must not block merges.
   build-release-xcode:
     name: Build with the release Xcode (26.6, advisory)
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: changes
+    if: >-
+      needs.changes.outputs.swift == 'true' &&
+      (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: macos-26
     timeout-minutes: 30
     env:
@@ -200,15 +236,25 @@ jobs:
           set -o pipefail
           tools/sim-test.sh build 2>&1 | xcbeautify --renderer github-actions
 
+  # The one required check: it passes only when every job above passed (the Swift jobs may also be skipped when
+  # `changes` says the pull request cannot affect the Swift app), so job names can change without touching the
+  # branch ruleset.
   gate:
     name: CI gate
     if: always()
-    needs: [lint, web, app, unit-tests, simulation]
+    needs: [changes, lint, web, app, unit-tests, simulation]
     runs-on: ubuntu-latest
     steps:
       - name: Require every job to pass
         env:
-          RESULTS: ${{ join(needs.*.result, ' ') }}
+          SWIFT: ${{ needs.changes.outputs.swift }}
+          REQUIRED: ${{ needs.changes.result }} ${{ needs.lint.result }} ${{ needs.web.result }} ${{ needs.app.result }}
+          SWIFT_JOBS: ${{ needs.unit-tests.result }} ${{ needs.simulation.result }}
         run: |
-          echo "results: $RESULTS"
-          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
+          echo "required: $REQUIRED; Swift jobs: $SWIFT_JOBS (swift=$SWIFT)"
+          for r in $REQUIRED; do [ "$r" = success ] || exit 1; done
+          for r in $SWIFT_JOBS; do
+            [ "$r" = success ] && continue
+            [ "$SWIFT" = false ] && [ "$r" = skipped ] && continue
+            exit 1
+          done
