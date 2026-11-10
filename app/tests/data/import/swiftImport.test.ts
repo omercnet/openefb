@@ -310,7 +310,7 @@ function fakeSecrets(initial: Record<string, string>) {
       expect(service).toBe(LEGACY_NOTAM_SERVICE);
       return legacy.get(account) ?? null;
     },
-    async delete(service, account) {
+    async remove(service, account) {
       expect(service).toBe(LEGACY_NOTAM_SERVICE);
       calls.push(`delete ${account}`);
       legacy.delete(account);
@@ -324,6 +324,9 @@ function fakeSecrets(initial: Record<string, string>) {
       calls.push(`set ${key}`);
       store.set(key, value);
     },
+    async remove(key) {
+      store.delete(key);
+    },
   };
   return { legacy, store, calls, reader, secretStore };
 }
@@ -333,15 +336,10 @@ describe('keychain step', () => {
     const f = fakeSecrets({ client_id: 'id-1', client_secret: 'secret-1' });
     const r = await importKeychain(f.reader, f.secretStore);
     expect(r).toEqual({ moved: ['client_id', 'client_secret'], absent: [], failed: [] });
-    expect(f.store.get('faa-notam.client_id')).toBe('id-1');
-    expect(f.store.get('faa-notam.client_secret')).toBe('secret-1');
+    expect(f.store.get('client_id')).toBe('id-1');
+    expect(f.store.get('client_secret')).toBe('secret-1');
     expect(f.legacy.size).toBe(0);
-    expect(f.calls).toEqual([
-      'set faa-notam.client_id',
-      'delete client_id',
-      'set faa-notam.client_secret',
-      'delete client_secret',
-    ]);
+    expect(f.calls).toEqual(['set client_id', 'delete client_id', 'set client_secret', 'delete client_secret']);
   });
   it('reports absent items and is idempotent', async () => {
     const f = fakeSecrets({ client_id: 'id-1' });
@@ -363,9 +361,9 @@ describe('keychain step', () => {
   });
   it('does not overwrite a value the user already entered in the new app', async () => {
     const f = fakeSecrets({ client_id: 'old' });
-    f.store.set('faa-notam.client_id', 'typed-by-user');
+    f.store.set('client_id', 'typed-by-user');
     await importKeychain(f.reader, f.secretStore);
-    expect(f.store.get('faa-notam.client_id')).toBe('typed-by-user');
+    expect(f.store.get('client_id')).toBe('typed-by-user');
     expect(f.legacy.has('client_id')).toBe(false);
   });
 });

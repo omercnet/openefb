@@ -10,18 +10,21 @@ export interface LegacySecretReader {
   /** The UTF-8 string of the generic-password item, or null when absent. */
   read(service: string, account: string): Promise<string | null>;
   /** Deletes the item; a missing item is not an error. */
-  delete(service: string, account: string): Promise<void>;
+  remove(service: string, account: string): Promise<void>;
 }
 export interface SecretStore {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
+  remove(key: string): Promise<void>;
 }
 
+// These values mirror NOTAM_SECRET_SERVICE, NOTAM_CLIENT_ID_KEY and NOTAM_CLIENT_SECRET_KEY exported by
+// src/domain/ports/secretStore.ts (PR #27); replace them with those imports once it merges.
 export const LEGACY_NOTAM_SERVICE = 'quartermint.efb-212.faa-notam-api';
-/** Swift account name -> SecretStore key. The new key names are a proposal; align with the NOTAM adapter. */
+/** Swift account name -> SecretStore key. The new keys keep the Swift account names. */
 export const LEGACY_SECRETS: readonly { account: string; key: string }[] = [
-  { account: 'client_id', key: 'faa-notam.client_id' },
-  { account: 'client_secret', key: 'faa-notam.client_secret' },
+  { account: 'client_id', key: 'client_id' },
+  { account: 'client_secret', key: 'client_secret' },
 ];
 
 export interface KeychainResult {
@@ -48,7 +51,7 @@ export async function importKeychain(legacy: LegacySecretReader, store: SecretSt
         await store.set(key, value);
         if ((await store.get(key)) !== value) throw new Error('read-back mismatch');
       }
-      await legacy.delete(LEGACY_NOTAM_SERVICE, account);
+      await legacy.remove(LEGACY_NOTAM_SERVICE, account);
       result.moved.push(account);
     } catch {
       result.failed.push(account);
