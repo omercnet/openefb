@@ -315,8 +315,12 @@ test('the report window reaches the passage through the loader', async () => {
   const widened = await loadCVFRDebrief(flightID, recording, network, 300);
   expect(widened).not.toBeNull();
   expect(widened!.points.find((p) => p.code === 'TAVOR')?.reported).toBe(true);
-  // A flight outside Israel gets no CVFR debrief.
+  // A flight with no track gets no CVFR debrief.
   expect(await loadCVFRDebrief('other-flight', recording, network)).toBeNull();
+  // A flight whose first fix is outside the Israel box (US coordinates) gets none either.
+  const usTrack = f.track.map((p) => ({ ...p, latitude: 37.46, longitude: -122.12 }));
+  const usRecording = { ...recording, trackPoints: async () => usTrack };
+  expect(await loadCVFRDebrief(flightID, usRecording, network)).toBeNull();
 });
 
 // MARK: Hebrew and English text

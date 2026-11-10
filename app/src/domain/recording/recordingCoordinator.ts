@@ -169,7 +169,16 @@ export class RecordingCoordinator {
       onWriteFailure: () => this.handleTrackFailure('trackWriteFailed'),
       onStreamFailure: () => this.handleTrackFailure('trackStreamFailed'),
     });
-    await tracker.startTracking();
+    try {
+      await tracker.startTracking();
+    } catch (error) {
+      // JS-only guard (Swift's startTracking does not throw): roll back so the coordinator is not stuck in recording.
+      this.trackRecorder = null;
+      this.currentFlightID = null;
+      this.recordingStartDate = null;
+      this.state.set({ recordingStatus: idleStatus });
+      throw error;
+    }
 
     const audioURL = this.audioFileURL(flightID);
 
@@ -349,8 +358,13 @@ export class RecordingCoordinator {
 
   /** Audio stopped itself mid-recording: keep the track, stop transcription, surface the error. */
   private async handleAudioFailure(error: unknown): Promise<void> {
-    await this.transcription.stopTranscription();
+    // Surface the error first so a failing stopTranscription cannot hide it.
     this.state.set({ lastError: asAppError(error), audioLevel: -160 });
+    try {
+      await this.transcription.stopTranscription();
+    } catch {
+      // The audio error is already surfaced; nothing more to do.
+    }
   }
 
   /** The track recorder lost points or its stream. Recording continues but the pilot must know. */
