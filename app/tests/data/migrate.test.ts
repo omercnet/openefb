@@ -8,16 +8,18 @@ const tableNames = async (db: ReturnType<typeof openNodeSqliteDb>) =>
   );
 
 describe('schema migrations', () => {
-  it('creates exactly the six SchemaV1 tables on a fresh database and records the version', async () => {
+  it('creates the six SchemaV1 tables plus the import tables on a fresh database and records the version', async () => {
     const db = openNodeSqliteDb();
     expect(await currentVersion(db)).toBe(0);
     expect(await migrate(db)).toBe(LATEST_VERSION);
     expect(await currentVersion(db)).toBe(LATEST_VERSION);
     expect(await tableNames(db)).toEqual([
       'aircraft_profile',
+      'app_preferences',
       'flight_plan_record',
       'flight_record',
       'logbook_entry',
+      'migration_state',
       'pilot_profile',
       'user_settings',
     ]);
@@ -35,13 +37,23 @@ describe('schema migrations', () => {
     expect(await db.all('SELECT name FROM pilot_profile')).toEqual([{ name: 'Test Pilot' }]);
   });
 
+  it('upgrades a v1 database to v2 and keeps its rows', async () => {
+    const db = openNodeSqliteDb();
+    await migrate(db, migrations.slice(0, 1));
+    expect(await currentVersion(db)).toBe(1);
+    await db.run("INSERT INTO flight_record (id, start_date, created_at) VALUES ('f1', 5, 5)");
+    expect(await migrate(db)).toBe(LATEST_VERSION);
+    expect(await db.all('SELECT id FROM flight_record')).toEqual([{ id: 'f1' }]);
+    expect(await db.all('SELECT * FROM migration_state')).toEqual([]);
+  });
+
   it('upgrades a v1 database through a later migration and keeps its rows', async () => {
     const db = openNodeSqliteDb();
     await migrate(db);
     await db.run("INSERT INTO aircraft_profile (id, n_number, created_at) VALUES ('a1', 'N12345', 1)");
-    const v2: Migration = { version: 2, name: 'add_color', sql: 'ALTER TABLE aircraft_profile ADD COLUMN color TEXT;' };
-    expect(await migrate(db, [...migrations, v2])).toBe(2);
-    expect(await currentVersion(db)).toBe(2);
+    const v2: Migration = { version: 3, name: 'add_color', sql: 'ALTER TABLE aircraft_profile ADD COLUMN color TEXT;' };
+    expect(await migrate(db, [...migrations, v2])).toBe(3);
+    expect(await currentVersion(db)).toBe(3);
     expect(await db.get('SELECT n_number, color FROM aircraft_profile')).toEqual({ n_number: 'N12345', color: null });
   });
 
@@ -49,12 +61,12 @@ describe('schema migrations', () => {
     const db = openNodeSqliteDb();
     await migrate(db);
     const bad: Migration = {
-      version: 2,
+      version: 3,
       name: 'bad',
       sql: 'ALTER TABLE aircraft_profile ADD COLUMN color TEXT; ALTER TABLE no_such_table ADD COLUMN x TEXT;',
     };
     await expect(migrate(db, [...migrations, bad])).rejects.toThrow();
-    expect(await currentVersion(db)).toBe(1);
+    expect(await currentVersion(db)).toBe(LATEST_VERSION);
     const cols = await db.all<{ name: string }>('PRAGMA table_info(aircraft_profile)');
     expect(cols.map((c) => c.name)).not.toContain('color');
   });
