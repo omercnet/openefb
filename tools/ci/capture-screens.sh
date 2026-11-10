@@ -57,11 +57,24 @@ app_running() {
   return 2
 }
 
+# boot <sim>: up to three attempts. On hosted runners the second simulator sometimes never finishes booting; a
+# shutdown and erase (it holds nothing but the app prepare installs) before the next attempt clears that.
+boot() {
+  local sim=$1 try
+  for try in 1 2 3; do
+    xcrun simctl boot "$sim" 2>/dev/null || true
+    limited 300 xcrun simctl bootstatus "$sim" -b >/dev/null && return 0
+    echo "capture-screens: simulator $sim did not boot (attempt $try of 3)" >&2
+    xcrun simctl shutdown "$sim" 2>/dev/null || true
+    if [ "$try" -lt 3 ]; then xcrun simctl erase "$sim" 2>/dev/null || true; fi
+  done
+  return 1
+}
+
 # prepare <sim>: boot, install the built app, grant location, clear the simulator's GPS (the scenario replaces it).
 prepare() {
   local sim=$1
-  xcrun simctl boot "$sim" 2>/dev/null || true
-  limited 300 xcrun simctl bootstatus "$sim" -b >/dev/null || { echo "capture-screens: simulator $sim did not boot" >&2; exit 1; }
+  boot "$sim" || { echo "capture-screens: simulator $sim did not boot" >&2; exit 1; }
   limited 300 xcrun simctl install "$sim" "$APP" || { echo "capture-screens: install on $sim failed" >&2; exit 1; }
   xcrun simctl privacy "$sim" grant location-always "$BUNDLE" || true
   xcrun simctl location "$sim" clear 2>/dev/null || true
@@ -135,6 +148,8 @@ shot "$IPAD" ipad il-map-day il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -O
 shot "$IPAD" ipad il-map-predictions il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -showsPredictions YES
 echo "::endgroup::"
 
+# The iPad is done: shut it down so the iPhone boots on a runner with only one simulator running.
+xcrun simctl shutdown "$IPAD" 2>/dev/null || true
 echo "::group::iPhone"
 IPHONE=$(SIM_DEVICE="iPhone 17 Pro" SIM_TAG="${SIM_TAG:+$SIM_TAG-}iphone17pro-screens" tools/sim-test.sh id)
 stamp "iPhone simulator $IPHONE"
