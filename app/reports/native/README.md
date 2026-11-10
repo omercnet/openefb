@@ -210,3 +210,7 @@ secureStore, pdf, speech PASS; location FAIL (0 updates); symbol layers missing 
 `node scripts/compare.mjs <shot.png> [reference.png] [--out dir]` or `--dir <screens>`: resizes both images to 1032x1376,
 scores the left 400 pt strip and the whole frame (SSIM via ssim.js, differing-pixel share via pixelmatch at threshold 0.1),
 prints JSON and writes `<name>-side-by-side.png` and `<name>-diff.png` (default `reports/out/compare`, gitignored).
+`--gate ios|android` turns it into the CI fidelity gate: the strip SSIM of each screen listed in `scripts/fidelity-thresholds.json`
+for that platform must reach its floor (`interim` if present, else `min`), a listed screen that was not captured fails, and the
+exit code is 1 on any failure. `--json <file>` saves the results with the verdicts. Floors: iOS 0.90 map and night, 0.85 airport
+(interim 0.65 until U2); Android 0.85 map and night, 0.80 airport (owner decision, plan section 10).

@@ -1,0 +1,18 @@
+{
+  "_doc": "Minimum SSIM of the leading 400 pt strip (compare.mjs result.strip.ssim) per platform and screen. Plan 5.4 and section 10 (Q9): iOS 0.90 map-heavy / 0.85 text-heavy; Android 0.85 map / 0.80 text (owner decision). 'interim' lowers a floor below the target while a known gap is open; the gate uses interim when present. Ratchet up, never down, except by an explicit interim entry with a reason.",
+  "metric": "strip.ssim",
+  "ios": {
+    "map": { "min": 0.9 },
+    "night": { "min": 0.9 },
+    "airport": {
+      "min": 0.85,
+      "interim": 0.65,
+      "reason": "U2: airport column row drift, measured 0.67-0.72 on iOS (reports/ui/README.md)"
+    }
+  },
+  "android": {
+    "map": { "min": 0.85 },
+    "night": { "min": 0.85 },
+    "airport": { "min": 0.8 }
+  }
+}
