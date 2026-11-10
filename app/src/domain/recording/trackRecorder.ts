@@ -115,7 +115,7 @@ export class TrackRecorder {
       { activity: 'airborne', background: true },
       {
         onUpdate: (u) => {
-          if (u.fix) this.enqueue(u.fix);
+          if (u.fix) this.enqueue(u.fix).catch(() => undefined);
         },
         onError: (error) => {
           if (!this.subscription) return;
@@ -152,8 +152,9 @@ export class TrackRecorder {
 
   /** Queue a fix behind those already queued. Resolves when it has been ingested. */
   enqueue(fix: LocationFix): Promise<void> {
-    this.queue = this.queue.then(() => this.ingest(fix));
-    return this.queue;
+    const result = this.queue.then(() => this.ingest(fix));
+    this.queue = result.catch(() => undefined); // one failed fix must not stall the fixes behind it
+    return result;
   }
 
   /** Process one fix: convert, estimate VSI, store the point, advance the phase detector. */

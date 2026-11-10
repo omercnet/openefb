@@ -133,7 +133,7 @@ describe('createLocationSource', () => {
     expect(l.onError).toHaveBeenCalledWith(new Error('kCLErrorDomain 1'));
   });
 
-  it('a stop before the watch resolves removes it', async () => {
+  it('a stop before the permission check finishes never starts the watch', async () => {
     const remove = jest.fn();
     Location.watchPositionAsync.mockResolvedValue({ remove });
     const sub = adapter
@@ -143,6 +143,21 @@ describe('createLocationSource', () => {
     await flush();
     expect(Location.watchPositionAsync).not.toHaveBeenCalled();
     expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('a stop while the watch is being created removes it once it resolves', async () => {
+    const remove = jest.fn();
+    let resolveWatch: (sub: { remove: () => void }) => void = () => undefined;
+    Location.watchPositionAsync.mockReturnValue(new Promise((r) => (resolveWatch = r)) as never);
+    const sub = adapter
+      .createLocationSource()
+      .subscribe({ activity: 'otherNavigation', background: false }, listener());
+    await flush();
+    expect(Location.watchPositionAsync).toHaveBeenCalled();
+    sub.stop();
+    resolveWatch({ remove });
+    await flush();
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 
   it('reports Location Services off as denied globally and does not start', async () => {

@@ -83,11 +83,13 @@ export class AudioRecorderSession implements AudioRecorder {
   start(flightId: string, profile: AudioQualityProfile, outputUri: string): Promise<void> {
     return this.serial(async () => {
       if (this.options.audioDisabled) throw noAudioInputFailure();
+      if (this.recording) return; // already recording: do not begin a second capture over the first
       try {
         await this.driver.prepareOutput(outputUri);
         await this.driver.activateSession(profile);
         await this.driver.begin(flightId, profile, outputUri);
       } catch (error) {
+        await this.deactivate(); // do not leave the recording session active after a failed start
         throw error instanceof AppFailure ? error : new AppFailure({ kind: 'audioSessionFailed', cause: error });
       }
       this.outputUri = outputUri;

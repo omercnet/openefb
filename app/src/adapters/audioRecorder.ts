@@ -174,10 +174,12 @@ export class ExpoCaptureDriver implements AudioCaptureDriver {
     this.outputUri = null;
     this.capturing = false;
     if (!recorder) return null;
-    let staged: string | null = null;
+    let staged: string | null = recorder.uri; // keep the staged location even if stop() rejects
     try {
       await recorder.stop();
-      staged = recorder.uri;
+      staged = recorder.uri ?? staged;
+    } catch (error) {
+      this.options.log?.('audio stop failed; keeping staged file', error);
     } finally {
       recorder.release();
     }

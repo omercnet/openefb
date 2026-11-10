@@ -250,7 +250,7 @@ describe('createAudioRecorder on expo-audio', () => {
     expect(recorder.isRecording()).toBe(false);
   });
 
-  it('stop finalises, mockMoves the staged file to the output URI and releases everything', async () => {
+  it('stop finalises, moves the staged file to the output URI and releases everything', async () => {
     const { recorder } = started();
     await recorder.start('f1', 'standard', OUT);
     const [r] = mockRecorders;

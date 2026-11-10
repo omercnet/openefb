@@ -307,3 +307,20 @@ describe('level', () => {
     expect(session.audioLevel()).toBe(0);
   });
 });
+
+describe('AudioRecorderSession start guards', () => {
+  it('a failed begin deactivates the audio session again', async () => {
+    const { driver, session } = setup();
+    driver.beginError = new Error('no input');
+    await expect(session.start('F1', 'standard', OUT)).rejects.toBeDefined();
+    expect(driver.calls).toContain('deactivate');
+    expect(session.isRecording()).toBe(false);
+  });
+
+  it('start while already recording does not begin a second capture', async () => {
+    const { driver, session } = await recording();
+    await session.start('F2', 'standard', OUT);
+    expect(driver.calls).toEqual([]);
+    expect(session.isRecording()).toBe(true);
+  });
+});
