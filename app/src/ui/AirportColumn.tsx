@@ -157,11 +157,15 @@ function Chip({ icon, text }: { icon: ReactNode; text: string }) {
   );
 }
 
-/** Label column beside a value, first-baseline aligned. */
+/**
+ * Label column beside a value, first-baseline aligned. The height is the value's line height (Plex Mono 15: 19.5):
+ * iOS baseline alignment otherwise made every row 20 pt, 0.5 pt per row of drift (12 pt down the column, SSIM 0.72;
+ * the reference pitch is 27.5 pt = 19.5 + the 8 pt gap).
+ */
 function Row({ label, spoken, value, children }: { label: string; spoken: string; value: string; children: ReactNode }) {
   const t = useTheme();
   return (
-    <View accessible accessibilityLabel={spoken} accessibilityValue={{ text: value }} style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m }}>
+    <View accessible accessibilityLabel={spoken} accessibilityValue={{ text: value }} style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m, height: Type.data.lineHeight }}>
       <Text style={[Type.label, { color: t.inkSecondary, minWidth: LABEL_COLUMN }]}>{label}</Text>
       {children}
     </View>
