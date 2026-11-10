@@ -58,7 +58,9 @@ app_running() {
 }
 
 # boot <sim>: up to three attempts. On hosted runners the second simulator sometimes never finishes booting; a
-# shutdown and erase (it holds nothing but the app prepare installs) before the next attempt clears that.
+# shutdown before the next attempt clears that. Only on a CI runner (GITHUB_ACTIONS=true), where the simulator is
+# disposable and holds nothing but the app prepare installs, is it also erased; a local run reuses the worktree's
+# simulator (downloaded maps, settings), so it is never erased there.
 boot() {
   local sim=$1 try
   for try in 1 2 3; do
@@ -66,7 +68,7 @@ boot() {
     limited 300 xcrun simctl bootstatus "$sim" -b >/dev/null && return 0
     echo "capture-screens: simulator $sim did not boot (attempt $try of 3)" >&2
     xcrun simctl shutdown "$sim" 2>/dev/null || true
-    if [ "$try" -lt 3 ]; then xcrun simctl erase "$sim" 2>/dev/null || true; fi
+    if [ "$try" -lt 3 ] && [ "${GITHUB_ACTIONS:-}" = true ]; then xcrun simctl erase "$sim" 2>/dev/null || true; fi
   done
   return 1
 }
