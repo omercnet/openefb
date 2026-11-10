@@ -112,7 +112,7 @@ export interface LogbookRepository extends Repository<LogbookEntry> {
 }
 export function logbookRepository(db: Db): LogbookRepository {
   const base = makeRepository<LogbookEntry>(db, 'logbook_entry', logbookFields, 'date DESC, rowid');
-  return { ...base, byFlightId: async (flightID) => (await base.list()).filter((e) => e.flightID === flightID) };
+  return { ...base, byFlightId: (flightID) => base.listWhere('flight_id', flightID) };
 }
 
 const settingsColumns = [

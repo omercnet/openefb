@@ -28,7 +28,8 @@ function fakeExpoSqlite(): SQLiteDatabase {
         sqlite.exec('COMMIT');
       } catch (e) {
         sqlite.exec('ROLLBACK');
-        throw e;
+        // expo-sqlite rolls back but does not rethrow a falsy rejection; the fake mirrors that.
+        if (e) throw e;
       }
     },
   };
@@ -46,5 +47,22 @@ describe('expo-sqlite adapter specifics', () => {
   it('returns the value the transaction body resolves', async () => {
     const db = expoSqliteDb(fakeExpoSqlite());
     expect(await db.transaction(async () => 42)).toBe(42);
+  });
+
+  it.each([undefined, null, 0, ''])('rethrows a falsy rejection (%j) and rolls back', async (reason) => {
+    const sqlite = fakeExpoSqlite();
+    const db = expoSqliteDb(sqlite);
+    await db.run('CREATE TABLE t (id INTEGER PRIMARY KEY)');
+    let caught: unknown = 'not thrown';
+    try {
+      await db.transaction(async (tx) => {
+        await tx.run('INSERT INTO t DEFAULT VALUES');
+        throw reason;
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBe(reason);
+    expect(await db.all('SELECT * FROM t')).toEqual([]);
   });
 });

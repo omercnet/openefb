@@ -2,7 +2,7 @@
 export type Clock = () => number;
 export type IdGenerator = () => string;
 
-/** Random RFC 4122 version 4 UUID, lower case. Swift stores UUIDs uppercase; ids compare case-insensitively on import. */
+/** Random RFC 4122 version 4 UUID, lower case. */
 export function uuidv4(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.floor(Math.random() * 16);

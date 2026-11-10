@@ -80,6 +80,8 @@ export interface Repository<T extends { id: string }> {
   insert(record: T): Promise<void>;
   get(id: string): Promise<T | null>;
   list(): Promise<T[]>;
+  /** Rows where `column` equals `value`, in list order. `column` must be a trusted constant, never user input. */
+  listWhere(column: string, value: string): Promise<T[]>;
   /** Writes the given fields; resolves the stored record, or null when no row has that id. */
   update(id: string, patch: Partial<Omit<T, 'id'>>): Promise<T | null>;
   /** True when a row was deleted. */
@@ -114,6 +116,9 @@ export function makeRepository<T extends { id: string }>(
     },
     async list() {
       return (await db.all(`${select} ORDER BY ${orderBy}`)).map(toRecord);
+    },
+    async listWhere(column, value) {
+      return (await db.all(`${select} WHERE ${column} = ? ORDER BY ${orderBy}`, [value])).map(toRecord);
     },
     async update(id, patch) {
       const src = patch as Record<string, unknown>;

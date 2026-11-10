@@ -21,14 +21,23 @@ export function expoSqliteDb(sqlite: SQLiteDatabase): Db {
     ...api(sqlite),
     async transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T> {
       let result!: T;
+      let failure: { error: unknown } | null = null;
       await sqlite.withExclusiveTransactionAsync(async (txn) => {
         // Inside the transaction every call goes through txn; nested transactions are rejected.
         const tx: Db = {
           ...api(txn as unknown as SQLiteDatabase),
           transaction: () => Promise.reject(new Error('nested transactions are not supported')),
         };
-        result = await fn(tx);
+        try {
+          result = await fn(tx);
+        } catch (error) {
+          // Record the rejection and rethrow so expo rolls back. expo does not rethrow a falsy rejection (undefined,
+          // null, 0, ''), so the original value is rethrown below rather than relying on expo to propagate it.
+          failure = { error };
+          throw error;
+        }
       });
+      if (failure !== null) throw (failure as { error: unknown }).error;
       return result;
     },
   };
