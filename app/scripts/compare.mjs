@@ -6,7 +6,10 @@
 //   node scripts/compare.mjs <screenshot.png> [reference.png] [--out dir]
 //   node scripts/compare.mjs --dir <screens dir> [--out dir]   (every <dir>/<name>.png with a reference/ipad-<name>.png
 //                                                              or reference/<name>.png counterpart)
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+// Gate: add `--gate <ios|android>` (thresholds from scripts/fidelity-thresholds.json, or `--thresholds <file>`) to exit 1
+// when a screen's strip SSIM is below its floor or a screen listed for the platform was not captured. `--json <file>` writes
+// the results (with the gate verdict) to a file in addition to stdout.
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pixelmatch from 'pixelmatch';
@@ -63,13 +66,37 @@ const args = process.argv.slice(2);
 const flag = (f) => { const i = args.indexOf(f); return i >= 0 ? args.splice(i, 2)[1] : null; };
 const outDir = resolve(flag('--out') ?? join(ROOT, 'reports', 'out', 'compare'));
 const dir = flag('--dir');
+const gate = flag('--gate');
+const thresholdsFile = flag('--thresholds');
+const jsonFile = flag('--json');
 const pairs = dir
   ? (existsSync(dir) ? readdirSync(dir) : []).filter((f) => f.endsWith('.png')).map((f) => [join(dir, f), referenceFor(f)]).filter(([, r]) => r)
   : [[args[0], args[1] ?? (args[0] && referenceFor(args[0]))]];
-if (pairs.length === 0 || pairs.some(([s, r]) => !s || !r)) {
+if ((pairs.length === 0 && !gate) || pairs.some(([s, r]) => !s || !r)) {
   console.error('usage: compare.mjs <screenshot.png> [reference.png] [--out dir] | --dir <screens> [--out dir]');
   process.exit(dir ? 0 : 2); // a directory without matching screenshots is not an error (nothing to compare)
 }
 const results = [];
 for (const [shot, ref] of pairs) results.push(await compare(resolve(shot), resolve(ref), outDir));
-console.log(JSON.stringify(results.length === 1 ? results[0] : results, null, 2));
+
+let failed = false;
+if (gate) {
+  const table = JSON.parse(readFileSync(resolve(thresholdsFile ?? join(ROOT, 'scripts', 'fidelity-thresholds.json')), 'utf8'))[gate];
+  if (!table) { console.error(`compare: no thresholds for platform '${gate}'`); process.exit(2); }
+  const byName = new Map(results.map((r) => [basename(r.screenshot, '.png'), r]));
+  const verdicts = Object.entries(table).map(([screen, t]) => {
+    const floor = t.interim ?? t.min;
+    const r = byName.get(screen);
+    const got = r ? r.strip.ssim : null;
+    return { screen, floor, target: t.min, ssim: got, pass: got !== null && got >= floor };
+  });
+  for (const v of verdicts) {
+    console.error(`fidelity ${gate} ${v.screen}: ssim ${v.ssim ?? 'MISSING'} floor ${v.floor} (target ${v.target}) ${v.pass ? 'ok' : 'FAIL'}`);
+  }
+  failed = verdicts.some((v) => !v.pass);
+  for (const r of results) r.gate = verdicts.find((v) => v.screen === basename(r.screenshot, '.png')) ?? null;
+}
+const out = JSON.stringify(results.length === 1 ? results[0] : results, null, 2);
+if (jsonFile) writeFileSync(resolve(jsonFile), out);
+console.log(out);
+if (failed) process.exit(1);

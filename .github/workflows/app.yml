@@ -142,9 +142,9 @@ jobs:
           EXPORT_A: /tmp/ota-export-A
           EXPORT_B: /tmp/ota-export-B
         run: scripts/ota-smoke.sh
-      - name: Compare with the SwiftUI references
+      - name: Compare with the SwiftUI references (fails below scripts/fidelity-thresholds.json)
         if: always()
-        run: node scripts/compare.mjs --dir "$OUT/screens" --out "$OUT/compare" | tee "$OUT/compare.json"
+        run: node scripts/compare.mjs --dir "$OUT/screens" --out "$OUT/compare" --json "$OUT/compare.json" --gate ios
       - name: Keep the build log tail
         if: always()
         run: tail -n 300 "$OUT/build.log" > "$OUT/build-tail.log" 2>/dev/null || true
@@ -287,9 +287,9 @@ jobs:
           emulator-options: -no-window -gpu swangle_indirect -no-snapshot -no-boot-anim -camera-back none -noaudio
           working-directory: app
           script: bash scripts/android-capture.sh
-      - name: Compare with the SwiftUI references
+      - name: Compare with the SwiftUI references (fails below scripts/fidelity-thresholds.json)
         if: always()
-        run: node scripts/compare.mjs --dir "$OUT/screens" --out "$OUT/compare" | tee "$OUT/compare.json"
+        run: node scripts/compare.mjs --dir "$OUT/screens" --out "$OUT/compare" --json "$OUT/compare.json" --gate android
       - name: Keep the build log tail
         if: always()
         run: tail -n 300 "$OUT/build.log" > "$OUT/build-tail.log" 2>/dev/null || true
