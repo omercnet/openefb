@@ -355,6 +355,8 @@ export function createAviationDatabase(db: Db): AviationDatabase {
     airspacesNear,
 
     async airspacesContaining(point) {
+      // Swift looks 30 NM around the point, not at the point itself; kept as is (a radius of 0 would decode fewer rows,
+      // a candidate optimisation once the port is characterised, see docs/port-notes/D5.md).
       const candidates = await airspacesNear(point, 30);
       return candidates.filter(({ geometry }) =>
         geometry.kind === 'polygon'

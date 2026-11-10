@@ -3,7 +3,6 @@
 // (implemented over expo-file-system in src/adapters/aviationDb.ts, over node:fs in tests).
 import { AppFailure } from '../../domain/errors';
 import type { Db } from '../db';
-import { Sha256 } from './sha256';
 
 /** Version of the bundled aviation.sqlite. Bump whenever tools/nasr-importer regenerates the file; the fingerprint
  * also includes the file's size and SHA-256, so a regenerated file with a forgotten bump is still re-copied. */
@@ -13,15 +12,12 @@ export const BUNDLED_DATA_VERSION = 'nasr-2026-10-29';
 export const INSTALLED_FILE_NAME = 'aviation.sqlite';
 export const VERSION_MARKER_FILE_NAME = 'aviation.sqlite.version';
 
-/** The bundle is hashed in 1 MiB chunks, as in Swift. */
-export const HASH_CHUNK_BYTES = 1 << 20;
-
 /** The platform piece: the bundled asset and the install directory. Paths are the implementation's business. */
 export interface AviationInstallFiles {
   /** Size in bytes of the bundled file, or null when it does not exist. */
   bundledSize(): Promise<number | null>;
-  /** Up to `length` bytes of the bundled file starting at `offset` (fewer or none at the end). */
-  readBundled(offset: number, length: number): Promise<Uint8Array>;
+  /** Lower-case hex SHA-256 of the bundled file's contents (native digest on device, so no JS hashing at launch). */
+  bundledSha256(): Promise<string>;
   installedExists(): Promise<boolean>;
   /** Text of the version marker, or null when there is none. */
   readMarker(): Promise<string | null>;
@@ -50,14 +46,8 @@ export interface AviationInstallPlatform {
 export async function installFingerprint(files: AviationInstallFiles, dataVersion: string): Promise<string> {
   const size = await files.bundledSize();
   if (size === null) throw new AppFailure({ kind: 'databaseCorrupted' });
-  const hasher = new Sha256();
-  for (let offset = 0; offset < size;) {
-    const chunk = await files.readBundled(offset, Math.min(HASH_CHUNK_BYTES, size - offset));
-    if (chunk.length === 0) break;
-    hasher.update(chunk);
-    offset += chunk.length;
-  }
-  return `${dataVersion}|${size}|${hasher.digestHex()}`;
+  const digest = await files.bundledSha256();
+  return `${dataVersion}|${size}|${digest}`;
 }
 
 /**

@@ -29,15 +29,8 @@ export function nodeInstallFiles(bundledPath: string, installDir: string): Aviat
     async bundledSize() {
       return fs.existsSync(bundledPath) ? fs.statSync(bundledPath).size : null;
     },
-    async readBundled(offset, length) {
-      const fd = fs.openSync(bundledPath, 'r');
-      try {
-        const buffer = new Uint8Array(length);
-        const read = fs.readSync(fd, buffer, 0, length, offset);
-        return buffer.subarray(0, read);
-      } finally {
-        fs.closeSync(fd);
-      }
+    async bundledSha256() {
+      return sha256OfFile(bundledPath);
     },
     async installedExists() {
       return fs.existsSync(installed);

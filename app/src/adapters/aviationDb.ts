@@ -2,7 +2,7 @@
 // Platform half of src/data/aviation: copy-on-first-launch, asset file access and the expo-sqlite connection. The
 // repository and the versioning rules live in src/data/aviation and are tested there on Node's sqlite.
 import { Asset } from 'expo-asset';
-import { File, FileMode } from 'expo-file-system';
+import { Directory, File } from 'expo-file-system';
 import { defaultDatabaseDirectory, openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import {
   BUNDLED_DATA_VERSION,
@@ -15,7 +15,7 @@ import {
   type AviationInstallFiles,
   type AviationInstallPlatform,
 } from '../data/aviation';
-import type { SqlParams, SqlRow } from '../data/db';
+import type { Db, SqlParams, SqlRow } from '../data/db';
 
 export const DB_NAME = INSTALLED_FILE_NAME;
 
@@ -40,16 +40,10 @@ export function expoInstallFiles(): AviationInstallFiles {
       const file = await bundledFile();
       return file !== null && file.exists ? file.size : null;
     },
-    async readBundled(offset, length) {
+    async bundledSha256() {
       const file = await bundledFile();
-      if (file === null) return new Uint8Array(0);
-      const handle = file.open(FileMode.ReadOnly);
-      try {
-        handle.offset = offset;
-        return await handle.readBytes(length);
-      } finally {
-        handle.close();
-      }
+      if (file === null) throw new Error('bundled aviation.sqlite is missing');
+      return file.digest('SHA-256');
     },
     async installedExists() {
       return installedFile().exists;
@@ -67,11 +61,13 @@ export function expoInstallFiles(): AviationInstallFiles {
     async copyBundledToInstalled() {
       const source = await bundledFile();
       if (source === null) throw new Error('bundled aviation.sqlite is missing');
+      // The SQLite directory can be absent on a clean install (before any database was opened).
+      new Directory(defaultDatabaseDirectory).create({ intermediates: true, idempotent: true });
       await source.copy(installedFile());
     },
     async writeMarker(text) {
       const marker = markerFile();
-      if (!marker.exists) marker.create();
+      if (!marker.exists) marker.create({ intermediates: true });
       await marker.write(text);
     },
   };
@@ -80,27 +76,37 @@ export function expoInstallFiles(): AviationInstallFiles {
 type Bindable = string | number | null | Uint8Array;
 const bind = (params: SqlParams | undefined): Bindable[] => (params === undefined ? [] : [...params]);
 
-/** The Db interface over an open expo-sqlite connection. Nested transactions are not supported (read-only data). */
-function wrapExpoSqlite(sqlite: SQLiteDatabase): AviationDbHandle {
-  const db: AviationDbHandle = {
-    async all<T extends SqlRow>(sql: string, params?: SqlParams) {
-      return sqlite.getAllAsync<T>(sql, bind(params));
-    },
-    async get<T extends SqlRow>(sql: string, params?: SqlParams) {
-      return sqlite.getFirstAsync<T>(sql, bind(params));
-    },
+/** What the Db methods need from an expo-sqlite connection or exclusive-transaction handle. */
+interface ExpoQueryable {
+  getAllAsync<T>(sql: string, params: Bindable[]): Promise<T[]>;
+  getFirstAsync<T>(sql: string, params: Bindable[]): Promise<T | null>;
+  runAsync(sql: string, params: Bindable[]): Promise<{ changes: number; lastInsertRowId: number }>;
+}
+
+function queryDb(target: ExpoQueryable, transaction: Db['transaction']): Db {
+  return {
+    all: <T extends SqlRow>(sql: string, params?: SqlParams) => target.getAllAsync<T>(sql, bind(params)),
+    get: <T extends SqlRow>(sql: string, params?: SqlParams) => target.getFirstAsync<T>(sql, bind(params)),
     async run(sql, params) {
-      const result = await sqlite.runAsync(sql, bind(params));
+      const result = await target.runAsync(sql, bind(params));
       return { changes: result.changes, lastInsertRowId: result.lastInsertRowId };
     },
-    async transaction(fn) {
-      let value: Awaited<ReturnType<typeof fn>>;
-      await sqlite.withExclusiveTransactionAsync(async () => {
-        value = await fn(db);
+    transaction,
+  };
+}
+
+/** The Db interface over an open expo-sqlite connection. Nested transactions are not supported (read-only data). */
+function wrapExpoSqlite(sqlite: SQLiteDatabase): AviationDbHandle {
+  const nested: Db['transaction'] = () => Promise.reject(new Error('nested transactions are not supported'));
+  const db: AviationDbHandle = {
+    ...queryDb(sqlite, async <T>(fn: (tx: Db) => Promise<T>) => {
+      let value: T | undefined;
+      // The exclusive transaction runs on its own connection: fn must use the handle it is given.
+      await sqlite.withExclusiveTransactionAsync(async (txn) => {
+        value = await fn(queryDb(txn, nested));
       });
-      // withExclusiveTransactionAsync only returns after fn resolved; a rejection propagated above.
-      return value!;
-    },
+      return value as T;
+    }),
     async close() {
       await sqlite.closeAsync();
     },
@@ -114,7 +120,13 @@ const platform = (onOpen: (sqlite: SQLiteDatabase) => void): AviationInstallPlat
   files: expoInstallFiles(),
   async openInstalled() {
     const sqlite = await openDatabaseAsync(DB_NAME);
-    await sqlite.execAsync('PRAGMA journal_mode = WAL');
+    try {
+      await sqlite.execAsync('PRAGMA journal_mode = WAL');
+    } catch (error) {
+      // Not closing would leave this connection open while the retry deletes and re-copies the file.
+      await sqlite.closeAsync().catch(() => undefined);
+      throw error;
+    }
     onOpen(sqlite);
     return wrapExpoSqlite(sqlite);
   },
