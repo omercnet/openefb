@@ -3,14 +3,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
+  INSTALLED_FILE_NAME,
   WHOLE_COUNTRY,
+  createIsraelAviationDatabase,
   airspaceContainsAltitude,
   openIsraelDatabaseFile,
   segmentAltitude,
   type IsraelAviationDatabase,
 } from '../../../src/data/aviation';
 import { AppFailure } from '../../../src/domain/errors';
-import { openBundledIsrael } from './israelBundled';
+import { ISRAEL_BUNDLED, openBundledIsrael } from './israelBundled';
 import { makeTempDir, nodeInstallPlatform } from './nodeFiles';
 
 describe('Israel Aviation Database Tests', () => {
@@ -193,6 +195,17 @@ describe('Israel Aviation Database Tests', () => {
   });
 
   describe('opening', () => {
+    test('aDamagedInstalledCopyWithAMatchingMarkerIsReplacedFromTheBundle', async () => {
+      const dir = makeTempDir();
+      const install = path.join(dir, 'install');
+      const platform = nodeInstallPlatform(ISRAEL_BUNDLED, install);
+      await (await openIsraelDatabaseFile(platform)).close();
+      fs.writeFileSync(path.join(install, INSTALLED_FILE_NAME), 'damaged', 'utf8'); // marker still matches
+      const handle = await openIsraelDatabaseFile(platform);
+      expect((await createIsraelAviationDatabase(handle).metadata()).schemaVersion).toBe(3);
+      await handle.close();
+    });
+
     test('aMissingFileIsReportedAsUnavailableRegionData', async () => {
       const dir = makeTempDir();
       const failure = await openIsraelDatabaseFile(nodeInstallPlatform(path.join(dir, 'no-such.sqlite'), dir)).catch(

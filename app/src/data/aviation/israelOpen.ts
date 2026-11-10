@@ -16,7 +16,8 @@ const REGION_NAME = 'Israel';
 
 /**
  * Installs (when missing or changed) and opens the Israel database. Throws AppFailure `regionDataUnavailable` when the
- * bundled file is missing and `databaseCorrupted` when it cannot be read or its schema version is not supported.
+ * bundled file is missing and `databaseCorrupted` when it cannot be read or its schema version is not supported, even
+ * after one forced re-install of the installed copy (a deliberate addition to the Swift, which opened in place).
  */
 export async function openIsraelDatabaseFile(
   platform: AviationInstallPlatform,
@@ -25,15 +26,29 @@ export async function openIsraelDatabaseFile(
   if ((await platform.files.bundledSize()) === null) {
     throw new AppFailure({ kind: 'regionDataUnavailable', region: REGION_NAME });
   }
-  let handle: AviationDbHandle | null = null;
   try {
     await installBundledDatabase(platform.files, dataVersion);
-    handle = await platform.openInstalled();
+    return await openChecked(platform);
+  } catch {
+    // A damaged installed copy whose marker still matches is not re-copied: force one fresh copy before giving up.
+    try {
+      await installBundledDatabase(platform.files, dataVersion, true);
+      return await openChecked(platform);
+    } catch (error) {
+      throw error instanceof AppFailure ? error : new AppFailure({ kind: 'databaseCorrupted' });
+    }
+  }
+}
+
+/** Opens the installed file and checks the schema version; closes the handle when the check fails. */
+async function openChecked(platform: AviationInstallPlatform): Promise<AviationDbHandle> {
+  const handle = await platform.openInstalled();
+  try {
     const row = await handle.get("SELECT value FROM metadata WHERE key = 'schema_version'");
     if (row?.value !== String(SUPPORTED_SCHEMA_VERSION)) throw new AppFailure({ kind: 'databaseCorrupted' });
     return handle;
   } catch (error) {
-    await handle?.close().catch(() => undefined);
-    throw error instanceof AppFailure ? error : new AppFailure({ kind: 'databaseCorrupted' });
+    await handle.close().catch(() => undefined);
+    throw error;
   }
 }
