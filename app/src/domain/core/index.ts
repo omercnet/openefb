@@ -3,3 +3,6 @@ export * from './polygon';
 export * from './region';
 export * from './types';
 export * from './units';
+export * from './freshness';
+export * from './metarVisibility';
+export * from './tileFailureTracker';
