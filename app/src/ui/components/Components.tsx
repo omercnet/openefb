@@ -29,7 +29,7 @@ import {
   type FreshnessLevel,
 } from './logic';
 
-/** `color` with its alpha replaced (the Swift `Color.opacity(_)`); handles #RRGGBB and rgba(r,g,b,a). */
+/** `color` with its alpha replaced (the Swift `Color.opacity(_)`); handles #RRGGBB (6 digits only; Theme has no short or 8-digit hex) and rgba(r,g,b,a). */
 function withAlpha(color: string, alpha: number): string {
   if (color.startsWith('#')) {
     const n = parseInt(color.slice(1), 16);
@@ -164,7 +164,8 @@ export function FlightCategoryDot({
 export function OpacitySlider({ opacity, onChange }: { opacity: number; onChange: (value: number) => void }) {
   const t = useTheme();
   const [width, setWidth] = useState(0);
-  const set = (x: number) => onChange(clampOpacity(width > 0 ? x / width : 0));
+  const knobTravel = width - 28; // knob is 28 wide; the knob centre follows the finger
+  const set = (x: number) => onChange(clampOpacity(knobTravel > 0 ? (x - 14) / knobTravel : 0));
   const step = (e: AccessibilityActionEvent) =>
     onChange(clampOpacity(opacity + (e.nativeEvent.actionName === 'increment' ? 0.1 : -0.1)));
   const knob = 28;

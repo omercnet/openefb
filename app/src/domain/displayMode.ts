@@ -27,7 +27,7 @@ const normalizeDegrees = (value: number): number => {
   return r < 0 ? r + 360 : r;
 };
 
-/** CLLocationCoordinate2DIsValid: finite and within [-90, 90] x [-180, 180]. */
+/** CLLocationCoordinate2DIsValid: within [-90, 90] x [-180, 180]. NaN fails every comparison, so it is rejected too. */
 const isValidCoordinate = (c: Coordinate): boolean => c.lat >= -90 && c.lat <= 90 && c.lon >= -180 && c.lon <= 180;
 
 /** Low-precision solar elevation (NOAA simplified algorithm, about 0.5 degree accuracy, no network). */

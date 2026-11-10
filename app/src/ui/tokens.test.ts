@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { Day, MapControlMetrics, Night, Radius, Space, StripMetrics } from './tokens';
+import { AccentDayHighContrast, Day, MapControlMetrics, Night, Radius, Space, StripMetrics } from './tokens';
 
 const swift = readFileSync(join(__dirname, '../../../efb-212/Core/DesignTokens.swift'), 'utf8');
 
@@ -83,5 +83,18 @@ describe('DesignTokens parity', () => {
     expect(Night.categoryLIFR).toBe(rgb(0.9, 0.45, 0.9));
     expect(Night.accent).toBe(rgb(0.18, 0.29, 0.43));
     expect(Night.onAccent).toBe(rgb(0.85, 0.85, 0.85));
+  });
+
+  it('derived tokens match their Swift definitions', () => {
+    expect(Day.onWarning).toBe('#FFFFFF'); // .white by day
+    expect(Night.onWarning).toBe('#000000'); // .black in dark
+    expect(Day.cautionFill).toBe('#FF9500'); // Color.orange (systemOrange light)
+    expect(Night.cautionFill).toBe('#FF9F0A');
+    expect(Day.fill).toBe('rgba(60,60,67,0.072)'); // secondary 0.6 x 0.12
+    expect(Night.fill).toBe('rgba(235,235,245,0.072)');
+    expect(Day.infoFill).toBe('rgba(21,86,184,0.15)'); // accentDay at 0.15
+    expect(Night.infoFill).toBe('rgba(46,74,110,0.35)'); // accentNight at 0.35
+    expect(AccentDayHighContrast).toBe('#0C4091');
+    expect(Day.accent).toBe('#1556B8');
   });
 });
