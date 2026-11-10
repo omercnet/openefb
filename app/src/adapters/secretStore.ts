@@ -1,5 +1,5 @@
-// SecretStore on expo-secure-store. On iOS the keychainService and key map to kSecAttrService and kSecAttrAccount of a
-// generic-password item, so entries written by the Swift app are read in place when the service name matches.
+// SecretStore on expo-secure-store. Items written by the Swift app are NOT visible through this adapter (expo requires
+// kSecAttrGeneric); the D3 importer migrates them with a native Keychain query. See docs/port-notes/A4.md.
 import * as SecureStore from 'expo-secure-store';
 
 import { NOTAM_SECRET_SERVICE, type SecretStore } from '../domain/ports/secretStore';
