@@ -230,10 +230,14 @@ export type AirspaceGeometry =
  */
 export function decodeAirspaceGeometry(json: unknown): AirspaceGeometry {
   const o = (json ?? {}) as { coordinates?: unknown; center?: unknown; radiusNM?: unknown };
-  if (o.coordinates !== undefined && o.coordinates !== null)
-    return { kind: 'polygon', coordinates: o.coordinates as number[][] };
-  if (o.center != null && o.radiusNM != null)
-    return { kind: 'circle', center: o.center as number[], radiusNM: o.radiusNM as number };
+  const isPairs = (v: unknown): v is number[][] =>
+    Array.isArray(v) && v.every((p) => Array.isArray(p) && p.every((n) => typeof n === 'number'));
+  const isNums = (v: unknown): v is number[] => Array.isArray(v) && v.every((n) => typeof n === 'number');
+  if (o.coordinates !== undefined && o.coordinates !== null) {
+    if (isPairs(o.coordinates)) return { kind: 'polygon', coordinates: o.coordinates };
+  } else if (o.center != null && o.radiusNM != null && isNums(o.center) && typeof o.radiusNM === 'number') {
+    return { kind: 'circle', center: o.center, radiusNM: o.radiusNM };
+  }
   throw new Error('Invalid AirspaceGeometry');
 }
 

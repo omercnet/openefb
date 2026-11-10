@@ -125,7 +125,7 @@ export interface VerticalSpeedSource {
 
 export interface PredictionAirspaceSources {
   usAirspaces(near: Coordinate, radiusNM: number): Airspace[];
-  /** Lazily opened by the service; may throw (then Israel yields no volumes until the next query). */
+  /** The caller owns the Israel source's lifecycle (opening, caching). A throw is caught and yields no Israel volumes for that query. */
   israelAirspaces(near: Coordinate, radiusNM: number): IsraelAirspaceInput[];
 }
 

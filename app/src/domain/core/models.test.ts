@@ -225,3 +225,11 @@ describe('factory defaults', () => {
     expect(p.cruiseSpeed).toBe(100);
   });
 });
+
+describe('decodeAirspaceGeometry validation', () => {
+  it('rejects malformed shapes', () => {
+    expect(() => decodeAirspaceGeometry({ coordinates: 'x' })).toThrow('Invalid AirspaceGeometry');
+    expect(() => decodeAirspaceGeometry({ center: [1, 2], radiusNM: '5' })).toThrow('Invalid AirspaceGeometry');
+    expect(() => decodeAirspaceGeometry({ center: 'ab', radiusNM: 5 })).toThrow('Invalid AirspaceGeometry');
+  });
+});
