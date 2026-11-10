@@ -185,7 +185,7 @@ export async function openAviationDatabase(): Promise<AviationDatabase> {
   return createAviationDatabase((await open()).handle);
 }
 
-let israelOpening: Promise<IsraelAviationDatabase> | null = null;
+const israelOpenings = new Map<number, Promise<IsraelAviationDatabase>>();
 
 /**
  * The Israel aviation repository over the installed israel-aviation.sqlite. The caller passes the Metro asset module
@@ -199,16 +199,19 @@ export function openIsraelDatabase(assetModule: number): Promise<IsraelAviationD
     fileName: ISRAEL_INSTALLED_FILE_NAME,
     markerName: ISRAEL_VERSION_MARKER_FILE_NAME,
   };
-  israelOpening ??= openIsraelDatabaseFile(
+  const cached = israelOpenings.get(assetModule);
+  if (cached !== undefined) return cached;
+  const opening = openIsraelDatabaseFile(
     platform(spec, () => undefined),
     ISRAEL_BUNDLED_DATA_VERSION,
   )
     .then((handle) => createIsraelAviationDatabase(handle))
     .catch((error: unknown) => {
-      israelOpening = null; // let the next caller retry
+      israelOpenings.delete(assetModule); // let the next caller retry
       throw error;
     });
-  return israelOpening;
+  israelOpenings.set(assetModule, opening);
+  return opening;
 }
 
 export type AirportDot = { icao: string; name: string; latitude: number; longitude: number };
