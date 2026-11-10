@@ -8,7 +8,7 @@
 //                                                              or reference/<name>.png counterpart)
 // Gate: add `--gate <ios|android>` (thresholds from scripts/fidelity-thresholds.json, or `--thresholds <file>`) to exit 1
 // when a screen's strip SSIM is below its floor or a screen listed for the platform was not captured. `--json <file>` writes
-// the results (with the gate verdict) to a file in addition to stdout.
+// the results (with the gate verdict) to a file in addition to stdout. Android: `--shot-dpr 2 --shot-top 24 --ref-top 32 --rows 900`.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -24,30 +24,42 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Screen name -> reference file, for screenshots named after the kanaf-dev://<screen> route.
 const REFERENCE_FOR = { map: 'ipad-map-day.png', night: 'ipad-map-night.png', airport: 'ipad-airport-KSQL.png' };
 
-async function rgba(path, width) {
-  const { data, info } = await sharp(path).resize(W, H, { fit: 'fill' }).extract({ left: 0, top: 0, width, height: H })
+// The screenshot at 1 pt per pixel. iOS screenshots are scaled to the reference size (1032x1376). With --shot-dpr <n> (Android,
+// where the emulator's density is 2 and its screen is not the reference's aspect) the screenshot is divided by n instead, so a
+// 400 dp column is 400 px wide like the reference's 400 pt column, and both images are cropped to the rows both have.
+async function loadShot(path) {
+  if (!shotDpr) return sharp(path).resize(W, H, { fit: 'fill' }).png().toBuffer();
+  const { width, height } = await sharp(path).metadata();
+  return sharp(path).resize(Math.round(width / shotDpr), Math.round(height / shotDpr), { fit: 'fill' }).png().toBuffer();
+}
+
+async function rgba(buf, width, box, top) {
+  const { data, info } = await sharp(buf).extract({ left: 0, top, width: Math.min(width, box.w), height: box.h })
     .ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   return { data: new Uint8ClampedArray(data.buffer, data.byteOffset, data.length), width: info.width, height: info.height };
 }
 
-async function score(shot, ref, width) {
-  const [a, b] = await Promise.all([rgba(shot, width), rgba(ref, width)]);
+async function score(shotBuf, refBuf, width, box) {
+  const [a, b] = await Promise.all([rgba(shotBuf, width, box, shotTop), rgba(refBuf, width, box, refTop)]);
   const diff = new Uint8ClampedArray(a.data.length);
-  const differing = pixelmatch(a.data, b.data, diff, width, H, { threshold: 0.1 });
-  return { ssim: Math.round(ssim(a, b).mssim * 10000) / 10000, diffShare: Math.round((differing / (width * H)) * 10000) / 10000, diff };
+  const differing = pixelmatch(a.data, b.data, diff, a.width, a.height, { threshold: 0.1 });
+  return { ssim: Math.round(ssim(a, b).mssim * 10000) / 10000, diffShare: Math.round((differing / (a.width * a.height)) * 10000) / 10000, diff, width: a.width, height: a.height };
 }
 
 async function compare(shot, ref, outDir) {
   const name = basename(shot, '.png');
-  const strip = await score(shot, ref, STRIP);
-  const frame = await score(shot, ref, W);
+  const left = await loadShot(shot);
+  const right = await sharp(ref).resize(W, H, { fit: 'fill' }).png().toBuffer();
+  const shotMeta = await sharp(left).metadata();
+  const box = { w: Math.min(W, shotMeta.width), h: Math.min(rows || H, H - refTop, shotMeta.height - shotTop) };
+  const strip = await score(left, right, STRIP, box);
+  const frame = await score(left, right, W, box);
   mkdirSync(outDir, { recursive: true });
   const sideBySide = join(outDir, `${name}-side-by-side.png`);
   const diffPng = join(outDir, `${name}-diff.png`);
-  const [left, right] = await Promise.all([shot, ref].map((p) => sharp(p).resize(W, H, { fit: 'fill' }).png().toBuffer()));
   await sharp({ create: { width: W * 2 + 16, height: H, channels: 3, background: '#FF00FF' } })
     .composite([{ input: left, left: 0, top: 0 }, { input: right, left: W + 16, top: 0 }]).png().toFile(sideBySide);
-  await sharp(Buffer.from(frame.diff.buffer), { raw: { width: W, height: H, channels: 4 } }).png().toFile(diffPng);
+  await sharp(Buffer.from(frame.diff.buffer), { raw: { width: frame.width, height: frame.height, channels: 4 } }).png().toFile(diffPng);
   return {
     screenshot: shot, reference: ref,
     strip: { ssim: strip.ssim, diffShare: strip.diffShare },
@@ -69,6 +81,12 @@ const dir = flag('--dir');
 const gate = flag('--gate');
 const thresholdsFile = flag('--thresholds');
 const jsonFile = flag('--json');
+const shotDpr = Number(flag('--shot-dpr') ?? 0);
+// Alignment crops (Android): rows dropped above the screenshot (its status bar, in dp) and above the reference (the iOS status
+// bar, 32 pt), and how many rows are compared (the bottom toolbar sits at the bottom of a different-height screen).
+const shotTop = Number(flag('--shot-top') ?? 0);
+const refTop = Number(flag('--ref-top') ?? 0);
+const rows = Number(flag('--rows') ?? 0);
 const pairs = dir
   ? (existsSync(dir) ? readdirSync(dir) : []).filter((f) => f.endsWith('.png')).map((f) => [join(dir, f), referenceFor(f)]).filter(([, r]) => r)
   : [[args[0], args[1] ?? (args[0] && referenceFor(args[0]))]];

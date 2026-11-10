@@ -289,7 +289,7 @@ jobs:
           script: bash scripts/android-capture.sh
       - name: Compare with the SwiftUI references (fails below scripts/fidelity-thresholds.json)
         if: always()
-        run: node scripts/compare.mjs --dir "$OUT/screens" --out "$OUT/compare" --json "$OUT/compare.json" --gate android
+        run: node scripts/compare.mjs --dir "$OUT/screens" --out "$OUT/compare" --json "$OUT/compare.json" --shot-dpr 2 --shot-top 24 --ref-top 32 --rows 900 --gate android
       - name: Keep the build log tail
         if: always()
         run: tail -n 300 "$OUT/build.log" > "$OUT/build-tail.log" 2>/dev/null || true
