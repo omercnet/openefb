@@ -174,6 +174,20 @@ describe('TrackRecorder', () => {
   });
 
   // New in TS.
+  it('a failed fix rejects for its caller but does not block later fixes', async () => {
+    let calls = 0;
+    const process = jest.fn((): FlightPhase => {
+      calls += 1;
+      if (calls === 1) throw new Error('boom');
+      return 'taxi';
+    });
+    const { store, recorder } = makeRecorder({ phaseDetector: { process, phaseMarkers: [] } });
+    await expect(recorder.enqueue(fix(0, 10, 100))).rejects.toThrow('boom');
+    await expect(recorder.enqueue(fix(1, 10, 100))).resolves.toBeUndefined();
+    expect(process).toHaveBeenCalledTimes(2);
+    expect(store.points.length).toBeGreaterThanOrEqual(1);
+  });
+
   it('converts units into the stored point and passes hasAltitude from vertical accuracy', async () => {
     const process = jest.fn((): FlightPhase => 'taxi');
     const { store, recorder } = makeRecorder({ phaseDetector: { process, phaseMarkers: [] } });
