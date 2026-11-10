@@ -6,8 +6,8 @@
     "night": { "min": 0.9 },
     "airport": {
       "min": 0.85,
-      "interim": 0.65,
-      "reason": "U2: airport column row drift, measured 0.67-0.72 on iOS (reports/ui/README.md)"
+      "interim": 0.8,
+      "reason": "U2 raised iOS airport from 0.717 to 0.8218 (run 42886165382); remaining gap to 0.85 is the header and text-width residual"
     }
   },
   "android": {
