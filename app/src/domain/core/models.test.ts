@@ -207,3 +207,21 @@ describe('TFR and type helpers', () => {
     expect(weatherRefreshInterval('normal')).toBe(900);
   });
 });
+
+describe('factory defaults', () => {
+  it('explicit undefined keeps the Swift defaults', () => {
+    const a = makeAirport({
+      icao: 'X',
+      name: 'X',
+      latitude: 0,
+      longitude: 0,
+      elevation: 0,
+      type: 'airport',
+      ownership: 'public',
+      runways: undefined,
+    });
+    expect(a.runways).toEqual([]);
+    const p = makeFlightPlan({ id: 'a', departure: 'A', destination: 'B', createdAt: 0, cruiseSpeed: undefined });
+    expect(p.cruiseSpeed).toBe(100);
+  });
+});

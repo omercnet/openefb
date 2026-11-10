@@ -21,6 +21,7 @@ describe('Tile failure tracker', () => {
   });
   it('aTileFromTheNetworkClearsItAndTheRunStartsOver', () => {
     let t = errors(TILE_FAILURE_THRESHOLD + 3);
+    expect(isTileFailing(t)).toBe(true);
     t = recordTileNetworkLoad();
     expect(isTileFailing(t)).toBe(false);
     t = errors(TILE_FAILURE_THRESHOLD - 1, t);

@@ -15,11 +15,19 @@ const SOME: AppError[] = [
   { kind: 'nasrImportFailed', cause },
   { kind: 'networkUnavailable' },
   { kind: 'airportNotFound', icao: 'KXYZ' },
+  { kind: 'audioSessionFailed', cause },
+  { kind: 'transcriptionUnavailable' },
+  { kind: 'microphonePermissionDenied' },
+  { kind: 'tfrFetchFailed', cause },
+  { kind: 'debriefFailed', cause },
+  { kind: 'debriefUnavailable', reason: 'why' },
+  { kind: 'regionDataUnavailable', region: 'israel' },
+  { kind: 'remoteConfigRejected', reason: 'bad' },
 ];
 
 describe('EFBError', () => {
   it('allErrorsHaveDescriptions', () => {
-    for (const e of [...SOME, { kind: 'audioSessionFailed', cause } as AppError]) {
+    for (const e of SOME) {
       expect(errorDescription(e).length).toBeGreaterThan(0);
     }
   });
@@ -42,6 +50,14 @@ describe('EFBError', () => {
     expect(sev({ kind: 'recordingFailed', cause })).toBe('error');
     expect(sev({ kind: 'nasrImportFailed', cause })).toBe('error');
     expect(sev({ kind: 'airportNotFound', icao: 'KXYZ' })).toBe('info');
+    expect(sev({ kind: 'audioSessionFailed', cause })).toBe('error');
+    expect(sev({ kind: 'microphonePermissionDenied' })).toBe('error');
+    expect(sev({ kind: 'debriefFailed', cause })).toBe('error');
+    expect(sev({ kind: 'transcriptionUnavailable' })).toBe('warning');
+    expect(sev({ kind: 'tfrFetchFailed', cause })).toBe('warning');
+    expect(sev({ kind: 'debriefUnavailable', reason: 'r' })).toBe('warning');
+    expect(sev({ kind: 'regionDataUnavailable', region: 'r' })).toBe('info');
+    expect(sev({ kind: 'remoteConfigRejected', reason: 'r' })).toBe('info');
   });
   it('errorDescriptionsContainContext', () => {
     expect(errorDescription({ kind: 'chartExpired', expiredAtMs: Date.now() })).toContain('expired');

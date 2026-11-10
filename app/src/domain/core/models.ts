@@ -65,7 +65,13 @@ export interface Airport {
 export function makeAirport(
   a: Pick<Airport, 'icao' | 'name' | 'latitude' | 'longitude' | 'elevation' | 'type' | 'ownership'> & Partial<Airport>,
 ): Airport {
-  return { fuelTypes: [], hasBeaconLight: false, runways: [], frequencies: [], ...a };
+  return {
+    ...a,
+    fuelTypes: a.fuelTypes ?? [],
+    hasBeaconLight: a.hasBeaconLight ?? false,
+    runways: a.runways ?? [],
+    frequencies: a.frequencies ?? [],
+  };
 }
 
 export const airportCoordinate = (a: { latitude: number; longitude: number }): Coordinate => ({
@@ -188,13 +194,20 @@ export interface FlightPlan {
 export function makeFlightPlan(
   p: Pick<FlightPlan, 'id' | 'departure' | 'destination' | 'createdAt'> & Partial<FlightPlan>,
 ): FlightPlan {
-  return { waypoints: [], cruiseAltitude: 3000, cruiseSpeed: 100, totalDistance: 0, estimatedTime: 0, ...p };
+  return {
+    ...p,
+    waypoints: p.waypoints ?? [],
+    cruiseAltitude: p.cruiseAltitude ?? 3000,
+    cruiseSpeed: p.cruiseSpeed ?? 100,
+    totalDistance: p.totalDistance ?? 0,
+    estimatedTime: p.estimatedTime ?? 0,
+  };
 }
 
 export function makeWaypoint(
   w: Pick<Waypoint, 'id' | 'identifier' | 'name' | 'latitude' | 'longitude'> & Partial<Waypoint>,
 ): Waypoint {
-  return { type: 'airport', ...w };
+  return { ...w, type: w.type ?? 'airport' };
 }
 
 export interface WeatherCache {
@@ -221,7 +234,7 @@ export const weatherCacheIsStale = (w: WeatherCache, nowMs: number): boolean => 
 export function makeWeatherCache(
   w: Pick<WeatherCache, 'id' | 'stationID' | 'fetchedAt'> & Partial<WeatherCache>,
 ): WeatherCache {
-  return { flightCategory: 'vfr', ...w };
+  return { ...w, flightCategory: w.flightCategory ?? 'vfr' };
 }
 
 export interface ChartRegion {

@@ -21,5 +21,6 @@ describe('TAF validity', () => {
   it('rejectsOutOfRangeDayAndHour', () => {
     expect(tafValidUntil('TAF X 0218/0025 00000KT', 0)).toBeNull();
     expect(tafValidUntil('TAF X 0218/3200 00000KT', 0)).toBeNull();
+    expect(tafValidUntil('TAF X 0218/0225 00000KT', 0)).toBeNull();
   });
 });
