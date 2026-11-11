@@ -180,22 +180,19 @@ export class PredictionService {
     ) {
       return this.cachedVolumes;
     }
-    if (region === 'us') {
-      let airspaces: Airspace[] = [];
-      try {
-        airspaces = this.sources.usAirspaces(fix.coordinate, radiusNM);
-      } catch {
-        // Swift: try? -> empty
+    try {
+      if (region === 'us') {
+        this.cachedVolumes = this.sources
+          .usAirspaces(fix.coordinate, radiusNM)
+          .flatMap((a) => volumeFromAirspace(a) ?? []);
+      } else {
+        this.cachedVolumes = this.sources.israelAirspaces(fix.coordinate, radiusNM).flatMap(volumesFromIsraelAirspace);
       }
-      this.cachedVolumes = airspaces.flatMap((a) => volumeFromAirspace(a) ?? []);
-    } else {
-      let airspaces: IsraelAirspaceInput[] = [];
-      try {
-        airspaces = this.sources.israelAirspaces(fix.coordinate, radiusNM);
-      } catch {
-        // Swift: try? -> empty
-      }
-      this.cachedVolumes = airspaces.flatMap(volumesFromIsraelAirspace);
+    } catch {
+      // Swift: try? -> empty. Unlike Swift, a failed query is not cached, so the next fix retries immediately.
+      this.cachedVolumes = [];
+      this.lastQuery = null;
+      return this.cachedVolumes;
     }
     this.lastQuery = { coordinate: fix.coordinate, timeMs: fix.timestampMs, radiusNM, region };
     return this.cachedVolumes;

@@ -104,6 +104,11 @@ describe('AirspacePredictor Tests', () => {
   it('holeInPolygonIsNotEntered', () => {
     const ringed = volume('C1', [box([31.5, 32.5], [35.1, 35.8]), box([31.9, 32.1], [35.15, 35.75])], null, 5000, 'C');
     expect(predictEvents(input({ position: { lat: 32, lon: 35.3 } }), [ringed])).toEqual([]);
+    // Starting inside the hole near its east edge: the track leaves the hole into the ring, a lateral entry.
+    const events = predictEvents(input({ position: { lat: 32, lon: 35.7 } }), [ringed]);
+    expect(events).toHaveLength(1);
+    expect(events[0].kind).toBe('lateral');
+    expect(events[0].coordinate.lon).toBeGreaterThan(35.75);
   });
   it('circleVolumeIsEntered', () => {
     const prohibited: PredictableVolume = {

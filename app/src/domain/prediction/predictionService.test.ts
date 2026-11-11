@@ -225,4 +225,18 @@ describe('PredictionServiceUpdateTests', () => {
     service.update(fix(11), state, false, true);
     expect(usAirspaces).toHaveBeenCalledTimes(2);
   });
+
+  it('does not cache a failed query', () => {
+    let fail = true;
+    const usAirspaces = jest.fn(() => {
+      if (fail) throw new Error('db');
+      return [classC];
+    });
+    const service = new PredictionService({ usAirspaces, israelAirspaces: () => [] }, { update: () => 0 });
+    const state = makeState();
+    service.update(fix(0), state, false, true);
+    fail = false;
+    service.update(fix(1), state, false, true);
+    expect(usAirspaces).toHaveBeenCalledTimes(2);
+  });
 });
