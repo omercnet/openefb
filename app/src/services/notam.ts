@@ -143,7 +143,11 @@ export function locationQuery(airport: Pick<Airport, 'icao' | 'faaID'>): Locatio
 
 /** Drops cancellations and NOTAMs not effective at `atMs`, then sorts closures first. */
 export function activeSorted(notams: readonly Notam[], atMs: number): Notam[] {
-  return notams.filter((n) => !isCancellation(n) && isEffective(n, atMs)).sort(compareBriefingOrder);
+  // Copies, so a caller that edits a returned NOTAM cannot change the cached entry (all fields are primitives or null).
+  return notams
+    .filter((n) => !isCancellation(n) && isEffective(n, atMs))
+    .map((n) => ({ ...n }))
+    .sort(compareBriefingOrder);
 }
 
 const trimSpaces = (s: string): string => s.replace(/^[ \t]+|[ \t]+$/g, '');

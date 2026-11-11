@@ -12,8 +12,10 @@ export class RequestTimeoutError extends Error {
   }
 }
 
-/** Runs fetch with a timeout. On timeout the request is aborted and the promise rejects with RequestTimeoutError.
- * The timer is always cleared, so a fast answer leaves nothing pending. */
+/** Runs fetch with a deadline that covers the headers AND the body: the returned response's `text()` and `arrayBuffer()`
+ * race the same deadline, so a server that sends headers and then stalls cannot hang a caller. On timeout the request is
+ * aborted and the call rejects with RequestTimeoutError. The timer is cleared when the body has been read, when the request
+ * fails, and for a non-2xx answer (whose body callers do not read); it is unref'd where the platform supports it. */
 export async function fetchWithTimeout(
   fetchFn: FetchLike,
   url: string,
@@ -22,21 +24,36 @@ export async function fetchWithTimeout(
 ): Promise<HttpResponse> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
+  const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
       controller.abort();
       reject(new RequestTimeoutError(url, timeoutMs));
     }, timeoutMs);
+    (timer as { unref?: () => void }).unref?.();
   });
-  // The promise constructor turns a synchronous throw from fetchFn into a rejection; the no-op catch keeps a
-  // request that fails after the timeout already won from surfacing as an unhandled rejection.
+  deadline.catch(() => undefined); // the deadline may fire after everything settled
+  const release = () => clearTimeout(timer);
+  // The promise constructor turns a synchronous throw from fetchFn into a rejection; the no-op catch keeps a request that
+  // fails after the deadline already won from surfacing as an unhandled rejection.
   const request = new Promise<HttpResponse>((resolve) => resolve(fetchFn(url, { ...init, signal: controller.signal })));
   request.catch(() => undefined);
+  let response: HttpResponse;
   try {
-    return await Promise.race([request, timeout]);
-  } finally {
-    clearTimeout(timer);
+    response = await Promise.race([request, deadline]);
+  } catch (error) {
+    release();
+    throw error;
   }
+  if (response.status < 200 || response.status > 299) release();
+  const guard = <T>(body: Promise<T>): Promise<T> => {
+    body.catch(() => undefined);
+    return Promise.race([body, deadline]).finally(release);
+  };
+  return {
+    status: response.status,
+    text: () => guard(response.text()),
+    arrayBuffer: () => guard(response.arrayBuffer()),
+  };
 }
 
 export function utf8ByteLength(text: string): number {

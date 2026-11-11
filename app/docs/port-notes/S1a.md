@@ -43,3 +43,19 @@ tests are `test.each`). `MockRemoteConfigService` is replaced by `FakeConfigServ
 - I1 wires `createRemoteConfigService({ fetch })`, `RemoteConfigStore.open({ storage: fileTextStorage, buildNumber })`
   and calls `refreshIfDue(recordingActive)` at launch and on app active. `DataRefreshScheduler` is pure; the map view
   model (M-track/I1) owns lastData and calls `recordAttempt`.
+
+## Review follow-ups (PR #43)
+
+- Preserved Swift behaviour, not changed: the hourly remote-config check limit is per process. `nextCheckAt` is not persisted,
+  so the first `refreshIfDue` after a launch fetches at once (Swift `RemoteConfigStore.swift:45,136-152` does the same, and
+  `docs/handoff/REMOTE-CONFIG.md` says "at launch and when the app returns to the foreground"). If the owner wants the hour to
+  span launches, persist the last check time next to `last-config.json`; that is a behaviour change, not a port fix.
+- Added: the request deadline now covers the response body (`http.ts`), not only the headers; a stalled body rejects with
+  `RequestTimeoutError` and the abort signal fires.
+
+## Review follow-ups for S1b (PR #43)
+
+- Israel NOTAM feed copies (memory and saved file) are keyed by the feed URL they came from; a copy is never served for another URL.
+- A connection lost while a body streams is `networkUnavailable` (FAA and Israel clients), not `weatherFetchFailed` / `undecodable`.
+- `activeSorted` returns copies; `clearCache()` invalidates running downloads (they cannot repopulate the cache or be joined).
+- `fileTextStorage.write` writes a temp file and moves it over the target.

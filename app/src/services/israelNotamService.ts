@@ -55,10 +55,16 @@ export interface IsraelNotamServiceOptions {
 interface SavedFeed {
   fetchedAtMs: number;
   body: string;
+  /** The feed URL the body was downloaded from. */
+  url: string;
 }
 
 export class IsraelNotamService implements IsraelNotamServiceLike {
   private cached: IsraelNotamReport | null = null;
+  /** The feed URL the in-memory copy came from: a copy is only reused for its own source. */
+  private cachedUrl: string | null = null;
+  private latestUrl: string | null = null;
+  private inFlightUrl: string | null = null;
   private inFlight: Promise<IsraelNotamReport> | null = null;
   private writeChain: Promise<void> = Promise.resolve();
   private readonly now: Clock;
@@ -70,7 +76,8 @@ export class IsraelNotamService implements IsraelNotamServiceLike {
   async fetchFeed(forceRefresh = false): Promise<IsraelNotamReport> {
     const url = this.options.feedUrl ? this.options.feedUrl() : DEFAULT_ISRAEL_NOTAM_FEED_URL;
     if (!url) throw new IsraelNotamError('notConfigured');
-    const cached = this.cached;
+    this.latestUrl = url;
+    const cached = this.cachedUrl === url ? this.cached : null;
     if (
       !forceRefresh &&
       cached &&
@@ -80,11 +87,15 @@ export class IsraelNotamService implements IsraelNotamServiceLike {
       return cached;
     }
     // JS-only: callers that arrive while a download runs join it instead of starting another.
-    if (this.inFlight) return this.inFlight;
+    if (this.inFlight && this.inFlightUrl === url) return this.inFlight;
     const run: Promise<IsraelNotamReport> = this.refresh(url).finally(() => {
-      if (this.inFlight === run) this.inFlight = null;
+      if (this.inFlight === run) {
+        this.inFlight = null;
+        this.inFlightUrl = null;
+      }
     });
     this.inFlight = run;
+    this.inFlightUrl = url;
     return run;
   }
 
@@ -97,18 +108,25 @@ export class IsraelNotamService implements IsraelNotamServiceLike {
     try {
       const { feed, body } = await this.download(url);
       const report: IsraelNotamReport = { feed, fetchedAt: this.now(), refreshFailed: false };
-      this.cached = report;
-      this.persist(report.fetchedAt, body);
+      // A download that was overtaken by a request for another feed URL must not replace the newer source's copy.
+      if (this.latestUrl === url) {
+        this.cached = report;
+        this.cachedUrl = url;
+      }
+      this.persist(report.fetchedAt, body, url);
       this.options.log?.(`Fetched ${feed.items.length} Israel NOTAMs, ${feed.closures.length} route closures`);
       return report;
     } catch (error) {
-      const previous = this.cached ?? (await this.loadPersisted());
+      const previous = (this.cachedUrl === url ? this.cached : null) ?? (await this.loadPersisted(url));
       if (previous) {
         this.options.log?.(
           `Israel NOTAM refresh failed, serving the saved copy: ${error instanceof Error ? error.message : String(error)}`,
         );
         const stale: IsraelNotamReport = { feed: previous.feed, fetchedAt: previous.fetchedAt, refreshFailed: true };
-        this.cached = stale;
+        if (this.latestUrl === url) {
+          this.cached = stale;
+          this.cachedUrl = url;
+        }
         return stale;
       }
       throw error;
@@ -131,8 +149,15 @@ export class IsraelNotamService implements IsraelNotamServiceLike {
       throw error;
     }
     if (response.status !== 200) throw new IsraelNotamError('badStatus', response.status);
+    let body: string;
     try {
-      const body = await response.text();
+      body = await response.text();
+    } catch (error) {
+      // A connection lost while the body streams is offline, not an unreadable feed.
+      if (isOfflineError(error)) throw new AppFailure({ kind: 'networkUnavailable' });
+      throw error;
+    }
+    try {
       return { feed: decodeIsraelNotamFeed(body), body };
     } catch {
       throw new IsraelNotamError('undecodable');
@@ -143,10 +168,10 @@ export class IsraelNotamService implements IsraelNotamServiceLike {
 
   /** Saves the last good feed. Writes are chained so an older save never lands after a newer one; a failure to save
    * never blocks the feed. */
-  private persist(fetchedAtMs: number, body: string): void {
+  private persist(fetchedAtMs: number, body: string, url: string): void {
     const storage = this.options.storage;
     if (!storage) return;
-    const saved: SavedFeed = { fetchedAtMs, body };
+    const saved: SavedFeed = { fetchedAtMs, body, url };
     this.writeChain = this.writeChain.then(async () => {
       try {
         await storage.write(ISRAEL_NOTAM_STORAGE_KEY, JSON.stringify(saved));
@@ -160,15 +185,22 @@ export class IsraelNotamService implements IsraelNotamServiceLike {
 
   /** The saved feed, or null when none exists or it cannot be read. Display age comes from the feed's own
    * `generatedAt`, so a copy that is too old is still gated by the existing freshness rules. */
-  private async loadPersisted(): Promise<IsraelNotamReport | null> {
+  private async loadPersisted(url: string): Promise<IsraelNotamReport | null> {
     const storage = this.options.storage;
     if (!storage) return null;
     try {
       const raw = await storage.read(ISRAEL_NOTAM_STORAGE_KEY);
       if (raw === null) return null;
       const saved = JSON.parse(raw) as Partial<SavedFeed> | null;
-      if (!saved || typeof saved.fetchedAtMs !== 'number' || typeof saved.body !== 'string')
+      if (
+        !saved ||
+        typeof saved.fetchedAtMs !== 'number' ||
+        typeof saved.body !== 'string' ||
+        typeof saved.url !== 'string'
+      ) {
         throw new Error('bad shape');
+      }
+      if (saved.url !== url) return null; // saved from another relay: never served for this one
       return { feed: decodeIsraelNotamFeed(saved.body), fetchedAt: saved.fetchedAtMs, refreshFailed: true };
     } catch {
       this.options.log?.('Saved Israel NOTAM feed is unreadable; ignoring it');

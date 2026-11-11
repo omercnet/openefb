@@ -18,9 +18,17 @@ export const fileTextStorage: TextStorage = {
     return file.exists ? await file.text() : null;
   },
   async write(key, text) {
-    const file = fileFor(key);
-    file.create({ intermediates: true, overwrite: true });
-    await file.write(text);
+    // Atomic replace: write the new text beside the old file, then move it over. A crash mid-write leaves the last good copy.
+    const target = fileFor(key);
+    const temp = fileFor(`${key}.tmp`);
+    temp.create({ intermediates: true, overwrite: true });
+    try {
+      await temp.write(text);
+      temp.move(target, { overwrite: true });
+    } catch (error) {
+      if (temp.exists) temp.delete();
+      throw error;
+    }
   },
   async remove(key) {
     const file = fileFor(key);
