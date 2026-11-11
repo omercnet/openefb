@@ -35,15 +35,26 @@ type Face = keyof typeof FontFiles;
 /**
  * Line height in points for a face whose natural height (hhea ascent + descent) is `em` times the size: Archivo 1.088,
  * Plex Mono 1.3, SF 1.193. SwiftUI sizes a Text to its natural height rounded up to the pixel grid (0.5 pt on the 2x iPad).
- * RN iOS does the same ceil, but when an explicit line height is above the natural one it adds a baseline offset and the
- * ceil then costs another half point (measured on iOS: the 12 pt line of an 11 pt label became 12.5), which drifted every
- * text column down (the airport column ended 4.5 pt low). So native gets a height just below the natural one,
- * which RN ceils to the same grid line as SwiftUI. react-native-web has no pixel grid: it gets the rounded-up height itself.
- * Explicit at all because Chromium rounds ascent and descent separately.
+ * Explicit at all because Chromium rounds ascent and descent separately. Per platform, each measured on the CI
+ * simulator or emulator against the Swift reference:
+ * - iOS: RN ceils to that same grid, but when an explicit line height is above the natural one it adds a baseline
+ *   offset and the ceil then costs another half point (the 12.0 pt line of an 11 pt label became 12.5), which drifted
+ *   every text column down. So iOS gets a height just below the natural one, which RN ceils to SwiftUI's grid line
+ *   (iPad strip SSIM: map 0.9428 -> 0.9858, night 0.9483 -> 0.9856, airport 0.8209 -> 0.8853).
+ * - Android: the natural height rounded to the nearest 0.5 pt, as before: every airport row then sat within 1 dp of the
+ *   reference (SSIM 0.98). The iOS rule lost 1 to 2 dp on Android (airport 0.9813 -> 0.8577), so it is iOS only.
+ * - react-native-web has no pixel grid and gets the rounded-up height itself.
  */
 export const lineHeight = (fontSize: number, em: number) => {
-  const natural = fontSize * em - 0.01;
-  return Platform.OS === 'web' ? Math.ceil(natural * 2) / 2 : Math.round(natural * 1000) / 1000;
+  const natural = fontSize * em;
+  switch (Platform.OS) {
+    case 'ios':
+      return Math.round((natural - 0.01) * 1000) / 1000;
+    case 'web':
+      return Math.ceil((natural - 0.01) * 2) / 2;
+    default:
+      return Math.round(natural * 2) / 2;
+  }
 };
 const face = (fontFamily: Face, fontSize: number, extra?: TextStyle): TextStyle => ({
   fontFamily,
