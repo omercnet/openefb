@@ -62,7 +62,7 @@ TaskManager.defineTask<{ locations: Location.LocationObject[] }>(LOCATION_TASK, 
   }
   for (const loc of data?.locations ?? []) {
     const fix = fixFromLocationObject(loc);
-    for (const l of [...backgroundListeners]) l.onUpdate({ fix });
+    for (const l of [...backgroundListeners]) if (backgroundListeners.has(l)) l.onUpdate({ fix }); // skip stopped mid-delivery
   }
 });
 

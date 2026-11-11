@@ -217,6 +217,19 @@ describe('createLocationSource', () => {
     expect(Location.stopLocationUpdatesAsync).toHaveBeenCalledWith(adapter.LOCATION_TASK);
   });
 
+  it('background: a listener stopped by an earlier listener in the same delivery is not called', async () => {
+    const source = adapter.createLocationSource();
+    const a = listener();
+    const b = listener();
+    source.subscribe({ activity: 'airborne', background: true }, a);
+    const subB = source.subscribe({ activity: 'airborne', background: true }, b);
+    await flush();
+    a.onUpdate.mockImplementation(() => subB.stop());
+    await mockTasks.get(adapter.LOCATION_TASK)!({ data: { locations: [loc({}, 1)] }, error: null });
+    expect(a.onUpdate).toHaveBeenCalledTimes(1);
+    expect(b.onUpdate).not.toHaveBeenCalled();
+  });
+
   it('background: a task error fails every subscriber and stops updates', async () => {
     const source = adapter.createLocationSource();
     const a = listener();
