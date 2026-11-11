@@ -126,7 +126,7 @@ export class RecordingCoordinator {
   private autoStopTask: Cancellable | null = null;
   private currentFlightID: string | null = null;
   private startSession: symbol | null = null;
-  private pendingCleanup: Promise<void> | null = null;
+  private pendingCleanups = new Set<Promise<void>>();
   private autoStartGate = new AutoStartGate();
   private recordingStartDate: number | null = null;
 
@@ -145,7 +145,12 @@ export class RecordingCoordinator {
   /** Start a new flight recording. Returns the flight id. */
   async startRecording(profile: AudioQualityProfile = 'standard'): Promise<string> {
     // Let a canceled start finish releasing the shared audio and transcription services first.
-    while (this.pendingCleanup) await this.pendingCleanup;
+    const statusOnEntry = this.state.recordingStatus;
+    while (this.pendingCleanups.size > 0) await Promise.all([...this.pendingCleanups]);
+    // An auto-start countdown canceled while we waited must not start a flight.
+    if (statusOnEntry.kind === 'countdown' && this.state.recordingStatus.kind !== 'countdown') {
+      throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
+    }
 
     // Allowed from idle or from the tail of an auto-start countdown (whatever the remaining count is).
     const current = this.state.recordingStatus;
@@ -242,9 +247,12 @@ export class RecordingCoordinator {
           await bestEffort(() => this.transcription.stopTranscription());
         }
       })();
-      this.pendingCleanup = cleanup;
-      await cleanup;
-      if (this.pendingCleanup === cleanup) this.pendingCleanup = null;
+      this.pendingCleanups.add(cleanup);
+      try {
+        await cleanup;
+      } finally {
+        this.pendingCleanups.delete(cleanup);
+      }
       throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
     }
 
