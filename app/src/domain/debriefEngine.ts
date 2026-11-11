@@ -46,7 +46,7 @@ export type DebriefStore = Pick<RecordingDatabase, 'insertDebrief' | 'debrief'>;
 export interface DebriefEngineDeps {
   model: DebriefModel;
   /** Receives "Debrief.generated" after a debrief is generated (Swift `Telemetry.signal`). Best effort. */
-  telemetry?: { signal(name: string): void };
+  telemetry?: { signal(event: 'Debrief.generated'): void };
   /** epoch ms; defaults to Date.now. */
   now?: () => number;
   newId?: IdGenerator;

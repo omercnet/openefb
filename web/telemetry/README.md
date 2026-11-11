@@ -87,7 +87,7 @@ curl "https://api.cloudflare.com/client/v4/accounts/<account_id>/analytics_engin
           GROUP BY event, update_id ORDER BY n DESC"
 ```
 
-Launches per update (the denominator of the OTA crash-free comparison in the rewrite plan section 3.7) are the `App.launched` rows.
+Launches per update (the denominator of the crash-free comparison per update in the rewrite plan, section 6.3) are the `App.launched` rows.
 
 ## Changing the vocabulary
 
