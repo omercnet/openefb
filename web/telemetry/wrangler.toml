@@ -1,0 +1,10 @@
+name = "openefb-telemetry"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+# NOT DEPLOYED. The owner deploys this by hand with `npm run deploy` (see README.md); nothing in CI or on merge deploys it.
+# Analytics Engine datasets need no creation step: the first write after deploying creates `kanaf_counters`. Without this
+# binding the Worker answers 503 and stores nothing.
+[[analytics_engine_datasets]]
+binding = "COUNTERS"
+dataset = "kanaf_counters"
