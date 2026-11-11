@@ -198,6 +198,8 @@ it and run on an in-memory fallback with a visible banner. No silent catch.
 
 ## 4. User data migration (same bundle id, in-place upgrade)
 
+> Cancelled: see "No import of Swift user data" in section 10. The text below is kept for reference only.
+
 Where the data lives (verified in code):
 1. SwiftData store: opened by EFBModelContainer.make()/makeForApp() in efb-212/Data/Models/ModelContainerFactory.swift
    with `ModelConfiguration()` and no URL, i.e. SwiftData's default store: `default.store` (SQLite, Core Data table
@@ -514,6 +516,7 @@ Mitigation: gitleaks already in CI lint; add a test that production builds do no
 | Q6 Airport diagrams | Precompute georeferencing offline into the chart packs (tools/apd-georef); no on-device Vision |
 | Q7 Telemetry | First-party counters on our Worker, no identifiers; PRIVACY.md updated accordingly |
 | Q10 Swift app | Fixes only until parity, then deleted per section 2 |
+| No import of Swift user data | The RN app starts with a clean slate (owner, 2026-11-10). Section 4 and ticket D3 are cancelled; D4 has no importer step. |
 | Q8, Q9, Q11, Q12 | Recommendations adopted: hide the AI debrief on Android in v1; Android SSIM floors 0.85 map / 0.80 text; iOS 26 and Android minSdk 30; first RN TestFlight builds to an internal group until P1-P6 |
 
 Also decided: Android demand is confirmed and the owner ran the real-device checks on the spike (2026-11-09). The current SwiftUI app is offered on Apple Silicon Macs and Vision Pro as "Designed for iPad" (PR #21).

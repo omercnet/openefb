@@ -1,9 +1,9 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { Db, RunResult, SqlParams, SqlRow } from '../../src/data/db';
 
-/** In-memory Db over Node's built-in SQLite (it ships with R-tree). Tests only; not nested-transaction safe. */
-export function openNodeSqliteDb(): Db {
-  const sqlite = new DatabaseSync(':memory:');
+/** Db over Node's built-in SQLite (it ships with R-tree); in memory unless a file path is given. Tests only; not nested-transaction safe. */
+export function openNodeSqliteDb(path: string = ':memory:'): Db {
+  const sqlite = new DatabaseSync(path);
   const db: Db = {
     async all<T extends SqlRow>(sql: string, params: SqlParams = []) {
       return sqlite.prepare(sql).all(...params) as T[];
