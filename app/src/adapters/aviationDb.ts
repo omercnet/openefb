@@ -8,12 +8,18 @@ import {
   BUNDLED_DATA_VERSION,
   INSTALLED_FILE_NAME,
   VERSION_MARKER_FILE_NAME,
+  ISRAEL_BUNDLED_DATA_VERSION,
+  ISRAEL_INSTALLED_FILE_NAME,
+  ISRAEL_VERSION_MARKER_FILE_NAME,
   createAviationDatabase,
+  createIsraelAviationDatabase,
   openAviationDatabaseFile,
+  openIsraelDatabaseFile,
   type AviationDatabase,
   type AviationDbHandle,
   type AviationInstallFiles,
   type AviationInstallPlatform,
+  type IsraelAviationDatabase,
 } from '../data/aviation';
 import type { Db, SqlParams, SqlRow } from '../data/db';
 
@@ -23,50 +29,65 @@ export const DB_NAME = INSTALLED_FILE_NAME;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const bundledAssetModule: number = require('../../assets/aviation.sqlite');
 
+/** A bundled database asset and where it is installed (both names live in expo-sqlite's default directory). */
+interface AssetSpec {
+  /** The Metro asset module id (the result of `require('.../x.sqlite')`). */
+  assetModule: number;
+  fileName: string;
+  markerName: string;
+}
+
+const AVIATION: AssetSpec = {
+  assetModule: bundledAssetModule,
+  fileName: INSTALLED_FILE_NAME,
+  markerName: VERSION_MARKER_FILE_NAME,
+};
+
 /** The bundled asset as a local file (Metro serves it from the app bundle on release builds, downloads it in dev). */
-async function bundledFile(): Promise<File | null> {
-  const asset = Asset.fromModule(bundledAssetModule);
+async function bundledFile(spec: AssetSpec): Promise<File | null> {
+  const asset = Asset.fromModule(spec.assetModule);
   await asset.downloadAsync();
   return asset.localUri === null ? null : new File(asset.localUri);
 }
 
-const installedFile = (suffix = ''): File => new File(defaultDatabaseDirectory, INSTALLED_FILE_NAME + suffix);
-const markerFile = (): File => new File(defaultDatabaseDirectory, VERSION_MARKER_FILE_NAME);
+const installedFile = (spec: AssetSpec, suffix = ''): File =>
+  new File(defaultDatabaseDirectory, spec.fileName + suffix);
+const markerFile = (spec: AssetSpec): File => new File(defaultDatabaseDirectory, spec.markerName);
 
 /** AviationInstallFiles over expo-file-system: the install directory is expo-sqlite's default database directory. */
-export function expoInstallFiles(): AviationInstallFiles {
+function expoInstallFiles(spec: AssetSpec): AviationInstallFiles {
   return {
     async bundledSize() {
-      const file = await bundledFile();
+      const file = await bundledFile(spec);
       return file !== null && file.exists ? file.size : null;
     },
     async bundledSha256() {
-      const file = await bundledFile();
-      if (file === null) throw new Error('bundled aviation.sqlite is missing');
+      const file = await bundledFile(spec);
+      if (file === null) throw new Error(`bundled ${spec.fileName} is missing`);
       return file.digest('SHA-256');
     },
     async installedExists() {
-      return installedFile().exists;
+      return installedFile(spec).exists;
     },
     async readMarker() {
-      const marker = markerFile();
+      const marker = markerFile(spec);
       return marker.exists ? await marker.text() : null;
     },
     async removeInstalled() {
       for (const suffix of ['', '-wal', '-shm']) {
-        const file = installedFile(suffix);
+        const file = installedFile(spec, suffix);
         if (file.exists) file.delete();
       }
     },
     async copyBundledToInstalled() {
-      const source = await bundledFile();
-      if (source === null) throw new Error('bundled aviation.sqlite is missing');
+      const source = await bundledFile(spec);
+      if (source === null) throw new Error(`bundled ${spec.fileName} is missing`);
       // The SQLite directory can be absent on a clean install (before any database was opened).
       new Directory(defaultDatabaseDirectory).create({ intermediates: true, idempotent: true });
-      await source.copy(installedFile());
+      await source.copy(installedFile(spec));
     },
     async writeMarker(text) {
-      const marker = markerFile();
+      const marker = markerFile(spec);
       if (!marker.exists) marker.create({ intermediates: true });
       await marker.write(text);
     },
@@ -116,10 +137,10 @@ function wrapExpoSqlite(sqlite: SQLiteDatabase): AviationDbHandle {
 
 let opening: Promise<{ sqlite: SQLiteDatabase; handle: AviationDbHandle }> | null = null;
 
-const platform = (onOpen: (sqlite: SQLiteDatabase) => void): AviationInstallPlatform => ({
-  files: expoInstallFiles(),
+const platform = (spec: AssetSpec, onOpen: (sqlite: SQLiteDatabase) => void): AviationInstallPlatform => ({
+  files: expoInstallFiles(spec),
   async openInstalled() {
-    const sqlite = await openDatabaseAsync(DB_NAME);
+    const sqlite = await openDatabaseAsync(spec.fileName);
     try {
       await sqlite.execAsync('PRAGMA journal_mode = WAL');
     } catch (error) {
@@ -141,7 +162,7 @@ function open(): Promise<{ sqlite: SQLiteDatabase; handle: AviationDbHandle }> {
   opening ??= (async () => {
     let sqlite: SQLiteDatabase | undefined;
     const handle = await openAviationDatabaseFile(
-      platform((opened) => {
+      platform(AVIATION, (opened) => {
         sqlite = opened;
       }),
       BUNDLED_DATA_VERSION,
@@ -162,6 +183,35 @@ export async function openAviationDb(): Promise<SQLiteDatabase> {
 /** The aviation repository (airports, airspaces, navaids, search) over the installed database. */
 export async function openAviationDatabase(): Promise<AviationDatabase> {
   return createAviationDatabase((await open()).handle);
+}
+
+const israelOpenings = new Map<number, Promise<IsraelAviationDatabase>>();
+
+/**
+ * The Israel aviation repository over the installed israel-aviation.sqlite. The caller passes the Metro asset module
+ * (`require('../../assets/israel-aviation.sqlite')`, copied there from efb-212/Resources as aviation.sqlite is) so this
+ * adapter does not force the asset on builds that do not ship it. Throws AppFailure regionDataUnavailable when the
+ * asset is missing and databaseCorrupted when it cannot be read or has an unsupported schema.
+ */
+export function openIsraelDatabase(assetModule: number): Promise<IsraelAviationDatabase> {
+  const spec: AssetSpec = {
+    assetModule,
+    fileName: ISRAEL_INSTALLED_FILE_NAME,
+    markerName: ISRAEL_VERSION_MARKER_FILE_NAME,
+  };
+  const cached = israelOpenings.get(assetModule);
+  if (cached !== undefined) return cached;
+  const opening = openIsraelDatabaseFile(
+    platform(spec, () => undefined),
+    ISRAEL_BUNDLED_DATA_VERSION,
+  )
+    .then((handle) => createIsraelAviationDatabase(handle))
+    .catch((error: unknown) => {
+      israelOpenings.delete(assetModule); // let the next caller retry
+      throw error;
+    });
+  israelOpenings.set(assetModule, opening);
+  return opening;
 }
 
 export type AirportDot = { icao: string; name: string; latitude: number; longitude: number };

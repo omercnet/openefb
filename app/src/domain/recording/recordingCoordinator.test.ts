@@ -5,6 +5,7 @@ import { AppFailure } from '../errors';
 import { RecordingCoordinator } from './recordingCoordinator';
 import {
   FakeClock,
+  flush,
   FakeRecordingStore,
   FakeTrackRecorder,
   MockAudioRecorder,
@@ -195,6 +196,279 @@ describe('startRecording rollback', () => {
     await coordinator.startRecording();
     expect(coordinator.state.recordingStatus).toEqual({ kind: 'recording' });
     await coordinator.stopRecording();
+  });
+});
+
+describe('startRecording rollback (session and cleanup)', () => {
+  test('a failed startup stops the tracker it started', async () => {
+    const { coordinator, tracker } = make();
+    let stopped = 0;
+    tracker.startTracking = async () => {
+      throw new Error('boom');
+    };
+    tracker.stopTracking = async () => {
+      stopped += 1;
+      return { trackPointCount: 0, phaseMarkers: [] };
+    };
+    await expect(coordinator.startRecording()).rejects.toThrow('boom');
+    expect(stopped).toBe(1);
+  });
+
+  function makeWithTrackers(trackers: FakeTrackRecorder[]) {
+    let i = 0;
+    return new RecordingCoordinator({
+      recordingStore: new FakeRecordingStore(),
+      audioRecorder: new MockAudioRecorder(),
+      transcriptionService: new MockTranscriptionService(),
+      makeTrackRecorder: () => trackers[i++]!,
+      audioFileURL: (id) => `/rec/${id}.m4a`,
+      clock: new FakeClock(),
+    });
+  }
+
+  test('a stale failed startup does not clear or stop a newer recording', async () => {
+    const t1 = new FakeTrackRecorder();
+    const t2 = new FakeTrackRecorder();
+    let rejectFirst!: (e: Error) => void;
+    t1.startTracking = () => new Promise<void>((_, reject) => (rejectFirst = reject));
+    let t2Stops = 0;
+    t2.stopTracking = async () => {
+      t2Stops += 1;
+      return { trackPointCount: 0, phaseMarkers: [] };
+    };
+    const coordinator = makeWithTrackers([t1, t2]);
+    const firstResult = coordinator.startRecording().catch((e: Error) => e);
+    await Promise.resolve();
+    await coordinator.stopRecording();
+    await coordinator.startRecording();
+    rejectFirst(new Error('late'));
+    expect(await firstResult).toBeInstanceOf(Error);
+    expect(t2Stops).toBe(0);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'recording' });
+    expect(await coordinator.stopRecording()).not.toBeNull();
+  });
+
+  test('a canceled startup that later succeeds does not start more services', async () => {
+    const t1 = new FakeTrackRecorder();
+    let resolveFirst!: () => void;
+    t1.startTracking = () => new Promise<void>((resolve) => (resolveFirst = resolve));
+    const audio = new MockAudioRecorder();
+    const coordinator = new RecordingCoordinator({
+      recordingStore: new FakeRecordingStore(),
+      audioRecorder: audio,
+      transcriptionService: new MockTranscriptionService(),
+      makeTrackRecorder: () => t1,
+      audioFileURL: (id) => `/rec/${id}.m4a`,
+      clock: new FakeClock(),
+    });
+    const first = coordinator.startRecording().catch((e: Error) => e);
+    await Promise.resolve();
+    await coordinator.stopRecording();
+    resolveFirst();
+    expect(await first).toBeInstanceOf(Error);
+    expect(audio.startRecordingCalled).toBe(false);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+  });
+
+  test('a stop that lands while audio is starting releases audio and transcription and rejects', async () => {
+    const audio = new MockAudioRecorder();
+    let resolveAudio!: () => void;
+    audio.startRecording = async () => {
+      audio.startRecordingCalled = true;
+      await new Promise<void>((resolve) => (resolveAudio = resolve));
+    };
+    const transcription = new MockTranscriptionService();
+    const { coordinator } = make({ audio, transcription });
+    const start = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    expect(audio.startRecordingCalled).toBe(true);
+    await coordinator.stopRecording();
+    const stopsAfterStop = audio.stopRecordingCallCount;
+    const transcriptionStopsAfterStop = transcription.stopTranscriptionCallCount;
+    resolveAudio();
+    expect(await start).toBeInstanceOf(Error);
+    // The late start released what it had just started.
+    expect(audio.stopRecordingCallCount).toBe(stopsAfterStop + 1);
+    expect(transcription.stopTranscriptionCallCount).toBe(transcriptionStopsAfterStop + 1);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+  });
+
+  test('a new start waits for a canceled start to finish releasing audio and transcription', async () => {
+    const audio = new MockAudioRecorder();
+    let resolveAudioStart!: () => void;
+    let releaseAudioStop!: () => void;
+    let firstAudioStart = true;
+    const realStart = audio.startRecording.bind(audio);
+    audio.startRecording = async (...args) => {
+      if (firstAudioStart) {
+        firstAudioStart = false;
+        await new Promise<void>((resolve) => (resolveAudioStart = resolve));
+      }
+      return realStart(...args);
+    };
+    const realStop = audio.stopRecording.bind(audio);
+    let stops = 0;
+    audio.stopRecording = async () => {
+      stops += 1;
+      if (stops === 2) await new Promise<void>((resolve) => (releaseAudioStop = resolve)); // the canceled start's stop
+      return realStop();
+    };
+    const transcription = new MockTranscriptionService();
+    const { coordinator } = make({ audio, transcription });
+    const first = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    await coordinator.stopRecording(); // stops === 1
+    resolveAudioStart();
+    await flush(); // the canceled start is now waiting on its audio stop
+    const second = coordinator.startRecording();
+    await flush();
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' }); // new start is waiting
+    releaseAudioStop();
+    expect(await first).toBeInstanceOf(Error);
+    await second;
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'recording' });
+    const stopsBefore = transcription.stopTranscriptionCallCount;
+    await flush();
+    expect(transcription.stopTranscriptionCallCount).toBe(stopsBefore); // old cleanup did not stop the new flight
+    expect(await coordinator.stopRecording()).not.toBeNull();
+  });
+
+  test('a countdown canceled while a start waits for cleanup does not start a flight', async () => {
+    const audio = new MockAudioRecorder();
+    let resolveAudioStart!: () => void;
+    let releaseStop!: () => void;
+    let startCalls = 0;
+    const realStart = audio.startRecording.bind(audio);
+    audio.startRecording = async (...args) => {
+      startCalls += 1;
+      if (startCalls === 1) await new Promise<void>((resolve) => (resolveAudioStart = resolve));
+      return realStart(...args);
+    };
+    let stops = 0;
+    audio.stopRecording = async () => {
+      stops += 1;
+      if (stops === 2) await new Promise<void>((resolve) => (releaseStop = resolve));
+      return '/tmp/x.m4a';
+    };
+    const { coordinator } = make({ audio });
+    const first = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    await coordinator.stopRecording();
+    resolveAudioStart();
+    await flush(); // cleanup pending on the second audio stop
+    coordinator.state.recordingStatus = { kind: 'countdown', remaining: 1 };
+    const auto = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    coordinator.cancelCountdown();
+    releaseStop();
+    expect(await first).toBeInstanceOf(Error);
+    expect(await auto).toBeInstanceOf(Error);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+    expect(startCalls).toBe(1);
+  });
+
+  test('a start waiting for cleanup is bound to its own countdown, not a newer one', async () => {
+    const audio = new MockAudioRecorder();
+    let resolveAudioStart!: () => void;
+    let releaseStop!: () => void;
+    let startCalls = 0;
+    const realStart = audio.startRecording.bind(audio);
+    audio.startRecording = async (...args) => {
+      startCalls += 1;
+      if (startCalls === 1) await new Promise<void>((resolve) => (resolveAudioStart = resolve));
+      return realStart(...args);
+    };
+    let stops = 0;
+    audio.stopRecording = async () => {
+      stops += 1;
+      if (stops === 2) await new Promise<void>((resolve) => (releaseStop = resolve));
+      return '/tmp/x.m4a';
+    };
+    const { coordinator, clock } = make({ audio });
+    const first = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    await coordinator.stopRecording();
+    resolveAudioStart();
+    await flush(); // cleanup pending
+
+    const speed0 = 0;
+    let speed = speed0; // reopens the post-stop gate first
+    coordinator.startAutoStartMonitoring({
+      groundSpeedKts: () => speed,
+      autoStartSpeedThresholdKts: () => 15,
+      isAutoStartEnabled: () => true,
+    });
+    await clock.advance(500);
+    speed = 20;
+    await clock.advance(1500 + 3000); // countdown 1 runs out and its start waits for cleanup
+    expect(coordinator.state.recordingStatus.kind).toBe('countdown');
+    coordinator.cancelCountdown(); // the pilot cancels while the start waits (the monitor loop is blocked on it)
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+    coordinator.state.recordingStatus = { kind: 'countdown', remaining: 3 }; // a newer countdown owns the status
+    releaseStop();
+    await flush();
+    expect(await first).toBeInstanceOf(Error);
+    // The old countdown's start was rejected and did not touch the newer countdown or start a flight.
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'countdown', remaining: 3 });
+    expect(startCalls).toBe(1);
+    coordinator.stopAutoStartMonitoring();
+  });
+
+  test('two overlapping canceled starts both finish cleanup before a new start proceeds', async () => {
+    const audio = new MockAudioRecorder();
+    const startGates: (() => void)[] = [];
+    let startCalls = 0;
+    const realStart = audio.startRecording.bind(audio);
+    audio.startRecording = async (...args) => {
+      startCalls += 1;
+      if (startCalls <= 2) await new Promise<void>((resolve) => startGates.push(resolve));
+      return realStart(...args);
+    };
+    const stopGates: (() => void)[] = [];
+    let stops = 0;
+    audio.stopRecording = async () => {
+      stops += 1;
+      if (stops === 3 || stops === 4) await new Promise<void>((resolve) => stopGates.push(resolve)); // the two canceled starts' stops
+      return '/tmp/x.m4a';
+    };
+    const transcription = new MockTranscriptionService();
+    const { coordinator } = make({ audio, transcription });
+    // Two starts reach audio startup: the second is allowed because stop returns the coordinator to idle in between.
+    const a = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    await coordinator.stopRecording();
+    const b = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    await coordinator.stopRecording();
+    startGates.forEach((g) => g());
+    await flush();
+    const third = coordinator.startRecording();
+    await flush();
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' }); // waiting on both cleanups
+    stopGates[0]?.();
+    await flush();
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' }); // one cleanup still pending
+    stopGates[1]?.();
+    expect(await a).toBeInstanceOf(Error);
+    expect(await b).toBeInstanceOf(Error);
+    await third;
+    const before = transcription.stopTranscriptionCallCount;
+    await flush();
+    expect(transcription.stopTranscriptionCallCount).toBe(before);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'recording' });
+    await coordinator.stopRecording();
+  });
+
+  test('a synchronously throwing tracker cleanup does not replace the startup error', async () => {
+    const { coordinator, tracker } = make();
+    tracker.startTracking = async () => {
+      throw new Error('start failed');
+    };
+    tracker.stopTracking = () => {
+      throw new Error('cleanup failed');
+    };
+    await expect(coordinator.startRecording()).rejects.toThrow('start failed');
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
   });
 });
 

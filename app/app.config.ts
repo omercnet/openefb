@@ -13,7 +13,12 @@ const FONTS = [
 
 const MIC = 'Kanaf records cockpit audio during flights for transcription and debrief.';
 const SPEECH = 'Kanaf transcribes cockpit audio in real-time to create flight transcripts.';
-const LOCATION = 'Kanaf shows your position on the chart and records your flight track.';
+// Location usage strings verbatim from the SwiftUI target (efb-212.xcodeproj INFOPLIST_KEY_NSLocation*UsageDescription).
+// The Swift app declares no NSLocationAlwaysUsageDescription (iOS 11+ reads AlwaysAndWhenInUse), so neither does this.
+const LOCATION_WHEN_IN_USE =
+  'Kanaf uses your location to show your position on the aviation map and provide navigation guidance.';
+const LOCATION_ALWAYS_AND_WHEN_IN_USE =
+  'Kanaf uses your location in the background to continue tracking your flight when the screen is off.';
 
 // expo-task-manager adds UIBackgroundModes "fetch"; the SwiftUI app declares only location and audio.
 const withOnlyLocationAudioBackground: ConfigPlugin = (c) =>
@@ -65,9 +70,18 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
       monochromeImage: './assets/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
-    // FOREGROUND_SERVICE_LOCATION comes from expo-location, POST_NOTIFICATIONS from expo-audio; the
-    // microphone foreground-service type (API 34+) for background cockpit recording is added here.
-    permissions: ['android.permission.FOREGROUND_SERVICE_MICROPHONE'],
+    // Location (src/adapters/location.ts): fine/coarse for fixes, background for the flight track, and the
+    // location foreground service that keeps updates alive with the screen off. expo-location adds these too;
+    // listing them pins the manifest. POST_NOTIFICATIONS comes from expo-audio; the microphone foreground-service
+    // type (API 34+) for background cockpit recording is added here.
+    permissions: [
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.ACCESS_COARSE_LOCATION',
+      'android.permission.ACCESS_BACKGROUND_LOCATION',
+      'android.permission.FOREGROUND_SERVICE',
+      'android.permission.FOREGROUND_SERVICE_LOCATION',
+      'android.permission.FOREGROUND_SERVICE_MICROPHONE',
+    ],
   },
   // A binary only receives updates built from the same native code (web/ota README: what needs a store release).
   runtimeVersion: { policy: 'fingerprint' },
@@ -88,11 +102,13 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
     // SQLite from source instead of the prebuilt AAR (android/shouldUsePublication.groovy).
     ['expo-sqlite', { customBuildFlags: '-DSQLITE_ENABLE_RTREE=1' }],
     ['expo-location', {
-      locationWhenInUsePermission: LOCATION,
-      locationAlwaysAndWhenInUsePermission: LOCATION,
-      locationAlwaysPermission: LOCATION,
+      locationWhenInUsePermission: LOCATION_WHEN_IN_USE,
+      locationAlwaysAndWhenInUsePermission: LOCATION_ALWAYS_AND_WHEN_IN_USE,
+      locationAlwaysPermission: false,
       isIosBackgroundLocationEnabled: true,
       isAndroidBackgroundLocationEnabled: true,
+      // Android foreground service for background updates; its notification text is set per start in
+      // src/adapters/location.ts (FOREGROUND_SERVICE_NOTIFICATION). No custom icon: the app icon is used.
       isAndroidForegroundServiceEnabled: true,
       motionUsagePermission: false, // no CoreMotion, as in the SwiftUI app
       locationFullAccuracyPermission: false,

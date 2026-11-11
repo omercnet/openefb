@@ -91,7 +91,17 @@ jobs:
             gitleaks = "8.30.1"
       - name: Install plistutil
         # libplist lints plists and project.pbxproj off macOS (tools/hooks/plist-lint.sh). shellcheck and python3 ship with the runner.
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libplist-utils
+        # Ubuntu's mirrors are sometimes unresolvable from hosted runners, and each failed fetch burns minutes of DNS
+        # timeouts. Give apt two minutes, then install libplist from Homebrew (bottles come from ghcr.io).
+        run: |
+          if timeout 120 bash -c 'sudo apt-get update -qq -o Acquire::Retries=1 && sudo apt-get install -y -qq libplist-utils'; then
+            exit 0
+          fi
+          echo "apt could not install libplist-utils; falling back to Homebrew" >&2
+          brew=/home/linuxbrew/.linuxbrew/bin/brew
+          command -v brew >/dev/null && brew="$(command -v brew)"
+          HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 "$brew" install --quiet libplist
+          echo "$("$brew" --prefix)/bin" >> "$GITHUB_PATH"
       - name: Conventional Commits (pull requests)
         if: github.event_name == 'pull_request'
         run: tools/hooks/commit-msg.sh --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"

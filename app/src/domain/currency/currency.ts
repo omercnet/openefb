@@ -40,10 +40,13 @@ export function flightReviewStatus(reviewDate: number | null | undefined, now: n
   return medicalStatus(addMonths(reviewDate, 24), now);
 }
 
-/** Needs 3 night landings in the preceding 90 days; no warning state. */
+/**
+ * Needs 3 night landings in the preceding 90 days; no warning state. Landings dated after `now` do not count (owner
+ * decision 2026-11-11, differs from Swift).
+ */
 export function nightCurrencyStatus(nightLandings: readonly NightLanding[], now: number): CurrencyStatus {
   const cutoff = now - 90 * DAY_MS;
-  const recent = nightLandings.filter((l) => l.date >= cutoff).reduce((sum, l) => sum + l.count, 0);
+  const recent = nightLandings.filter((l) => l.date >= cutoff && l.date <= now).reduce((sum, l) => sum + l.count, 0);
   return recent >= 3 ? 'current' : 'expired';
 }
 

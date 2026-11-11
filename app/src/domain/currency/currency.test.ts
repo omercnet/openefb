@@ -84,6 +84,27 @@ describe('CurrencyService Tests', () => {
     expect(nightCurrencyStatus(landings, NOW)).toBe('current');
   });
 
+  // Owner decision 2026-11-11: landings dated after now do not count (not in Swift).
+  test('nightLandingOneHourInFutureDoesNotCount', () => {
+    expect(nightCurrencyStatus([{ date: NOW + 3_600_000, count: 3 }], NOW)).toBe('expired');
+    expect(
+      nightCurrencyStatus(
+        [
+          { date: addDays(-10), count: 2 },
+          { date: NOW + 3_600_000, count: 1 },
+        ],
+        NOW,
+      ),
+    ).toBe('expired');
+  });
+  test('nightLandingDatedExactlyNowCounts', () => {
+    expect(nightCurrencyStatus([{ date: NOW, count: 3 }], NOW)).toBe('current');
+  });
+  test('nightLanding90DayBoundaryUnchanged', () => {
+    expect(nightCurrencyStatus([{ date: addDays(-90) - 1, count: 3 }], NOW)).toBe('expired');
+    expect(nightCurrencyStatus([{ date: addDays(-90), count: 3 }], NOW)).toBe('current');
+  });
+
   // Overall Status
   test('overallCurrentWhenAllCurrent', () => {
     expect(overallStatus('current', 'current', 'current')).toBe('current');

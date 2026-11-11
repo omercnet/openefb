@@ -125,6 +125,10 @@ export class RecordingCoordinator {
   private autoStartTask: Cancellable | null = null;
   private autoStopTask: Cancellable | null = null;
   private currentFlightID: string | null = null;
+  private startSession: symbol | null = null;
+  /** Identity of the current auto-start countdown; bumped when one begins or is canceled. */
+  private countdownGeneration = 0;
+  private pendingCleanups = new Set<Promise<void>>();
   private autoStartGate = new AutoStartGate();
   private recordingStartDate: number | null = null;
 
@@ -141,7 +145,16 @@ export class RecordingCoordinator {
   // MARK: Core lifecycle
 
   /** Start a new flight recording. Returns the flight id. */
-  async startRecording(profile: AudioQualityProfile = 'standard'): Promise<string> {
+  async startRecording(profile: AudioQualityProfile = 'standard', countdownGeneration?: number): Promise<string> {
+    // Let a canceled start finish releasing the shared audio and transcription services first.
+    const statusOnEntry = this.state.recordingStatus;
+    while (this.pendingCleanups.size > 0) await Promise.all([...this.pendingCleanups]);
+    // An auto-start countdown canceled while we waited must not start a flight.
+    const countdownReplaced = countdownGeneration !== undefined && countdownGeneration !== this.countdownGeneration;
+    if (countdownReplaced || (statusOnEntry.kind === 'countdown' && this.state.recordingStatus.kind !== 'countdown')) {
+      throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
+    }
+
     // Allowed from idle or from the tail of an auto-start countdown (whatever the remaining count is).
     const current = this.state.recordingStatus;
     if (current.kind !== 'idle' && current.kind !== 'countdown') {
@@ -152,6 +165,8 @@ export class RecordingCoordinator {
     }
 
     const flightID = this.newId();
+    const session = Symbol('startRecording');
+    this.startSession = session;
     this.currentFlightID = flightID;
     this.recordingStartDate = this.clock.now();
 
@@ -163,23 +178,34 @@ export class RecordingCoordinator {
       lastError: null,
     });
 
+    let startingTracker: TrackRecorderLike | null = null;
     try {
-      const tracker = this.makeTrackRecorder(flightID);
-      this.trackRecorder = tracker;
-      tracker.setFailureHandlers({
+      startingTracker = this.makeTrackRecorder(flightID);
+      this.trackRecorder = startingTracker;
+      startingTracker.setFailureHandlers({
         onWriteFailure: () => this.handleTrackFailure('trackWriteFailed'),
         onStreamFailure: () => this.handleTrackFailure('trackStreamFailed'),
       });
-      await tracker.startTracking();
+      await startingTracker.startTracking();
     } catch (error) {
-      // JS-only guard (Swift's tracker calls do not throw): roll back so the coordinator is not stuck in recording.
-      this.trackRecorder = null;
-      this.currentFlightID = null;
-      this.recordingStartDate = null;
-      this.state.set({ recordingStatus: idleStatus });
+      // JS-only guard (Swift's tracker calls do not throw). Best-effort release of whatever the tracker acquired.
+      await bestEffort(() => startingTracker?.stopTracking());
+      // Only roll back our own start: a stop or a newer start may have replaced the session while startup was pending.
+      if (this.startSession === session) {
+        this.startSession = null;
+        this.trackRecorder = null;
+        this.currentFlightID = null;
+        this.recordingStartDate = null;
+        this.state.set({ recordingStatus: idleStatus });
+      }
       throw error;
     }
-    const tracker = this.trackRecorder;
+    const tracker = startingTracker;
+    if (this.startSession !== session) {
+      // Stopped (or replaced) while the tracker was starting: release it and do not start more services.
+      await bestEffort(() => tracker.stopTracking());
+      throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
+    }
 
     const audioURL = this.audioFileURL(flightID);
 
@@ -214,6 +240,25 @@ export class RecordingCoordinator {
       // Continue without transcription.
     }
 
+    if (this.startSession !== session) {
+      // Stopped while audio or transcription were starting. If nothing newer took over, release what just started.
+      // Serialized: a new startRecording waits for this cleanup, so it cannot lose services to a late stop.
+      const cleanup = (async () => {
+        await bestEffort(() => tracker.stopTracking());
+        if (this.startSession === null) {
+          await bestEffort(() => this.audio.stopRecording());
+          await bestEffort(() => this.transcription.stopTranscription());
+        }
+      })();
+      this.pendingCleanups.add(cleanup);
+      try {
+        await cleanup;
+      } finally {
+        this.pendingCleanups.delete(cleanup);
+      }
+      throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
+    }
+
     this.startTimer();
     return flightID;
   }
@@ -224,6 +269,7 @@ export class RecordingCoordinator {
     const startDate = this.recordingStartDate;
     if (flightID === null || startDate === null) return null;
 
+    this.startSession = null;
     this.state.set({ recordingStatus: { kind: 'stopping' } });
 
     if (this.timerTask) this.timerTask.cancelled = true;
@@ -343,6 +389,7 @@ export class RecordingCoordinator {
   }
 
   cancelCountdown(): void {
+    this.countdownGeneration += 1;
     this.state.set({ recordingStatus: idleStatus, countdownRemaining: 0 });
   }
 
@@ -374,16 +421,18 @@ export class RecordingCoordinator {
   }
 
   private async startCountdown(): Promise<void> {
+    const generation = ++this.countdownGeneration;
     for (let remaining = 3; remaining >= 1; remaining--) {
       this.state.set({ recordingStatus: { kind: 'countdown', remaining }, countdownRemaining: remaining });
       await this.clock.sleep(1000);
-      if (this.state.recordingStatus.kind === 'idle') return; // cancelled during countdown
+      if (this.state.recordingStatus.kind === 'idle' || this.countdownGeneration !== generation) return; // cancelled or replaced
     }
 
     try {
-      await this.startRecording();
+      await this.startRecording('standard', generation);
     } catch {
-      this.state.set({ recordingStatus: idleStatus });
+      // Only reset our own countdown: a newer one may own the status now.
+      if (this.countdownGeneration === generation) this.state.set({ recordingStatus: idleStatus });
     }
   }
 
@@ -410,4 +459,13 @@ function asAppError(error: unknown): AppError {
   if (error instanceof AppFailure) return error.error;
   if (typeof error === 'object' && error !== null && 'kind' in error) return error as AppError;
   return { kind: 'recordingFailed', cause: error };
+}
+
+/** Runs cleanup that may throw synchronously or reject; never lets it replace the caller's error. */
+async function bestEffort(fn: () => Promise<unknown> | undefined): Promise<void> {
+  try {
+    await fn();
+  } catch {
+    // ignored on purpose
+  }
 }
