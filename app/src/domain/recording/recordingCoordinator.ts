@@ -126,6 +126,7 @@ export class RecordingCoordinator {
   private autoStopTask: Cancellable | null = null;
   private currentFlightID: string | null = null;
   private startSession: symbol | null = null;
+  private pendingCleanup: Promise<void> | null = null;
   private autoStartGate = new AutoStartGate();
   private recordingStartDate: number | null = null;
 
@@ -143,6 +144,9 @@ export class RecordingCoordinator {
 
   /** Start a new flight recording. Returns the flight id. */
   async startRecording(profile: AudioQualityProfile = 'standard'): Promise<string> {
+    // Let a canceled start finish releasing the shared audio and transcription services first.
+    while (this.pendingCleanup) await this.pendingCleanup;
+
     // Allowed from idle or from the tail of an auto-start countdown (whatever the remaining count is).
     const current = this.state.recordingStatus;
     if (current.kind !== 'idle' && current.kind !== 'countdown') {
@@ -230,11 +234,17 @@ export class RecordingCoordinator {
 
     if (this.startSession !== session) {
       // Stopped while audio or transcription were starting. If nothing newer took over, release what just started.
-      await bestEffort(() => tracker.stopTracking());
-      if (this.startSession === null) {
-        await bestEffort(() => this.audio.stopRecording());
-        await bestEffort(() => this.transcription.stopTranscription());
-      }
+      // Serialized: a new startRecording waits for this cleanup, so it cannot lose services to a late stop.
+      const cleanup = (async () => {
+        await bestEffort(() => tracker.stopTracking());
+        if (this.startSession === null) {
+          await bestEffort(() => this.audio.stopRecording());
+          await bestEffort(() => this.transcription.stopTranscription());
+        }
+      })();
+      this.pendingCleanup = cleanup;
+      await cleanup;
+      if (this.pendingCleanup === cleanup) this.pendingCleanup = null;
       throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
     }
 

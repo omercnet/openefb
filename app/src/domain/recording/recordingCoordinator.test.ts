@@ -293,6 +293,46 @@ describe('startRecording rollback (session and cleanup)', () => {
     expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
   });
 
+  test('a new start waits for a canceled start to finish releasing audio and transcription', async () => {
+    const audio = new MockAudioRecorder();
+    let resolveAudioStart!: () => void;
+    let releaseAudioStop!: () => void;
+    let firstAudioStart = true;
+    const realStart = audio.startRecording.bind(audio);
+    audio.startRecording = async (...args) => {
+      if (firstAudioStart) {
+        firstAudioStart = false;
+        await new Promise<void>((resolve) => (resolveAudioStart = resolve));
+      }
+      return realStart(...args);
+    };
+    const realStop = audio.stopRecording.bind(audio);
+    let stops = 0;
+    audio.stopRecording = async () => {
+      stops += 1;
+      if (stops === 2) await new Promise<void>((resolve) => (releaseAudioStop = resolve)); // the canceled start's stop
+      return realStop();
+    };
+    const transcription = new MockTranscriptionService();
+    const { coordinator } = make({ audio, transcription });
+    const first = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    await coordinator.stopRecording(); // stops === 1
+    resolveAudioStart();
+    await flush(); // the canceled start is now waiting on its audio stop
+    const second = coordinator.startRecording();
+    await flush();
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' }); // new start is waiting
+    releaseAudioStop();
+    expect(await first).toBeInstanceOf(Error);
+    await second;
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'recording' });
+    const stopsBefore = transcription.stopTranscriptionCallCount;
+    await flush();
+    expect(transcription.stopTranscriptionCallCount).toBe(stopsBefore); // old cleanup did not stop the new flight
+    expect(await coordinator.stopRecording()).not.toBeNull();
+  });
+
   test('a synchronously throwing tracker cleanup does not replace the startup error', async () => {
     const { coordinator, tracker } = make();
     tracker.startTracking = async () => {
