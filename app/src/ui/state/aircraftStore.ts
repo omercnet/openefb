@@ -1,4 +1,4 @@
-import { createStore } from 'zustand';
+import { createStore, type StoreApi } from 'zustand';
 import type { IsraelRouteNetwork } from '../../data/aviation/israelTypes';
 import type { AircraftProfile } from '../../data/models';
 import { describeError } from '../../domain/describeError';
@@ -43,12 +43,16 @@ export interface AircraftState {
   select(id: string): Promise<void>;
   /** `id` null creates a new, inactive profile. */
   save(id: string | null, form: AircraftForm): Promise<AircraftSaveResult>;
-  remove(id: string): Promise<void>;
+  /** True when the profile is gone afterwards (deleted, or already gone); false when the delete failed (see `error`). */
+  remove(id: string): Promise<boolean>;
   /** The route network kept for an aircraft; unreadable reads as none. */
   routeNetworkFor(id: string): Promise<IsraelRouteNetwork | null>;
 }
 
-export function createAircraftStore(deps: AircraftDeps) {
+/** The store a screen renders (`useStore(store)`); the app shell creates it so list and editor share one. */
+export type AircraftStore = StoreApi<AircraftState>;
+
+export function createAircraftStore(deps: AircraftDeps): AircraftStore {
   // Every change to the data runs here, one at a time in call order.
   const enqueue = createSerialQueue();
 
@@ -134,9 +138,10 @@ export function createAircraftStore(deps: AircraftDeps) {
             await deleteAircraftProfile(deps.userData, id);
           } catch (error) {
             set({ error: `Could not delete the aircraft: ${describeError(error)}` });
-            return;
+            return false;
           }
           set({ error: await reload() });
+          return true;
         }),
 
       async routeNetworkFor(id) {

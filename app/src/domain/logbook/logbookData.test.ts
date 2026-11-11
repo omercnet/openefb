@@ -55,9 +55,16 @@ describe.each(makers)('LogbookViewModel Tests over %s', (_name, make) => {
     expect(logbook.totalFlightTimeSeconds).toBe(10_800);
   });
 
-  it('an empty logbook has no entries and zero totals', async () => {
+  it('loadEntriesOnEmptyLogbookZeroesPreviousTotals', async () => {
     const data = await make();
-    expect(await loadLogbook(data)).toEqual({ entries: [], totalFlights: 0, totalFlightTimeSeconds: 0 });
+    const entry = await insertEntry(data, 1_700_000_000_000, 3600);
+    expect((await loadLogbook(data)).totalFlights).toBe(1);
+
+    await deleteLogbookEntry(data, entry.id);
+    const logbook = await loadLogbook(data);
+
+    // Swift's view model kept the previous totals until the next load; loadLogbook has no state to go stale.
+    expect(logbook).toEqual({ entries: [], totalFlights: 0, totalFlightTimeSeconds: 0 });
   });
 
   it('manualEntryIsUnconfirmedHasNoFlightIDAndIsDatedNow (inserted, not just returned)', async () => {

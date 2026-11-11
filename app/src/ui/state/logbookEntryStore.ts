@@ -1,4 +1,4 @@
-import { createStore } from 'zustand';
+import { createStore, type StoreApi } from 'zustand';
 import type { LogbookEntry } from '../../data/models';
 import { describeError } from '../../domain/describeError';
 import { confirmEntryAndUpdateCurrency, LogbookError, saveLogbookEntry } from '../../domain/logbook/logbookData';
@@ -32,7 +32,10 @@ export interface LogbookEntryState {
   confirm(form: LogbookForm): Promise<LogbookSaveResult>;
 }
 
-export function createLogbookEntryStore(deps: LogbookEntryDeps) {
+/** The store a screen renders (`useStore(store)`); the app shell creates it so list and editor share one. */
+export type LogbookEntryStore = StoreApi<LogbookEntryState>;
+
+export function createLogbookEntryStore(deps: LogbookEntryDeps): LogbookEntryStore {
   // Loads and writes run one at a time in call order, so a late read cannot replace what a save just wrote.
   const enqueue = createSerialQueue();
 

@@ -1,4 +1,4 @@
-import { createStore } from 'zustand';
+import { createStore, type StoreApi } from 'zustand';
 import type { PilotProfile } from '../../data/models';
 import { describeError } from '../../domain/describeError';
 import {
@@ -49,7 +49,8 @@ export interface PilotState {
   /** addProfile(): inserts a blank, inactive profile and resolves its id for the editor; null when it failed or was refused. */
   create(): Promise<string | null>;
   save(id: string, form: PilotForm): Promise<PilotSaveResult>;
-  remove(id: string): Promise<void>;
+  /** True when the profile is gone afterwards (deleted, or already gone); false when the delete failed (see `error`). */
+  remove(id: string): Promise<boolean>;
   /** Appends a night landing entry to the pilot who is active when the job runs. */
   addNightLandings(date: number, count: number): Promise<NightLandingResult>;
 }
@@ -64,7 +65,10 @@ const isStorableLanding = (date: number, count: number): boolean =>
   count >= NIGHT_LANDING_STEPPER.min &&
   count <= NIGHT_LANDING_STEPPER.max;
 
-export function createPilotStore(deps: PilotDeps) {
+/** The store a screen renders (`useStore(store)`); the app shell creates it so list and editor share one. */
+export type PilotStore = StoreApi<PilotState>;
+
+export function createPilotStore(deps: PilotDeps): PilotStore {
   // Every change to the data runs here, one at a time in call order.
   const enqueue = createSerialQueue();
 
@@ -151,14 +155,23 @@ export function createPilotStore(deps: PilotDeps) {
             await deletePilotProfile(deps.userData, id);
           } catch (error) {
             set({ error: `Could not delete the pilot profile: ${describeError(error)}` });
-            return;
+            return false;
           }
           set({ error: await reload() });
+          return true;
         }),
 
       addNightLandings: (date, count) => {
         if (!isStorableLanding(date, count)) return Promise.resolve('invalid');
         return exclusive<NightLandingResult>('busy', async () => {
+          // A sheet can open before the list has loaded; without the active pilot the landings would be dropped silently.
+          if (!get().loaded) {
+            const problem = await reload();
+            if (problem !== null) {
+              set({ error: problem });
+              return 'failed';
+            }
+          }
           // Read inside the job, so a select queued before this call decides who gets the landings.
           const pilotId = get().activeId;
           if (pilotId === null) return 'noActivePilot';

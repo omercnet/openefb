@@ -6,7 +6,6 @@ import {
   addNightLanding,
   CERTIFICATE_TYPE_NAMES,
   computePilotCurrency,
-  emptyPilotForm,
   landingCountText,
   MEDICAL_CLASS_NAMES,
   NIGHT_LANDING_STEPPER,
@@ -22,7 +21,9 @@ import {
 const DAY = 86_400_000;
 const NOW = Date.UTC(2026, 10, 11, 9, 30);
 const pilot = (over: Partial<PilotProfile> = {}): PilotProfile => newPilotProfile({ id: 'p1', createdAt: 1, ...over });
-const form = (over: Partial<PilotForm> = {}): PilotForm => ({ ...emptyPilotForm(NOW), ...over });
+/** The form of a blank profile: what the editor shows for a pilot nothing has been entered for. */
+const blankForm = (): PilotForm => pilotFormFromProfile(pilot(), NOW);
+const form = (over: Partial<PilotForm> = {}): PilotForm => ({ ...blankForm(), ...over });
 
 describe('display names (CertificateType and MedicalClass extensions)', () => {
   it('cover every case with the Swift words', () => {
@@ -43,9 +44,9 @@ describe('display names (CertificateType and MedicalClass extensions)', () => {
   });
 });
 
-describe('emptyPilotForm', () => {
+describe('the form of a blank profile (PilotEditView @State defaults)', () => {
   it('is blank with the pickers at None and the date pickers at now', () => {
-    expect(emptyPilotForm(NOW)).toEqual({
+    expect(blankForm()).toEqual({
       name: '',
       certificateNumber: '',
       phone: '',

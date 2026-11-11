@@ -12,6 +12,8 @@ const sf = (fontSize: number, extra?: TextStyle): TextStyle => ({
 /** The SwiftUI text styles at their default Dynamic Type sizes. */
 export const FormType = {
   largeTitle: sf(34, { fontWeight: '700' }),
+  /** The +/- glyphs of a stepper (.title2). */
+  title2: sf(22),
   headline: sf(17, { fontWeight: '600' }),
   body: sf(17),
   subheadline: sf(15),
@@ -32,7 +34,7 @@ export const FormMetrics = {
 /** Palette.accentText: the AccentColor asset (day = accent, night = a light blue that reads on dark paper). */
 export const accentText = (t: Theme): string => (t.night ? '#8FB4DF' : t.accent);
 
-export type Tone = 'primary' | 'secondary' | 'accent' | 'caution' | 'warning';
+export type Tone = 'primary' | 'secondary' | 'accent' | 'ok' | 'caution' | 'warning';
 
 export function toneColor(t: Theme, tone: Tone): string {
   switch (tone) {
@@ -42,6 +44,8 @@ export function toneColor(t: Theme, tone: Tone): string {
       return t.secondaryText;
     case 'accent':
       return accentText(t);
+    case 'ok':
+      return t.ok;
     case 'caution':
       return t.caution;
     case 'warning':

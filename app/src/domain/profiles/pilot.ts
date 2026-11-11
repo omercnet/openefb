@@ -64,20 +64,6 @@ export type PilotFields = Pick<
   | 'totalHours'
 >;
 
-export const emptyPilotForm = (now: number): PilotForm => ({
-  name: '',
-  certificateNumber: '',
-  phone: '',
-  email: '',
-  certificateType: null,
-  medicalClass: null,
-  hasMedicalExpiry: false,
-  medicalExpiry: now,
-  hasFlightReview: false,
-  flightReviewDate: now,
-  totalHours: '',
-});
-
 /** loadProfile. An unknown stored certificate type or medical class reads as None, and saving then clears it. */
 export function pilotFormFromProfile(profile: PilotProfile, now: number): PilotForm {
   return {

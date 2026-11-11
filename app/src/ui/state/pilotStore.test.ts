@@ -1,7 +1,7 @@
 // Behaviour of the pilot profile's view model (PilotProfileViewModel + the save flows of PilotProfileView and PilotEditView).
 // Swift has no test of it; the cases follow the Swift source, and the guards are JS-only (see U7.md).
 import { newPilotProfile } from '../../data/defaults';
-import { emptyPilotForm, type PilotForm } from '../../domain/profiles/pilot';
+import { pilotFormFromProfile, type PilotForm } from '../../domain/profiles/pilot';
 import type { UserData } from '../../domain/userData';
 import { createMemoryUserData } from '../../domain/userData/memory';
 import { viaTx } from '../../domain/userData/testSupport';
@@ -17,7 +17,11 @@ function setup(over: Partial<PilotDeps> = {}, userData: UserData = createMemoryU
   return { store: createPilotStore(deps), userData, onActiveChange };
 }
 
-const form = (over: Partial<PilotForm> = {}): PilotForm => ({ ...emptyPilotForm(NOW), name: 'Ada', ...over });
+const form = (over: Partial<PilotForm> = {}): PilotForm => ({
+  ...pilotFormFromProfile(newPilotProfile({ id: 'blank', createdAt: 1 }), NOW),
+  name: 'Ada',
+  ...over,
+});
 
 /** p1 (oldest, inactive), p2 (active, with a medical and a review), p3 (newest, inactive). */
 async function seeded(): Promise<UserData> {
@@ -238,7 +242,7 @@ describe('remove', () => {
   it('deleting the active pilot leaves none active, tells the app and reads expired', async () => {
     const { store, onActiveChange } = setup({}, await seeded());
     await store.getState().load();
-    await store.getState().remove('p2');
+    expect(await store.getState().remove('p2')).toBe(true);
     expect(store.getState().profiles.map((p) => p.id)).toEqual(['p3', 'p1']);
     expect(store.getState().activeId).toBeNull();
     expect(store.getState().currency.overall).toBe('expired');
@@ -250,7 +254,7 @@ describe('remove', () => {
     const broken: UserData = { ...data, pilots: { ...data.pilots, remove: () => Promise.reject(new Error('locked')) } };
     const { store } = setup({}, broken);
     await store.getState().load();
-    await store.getState().remove('p1');
+    expect(await store.getState().remove('p1')).toBe(false);
     expect(store.getState().error).toBe('Could not delete the pilot profile: locked');
     expect(store.getState().profiles).toHaveLength(3);
   });
@@ -348,6 +352,25 @@ describe('addNightLandings', () => {
     gate.resolve();
     expect(await first).toBe('saved');
     expect((await data.pilots.get('p2'))?.nightLandingEntries).toHaveLength(1);
+  });
+
+  it('works when the list was never loaded (a sheet opened before the list): the active pilot is read first, nothing is dropped', async () => {
+    const { store, userData } = setup({}, await seeded());
+    expect(store.getState().loaded).toBe(false);
+    expect(await store.getState().addNightLandings(NOW, 2)).toBe('saved');
+    expect((await userData.pilots.get('p2'))?.nightLandingEntries).toEqual([{ date: NOW, count: 2 }]);
+  });
+
+  it('when the list cannot be loaded the landings are not dropped silently: the save fails and says why', async () => {
+    const data = await seeded();
+    const broken: UserData = {
+      ...data,
+      pilots: { ...data.pilots, list: () => Promise.reject(new Error('db locked')) },
+    };
+    const { store } = setup({}, broken);
+    expect(await store.getState().addNightLandings(NOW, 2)).toBe('failed');
+    expect(store.getState().error).toBe('Could not load the pilot profiles: db locked');
+    expect((await data.pilots.get('p2'))?.nightLandingEntries).toEqual([]);
   });
 
   it('goes to the pilot who is active when the job runs: a queued select decides who gets the landings', async () => {

@@ -262,7 +262,7 @@ describe('remove', () => {
     const data = await seeded();
     const { store, onActiveChange } = setup({}, data);
     await store.getState().load();
-    await store.getState().remove('a2');
+    expect(await store.getState().remove('a2')).toBe(true);
     expect(store.getState().profiles.map((p) => p.id)).toEqual(['a3', 'a1']);
     expect(store.getState().activeId).toBeNull();
     expect(onActiveChange).toHaveBeenLastCalledWith(null);
@@ -276,9 +276,18 @@ describe('remove', () => {
     };
     const { store } = setup({}, broken);
     await store.getState().load();
-    await store.getState().remove('a1');
+    expect(await store.getState().remove('a1')).toBe(false);
     expect(store.getState().error).toBe('Could not delete the aircraft: locked');
     expect(store.getState().profiles).toHaveLength(3);
+  });
+});
+
+describe('remove of a profile that is already gone', () => {
+  it('counts as removed, so a screen that shows it can close', async () => {
+    const { store } = setup({}, await seeded());
+    await store.getState().load();
+    expect(await store.getState().remove('never-existed')).toBe(true);
+    expect(store.getState().error).toBeNull();
   });
 });
 
