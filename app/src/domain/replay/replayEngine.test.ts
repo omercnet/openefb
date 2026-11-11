@@ -257,3 +257,14 @@ describe('ReplayEngine timer and audio', () => {
     expect(player.currentTime).toBeCloseTo(engine.currentPosition, 5);
   });
 });
+
+describe('ReplayEngine loadFlight atomicity', () => {
+  test('a failed load keeps the previous flight', async () => {
+    const engine = new ReplayEngine(noTimer);
+    await engine.loadFlight('a', makeTestStore(), null);
+    const failing: ReplayStore = { ...makeTestStore(), phaseMarkers: async () => Promise.reject(new Error('boom')) };
+    await expect(engine.loadFlight('b', failing, null)).rejects.toThrow('boom');
+    expect(engine.trackPointCount).toBe(10);
+    expect(engine.totalDuration).toBe(9);
+  });
+});

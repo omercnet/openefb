@@ -24,6 +24,7 @@ export interface ReplayPhaseMarker {
 
 /** What loadFlight reads from the recording store (RecordingDatabase in Swift). */
 export interface ReplayStore {
+  /** Must be sorted by ascending timestamp (Swift: .order(Column("timestamp"))); duration and interpolation rely on it. */
   trackPoints(flightID: string): Promise<ReplayTrackPoint[]>;
   transcriptSegments(flightID: string): Promise<ReplayTranscriptSegment[]>;
   phaseMarkers(flightID: string): Promise<ReplayPhaseMarker[]>;

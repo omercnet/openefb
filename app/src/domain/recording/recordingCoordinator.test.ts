@@ -198,6 +198,24 @@ describe('startRecording rollback', () => {
   });
 });
 
+describe('startRecording rollback (factory)', () => {
+  test('makeTrackRecorder throwing rolls state back', async () => {
+    const coordinator = new RecordingCoordinator({
+      recordingStore: new FakeRecordingStore(),
+      audioRecorder: new MockAudioRecorder(),
+      transcriptionService: new MockTranscriptionService(),
+      makeTrackRecorder: () => {
+        throw new Error('no tracker');
+      },
+      audioFileURL: (id) => `/rec/${id}.m4a`,
+      clock: new FakeClock(),
+    });
+    await expect(coordinator.startRecording()).rejects.toThrow('no tracker');
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+    expect(await coordinator.stopRecording()).toBeNull();
+  });
+});
+
 describe('AutoStart (coordinator)', () => {
   test('cancelCountdownResetsToIdle', () => {
     const { coordinator } = make();

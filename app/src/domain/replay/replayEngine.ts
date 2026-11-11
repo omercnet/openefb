@@ -47,6 +47,7 @@ export class ReplayEngine {
   private cancelTimer: (() => void) | null = null;
   private recordingStartTime: number;
   private tickCount = 0;
+  private loadCounter = 0;
   private listeners = new Set<() => void>();
 
   constructor(
@@ -77,9 +78,18 @@ export class ReplayEngine {
 
   /** Load flight data from the recording store. Optionally attach an audio player for synchronized playback. */
   async loadFlight(flightID: string, store: ReplayStore, audio: ReplayAudioPlayer | null = null): Promise<void> {
-    this.trackPoints = await store.trackPoints(flightID);
-    this.transcriptSegments = await store.transcriptSegments(flightID);
-    this.phaseMarkers = await store.phaseMarkers(flightID);
+    // Read everything first, then assign, so a failed or superseded load leaves the previous flight intact.
+    const loadId = ++this.loadCounter;
+    const [trackPoints, transcriptSegments, phaseMarkers] = await Promise.all([
+      store.trackPoints(flightID),
+      store.transcriptSegments(flightID),
+      store.phaseMarkers(flightID),
+    ]);
+    if (loadId !== this.loadCounter) return; // a newer loadFlight started meanwhile
+
+    this.trackPoints = trackPoints;
+    this.transcriptSegments = transcriptSegments;
+    this.phaseMarkers = phaseMarkers;
 
     this.recordingStartTime = this.trackPoints[0]?.timestamp ?? this.now();
 

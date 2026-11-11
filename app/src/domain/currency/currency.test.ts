@@ -43,6 +43,11 @@ describe('CurrencyService Tests', () => {
     expect(medicalStatus(NOW - 3_600_000, NOW)).toBe('expired');
   });
 
+  test('invalid (NaN) timestamps read expired', () => {
+    expect(medicalStatus(NaN, NOW)).toBe('expired');
+    expect(flightReviewStatus(NaN, NOW)).toBe('expired');
+  });
+
   // Flight Review Status (FAR 61.56)
   test('flightReviewCurrentWhenRecent', () => {
     expect(flightReviewStatus(addMonths(-12), NOW)).toBe('current');

@@ -25,7 +25,7 @@ function addMonths(epochMs: number, months: number): number {
 
 /** > 30 days remaining = current, 0..30 = warning, past or missing = expired. */
 export function medicalStatus(expiryDate: number | null | undefined, now: number): CurrencyStatus {
-  if (expiryDate == null) return 'expired';
+  if (expiryDate == null || !Number.isFinite(expiryDate)) return 'expired'; // NaN guard is JS-only
   // Owner decision 2026-11-10 (differs from Swift): once the expiry instant has passed it is expired at once.
   // Swift truncated the day count toward zero, so 0-24 h past expiry read warning.
   if (expiryDate < now) return 'expired';
@@ -36,7 +36,7 @@ export function medicalStatus(expiryDate: number | null | undefined, now: number
 
 /** Flight review expires 24 calendar months after the review date. */
 export function flightReviewStatus(reviewDate: number | null | undefined, now: number): CurrencyStatus {
-  if (reviewDate == null) return 'expired';
+  if (reviewDate == null || !Number.isFinite(reviewDate)) return 'expired';
   return medicalStatus(addMonths(reviewDate, 24), now);
 }
 

@@ -163,22 +163,23 @@ export class RecordingCoordinator {
       lastError: null,
     });
 
-    const tracker = this.makeTrackRecorder(flightID);
-    this.trackRecorder = tracker;
-    tracker.setFailureHandlers({
-      onWriteFailure: () => this.handleTrackFailure('trackWriteFailed'),
-      onStreamFailure: () => this.handleTrackFailure('trackStreamFailed'),
-    });
     try {
+      const tracker = this.makeTrackRecorder(flightID);
+      this.trackRecorder = tracker;
+      tracker.setFailureHandlers({
+        onWriteFailure: () => this.handleTrackFailure('trackWriteFailed'),
+        onStreamFailure: () => this.handleTrackFailure('trackStreamFailed'),
+      });
       await tracker.startTracking();
     } catch (error) {
-      // JS-only guard (Swift's startTracking does not throw): roll back so the coordinator is not stuck in recording.
+      // JS-only guard (Swift's tracker calls do not throw): roll back so the coordinator is not stuck in recording.
       this.trackRecorder = null;
       this.currentFlightID = null;
       this.recordingStartDate = null;
       this.state.set({ recordingStatus: idleStatus });
       throw error;
     }
+    const tracker = this.trackRecorder;
 
     const audioURL = this.audioFileURL(flightID);
 
