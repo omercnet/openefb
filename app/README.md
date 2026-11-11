@@ -21,6 +21,7 @@ scheme `kanaf-dev` (the iOS project is then `KanafEFBDev`). CI builds and the OT
 src/domain/    pure TypeScript: no react, react-native, expo* or @maplibre imports (eslint no-restricted-imports)
 src/data/      the Db interface and, later, schema, migrations and repositories; same import ban as domain
 src/adapters/  platform wrappers (expo-sqlite, file store, ...) behind interfaces defined in domain or data
+modules/       local Expo modules, autolinked (kanaf-speech: iOS 26 SpeechAnalyzer, docs/port-notes/A3.md)
 src/ui/        tokens, primitives, screens, map surface, state (Zustand store)
 src/app/       expo-router routes: thin files that render a screen from src/ui/screens
 tests/         Jest helpers and tests that span layers (Db contract on Node sqlite, which has R-tree); unit tests sit
