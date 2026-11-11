@@ -118,6 +118,7 @@ export function MapScreen({ screen, allLayers = false }: { screen?: StripScreen;
             camera={model.camera}
             onViewChange={model.onViewChange}
             onStyleLoaded={model.onStyleLoaded}
+            onTileHealth={model.onTileHealth}
           />
         </View>
       </View>

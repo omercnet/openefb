@@ -150,6 +150,10 @@ export function useMapModel(input: MapModelInput) {
     mapMode: cam.state.mode,
     mapDirection: cam.state.mapDirection,
     onViewChange,
+    onTileHealth: useCallback(
+      (e: 'error' | 'ok') => (e === 'error' ? controller.noteTileError() : controller.noteTileLoadedFromNetwork()),
+      [controller],
+    ),
     onStyleLoaded: useCallback(() => void controller.onMapStyleLoaded(), [controller]),
     recenter,
     setMode,
