@@ -147,6 +147,14 @@ describe('signal and flush', () => {
     expect(ok.transport.batches).toEqual([]);
   });
 
+  test('count the event that was signalled, whatever the context holds under the names of the row', async () => {
+    const { telemetry, transport, setContext } = setup();
+    setContext({ ...CONTEXT, event: 'Debrief.generated', params: { screen: 'map' }, count: 5000 } as TelemetryContext);
+    telemetry.signal('Recording.started');
+    await telemetry.flush();
+    expect(transport.batches).toEqual([[row('Recording.started')]]);
+  });
+
   test('keep counting after a signal that did not fit', async () => {
     const { telemetry, transport } = setup();
     loose(telemetry).signal('nope');

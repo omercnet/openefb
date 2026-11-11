@@ -71,7 +71,7 @@ export class Telemetry {
   signal<E extends EventName>(event: E, ...params: SignalArgs<E>): void {
     try {
       if (!this.on) return;
-      const row = validateRow({ event, params: params[0], ...this.deps.context(), count: 1 });
+      const row = validateRow({ ...this.deps.context(), event, params: params[0], count: 1 });
       if (row && this.buffer.add(row)) this.persist();
     } catch {
       // Counting is never worth a failure in the app.
