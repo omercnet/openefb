@@ -3,7 +3,7 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { openAviationDatabase } from '../../adapters/aviationDb';
 import type { MapLayer } from '../../domain/core';
-import { CORE_LAYER_SPECS } from '../../domain/map/layers';
+import { layerSpecsFor } from '../../domain/map/registry';
 import type { MapDataSource } from '../../domain/map/mapDataController';
 import { fixtureAdvisory, fixtureTfr } from '../../fixtures/mapLayers';
 import { scenario } from '../../fixtures/scenario';
@@ -86,7 +86,7 @@ export function MapScreen({ screen, allLayers = false }: { screen: StripScreen; 
             sectional
             region={model.snapshot.region}
             visibleLayers={model.snapshot.visibleLayers}
-            layers={CORE_LAYER_SPECS}
+            layers={layerSpecsFor(model.snapshot.region)}
             sources={model.sources}
             initialView={INITIAL_VIEW}
             camera={model.camera}
