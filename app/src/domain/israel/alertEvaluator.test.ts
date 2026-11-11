@@ -538,3 +538,22 @@ describe('JS-only guards', () => {
     expect(formatOneDecimal(0.96)).toBe('1.0');
   });
 });
+
+describe('review fixes (JS-only guards)', () => {
+  test('border lines with fewer than two vertices or bad coordinates are rejected', () => {
+    const file = (lines: unknown) => JSON.stringify({ source: 's', borders: [{ name: 'B', bufferKm: 3, lines }] });
+    expect(() => parseBorderBuffers(file([[[32.7, 35.8]]]))).toThrow('malformed');
+    expect(() => parseBorderBuffers(file([[]]))).toThrow('malformed');
+    expect(() => parseBorderBuffers(file([[[32.7], [32.8, 35.8]]]))).toThrow('malformed');
+    expect(
+      parseBorderBuffers(
+        file([
+          [
+            [32.7, 35.8],
+            [32.8, 35.9],
+          ],
+        ]),
+      ).borders,
+    ).toHaveLength(1);
+  });
+});

@@ -63,3 +63,8 @@ Additions: closure mapper JS guard (1). Briefing `BriefingRoute` sources charact
 - **`"%.1f"` formatting:** reproduced by `formatOneDecimal`, which rounds exact binary ties half to even (`toFixed` would round 0.25 up).
 - **Whitespace trimming:** `trimmingCharacters(in: .whitespaces)` is reproduced as trimming Unicode Zs plus tab, not newlines (unlike `String.trim`).
 - **Id ordering:** briefing and alert ids compare by UTF-16 code unit. Swift compares Unicode scalars. These are identical for the ASCII ids in use.
+
+## Review decisions (CodeRabbit round 1)
+
+Kept as Swift parity, not changed: the alert evaluator's endpoint-only two-minute projection for airspace and border entry; the briefing's CVFR network for an active route (a known Swift bug, see above); permanent NOTAMs always included; area-distance filtering before closure classification; a single-code closure chain counting as fully mapped (Swift test `aSinglePointChainHasNoLegs` asserts it); a missing departure point shortening the active-route corridor (ActiveRoute carries none).
+Changed (JS-only guard): `parseBorderBuffers` now rejects lines with fewer than two vertices or non-finite coordinates, which could never produce a distance.

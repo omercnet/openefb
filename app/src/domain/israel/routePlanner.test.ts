@@ -133,11 +133,12 @@ describe('Shortest path', () => {
   });
 
   test('a segment naming a point the caller did not supply gets a synthetic point at the polyline end', () => {
-    const plan = new IsraelRoutePlanner(points().slice(0, 1), [segment(1, 'A', 'B', 10)]).route('A', 'A', 90);
-    expect(plan.legs).toEqual([]);
-    const p = new IsraelRoutePlanner([points()[0], { ...points()[1], id: 99 }], [segment(1, 'A', 'B', 10)]);
-    const routed = p.route('A', 'B', 90);
-    expect(routed.legs[0].to.latitude).toBe(32.01);
+    // B is on the network (two segments) but not in the supplied points, so the first leg ends on a synthetic B.
+    const pts = [points()[0], points()[2]];
+    const p = new IsraelRoutePlanner(pts, [segment(1, 'A', 'B', 10), segment(2, 'B', 'C', 10)]);
+    const routed = p.route('A', 'C', 90);
+    expect(routed.legs.map((l) => l.to.code)).toEqual(['B', 'C']);
+    expect(routed.legs[0].to).toMatchObject({ code: 'B', kind: 'onRequest', latitude: 32.0, longitude: 34.9 });
   });
 
   test('a code shared by two points resolves to the copy the segments reference', () => {

@@ -110,6 +110,14 @@ export function parseBorderBuffers(json: string): IsraelBorderBuffers {
       ) {
         throw new Error(`israel-border-lines: border ${index} malformed`);
       }
+      // JS-only guard: a line needs two vertices of [lat, lon], or it can never produce a distance (silent no-alert).
+      if (
+        !lines.every(
+          (line: number[][]) => line.length >= 2 && line.every((v) => v.length >= 2 && v.every(Number.isFinite)),
+        )
+      ) {
+        throw new Error(`israel-border-lines: border ${index} malformed`);
+      }
       return { name, bufferKm, lines: lines as number[][][] };
     }),
   };

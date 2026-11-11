@@ -131,6 +131,8 @@ describe('IsraelRoutePlanner over the bundled database', () => {
     });
     expect(debrief.fromPlan).toBe(true);
     expect(debrief.legs).toHaveLength(plan.legs.length);
+    // Guard: the loop below must measure something.
+    expect(debrief.legs.some((l) => l.adherence !== null)).toBe(true);
     for (const leg of debrief.legs) {
       if (!leg.adherence) continue;
       const name = `${leg.fromCode}-${leg.toCode} ${leg.publishedAltitude ?? '-'} ${(leg.startTime - t0) / 1000}s`;

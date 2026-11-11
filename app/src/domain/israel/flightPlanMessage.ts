@@ -248,6 +248,10 @@ export function validate(plan: IsraelRoutePlan, options: ValidateOptions = {}): 
     if (leg.segment.isMilitary) add({ kind: 'militarySegment', value: name }, true);
     if (leg.altitude === null) add({ kind: 'wrongWay', value: name }, true);
     const closure = closures.get(leg.segment.id);
+    // A plan carrying a check-NOTAM caution blocks filing even when the caller passes no closure map.
+    for (const caution of leg.cautions) {
+      if (caution.kind === 'checkNotam') add({ kind: 'checkNotam', value: caution.notamID }, true);
+    }
     if (closure?.kind === 'full') add({ kind: 'closedSegment', value: `${name} (${closure.notamID})` }, true);
     else if (closure?.kind === 'check') add({ kind: 'checkNotam', value: closure.notamID }, true);
     for (const caution of leg.cautions) {

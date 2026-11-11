@@ -329,3 +329,16 @@ describe('Validation', () => {
     expect(validate(twice, { closures })).toHaveLength(1);
   });
 });
+
+describe('review fixes', () => {
+  test('a check-NOTAM caution on the plan blocks filing without a closure map', () => {
+    const plan = route([point(1, 'LLHZ', 'arp'), point(2, 'LLIB', 'arp')]);
+    const cautioned = {
+      ...plan,
+      legs: [{ ...plan.legs[0], cautions: [{ kind: 'checkNotam' as const, notamID: 'C3/26' }] }],
+    };
+    const issues = validate(cautioned);
+    expect(issues).toEqual([{ kind: { kind: 'checkNotam', value: 'C3/26' }, blocksFiling: true }]);
+    expect(canFile(issues)).toBe(false);
+  });
+});
