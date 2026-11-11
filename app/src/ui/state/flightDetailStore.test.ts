@@ -20,6 +20,11 @@ describe('a new flight detail', () => {
     const { store } = setup();
     expect(store.getState()).toMatchObject({ cvfr: null, availability: { kind: 'unknown' } });
   });
+
+  it('says whether the app has a debrief engine at all', () => {
+    expect(setup().store.getState().hasEngine).toBe(true);
+    expect(setup({ engine: null }).store.getState().hasEngine).toBe(false);
+  });
 });
 
 describe('appear', () => {

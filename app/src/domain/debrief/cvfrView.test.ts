@@ -74,6 +74,7 @@ describe('cvfrLegRows', () => {
   it('marks a leg amber when less than 80% of it was within 300 ft', () => {
     expect(rows[1]).toMatchObject({
       route: 'KISON\u2013AFULA',
+      times: '14:18:08\u201314:23:32',
       adherence: { text: '58% / 66%', low: true },
       maxDeviation: '-330 ft',
     });
@@ -114,7 +115,7 @@ describe('cvfrPointRows', () => {
     expect(rows.map((r) => [r.code, r.name, r.time, r.closest, r.reported.text])).toEqual([
       ['LLHA', 'Haifa', '14:13:20', '0.3 NM', 'Yes'],
       ['KISON', 'Kishon', '14:18:08', '0.3 NM', 'Yes'],
-      ['AFULA', null, '14:24:44', '0.3 NM', 'No'],
+      ['AFULA', null, '14:23:32', '0.3 NM', 'No'],
       ['LLMG', 'Megiddo', '14:28:20', '0.3 NM', 'Yes'],
     ]);
   });

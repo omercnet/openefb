@@ -50,7 +50,7 @@ describe('profileModel', () => {
     expect(model.stops.map((s) => [s.code, s.distanceNM, s.passage?.reported])).toEqual([
       ['LLHA', 0, true],
       ['KISON', 8, true],
-      ['AFULA', 19, false],
+      ['AFULA', 17, false],
       ['LLMG', 25, true],
     ]);
   });
@@ -119,7 +119,7 @@ describe('profileModel', () => {
     expect(model.longest).toBe(
       model.excursions.reduce((a, b) => (b.endTime - b.startTime > a.endTime - a.startTime ? b : a)),
     );
-    expect(model.findings).toEqual(['KISON to AFULA: 355 ft low, 3 min', 'AFULA report not heard']);
+    expect(model.findings).toEqual(['KISON to AFULA: 355 ft low, 2 min', 'AFULA report not heard']);
   });
 });
 
@@ -168,10 +168,16 @@ describe('axisX', () => {
 
 describe('labelRows', () => {
   const stops = profileModel(sampleCvfrDebrief()).stops;
+  const stopsAt = (...distances: number[]) =>
+    distances.map((distanceNM, i) => ({ code: `P${i}`, distanceNM, passage: null }));
 
-  it('puts a label on the top row when there is room after the last label there, else on the lower row', () => {
+  it('puts every label on the top row when there is room for them', () => {
     expect(LABEL_SPACING).toBe(84);
-    expect(labelRows(stops, 25, 400)).toEqual([0, 0, 0, 1]); // LLMG is 75 points after AFULA
+    expect(labelRows(stops, 25, 400)).toEqual([0, 0, 0, 0]); // 100 points or more between neighbours
+  });
+
+  it('puts a label on the lower row when it is less than 84 points after the last label on the top row', () => {
+    expect(labelRows(stopsAt(0, 8, 17, 21), 25, 400)).toEqual([0, 0, 0, 1]); // 21 NM is 50 points after 17 NM
   });
 
   it('staggers more labels on a narrower axis', () => {
@@ -248,7 +254,7 @@ describe('spokenDuration (FlightLogStrip.spokenDuration)', () => {
 describe('longestLabel', () => {
   it('is the deviation and the time of the longest stretch', () => {
     const model = profileModel(sampleCvfrDebrief());
-    expect(longestLabel(model.longest!)).toBe('355 ft low \u00B7 2:48');
+    expect(longestLabel(model.longest!)).toBe('355 ft low \u00B7 2:12');
   });
 });
 
@@ -258,7 +264,7 @@ describe('the summaries, one per band, for screen readers', () => {
 
   it('route: the length and each point with its distance', () => {
     expect(routeSummary(model)).toBe(
-      'Route, 25 nautical miles: LLHA at 0 nautical miles, KISON at 8 nautical miles, AFULA at 19 nautical miles, LLMG at 25 nautical miles.',
+      'Route, 25 nautical miles: LLHA at 0 nautical miles, KISON at 8 nautical miles, AFULA at 17 nautical miles, LLMG at 25 nautical miles.',
     );
   });
 
@@ -281,7 +287,7 @@ describe('the summaries, one per band, for screen readers', () => {
       'Altitude. LLHA to KISON, published 1500 feet, 100% within 200 feet. ' +
         'KISON to AFULA, published 2500 feet, 58% within 200 feet, caution. ' +
         'AFULA to LLMG, published 1500 feet, 90% within 200 feet. ' +
-        'Longest stretch outside the band: 355 ft low for 2 minutes 48 seconds on KISON to AFULA. ' +
+        'Longest stretch outside the band: 355 ft low for 2 minutes 12 seconds on KISON to AFULA. ' +
         'Aerodrome zones are not scored.',
     );
   });

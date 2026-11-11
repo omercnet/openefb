@@ -13,6 +13,8 @@ export interface FlightDetailDeps {
 }
 
 export interface FlightDetailState {
+  /** Whether the app has a debrief engine at all (not on Android, owner decision Q8). */
+  hasEngine: boolean;
   /** Null until it is loaded, for a flight outside Israel, and when it cannot be loaded. */
   cvfr: CVFRDebrief | null;
   availability: DebriefAvailability;
@@ -34,6 +36,7 @@ export function createFlightDetailStore(deps: FlightDetailDeps): FlightDetailSto
   let unsubscribe = () => {};
 
   const store = createStore<FlightDetailState>()(() => ({
+    hasEngine: engine !== null,
     cvfr: null,
     availability: engine?.state.availability ?? { kind: 'unknown' },
 

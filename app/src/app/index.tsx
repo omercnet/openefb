@@ -27,6 +27,9 @@ const LAUNCH_SCREENS = [
   'recordingstop',
   'replay',
   'replayfast',
+  'flightdetail',
+  'cvfr',
+  'debrief',
 ];
 
 /** The screen requested at launch without a deep link (iOS launch argument, web query), if any. */
