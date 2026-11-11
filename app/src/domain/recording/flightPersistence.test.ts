@@ -289,6 +289,16 @@ describe('Characterization: FlightPersistence stop path', () => {
     expect(relativeToApplicationSupport('/app/efb-212/recordings/ABC.m4a', '/app')).toBe('efb-212/recordings/ABC.m4a');
   });
 
+  test('a file:// URI inside Application Support is stored relative', () => {
+    expect(relativeToApplicationSupport('file:///app/efb-212/recordings/ABC.m4a', '/app')).toBe(
+      'efb-212/recordings/ABC.m4a',
+    );
+    expect(relativeToApplicationSupport('/app/efb-212/recordings/ABC.m4a', 'file:///app/')).toBe(
+      'efb-212/recordings/ABC.m4a',
+    );
+    expect(relativeToApplicationSupport('file:///tmp/x.m4a', '/app')).toBe('file:///tmp/x.m4a');
+  });
+
   test('audioPathOutsideApplicationSupportIsStoredAbsolute', () => {
     expect(relativeToApplicationSupport('/tmp/x.m4a', '/app')).toBe('/tmp/x.m4a');
   });
@@ -408,6 +418,50 @@ describe('FlightRecovery Tests', () => {
     expect(flight.trackPointCount).toBe(0);
     expect(isRecovered(flight)).toBe(true);
     expect(f.files.files.has(audio)).toBe(true);
+  });
+
+  test('an uppercase audio file name is found by a case-preserving file lookup', async () => {
+    const f = await makeFixture();
+    const flightID = uuid();
+    const upper = flightID.toUpperCase();
+    f.files.add(upper); // stored under the upper-case spelling
+    const service = new FlightRecoveryService({
+      recordingStore: f.recording,
+      persistence: f.service(null),
+      flights: f.flightsRepo,
+      audio: f.files, // pathFor preserves the id's case, exists is case-sensitive
+      now: () => start,
+    });
+    expect(await service.recoverOrphans()).toEqual([flightID]);
+    expect((await f.flightsRepo.list())[0]!.audioFileURL?.endsWith(`${upper}.m4a`)).toBe(true);
+  });
+
+  test('a failing audio read for one orphan does not block the others', async () => {
+    const f = await makeFixture();
+    const bad = uuid();
+    const good = uuid();
+    await insertTrack(f, bad, 2);
+    await insertTrack(f, good, 2);
+    const audio: RecoveryAudioFiles = {
+      listFileNames: () => f.files.listFileNames(),
+      pathFor: (id) => f.files.pathFor(id),
+      exists: async (p) => {
+        if (p.includes(bad)) throw new Error('io error');
+        return false;
+      },
+      durationSeconds: async () => 0,
+      creationDate: async () => null,
+    };
+    const service = new FlightRecoveryService({
+      recordingStore: f.recording,
+      persistence: f.service(null),
+      flights: f.flightsRepo,
+      audio,
+      now: () => start,
+    });
+    const recovered = await service.recoverOrphans();
+    expect(recovered).toEqual([good]);
+    expect(await f.flightsRepo.get(bad)).toBeNull(); // left for the next launch
   });
 
   test('anOrphanWhoseTrackCannotBeReadIsLeftUntouchedForTheNextLaunch', async () => {

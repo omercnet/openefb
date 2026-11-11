@@ -59,33 +59,44 @@ export class FlightRecoveryService {
       return [];
     }
 
-    const candidates = new Set<string>();
+    // Keyed by lower-case id (dedup against the data layer); the value is the id as spelled in the audio file name,
+    // so a case-sensitive file lookup still finds the file.
+    const candidates = new Map<string, string | null>();
     try {
-      (await this.deps.recordingStore.flightIDsWithRecordedData()).forEach((id) => candidates.add(id.toLowerCase()));
+      (await this.deps.recordingStore.flightIDsWithRecordedData()).forEach((id) =>
+        candidates.set(id.toLowerCase(), null),
+      );
     } catch {
       // Swift logs and continues with the audio-derived candidates.
     }
-    (await this.audioFlightIDs()).forEach((id) => candidates.add(id));
+    for (const id of await this.audioFlightIDs()) {
+      const key = id.toLowerCase();
+      if (candidates.get(key) == null) candidates.set(key, id);
+    }
     existing.forEach((id) => candidates.delete(id));
     if (options.activeFlightID) candidates.delete(options.activeFlightID.toLowerCase());
 
     const recovered: string[] = [];
-    for (const flightID of [...candidates].sort()) {
-      const summary = await this.summaryFor(flightID);
-      if (!summary) continue;
-      const result = await this.deps.persistence.store(
-        summary,
-        options.aircraftProfileID ?? null,
-        options.pilotProfileID ?? null,
-        'recovered',
-      );
-      if (result === 'saved' || result === 'savedTrackUnreadable') recovered.push(flightID);
-      // saveFailed or discardedEmpty: retried at next launch.
+    for (const flightID of [...candidates.keys()].sort()) {
+      try {
+        const summary = await this.summaryFor(flightID, candidates.get(flightID) ?? flightID);
+        if (!summary) continue;
+        const result = await this.deps.persistence.store(
+          summary,
+          options.aircraftProfileID ?? null,
+          options.pilotProfileID ?? null,
+          'recovered',
+        );
+        if (result === 'saved' || result === 'savedTrackUnreadable') recovered.push(flightID);
+        // saveFailed or discardedEmpty: retried at next launch.
+      } catch {
+        // One unreadable candidate must not block the rest; it is retried at the next launch.
+      }
     }
     return recovered;
   }
 
-  /** Flight ids of `<uuid>.m4a` files in the recordings directory (lower-cased). */
+  /** Flight ids of `<uuid>.m4a` files in the recordings directory, as spelled in the file name. */
   private async audioFlightIDs(): Promise<string[]> {
     let names: string[] = [];
     try {
@@ -95,12 +106,12 @@ export class FlightRecoveryService {
     }
     return names.flatMap((n) => {
       const m = UUID_M4A.exec(n);
-      return m ? [m[1]!.toLowerCase()] : [];
+      return m ? [m[1]!] : [];
     });
   }
 
   /** null when there is nothing to recover or the data cannot be read right now (retried next launch). */
-  private async summaryFor(flightID: string): Promise<FlightRecordingSummary | null> {
+  private async summaryFor(flightID: string, audioID: string): Promise<FlightRecordingSummary | null> {
     let track: TrackPoint[];
     let transcripts: { timestamp: number }[];
     let phases: PhaseMarker[];
@@ -112,7 +123,7 @@ export class FlightRecoveryService {
       return null;
     }
 
-    const audioPath = this.deps.audio.pathFor(flightID);
+    const audioPath = this.deps.audio.pathFor(audioID);
     const hasAudio = await this.deps.audio.exists(audioPath);
     if (track.length === 0 && transcripts.length === 0 && !hasAudio) return null;
 

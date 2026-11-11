@@ -59,8 +59,11 @@ export interface FlightPersistenceDeps {
  */
 export function relativeToApplicationSupport(path: string, appSupportRoot: string | null): string {
   if (!appSupportRoot) return path;
-  const root = appSupportRoot.replace(/\/+$/, '') + '/';
-  return path.startsWith(root) ? path.slice(root.length) : path;
+  // file:// URIs and plain paths compare on the same footing; the stored value keeps no scheme when inside the root.
+  const bare = (p: string): string => (p.startsWith('file://') ? p.slice('file://'.length) : p);
+  const root = bare(appSupportRoot).replace(/\/+$/, '') + '/';
+  const full = bare(path);
+  return full.startsWith(root) ? full.slice(root.length) : path;
 }
 
 export class FlightPersistenceService {
