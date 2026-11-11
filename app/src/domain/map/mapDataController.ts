@@ -158,6 +158,7 @@ export class MapDataController {
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private pendingRegion: { promise: Promise<void>; resolve: () => void } | null = null;
   private airportsInFlight = 0;
+  private regionRunsInFlight = 0;
   /** Latest-wins tokens: a slower, older load must never overwrite a newer one. */
   private seq = { airports: 0, navaids: 0, airspaces: 0, weather: 0, tfrs: 0, advisories: 0 };
   private disposed = false;
@@ -227,7 +228,18 @@ export class MapDataController {
 
   /** Loads the home view of the current region. Call when the map style finishes loading. */
   onMapStyleLoaded(): Promise<void> {
-    const { region, mapZoom } = this.appState;
+    const { region, mapZoom, mapCenter, mapVisibleBounds } = this.appState;
+    // A style reload (display mode, sectional toggle) after the pilot has panned reloads the current view, not the home view.
+    if (this.lastQueryCenter && mapVisibleBounds) {
+      const ne = { lat: mapVisibleBounds.north, lon: mapVisibleBounds.east };
+      const sw = { lat: mapVisibleBounds.south, lon: mapVisibleBounds.west };
+      const low = isLowZoom(mapZoom);
+      return this.loadDataForRegion(
+        mapCenter,
+        cappedRadiusNM(mapCenter, ne, sw),
+        low ? lowZoomRadiusNM(mapCenter, ne, sw) : null,
+      );
+    }
     return this.loadDataForRegion(
       regionDefaultCenter(region),
       MAX_RADIUS_NM,
@@ -270,6 +282,7 @@ export class MapDataController {
     northEast: Coordinate,
     southWest: Coordinate,
   ): Promise<void> {
+    this.regionRunsInFlight += 1;
     try {
       if (this.disposed) return;
       this.appState.mapCenter = center;
@@ -295,7 +308,8 @@ export class MapDataController {
       await this.loadDataForRegion(center, capped, low ? queryRadius : null);
     } finally {
       // A newer change may have armed a new pending promise while this one ran; only settle if none is waiting.
-      if (!this.debounceTimer) this.resolvePending();
+      this.regionRunsInFlight -= 1;
+      if (!this.debounceTimer && this.regionRunsInFlight === 0) this.resolvePending();
     }
   }
 
@@ -350,6 +364,10 @@ export class MapDataController {
    */
   async regionDidChange(): Promise<void> {
     const { region } = this.appState;
+    // A queued view change belongs to the old region and would overwrite the new region's reset view.
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = null;
+    this.resolvePending();
     const s = { ...this.sources };
     if (!isLayerAvailable(region, 'tfrs')) {
       this.loadedTfrs = [];
@@ -561,8 +579,22 @@ export class MapDataController {
 
   /** Redraw an overlay only when its age class changed, so a snapshot never stays drawn as current. */
   refreshOverlayStaleness(nowMs: number = this.now()): void {
-    if (evaluateOverlayStaleness('tfr', this.tfrFetchedAt, nowMs) !== this.tfrOverlay) this.drawTFRs(nowMs);
-    if (evaluateOverlayStaleness('airmetSigmet', this.advisoriesFetchedAt, nowMs) !== this.advisoryOverlay) {
+    // Redraw when the age class changed OR an item crossed its own expiry/validity while the class stayed the same.
+    const tfrClass = evaluateOverlayStaleness('tfr', this.tfrFetchedAt, nowMs);
+    const tfrShown = this.sources.tfrs.features.length;
+    if (
+      tfrClass !== this.tfrOverlay ||
+      (tfrClass !== 'hidden' && tfrFeatures(this.loadedTfrs, nowMs).features.length !== tfrShown)
+    ) {
+      this.drawTFRs(nowMs);
+    }
+    const advClass = evaluateOverlayStaleness('airmetSigmet', this.advisoriesFetchedAt, nowMs);
+    const advShown = this.sources.advisories.features.length;
+    const advNow = this.loadedAdvisories.filter((a) => advisoryIsValid(a, nowMs));
+    if (
+      advClass !== this.advisoryOverlay ||
+      (advClass !== 'hidden' && advisoryFeatures(advNow).features.length !== advShown)
+    ) {
       this.drawAdvisories(nowMs);
     }
   }

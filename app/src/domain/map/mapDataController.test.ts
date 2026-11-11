@@ -313,6 +313,79 @@ describe('MapDataController (JS-only guards)', () => {
   });
 });
 
+describe('MapDataController review fixes', () => {
+  it('a style reload after a pan reloads the current view, not the region home view', async () => {
+    const h = makeHarness();
+    changeRegion(h, { lat: 38, lon: -122 });
+    await h.vm.settleRegionChange();
+    h.db.airportQueries.length = 0;
+    await h.vm.onMapStyleLoaded();
+    expect(h.db.airportQueries[0]?.center).toEqual({ lat: 38, lon: -122 });
+  });
+
+  it('before any pan the style load uses the home view', async () => {
+    const h = makeHarness();
+    await h.vm.onMapStyleLoaded();
+    expect(h.db.airportQueries[0]?.center).toEqual({ lat: 39, lon: -98 });
+  });
+
+  it('regionDidChange cancels a queued view change so it cannot overwrite the reset view', async () => {
+    const h = makeHarness();
+    changeRegion(h, { lat: 10, lon: 10 });
+    h.appState.mapCenter = { lat: 31.5, lon: 34.8 };
+    await h.vm.regionDidChange();
+    await new Promise((r) => setTimeout(r, 5));
+    expect(h.appState.mapCenter).toEqual({ lat: 31.5, lon: 34.8 });
+  });
+
+  it('settleRegionChange does not resolve while an older run is still loading and a newer one is armed', async () => {
+    const h = makeHarness();
+    const resolvers: ((a: Airport[]) => void)[] = [];
+    h.db.airportsNear = () => new Promise<Airport[]>((r) => resolvers.push(r));
+    changeRegion(h, kpaoCoord);
+    await new Promise((r) => setTimeout(r, 2)); // run A is waiting on the database
+    changeRegion(h, { lat: 38, lon: -122 });
+    let settled = false;
+    void h.vm.settleRegionChange().then(() => (settled = true));
+    await new Promise((r) => setTimeout(r, 2)); // run B started too
+    expect(resolvers).toHaveLength(2);
+    resolvers[0]!([kpao]); // A finishes first while B is still loading
+    await new Promise((r) => setTimeout(r, 2));
+    expect(settled).toBe(false);
+    resolvers[1]!([ksql]);
+    await new Promise((r) => setTimeout(r, 2));
+    expect(settled).toBe(true);
+    expect(h.snap().visibleAirports.map((a) => a.icao)).toEqual(['KSQL']);
+  });
+
+  it('a TFR that expires inside the same age class disappears on the next staleness tick', async () => {
+    const h = makeHarness();
+    const ring = [
+      [37, -122],
+      [37, -121],
+      [38, -121],
+    ];
+    const vm = new MapDataController({
+      appState: h.appState,
+      db: h.db,
+      now: () => 1_000,
+      tfr: {
+        currentTFRs: async () => ({
+          tfrs: [
+            { id: 't', notamID: 'n', type: 'HAZARDS' as const, title: 't', boundaries: ring, expirationDate: 5_000 },
+          ],
+          fetchedAt: 1_000,
+        }),
+      },
+    });
+    await vm.loadTFRs();
+    expect(vm.getSnapshot().sources.tfrs.features).toHaveLength(1);
+    vm.refreshOverlayStaleness(6_000);
+    expect(vm.getSnapshot().tfrOverlay).toBe('current');
+    expect(vm.getSnapshot().sources.tfrs.features).toHaveLength(0);
+  });
+});
+
 describe('MapDataController.regionDidChange', () => {
   it('clears data of layers the new region lacks, forgets the last query and reloads the home view', async () => {
     const h = makeHarness();

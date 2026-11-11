@@ -1,6 +1,6 @@
 import { isLayerVisible, validateRegistry, visibleLayerIds } from './layerSpec';
 import { CORE_LAYER_SPECS, SOURCE_IDS } from './layers';
-import { ownshipFeatures, routeLinePath } from './ownshipRoute';
+import { ownshipFeatures, routeLineGreatCircle, routeLinePath } from './ownshipRoute';
 import { trackRuler, rulerLabelAnchor } from './trackRuler';
 
 describe('core layer registry', () => {
@@ -10,7 +10,10 @@ describe('core layer registry', () => {
 
   it('keeps Swift z-order: advisories and the ruler under ownship, ownship under the airport dots, TFRs and route on top', () => {
     const ids = CORE_LAYER_SPECS.map((s) => s.id);
-    const at = (id: string) => ids.indexOf(id);
+    const at = (id: string) => {
+      expect(ids).toContain(id);
+      return ids.indexOf(id);
+    };
     expect(at('advisory-fill')).toBeLessThan(at('ownship-symbol'));
     expect(at('track-ruler-ticks')).toBeLessThan(at('ownship-symbol'));
     expect(at('ownship-symbol')).toBeLessThan(at('airport-circles'));
@@ -60,6 +63,14 @@ describe('ownshipFeatures', () => {
   });
 });
 
+describe('routeLineGreatCircle', () => {
+  it('coincident endpoints draw nothing (a LineString needs two positions)', () => {
+    const p = { lat: 37, lon: -122 };
+    expect(routeLineGreatCircle(p, p).features).toEqual([]);
+    expect(routeLineGreatCircle(p, { lat: 38, lon: -121 }).features).toHaveLength(1);
+  });
+});
+
 describe('routeLinePath', () => {
   it('needs two points', () => {
     expect(routeLinePath([{ lat: 1, lon: 1 }]).features).toEqual([]);
@@ -94,6 +105,7 @@ describe('trackRuler', () => {
     expect(trackRuler(origin, 90, 29.9).line.features).toEqual([]);
     expect(trackRuler(origin, 90, 30).ticks.features).toHaveLength(5);
     expect(trackRuler(origin, Number.NaN, 100).line.features).toEqual([]);
+    expect(trackRuler(origin, 90, Number.POSITIVE_INFINITY).line.features).toEqual([]);
     expect(trackRuler(origin, 90, Number.NaN).line.features).toEqual([]);
   });
   it('label anchor: top for a line running across the screen, left for up/down; follows the map bearing', () => {

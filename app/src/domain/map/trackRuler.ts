@@ -32,7 +32,13 @@ export function trackRuler(
   mapDirection = 0,
   minutes: readonly number[] = TRACK_RULER_MINUTES,
 ): TrackRuler {
-  if (!origin || !(groundSpeedKnots >= TRACK_RULER_MIN_GROUND_SPEED_KT) || !Number.isFinite(trackTrue)) return CLEARED;
+  if (
+    !origin ||
+    !Number.isFinite(groundSpeedKnots) ||
+    groundSpeedKnots < TRACK_RULER_MIN_GROUND_SPEED_KT ||
+    !Number.isFinite(trackTrue)
+  )
+    return CLEARED;
   const anchor = rulerLabelAnchor(trackTrue, mapDirection);
   const ticks: Feature[] = [];
   let end = origin;

@@ -23,6 +23,37 @@ const tfr = (over: Partial<Tfr> = {}): Tfr => ({
   ...over,
 });
 
+describe('degenerate rings', () => {
+  it('a ring that closes to three positions ([A, B, A]) is not an area', () => {
+    const bad = tfr({
+      id: 'd',
+      boundaries: [
+        [37, -122],
+        [38, -121],
+        [37, -122],
+      ],
+    });
+    expect(tfrFeatures([bad], 0).features).toEqual([]);
+    expect(
+      advisoryFeatures([
+        {
+          id: 'x',
+          kind: 'a',
+          hazardCode: 'h',
+          colorHex: '#fff',
+          validFrom: 0,
+          validTo: 1,
+          boundaries: [
+            [1, 1],
+            [2, 2],
+            [1, 1],
+          ],
+        },
+      ]).features,
+    ).toEqual([]);
+  });
+});
+
 describe('airportFeatures', () => {
   it('maps icao, name, type and isTowered (a tower frequency)', () => {
     const a = makeAirport({

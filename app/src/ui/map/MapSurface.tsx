@@ -5,7 +5,7 @@
 // The surface is presentational: data comes from MapDataController (hooks in useMapData.ts), camera moves from the
 // camera reducer, and navigation is wired by I1.
 import { Camera, GeoJSONSource, Images, Layer, Map, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
-import { memo, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Coordinate, MapLayer, Region } from '../../domain/core';
 import type { CameraCommand } from '../../domain/map/camera';
 import { EMPTY_COLLECTION, type FeatureCollection } from '../../domain/map/geojson';
@@ -76,13 +76,17 @@ export function MapSurface({
   const reporter = useMapStatus(night);
 
   // Imperative camera moves from the reducer. Each `seq` is applied once.
-  const lastSeq = useRef(camera.seq);
-  useEffect(() => {
-    if (camera.seq === lastSeq.current) return;
-    lastSeq.current = camera.seq;
-    const c = camera.command;
-    if (!c || !cameraRef.current) return;
-    cameraRef.current
+  // A command is only dropped once it was handed to the Camera: one that arrives before the ref exists (or before the
+  // map loaded) stays pending and is flushed on the next effect run or when the map finishes loading.
+  const pending = useRef<{ seq: number; command: CameraCommand } | null>(null);
+  const appliedSeq = useRef(-1);
+  const flushCamera = useCallback(() => {
+    const p = pending.current;
+    const cam = cameraRef.current;
+    if (!p || !cam) return;
+    pending.current = null;
+    const c = p.command;
+    cam
       .setStop({
         ...(c.center ? { center: [c.center.lon, c.center.lat] as [number, number] } : {}),
         ...(c.zoom === null ? {} : { zoom: c.zoom }),
@@ -90,7 +94,14 @@ export function MapSurface({
         duration: c.animated ? 400 : 0,
       })
       .catch((e: unknown) => console.warn('camera move failed', e));
-  }, [camera]);
+  }, []);
+  useEffect(() => {
+    if (camera.seq !== appliedSeq.current) {
+      appliedSeq.current = camera.seq;
+      if (camera.command) pending.current = { seq: camera.seq, command: camera.command };
+    }
+    flushCamera();
+  }, [camera, flushCamera]);
 
   return (
     <Map
@@ -105,7 +116,8 @@ export function MapSurface({
         if (reporter.has('didFinishRenderingMapFully')) return;
         reporter.report('didFinishRenderingMapFully');
         // Give symbol placement a moment, count what each layer placed, then tell CI the map is ready.
-        setTimeout(async () => {
+        // Data layers fill in as the aviation database opens, so the probe repeats until airports were placed (or 15 tries).
+        const probe = async (attempt: number) => {
           const rendered: Record<string, number | string> = {};
           for (const id of PROBED_LAYERS) {
             rendered[id] =
@@ -114,11 +126,15 @@ export function MapSurface({
                 (e) => String(e),
               )) ?? 'no map';
           }
-          reporter.markRendered(rendered);
-        }, 1000);
+          const dataReady = typeof rendered['airport-circles'] === 'number' && rendered['airport-circles'] > 0;
+          if (dataReady || attempt >= 15) reporter.markRendered(rendered);
+          else setTimeout(() => void probe(attempt + 1), 1000);
+        };
+        setTimeout(() => void probe(1), 1000);
       }}
       onDidFinishLoadingMap={() => {
         reporter.report('didFinishLoadingMap');
+        flushCamera();
         onStyleLoaded?.();
       }}
       onRegionDidChange={(e) => {

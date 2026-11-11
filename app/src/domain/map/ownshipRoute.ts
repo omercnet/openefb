@@ -28,8 +28,11 @@ const line = (coords: Coordinate[]): FeatureCollection =>
   ]);
 
 /** Great-circle route line between departure and destination (100 points). */
-export const routeLineGreatCircle = (departure: Coordinate, destination: Coordinate): FeatureCollection =>
-  line(greatCirclePoints(departure, destination, 100));
+export function routeLineGreatCircle(departure: Coordinate, destination: Coordinate): FeatureCollection {
+  const pts = greatCirclePoints(departure, destination, 100);
+  // Coincident endpoints yield one point; a LineString needs two (JS-only guard).
+  return pts.length >= 2 ? line(pts) : EMPTY_COLLECTION;
+}
 
 /**
  * A routed path along its own vertices (Israel CVFR route). Fewer than two points draws nothing, as in Swift, where the

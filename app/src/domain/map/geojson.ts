@@ -51,5 +51,7 @@ export function polygonFeature(ring: readonly (readonly number[])[], properties:
   const first = coords[0]!;
   const last = coords[coords.length - 1]!;
   if (first[0] !== last[0] || first[1] !== last[1]) coords.push([first[0], first[1]]);
+  // A closed ring needs four positions: [A, B, A] is a line, not an area.
+  if (coords.length < 4) return null;
   return { type: 'Feature', geometry: { type: 'Polygon', coordinates: [coords] }, properties };
 }
