@@ -267,4 +267,25 @@ describe('ReplayEngine loadFlight atomicity', () => {
     expect(engine.trackPointCount).toBe(10);
     expect(engine.totalDuration).toBe(9);
   });
+
+  test('a superseded loadFlight is ignored: the newer call wins', async () => {
+    const engine = new ReplayEngine(noTimer);
+    let releaseOld!: () => void;
+    const gate = new Promise<void>((resolve) => (releaseOld = resolve));
+    const slowOld: ReplayStore = {
+      trackPoints: async () => {
+        await gate;
+        return [];
+      },
+      transcriptSegments: async () => [],
+      phaseMarkers: async () => [],
+    };
+    const oldLoad = engine.loadFlight('old', slowOld, null);
+    await engine.loadFlight('new', makeTestStore(), null);
+    expect(engine.trackPointCount).toBe(10);
+    releaseOld();
+    await oldLoad;
+    expect(engine.trackPointCount).toBe(10);
+    expect(engine.totalDuration).toBe(9);
+  });
 });
