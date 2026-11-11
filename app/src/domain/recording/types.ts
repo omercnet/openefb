@@ -21,7 +21,8 @@ export interface TrackPoint {
 export interface PhaseMarker {
   id: string;
   flightID: string;
-  phase: FlightPhaseType;
+  /** FlightPhaseType raw value; stored as text, so unknown values from older data stay representable. */
+  phase: string;
   startTimestamp: number; // epoch ms
   endTimestamp: number | null;
   latitude: number;
