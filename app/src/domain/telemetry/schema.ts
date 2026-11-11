@@ -4,8 +4,8 @@
 // counted, and the types below stop a call site from passing one.
 //
 // web/telemetry/src/schema.json is the server's copy and the source of truth; tests/telemetry/workerSchema.test.ts fails when
-// this table and that file differ. Adding an event means changing both, the PRIVACY.md section on usage counters, and the Worker
-// deployment first (web/telemetry/README.md).
+// this table and that file differ. Adding an event means changing both, the usage-counts section of the policy text
+// (app/docs/privacy-rn-draft.md until cutover, then PRIVACY.md), and the Worker deployment first (web/telemetry/README.md).
 import type { Region } from '../core/region';
 import { isRecord } from '../typeGuards';
 

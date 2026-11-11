@@ -70,8 +70,10 @@ curl https://openefb-telemetry.omerc.workers.dev/health    # ok
 Then build the app with `EXPO_PUBLIC_TELEMETRY_URL=https://openefb-telemetry.omerc.workers.dev`. A release build sends over HTTPS
 only; a development build (the app run from source) sends only to a Worker on the same machine, such as `npm run dev` below
 (the Android emulator reaches it at `http://10.0.2.2:8788`), so nobody's test runs reach the deployed Worker. The app sends nothing
-while that variable is empty or the user has turned "Share anonymous usage data" off. Merge the PRIVACY.md change before the first
-build that has the variable set: the policy promises to change before the app sends anything new.
+while that variable is empty or the user has turned "Share anonymous usage data" off. The policy text for the rewritten app is the
+draft `app/docs/privacy-rn-draft.md`, which replaces `PRIVACY.md` at cutover (a release step the owner approves; the draft's header
+lists the two claims to confirm then). Until it does, do not ship a public build that has the variable set: the live `PRIVACY.md`
+describes the Swift app and promises to change before the app sends anything new.
 
 To stop it: delete the Worker, or build the app without the variable.
 
@@ -93,7 +95,8 @@ Launches per update (the denominator of the crash-free comparison per update in 
 ## Changing the vocabulary
 
 A new event or parameter needs all of these in one change: `src/schema.json`, the app's `schema.ts` (the contract test enforces
-the match), `test/schema.test.ts` (it pins the list on purpose), and the PRIVACY.md section on usage counters. Deploy the Worker
+the match), `test/schema.test.ts` (it pins the list on purpose), and the usage-counts section of the policy text
+(`app/docs/privacy-rn-draft.md` until cutover, then `PRIVACY.md`). Deploy the Worker
 before shipping an app that sends the new event; until then the old Worker drops those rows.
 
 ## Not covered

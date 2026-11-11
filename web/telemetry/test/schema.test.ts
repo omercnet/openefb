@@ -14,7 +14,7 @@ const base = (): SchemaJson => ({
 });
 
 describe("the shipped schema", () => {
-  it("is the vocabulary documented in PRIVACY.md: these events, nothing else", () => {
+  it("is the vocabulary the policy text documents: these events, nothing else", () => {
     expect(Object.keys(raw.events).sort()).toEqual(
       [
         "App.launched",
