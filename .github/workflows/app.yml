@@ -49,11 +49,13 @@ jobs:
   ios:
     name: iOS (iPad simulator, Release)
     needs: checks # a failed check stops the long device builds
-    runs-on: macos-26
+    # macos-latest, like ci.yml's unit-tests and simulation jobs: the separate macos-26 pool often has no runner for
+    # hours, and a job queued 15 minutes without one is cancelled. Uses the image's default Xcode (26.6 on macOS 26).
+    runs-on: macos-latest
     timeout-minutes: 90
     env:
-      # Set at job level, before checkout: /usr/bin/git is an xcrun shim (see ci.yml). Same Xcode as ci.yml.
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      # Set at job level, before checkout: /usr/bin/git is an xcrun shim (see ci.yml). Same Xcode as ci.yml's test jobs.
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
       DD: /tmp/rn-dd
       OUT: /tmp/app-ios
       # OTA build config (app/app.config.ts): URL and certificate go into the binary, cleartext is allowed
