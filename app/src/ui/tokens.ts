@@ -41,8 +41,9 @@ type Face = keyof typeof FontFiles;
  *   offset and the ceil then costs another half point (the 12.0 pt line of an 11 pt label became 12.5), which drifted
  *   every text column down. So iOS gets a height just below the natural one, which RN ceils to SwiftUI's grid line
  *   (iPad strip SSIM: map 0.9428 -> 0.9858, night 0.9483 -> 0.9856, airport 0.8209 -> 0.8853).
- * - Android: the natural height rounded to the nearest 0.5 pt, as before: every airport row then sat within 1 dp of the
- *   reference (SSIM 0.98). The iOS rule lost 1 to 2 dp on Android (airport 0.9813 -> 0.8577), so it is iOS only.
+ * - Android: the natural height rounded to the nearest 0.5 pt, as before: main measured SSIM 0.98 on the airport column with
+ *   it. The iOS rule was tried there in run 43102552494 without a clean result (that run also had the 1.5 pt header
+ *   regression described in AirportColumn, and a rewritten strip), so Android stays on the old rounding until an A/B.
  * - react-native-web has no pixel grid and gets the rounded-up height itself.
  */
 export const lineHeight = (fontSize: number, em: number) => {
