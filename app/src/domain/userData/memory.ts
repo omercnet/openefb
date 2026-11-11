@@ -103,32 +103,31 @@ export function createMemoryUserData(seed: MemoryUserDataSeed = {}): UserData {
     logbook: { ...logbookBase, byFlightId: (flightID) => logbookBase.listWhere('flight_id', flightID) },
   };
 
-  // One transaction at a time, like the single SQLite connection: a rollback must not undo another transaction's writes.
+  // Like the expo adapter's exclusive transaction, atomically calls run one after the other: a second waits for the first, so
+  // it reads what the first committed.
   let tail: Promise<unknown> = Promise.resolve();
   return {
     ...repos,
     atomically(fn) {
-      const run = tail.then(() => transaction(fn));
-      tail = run.catch(() => undefined);
+      const run = tail.then(async () => {
+        const saved = {
+          aircraft: new Map(aircraft.rows),
+          pilots: new Map(pilots.rows),
+          logbook: new Map(logbook.rows),
+          settings: settingsRow,
+        };
+        try {
+          return await fn(repos);
+        } catch (error) {
+          aircraft.rows = saved.aircraft;
+          pilots.rows = saved.pilots;
+          logbook.rows = saved.logbook;
+          settingsRow = saved.settings;
+          throw error;
+        }
+      });
+      tail = run.then(undefined, () => undefined);
       return run;
     },
   };
-
-  async function transaction<R>(fn: (repos: UserDataRepos) => Promise<R>): Promise<R> {
-    const saved = {
-      aircraft: new Map(aircraft.rows),
-      pilots: new Map(pilots.rows),
-      logbook: new Map(logbook.rows),
-      settings: settingsRow,
-    };
-    try {
-      return await fn(repos);
-    } catch (error) {
-      aircraft.rows = saved.aircraft;
-      pilots.rows = saved.pilots;
-      logbook.rows = saved.logbook;
-      settingsRow = saved.settings;
-      throw error;
-    }
-  }
 }

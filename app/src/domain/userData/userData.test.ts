@@ -181,3 +181,31 @@ describe('createMemoryUserData concurrency and columns (#45 review)', () => {
     expect((await data.settings.get())?.regionRaw).toBe('us');
   });
 });
+
+describe('createMemoryUserData transactions', () => {
+  it('overlapping atomically calls run one after the other, like the expo adapter (the second waits for the first)', async () => {
+    const data = createMemoryUserData();
+    const order: string[] = [];
+    const gate = Promise.withResolvers<void>();
+    const first = data.atomically(async () => {
+      order.push('first start');
+      await gate.promise;
+      order.push('first end');
+    });
+    const second = data.atomically(() => {
+      order.push('second start');
+      return Promise.resolve();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(order).toEqual(['first start']);
+    gate.resolve();
+    await Promise.all([first, second]);
+    expect(order).toEqual(['first start', 'first end', 'second start']);
+  });
+
+  it('a transaction that rejects does not stop the next one from running', async () => {
+    const data = createMemoryUserData();
+    await expect(data.atomically(() => Promise.reject(new Error('boom')))).rejects.toThrow('boom');
+    await expect(data.atomically(() => Promise.resolve('next'))).resolves.toBe('next');
+  });
+});
