@@ -11,9 +11,9 @@ import {
   problemSeverity,
   recordingErrorNotice,
 } from '../../domain/recording/recordingNotices';
-import { FormType } from '../form/formStyle';
 import { WarningTriangle } from '../Icons';
-import { Pressy, useTheme } from '../Primitives';
+import { BorderedButton } from '../components/BorderedButton';
+import { useTheme } from '../Primitives';
 import type { RecordingViewStore } from '../state/recordingStore';
 import { refreshMicrophoneOnForeground } from '../state/refreshMicrophoneOnForeground';
 import { Space, StripMetrics, Type } from '../tokens';
@@ -31,39 +31,6 @@ function NoticeRow({ tint, testID, children }: { tint: string; testID: string; c
       />
       {children}
     </View>
-  );
-}
-
-/** A bordered large button: a 60 pt target (an in-flight control). */
-function NoticeButton({
-  title,
-  label,
-  onPress,
-  testID,
-}: {
-  title: string;
-  label?: string;
-  onPress: () => void;
-  testID: string;
-}) {
-  const t = useTheme();
-  return (
-    <Pressy
-      accessibilityLabel={label ?? title}
-      onPress={onPress}
-      testID={testID}
-      style={{
-        minWidth: StripMetrics.cell,
-        minHeight: StripMetrics.cell,
-        paddingHorizontal: Space.l,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: StripMetrics.cell / 2,
-        backgroundColor: t.infoFill,
-      }}
-    >
-      <Text style={[FormType.body, { color: t.accent }]}>{title}</Text>
-    </Pressy>
   );
 }
 
@@ -92,7 +59,8 @@ function MicrophoneNotice({ store }: { store: RecordingViewStore }) {
         <Heading icon={<MicSlashFill color={t.caution} />} title={MICROPHONE_NOTICE.title} tint={t.caution} />
         <Text style={[Type.caption, { color: t.inkSecondary }]}>{MICROPHONE_NOTICE.text}</Text>
         <View style={{ alignSelf: 'flex-start' }}>
-          <NoticeButton
+          <BorderedButton
+            minSize={StripMetrics.cell}
             title={MICROPHONE_NOTICE.action}
             onPress={() => void store.getState().openMicrophoneSettings()}
             testID="mic-open-settings"
@@ -116,7 +84,8 @@ function ProblemNotice({ store, error }: { store: RecordingViewStore; error: App
           <Heading icon={<WarningTriangle color={tint} bang={t.activeCell} />} title={notice.title} tint={tint} />
           <Text style={[Type.caption, { color: t.inkSecondary }]}>{notice.text}</Text>
         </View>
-        <NoticeButton
+        <BorderedButton
+          minSize={StripMetrics.cell}
           title="Dismiss"
           label="Dismiss recording problem"
           onPress={() => store.getState().dismissError()}
@@ -137,7 +106,8 @@ function DiscardedNotice({ store }: { store: RecordingViewStore }) {
           <Heading icon={<TrashSlashFill color={t.caution} />} title={DISCARDED_NOTICE.title} tint={t.caution} />
           <Text style={[Type.caption, { color: t.inkSecondary }]}>{DISCARDED_NOTICE.text}</Text>
         </View>
-        <NoticeButton
+        <BorderedButton
+          minSize={StripMetrics.cell}
           title="Dismiss"
           label="Dismiss recording not saved notice"
           onPress={() => store.getState().dismissDiscardedNotice()}

@@ -25,6 +25,8 @@ const LAUNCH_SCREENS = [
   'recording',
   'recordingstopped',
   'recordingstop',
+  'replay',
+  'replayfast',
 ];
 
 /** The screen requested at launch without a deep link (iOS launch argument, web query), if any. */
