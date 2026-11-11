@@ -367,6 +367,53 @@ describe('startRecording rollback (session and cleanup)', () => {
     expect(startCalls).toBe(1);
   });
 
+  test('a start waiting for cleanup is bound to its own countdown, not a newer one', async () => {
+    const audio = new MockAudioRecorder();
+    let resolveAudioStart!: () => void;
+    let releaseStop!: () => void;
+    let startCalls = 0;
+    const realStart = audio.startRecording.bind(audio);
+    audio.startRecording = async (...args) => {
+      startCalls += 1;
+      if (startCalls === 1) await new Promise<void>((resolve) => (resolveAudioStart = resolve));
+      return realStart(...args);
+    };
+    let stops = 0;
+    audio.stopRecording = async () => {
+      stops += 1;
+      if (stops === 2) await new Promise<void>((resolve) => (releaseStop = resolve));
+      return '/tmp/x.m4a';
+    };
+    const { coordinator, clock } = make({ audio });
+    const first = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    await coordinator.stopRecording();
+    resolveAudioStart();
+    await flush(); // cleanup pending
+
+    const speed0 = 0;
+    let speed = speed0; // reopens the post-stop gate first
+    coordinator.startAutoStartMonitoring({
+      groundSpeedKts: () => speed,
+      autoStartSpeedThresholdKts: () => 15,
+      isAutoStartEnabled: () => true,
+    });
+    await clock.advance(500);
+    speed = 20;
+    await clock.advance(1500 + 3000); // countdown 1 runs out and its start waits for cleanup
+    expect(coordinator.state.recordingStatus.kind).toBe('countdown');
+    coordinator.cancelCountdown(); // the pilot cancels while the start waits (the monitor loop is blocked on it)
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+    coordinator.state.recordingStatus = { kind: 'countdown', remaining: 3 }; // a newer countdown owns the status
+    releaseStop();
+    await flush();
+    expect(await first).toBeInstanceOf(Error);
+    // The old countdown's start was rejected and did not touch the newer countdown or start a flight.
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'countdown', remaining: 3 });
+    expect(startCalls).toBe(1);
+    coordinator.stopAutoStartMonitoring();
+  });
+
   test('two overlapping canceled starts both finish cleanup before a new start proceeds', async () => {
     const audio = new MockAudioRecorder();
     const startGates: (() => void)[] = [];

@@ -126,6 +126,8 @@ export class RecordingCoordinator {
   private autoStopTask: Cancellable | null = null;
   private currentFlightID: string | null = null;
   private startSession: symbol | null = null;
+  /** Identity of the current auto-start countdown; bumped when one begins or is canceled. */
+  private countdownGeneration = 0;
   private pendingCleanups = new Set<Promise<void>>();
   private autoStartGate = new AutoStartGate();
   private recordingStartDate: number | null = null;
@@ -143,12 +145,13 @@ export class RecordingCoordinator {
   // MARK: Core lifecycle
 
   /** Start a new flight recording. Returns the flight id. */
-  async startRecording(profile: AudioQualityProfile = 'standard'): Promise<string> {
+  async startRecording(profile: AudioQualityProfile = 'standard', countdownGeneration?: number): Promise<string> {
     // Let a canceled start finish releasing the shared audio and transcription services first.
     const statusOnEntry = this.state.recordingStatus;
     while (this.pendingCleanups.size > 0) await Promise.all([...this.pendingCleanups]);
     // An auto-start countdown canceled while we waited must not start a flight.
-    if (statusOnEntry.kind === 'countdown' && this.state.recordingStatus.kind !== 'countdown') {
+    const countdownReplaced = countdownGeneration !== undefined && countdownGeneration !== this.countdownGeneration;
+    if (countdownReplaced || (statusOnEntry.kind === 'countdown' && this.state.recordingStatus.kind !== 'countdown')) {
       throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
     }
 
@@ -386,6 +389,7 @@ export class RecordingCoordinator {
   }
 
   cancelCountdown(): void {
+    this.countdownGeneration += 1;
     this.state.set({ recordingStatus: idleStatus, countdownRemaining: 0 });
   }
 
@@ -417,16 +421,18 @@ export class RecordingCoordinator {
   }
 
   private async startCountdown(): Promise<void> {
+    const generation = ++this.countdownGeneration;
     for (let remaining = 3; remaining >= 1; remaining--) {
       this.state.set({ recordingStatus: { kind: 'countdown', remaining }, countdownRemaining: remaining });
       await this.clock.sleep(1000);
-      if (this.state.recordingStatus.kind === 'idle') return; // cancelled during countdown
+      if (this.state.recordingStatus.kind === 'idle' || this.countdownGeneration !== generation) return; // cancelled or replaced
     }
 
     try {
-      await this.startRecording();
+      await this.startRecording('standard', generation);
     } catch {
-      this.state.set({ recordingStatus: idleStatus });
+      // Only reset our own countdown: a newer one may own the status now.
+      if (this.countdownGeneration === generation) this.state.set({ recordingStatus: idleStatus });
     }
   }
 
