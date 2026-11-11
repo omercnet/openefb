@@ -63,7 +63,7 @@ Nothing else is sent. There is no user, device, installation or session identifi
 earlier versions sent is gone), and no location, airport or route, aircraft, name, audio, transcript or other flight data.
 The app adds the counts up on the device and sends them in batches, so a count says that something happened, not when or
 to whom. The counter service reads no request header and stores each count with the time its batch arrived; the counts
-cannot be linked to you, so counts already sent cannot be looked up or deleted one by one. Cloudflare deletes them after
+cannot be linked to you, so counts already sent cannot be looked up or deleted one by one. Cloudflare keeps them for
 three months.
 
 Kanaf does not collect crash or hang reports. The App Store and Google Play give the developer their own crash statistics

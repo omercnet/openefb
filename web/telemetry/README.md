@@ -45,7 +45,7 @@ Each accepted row becomes one Workers Analytics Engine data point in the dataset
 | `double1` | the count |
 | `timestamp` | when the batch arrived, added by Analytics Engine |
 
-Analytics Engine deletes data after three months.
+Analytics Engine stores data for three months.
 
 The Worker reads **no request header and no Cloudflare property** (`request.cf`), only the URL path, the method and the body, so no
 address, user agent, cookie, location or token can reach storage; a test makes the request object throw if the handler touches
@@ -67,10 +67,11 @@ npx wrangler deploy          # creates https://openefb-telemetry.omerc.workers.d
 curl https://openefb-telemetry.omerc.workers.dev/health    # ok
 ```
 
-Then build the app with `EXPO_PUBLIC_TELEMETRY_URL=https://openefb-telemetry.omerc.workers.dev`. The app only sends over HTTPS
-(plain HTTP to localhost for `npm run dev`), and sends nothing while that variable is empty or the user has turned
-"Share anonymous usage data" off. Merge the PRIVACY.md change before the first build that has the variable set: the policy
-promises to change before the app sends anything new.
+Then build the app with `EXPO_PUBLIC_TELEMETRY_URL=https://openefb-telemetry.omerc.workers.dev`. A release build sends over HTTPS
+only; a development build (the app run from source) sends only to a Worker on the same machine, such as `npm run dev` below
+(the Android emulator reaches it at `http://10.0.2.2:8788`), so nobody's test runs reach the deployed Worker. The app sends nothing
+while that variable is empty or the user has turned "Share anonymous usage data" off. Merge the PRIVACY.md change before the first
+build that has the variable set: the policy promises to change before the app sends anything new.
 
 To stop it: delete the Worker, or build the app without the variable.
 
