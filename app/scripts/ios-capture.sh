@@ -71,11 +71,13 @@ wait_map() {
   sleep 2   # symbol fade-in
 }
 
-for screen in map airport night sheet; do
+# Screens with no map (a native sheet, the settings forms) wait a fixed time instead of for the map status.
+NO_MAP=" sheet settings onboarding disclaimers "
+for screen in map airport night sheet settings onboarding disclaimers; do
   stamp "screen $screen"
   rm -f "$DOCS/map-status.json"
   launch -KanafScreen "$screen"
-  if [ "$screen" = sheet ]; then sleep "$WAIT"; else wait_map "$screen"; fi
+  if [[ "$NO_MAP" == *" $screen "* ]]; then sleep "$WAIT"; else wait_map "$screen"; fi
   xcrun simctl io "$SIM" screenshot "$OUT/screens/$screen.png"
 done
 
