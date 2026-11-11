@@ -256,4 +256,49 @@ describe('refresh policy', () => {
     expect(store.getState().error).toBeNull();
     expect(icaos(store.getState())[0]).toBe('KPAO');
   });
+
+  test('swapping the queries while a slow query is in flight: the old answer never overwrites the new list', async () => {
+    const slow = deferred();
+    const store = nearest.make(EMPTY);
+    const refresher = createNearestRefresher(
+      store,
+      queriesWith(() => slow.promise),
+    );
+    const first = refresher.update(FIXTURE_OWNSHIP, 'us');
+    const swapped = jest.fn(async () => FIXTURE_AIRPORTS.filter((a) => a.icao === 'KSQL'));
+    refresher.setQueries(queriesWith(swapped));
+    await refresher.update(FIXTURE_OWNSHIP, 'us'); // same spot: the swap forgot the move threshold
+    expect(swapped).toHaveBeenCalledTimes(1);
+    expect(icaos(store.getState())).toEqual(['KSQL']);
+    slow.resolve([...FIXTURE_AIRPORTS]); // the old database answers late
+    await first;
+    expect(icaos(store.getState())).toEqual(['KSQL']);
+    expect(store.getState().loading).toBe(false);
+  });
+
+  test('setting the same queries object again changes nothing', async () => {
+    const query = jest.fn(createFakeAviationDatabase().nearestAirports);
+    const queries = queriesWith(query);
+    const store = nearest.make(EMPTY);
+    const refresher = createNearestRefresher(store, queries);
+    await refresher.update(FIXTURE_OWNSHIP, 'us');
+    refresher.setQueries(queries);
+    await refresher.update(FIXTURE_OWNSHIP, 'us');
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  test('a fresh queries object holding the same sources neither drops an in-flight answer nor requeries', async () => {
+    const slow = deferred();
+    const query = jest.fn(() => slow.promise);
+    const queries = queriesWith(query);
+    const store = nearest.make(EMPTY);
+    const refresher = createNearestRefresher(store, queries);
+    const first = refresher.update(FIXTURE_OWNSHIP, 'us');
+    refresher.setQueries({ ...queries }); // e.g. an inline provider value, rebuilt on the next render
+    await refresher.update(FIXTURE_OWNSHIP, 'us');
+    slow.resolve([...FIXTURE_AIRPORTS]);
+    await first;
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(icaos(store.getState())[0]).toBe('KPAO');
+  });
 });

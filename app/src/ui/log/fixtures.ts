@@ -1,6 +1,8 @@
 // Fake Log data until I1 feeds the flight and logbook repositories in: the reference screenshot's state, and model
 // factories for tests and other states.
 import type { FlightRecord, LogbookEntry } from '../../data/models';
+import { noNavigationFixture } from '../flightLog/fixtures';
+import type { FlightLogData } from '../flightLog/store';
 import type { LogData } from './store';
 
 let seq = 0;
@@ -59,21 +61,15 @@ export function flight(overrides: Partial<FlightRecord> = {}): FlightRecord {
 /** 2026-11-11 16:36 local, the reference screenshot's clock. */
 export const REFERENCE_NOW_MS = new Date(2026, 10, 11, 16, 36, 5).getTime();
 
+/** reference/ipad-log.png: nothing flown or logged yet (totals "0 flights  0.0 h"), no fix needed (no ETE shown). */
+export const REFERENCE_LOG: LogData = { flights: [], entries: [] };
+
 /**
- * reference/ipad-log.png: no plan, a recording 5 s in (Now shows "Flight" and "REC 0:00:05"), nothing flown yet,
- * totals "0 flights  0.0 h".
+ * The shared flight log slice for reference/ipad-log.png: no plan or Direct-To, a recording 5 s in (Now shows "Flight"
+ * and "REC 0:00:05"), GPS available.
  */
-export const REFERENCE_LOG: LogData = {
-  flights: [],
-  entries: [],
-  activePlanCodes: null,
-  directToIcao: null,
-  hasActiveNavigation: false,
-  recording: { kind: 'recording' },
-  recordingElapsedSeconds: 5,
-  nextIdent: null,
-  estimatedTimeEnrouteSeconds: null,
-  ownshipFix: null,
+export const REFERENCE_FLIGHT_LOG: FlightLogData = {
+  ...noNavigationFixture,
   gpsAvailable: true,
-  nowMs: REFERENCE_NOW_MS,
+  recording: { status: { kind: 'recording' }, elapsedSeconds: 5, levelDBFS: -160, microphoneDenied: false },
 };

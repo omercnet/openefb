@@ -6,7 +6,8 @@
 # MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), RESULT_TIMEOUT (seconds, default 120),
 # SCREENS (default "map airport night layers nearest search log sheet"), FULL (1 = also run the animation and the self test, default 1; the
 # workflow's second emulator pass with another GPU mode sets FULL=0 SCREENS=map).
-# Writes OUT/screens/<screen>.png, OUT/map-status-<screen>.json and OUT/logcat-<screen>.txt, OUT/spike-result.json
+# Writes OUT/screens/<screen>.png, OUT/map-status-<screen>.json (screens with a map) and OUT/logcat-<screen>.txt (every screen),
+# OUT/spike-result.json
 # and OUT/spike-anim.json (from logcat: a release build is not debuggable, so run-as cannot read the files), and
 # OUT/dumpsys-location.txt.
 set -euo pipefail
@@ -84,7 +85,13 @@ wait_map() {
 for screen in $SCREENS; do
   stamp "screen $screen"
   open_url "kanaf-dev://$screen"
-  if [ "$screen" = sheet ] || [ "$screen" = log ]; then sleep "$WAIT"; else wait_map "$screen"; fi
+  if [ "$screen" = sheet ] || [ "$screen" = log ]; then
+    sleep "$WAIT"
+    # No map status to wait for, and the next open_url clears logcat: keep this screen's log (the only evidence of a crash).
+    adb logcat -d > "$OUT/logcat-$screen.txt" || true
+  else
+    wait_map "$screen"
+  fi
   screenshot "$screen"
 done
 

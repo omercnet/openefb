@@ -28,4 +28,19 @@ export const defaultAirportQueries: AirportQueries = {
   now: () => Date.now(),
 };
 
+/**
+ * Whether two values hold the same sources (shallow equality of the fields). Only a change of a field is a database
+ * swap; a provider value rebuilt every render around the same databases is not.
+ */
+export const sameQueries = (a: Partial<AirportQueries>, b: Partial<AirportQueries>): boolean =>
+  a.aviation === b.aviation &&
+  a.israel === b.israel &&
+  a.fetchNotamClosures === b.fetchNotamClosures &&
+  a.now === b.now;
+
+/**
+ * A value whose fields differ (`sameQueries`) is a database swap: the Nearest refresher drops its in-flight answers and
+ * requeries, and the search re-runs the current query on the new sources. Memoising the value is still cheaper (the
+ * hooks' effects then do not run at all), but a fresh object around the same databases changes nothing.
+ */
 export const AirportQueriesContext = createContext<AirportQueries>(defaultAirportQueries);

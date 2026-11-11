@@ -1,8 +1,11 @@
 import { RECOVERED_NOTE } from '../../data/models';
+import { israelRoute } from '../flightLog/fixtures';
 import { entry, flight, nextId } from './fixtures';
 import {
+  activePlanCodes,
   activePlanSpoken,
   activePlanText,
+  deleteUnsignedEntry,
   entriesByFlight,
   flightRowTexts,
   flownEntryAction,
@@ -68,6 +71,15 @@ describe('FlownEntryAction', () => {
 });
 
 describe('duration formats (LogbookViewModel)', () => {
+  it('non-finite durations are dashed', () => {
+    for (const bad of [Number.NaN, Infinity, -Infinity]) {
+      expect(formatDurationHM(bad)).toBe('---');
+      expect(formatDurationDecimal(bad)).toBe('---');
+      expect(formatHourMinuteSecond(bad)).toBe('---');
+      expect(formatHourMinute(bad)).toBe('---');
+    }
+  });
+
   it('formatDurationHM: hours and minutes, seconds under a minute', () => {
     expect(formatDurationHM(5400)).toBe('1h 30m');
     expect(formatDurationHM(48)).toBe('48s');
@@ -132,6 +144,38 @@ describe('route texts', () => {
     expect(activePlanText(null)).toBeNull();
     expect(activePlanSpoken(null)).toBeNull();
   });
+
+  it('an empty route has no active plan text', () => {
+    expect(activePlanText([])).toBeNull();
+    expect(activePlanSpoken([])).toBeNull();
+  });
+
+  const noNav = {
+    directTo: null,
+    activeFlightPlan: false,
+    activeRoute: null,
+    planDeparture: null,
+    planDestination: null,
+  };
+
+  it('active plan codes: the route legs, else departure and destination of an active plan', () => {
+    expect(activePlanCodes({ ...noNav, activeFlightPlan: true, activeRoute: israelRoute })).toEqual([
+      'LLHZ',
+      'MIDAA',
+      'BAZRA',
+      'NATAN',
+      'LLIB',
+    ]);
+    // Swift reads appState.activeRoute without checking activeFlightPlan.
+    expect(activePlanCodes({ ...noNav, activeRoute: israelRoute })?.[0]).toBe('LLHZ');
+    expect(
+      activePlanCodes({ ...noNav, activeFlightPlan: true, planDeparture: 'KSQL', planDestination: 'KOAK' }),
+    ).toEqual(['KSQL', 'KOAK']);
+    expect(activePlanCodes({ ...noNav, planDeparture: 'KSQL', planDestination: 'KOAK' })).toBeNull();
+    expect(activePlanCodes({ ...noNav, activeFlightPlan: true, planDeparture: 'KSQL' })).toBeNull();
+    expect(activePlanCodes({ ...noNav, activeFlightPlan: true, activeRoute: { ...israelRoute, legs: [] } })).toBeNull();
+    expect(activePlanCodes(noNav)).toBeNull();
+  });
 });
 
 describe('Now', () => {
@@ -188,6 +232,19 @@ describe('Now', () => {
     expect(now.eteText).toBe('ETE ---');
     expect(now.accessibilityLabel).toBe('Now, Direct KOAK, next KOAK, time to next unavailable');
   });
+
+  it('an empty plan route falls back to "Flight", never a blank route', () => {
+    const now = nowRowTexts({ ...base, planCodes: [] });
+    expect(now.routeText).toBe('Flight');
+    expect(now.accessibilityLabel).toBe('Now, Flight, REC 0:00:05');
+  });
+
+  it('a non-finite ETE or elapsed time is dashed, never Infinity or NaN', () => {
+    const now = nowRowTexts({ ...base, elapsedSeconds: Number.NaN, nextIdent: 'LLIB', eteSeconds: Infinity });
+    expect(now.eteText).toBe('ETE ---');
+    expect(now.recordingText).toBe('REC ---');
+    expect(now.accessibilityLabel).toBe('Now, Flight, REC ---, next LLIB, time to next unavailable');
+  });
 });
 
 describe('Flown', () => {
@@ -230,7 +287,6 @@ describe('Flown', () => {
       warning: null,
       action: 'sign',
       accessibilityLabel: 'Flight, Nov 11, 2026 at 4:36 PM, KSQL to KOAK, block time 0h 45m, Logbook draft, not signed',
-      actionText: 'Draft, sign',
       actionLabel: 'Sign logbook draft, KSQL to KOAK',
       actionTestID: 'log-sign-draft',
     });
@@ -246,7 +302,6 @@ describe('Flown', () => {
     const texts = flightRowTexts(f, entry({ flightID: f.id, isConfirmed: true }));
     expect(texts.warning).toBe('Recovered');
     expect(texts.action).toBe('review');
-    expect(texts.actionText).toBe('Logbook');
     expect(texts.actionLabel).toBe('Logbook entry, KSQL to unknown');
     expect(texts.actionTestID).toBe('log-open-entry');
     expect(texts.accessibilityLabel).toBe(
@@ -257,7 +312,6 @@ describe('Flown', () => {
   it('flight row texts: no entry, no action', () => {
     const texts = flightRowTexts(flight({ startDate: nov11 }), null);
     expect(texts.action).toBeNull();
-    expect(texts.actionText).toBeNull();
     expect(texts.accessibilityLabel).toBe('Flight, Nov 11, 2026 at 4:36 PM, unknown to unknown, block time 0s');
   });
 
@@ -281,7 +335,29 @@ describe('Flown', () => {
   });
 });
 
+describe('deleting entries', () => {
+  it('deletes an unsigned entry and never a signed one (signed entries are locked)', () => {
+    const remove = jest.fn();
+    const draft = entry({ isConfirmed: false });
+    deleteUnsignedEntry(draft, remove);
+    expect(remove).toHaveBeenCalledWith(draft.id);
+    remove.mockClear();
+    deleteUnsignedEntry(entry({ isConfirmed: true }), remove);
+    expect(remove).not.toHaveBeenCalled();
+  });
+});
+
 describe('Totals', () => {
+  it('skips a non-finite duration instead of dashing the whole total', () => {
+    const t = totalsTexts([
+      entry({ durationSeconds: 3600 }),
+      entry({ durationSeconds: Number.NaN }),
+      entry({ durationSeconds: Infinity }),
+    ]);
+    expect(t.flightsText).toBe('3 flights');
+    expect(t.timeText).toBe('1.0 h');
+  });
+
   it('no entries', () => {
     expect(totalsTexts([])).toEqual({
       flightsText: '0 flights',

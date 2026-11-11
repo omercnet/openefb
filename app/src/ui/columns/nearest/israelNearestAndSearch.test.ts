@@ -1,6 +1,6 @@
 // Port of efb-212Tests/ViewModelTests/IsraelNearestAndSearchTests.swift: the NRST, search and adapter cases (12 of 18).
 // Not here: the four closingNotams cases (L3/S1: NOTAM feed types and matching) and the two IsraelAerodromeSection
-// sheet-text cases (U4b). See /tmp/u3/notes/nearest-search.md.
+// sheet-text cases (U4b). See app/docs/port-notes/U4.md.
 import type { IsraelAviationDatabase } from '../../../data/aviation/israelDatabase';
 import type {
   IsraelAerodrome,
@@ -10,11 +10,18 @@ import type {
   IsraelAerodromeUse,
   IsraelPPR,
 } from '../../../data/aviation/israelTypes';
+import { WHOLE_COUNTRY } from '../../../data/aviation/israelTypes';
 import { distanceNm, isLandable, type Airport, type Coordinate, type Region } from '../../../domain/core';
 import { openBundledIsrael } from '../../../../tests/data/aviation/israelBundled';
-import { createAirportSearch, type SearchState } from '../search/search';
-import { NOT_LANDABLE_USES, frequencyType, israelAirport } from './israelAerodromeAdapter';
-import { isClosedByNotam, requiresPPR } from './logic';
+import { createAirportSearch, searchSlice } from '../search/search';
+import {
+  NOT_LANDABLE_USES,
+  frequencyType,
+  israelAirport,
+  israelFrequency,
+  israelSurface,
+} from './israelAerodromeAdapter';
+import { entryIsPrivateUse, isClosedByNotam, requiresPPR } from './logic';
 import { createNearestRefresher } from './refresh';
 import { defaultAirportQueries, type AirportQueries, type NotamClosureLookup } from './sources';
 import { regionSlice } from '../../state/region';
@@ -208,7 +215,7 @@ describe('Israel NRST and Search Tests', () => {
     expect(requiresPPR(byCode.get('LLHZ')!)).toBe(false);
     expect(byCode.get('LLRS')?.israel?.isReviewed).toBe(false);
     expect(isClosedByNotam(byCode.get('LLHZ')!)).toBe(false); // no feed: no closure claim either way
-    expect(byCode.get('LLHZ')?.airport.ownership).not.toBe('private'); // PPR is its own tag, not the US private-use flag
+    expect(entryIsPrivateUse(byCode.get('LLHZ')!)).toBe(false); // PPR is its own tag, not the US private-use flag
   });
 
   test('switchingRegionRequeriesWithoutMoving', async () => {
@@ -244,18 +251,12 @@ describe('Israel NRST and Search Tests', () => {
   // MARK: - Search
 
   function search(region: () => Region) {
-    let state: SearchState | null = null;
-    const s = createAirportSearch({
-      queries: () => ({ aviation: usDb([kpao]), israel: israelDb }),
-      region,
-      onChange: (next) => {
-        state = next;
-      },
-    });
+    const store = searchSlice.make();
+    const s = createAirportSearch(store, { queries: () => ({ aviation: usDb([kpao]), israel: israelDb }), region });
     const run = async (query: string) => {
       s.setQuery(query);
       await jest.advanceTimersByTimeAsync(300);
-      return (state as SearchState | null)?.results.map((a) => a.icao);
+      return store.getState().results.map((a) => a.icao);
     };
     return run;
   }
@@ -303,5 +304,71 @@ describe('Israel NRST and Search Tests', () => {
     const pad = israelAirport(aerodrome('ICHILOV', { lat: 32.0, lon: 34.8, type: 'heliport', use: 'hospital' }));
     expect(pad.type).toBe('heliport');
     expect(isLandable(pad)).toBe(false);
+  });
+
+  // JS-only checks of the adapter against the Swift semantics (review N7, N8).
+
+  test.each([
+    ['10/28', '10', '28'],
+    ['H1', 'H1', ''], // no slash
+    ['?', '?', ''],
+    ['/09', '09', ''], // split(separator:maxSplits:) omits the empty leading part
+    ['09/', '09', ''],
+    ['09//27', '09', '/27'], // one split, the rest kept as is
+    ['//09/27', '09', '27'],
+    ['/', '/', ''], // no parts: baseEndID falls back to the designator
+  ])('runway ends of %j split like Swift split(separator: "/", maxSplits: 1)', (designator, base, reciprocal) => {
+    const airport = israelAirport(aerodrome('LLXX', { lat: 32, lon: 34.8, runways: [runway(designator, 900)] }));
+    expect(airport.runways[0]).toMatchObject({ id: designator, baseEndID: base, reciprocalEndID: reciprocal });
+  });
+
+  test.each([
+    ['asphalt', 'asphalt'],
+    ['concrete+asphalt', 'concrete'],
+    ['asphalt/concrete', 'asphalt'],
+    ['+asphalt', 'asphalt'],
+    ['grass', 'turf'],
+    ['gravel', 'gravel'],
+    ['dirt', 'dirt'],
+    ['unknown', 'other'],
+    ['', 'other'],
+  ])('surface %j maps to %s (composites take their first part)', (text, surface) => {
+    expect(israelSurface(text)).toBe(surface);
+  });
+
+  test('the bundled composite surfaces map to their first part', async () => {
+    const { db, close } = await openBundledIsrael();
+    try {
+      const surfaces = (await db.aerodromesIn(WHOLE_COUNTRY)).flatMap((a) => a.runways.map((r) => r.surface));
+      expect(surfaces.filter((s) => s === 'concrete+asphalt')).toHaveLength(5);
+      expect(surfaces.filter((s) => s === 'asphalt/concrete')).toHaveLength(2);
+      expect(israelSurface('concrete+asphalt')).toBe('concrete');
+      expect(israelSurface('asphalt/concrete')).toBe('asphalt');
+      const mhz = (await db.aerodromesIn(WHOLE_COUNTRY)).flatMap((a) => a.frequencies.map((f) => f.mhz));
+      expect(mhz.every((m) => /^\d+\.\d+$/.test(m))).toBe(true); // plain decimals: Swift Double(_:) and the regex agree
+    } finally {
+      await close();
+    }
+  });
+
+  test('israelFrequency keeps the MHz, takes the role from the AIP wording and names the Hebrew callsign', () => {
+    const at = aerodrome('LLHZ', { lat: 32.18, lon: 34.83 });
+    const source = { id: 7, mhz: '122.200', service: 'TWR primary', callsignHebrew: HERZLIYA_HE };
+    expect(israelFrequency(source, at)).toEqual({
+      id: 'LLHZ-7',
+      type: 'tower',
+      frequency: 122.2,
+      name: `TWR primary (${HERZLIYA_HE})`,
+    });
+    expect(
+      israelFrequency({ ...source, service: 'Airstrip operator channel', callsignHebrew: null }, at),
+    ).toMatchObject({
+      type: 'ctaf',
+      name: 'Airstrip operator channel',
+    });
+    expect(israelFrequency({ ...source, mhz: '' }, at)).toBeNull();
+    expect(israelFrequency({ ...source, mhz: 'n/a' }, at)).toBeNull();
+    const withFrequencies = israelAirport({ ...at, frequencies: [source, { ...source, id: 8, mhz: '?' }] });
+    expect(withFrequencies.frequencies.map((f) => f.id)).toEqual(['LLHZ-7']);
   });
 });

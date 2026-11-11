@@ -1,5 +1,6 @@
 // SearchColumnView (efb-212/Views/Log/SearchColumnView.swift): airport search in the strip column, a search field focused
-// when the column opens and 60pt result rows. Selecting a result hands its identifier to `onSelect` and clears the search.
+// when the column opens and 60pt result rows. Selecting a result hands its identifier to `onSelect` and clears the search;
+// closing the column keeps the query and results (the search lives in `searchSlice`).
 import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import type { Airport } from '../../domain/core';
 import { SearchBar } from '../components/Components';
@@ -7,7 +8,7 @@ import { ColumnRule, Pressy, useTheme } from '../Primitives';
 import { appStore } from '../state/appStore';
 import { Space, StripMetrics, Type } from '../tokens';
 import { ColumnHeader } from './ColumnHeader';
-import { MINIMUM_QUERY_LENGTH, useAirportSearch } from './search/search';
+import { isSearchableQuery, useAirportSearch } from './search/search';
 
 export function SearchColumn({
   onSelect = appStore.getState().showAirport,
@@ -46,7 +47,7 @@ export function SearchColumn({
         Search is unavailable right now
       </Text>
     );
-  } else if (search.query.trim().length >= MINIMUM_QUERY_LENGTH) {
+  } else if (isSearchableQuery(search.query.trim())) {
     body = (
       <Text testID="search-no-results" style={caption}>
         {`No airports match \u201C${search.query}\u201D`}
@@ -60,11 +61,12 @@ export function SearchColumn({
           Search
         </Text>
       </ColumnHeader>
-      <View accessibilityRole="search" accessibilityLabel="Search airports" style={{ padding: Space.l }}>
+      <View style={{ padding: Space.l }}>
         <SearchBar
           text={search.query}
           onChangeText={search.setQuery}
           placeholder="ICAO, name or city"
+          accessibilityLabel="Search airports"
           focusOnAppear
           onSubmit={search.submit}
         />

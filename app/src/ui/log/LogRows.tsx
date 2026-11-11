@@ -241,12 +241,12 @@ export function FlownEmptyRow() {
 }
 
 /** Swipe actions on an unsigned entry, offered as an accessibility action ("Delete draft" / "Delete"). */
-const deleteActions = (label: string, entry: LogbookEntry | null, onDelete: (id: string) => void) =>
+const deleteActions = (label: string, entry: LogbookEntry | null, onDelete: (entry: LogbookEntry) => void) =>
   entry && !entry.isConfirmed
     ? {
         accessibilityActions: [{ name: 'delete', label }],
         onAccessibilityAction: (e: { nativeEvent: { actionName: string } }) => {
-          if (e.nativeEvent.actionName === 'delete') onDelete(entry.id);
+          if (e.nativeEvent.actionName === 'delete') onDelete(entry);
         },
       }
     : {};
@@ -266,7 +266,8 @@ export function FlownFlightRow({
   entry: LogbookEntry | null;
   onOpen: () => void;
   onOpenEntry: (entryId: string) => void;
-  onDeleteEntry: (entryId: string) => void;
+  /** Swipe action on an unsigned entry; the caller re-checks the lock (deleteUnsignedEntry). */
+  onDeleteEntry: (entry: LogbookEntry) => void;
 }) {
   const t = useTheme();
   const texts = flightRowTexts(flight, entry);
@@ -328,7 +329,8 @@ export function FlownEntryRow({
 }: {
   entry: LogbookEntry;
   onOpen: () => void;
-  onDelete: (entryId: string) => void;
+  /** Swipe action on an unsigned entry; the caller re-checks the lock (deleteUnsignedEntry). */
+  onDelete: (entry: LogbookEntry) => void;
 }) {
   const t = useTheme();
   const texts = manualEntryRowTexts(entry);
@@ -385,8 +387,10 @@ export function FlownEntryRow({
 // MARK: - Totals
 
 /**
- * Logbook totals on one line, the draft count pushed to the trailing edge; on a narrow screen the parts wrap (the
- * Swift ViewThatFits falls back to a vertical stack).
+ * Logbook totals on one line, a flexible spacer pushing the draft count to the trailing edge (HStack with
+ * Spacer(minLength: 0)). On a narrow screen the parts wrap: the zero-width spacer stays on the first line, so a wrapped
+ * draft count starts at the leading edge like the Swift ViewThatFits vertical fallback (which also stacks flights and
+ * time; here they share the first line while they fit).
  */
 export function TotalsRow({ totals }: { totals: TotalsTexts }) {
   const t = useTheme();
@@ -412,7 +416,12 @@ export function TotalsRow({ totals }: { totals: TotalsTexts }) {
       >
         <Text style={text}>{totals.flightsText}</Text>
         <Text style={text}>{totals.timeText}</Text>
-        {totals.draftsText ? <Text style={[text, { marginLeft: 'auto' }]}>{totals.draftsText}</Text> : null}
+        {totals.draftsText ? (
+          <>
+            <View testID="log-totals-spacer" style={{ flexGrow: 1 }} />
+            <Text style={text}>{totals.draftsText}</Text>
+          </>
+        ) : null}
       </View>
     </LogStripRow>
   );

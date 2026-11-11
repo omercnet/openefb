@@ -1,8 +1,8 @@
 // Pure logic of the Log screen: efb-212/Views/Log/LogStackView.swift (Now text, Flown ordering, totals) and
 // LogStackRows.swift (FlownEntryAction, route texts, row texts), plus the LogbookViewModel duration formats they use.
 import { healthWarning, type FlightRecord, type LogbookEntry } from '../../data/models';
-import type { RecordingStatus } from '../../domain/core/types';
-import { printfFixed } from '../flightLog/logic';
+import type { RecordingStatus } from '../../domain/recording/recordingCoordinator';
+import { printfFixed, type NavState } from '../flightLog/logic';
 
 // MARK: - FlownEntryAction
 
@@ -40,8 +40,15 @@ const roundHalfEven = (x: number): number => {
   return Math.abs(x % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r;
 };
 
+/**
+ * Shown for a non-finite duration (Infinity, NaN). Swift's Int(seconds) traps on these and Duration would print
+ * garbage; the JS formatters would print "Infinity:NaN" or "NaNh NaNm", so they dash instead.
+ */
+const NO_DURATION = '---';
+
 /** Hours and minutes; under one minute, seconds. 5400 -> "1h 30m", 48 -> "48s", 0 -> "0s". */
 export function formatDurationHM(seconds: number): string {
+  if (!Number.isFinite(seconds)) return NO_DURATION;
   const whole = Math.trunc(seconds);
   if (whole < 60) return `${Math.max(0, whole)}s`;
   const totalMinutes = Math.floor(whole / 60);
@@ -53,18 +60,21 @@ export function formatDurationHM(seconds: number): string {
  * (0.25 h -> "0.2"); `printfFixed` does that without a floating-point multiply, which would turn 0.05 h (binary
  * 0.05000000000000000277, so "0.1") into an apparent tie.
  */
-export const formatDurationDecimal = (seconds: number): string => printfFixed(seconds / 3600, 1);
+export const formatDurationDecimal = (seconds: number): string =>
+  Number.isFinite(seconds) ? printfFixed(seconds / 3600, 1) : NO_DURATION;
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 /** Duration.formatted(.time(pattern: .hourMinuteSecond)): "0:00:05"; fractional seconds round to even. */
 export function formatHourMinuteSecond(seconds: number): string {
+  if (!Number.isFinite(seconds)) return NO_DURATION;
   const total = Math.max(0, roundHalfEven(seconds));
   return `${Math.floor(total / 3600)}:${pad2(Math.floor(total / 60) % 60)}:${pad2(total % 60)}`;
 }
 
 /** Duration.formatted(.time(pattern: .hourMinute)): "1:05"; seconds round to the nearest minute, halves to even. */
 export function formatHourMinute(seconds: number): string {
+  if (!Number.isFinite(seconds)) return NO_DURATION;
   const minutes = Math.max(0, roundHalfEven(seconds / 60));
   return `${Math.floor(minutes / 60)}:${pad2(minutes % 60)}`;
 }
@@ -101,10 +111,24 @@ export const logRouteText = (departure: string | null, arrival: string | null): 
 export const logRouteSpoken = (departure: string | null, arrival: string | null): string =>
   `${departure ?? 'unknown'} to ${arrival ?? 'unknown'}`;
 
-/** The active plan's route points (the route's legs, or departure and destination), "LLHZ ▸ ZOMET ▸ LLIB". */
-export const activePlanText = (codes: string[] | null): string | null => codes?.join(` ${ROUTE_ARROW} `) ?? null;
+/**
+ * Route idents of the active plan: the active route's points (Swift reads appState.activeRoute without checking
+ * activeFlightPlan), or departure and destination of an active plan; null without either.
+ */
+export function activePlanCodes(nav: NavState): string[] | null {
+  const first = nav.activeRoute?.legs[0];
+  if (nav.activeRoute && first) return [first.fromCode, ...nav.activeRoute.legs.map((leg) => leg.toCode)];
+  if (!nav.activeFlightPlan || nav.planDeparture == null || nav.planDestination == null) return null;
+  return [nav.planDeparture, nav.planDestination];
+}
 
-export const activePlanSpoken = (codes: string[] | null): string | null => codes?.join(' to ') ?? null;
+/** "LLHZ ▸ ZOMET ▸ LLIB"; null without codes (an empty list too, so Now never shows a blank route). */
+export const activePlanText = (codes: readonly string[] | null): string | null =>
+  codes?.length ? codes.join(` ${ROUTE_ARROW} `) : null;
+
+/** "LLHZ to ZOMET to LLIB" for VoiceOver; null like activePlanText. */
+export const activePlanSpoken = (codes: readonly string[] | null): string | null =>
+  codes?.length ? codes.join(' to ') : null;
 
 // MARK: - Now
 
@@ -130,12 +154,12 @@ export function recordingText(recording: RecordingStatus, elapsedSeconds: number
 
 export interface NowInput {
   directToIcao: string | null;
-  planCodes: string[] | null;
+  planCodes: readonly string[] | null;
   recording: RecordingStatus;
   elapsedSeconds: number;
   /** The next waypoint, with the strip's precedence (a Direct-To wins over the route). */
   nextIdent: string | null;
-  /** Seconds to the next waypoint; null when unknown or the fix is stale. */
+  /** Seconds to the next waypoint; null when unknown or the fix is stale (non-finite counts as unknown). */
   eteSeconds: number | null;
 }
 
@@ -152,19 +176,18 @@ export interface NowTexts {
 export function nowRowTexts(input: NowInput): NowTexts {
   const direct = input.directToIcao != null ? `Direct ${input.directToIcao}` : null;
   const rec = recordingText(input.recording, input.elapsedSeconds);
+  const ete = input.eteSeconds != null && Number.isFinite(input.eteSeconds) ? input.eteSeconds : null;
   const parts = ['Now', direct ?? activePlanSpoken(input.planCodes) ?? 'Flight'];
   if (rec) parts.push(rec);
   if (input.nextIdent != null) {
     parts.push(`next ${input.nextIdent}`);
-    parts.push(
-      input.eteSeconds != null ? `time to next ${formatDurationHM(input.eteSeconds)}` : 'time to next unavailable',
-    );
+    parts.push(ete != null ? `time to next ${formatDurationHM(ete)}` : 'time to next unavailable');
   }
   return {
     routeText: direct ?? activePlanText(input.planCodes) ?? 'Flight',
     recordingText: rec,
     nextText: input.nextIdent != null ? `Next ${input.nextIdent}` : null,
-    eteText: input.eteSeconds != null ? formatHourMinute(input.eteSeconds) : 'ETE ---',
+    eteText: ete != null ? formatHourMinute(ete) : 'ETE ---',
     accessibilityLabel: parts.join(', '),
   };
 }
@@ -204,8 +227,6 @@ export interface FlightRowTexts {
   /** Health caution ("Recovered", "Track damaged"); null for a normal flight. */
   warning: string | null;
   action: FlownEntryAction | null;
-  /** The entry button: "Draft, sign" or "Logbook"; null without an entry. */
-  actionText: string | null;
   actionLabel: string | null;
   actionTestID: string | null;
 }
@@ -231,7 +252,6 @@ export function flightRowTexts(
     warning,
     action,
     accessibilityLabel: parts.join(', '),
-    actionText: action === 'sign' ? 'Draft, sign' : action === 'review' ? 'Logbook' : null,
     actionLabel:
       action === 'sign'
         ? `Sign logbook draft, ${routeSpoken}`
@@ -274,6 +294,18 @@ export function manualEntryRowTexts(entry: LogbookEntry): EntryRowTexts {
   };
 }
 
+/**
+ * The only way the Log deletes an entry (Swift LogStackView.delete(_:)): unsigned entries only, a signed entry is locked.
+ * The rows offer the swipe action only for unsigned entries; this re-checks at the call.
+ */
+export function deleteUnsignedEntry(
+  entry: Pick<LogbookEntry, 'id' | 'isConfirmed'>,
+  deleteEntry: (id: string) => void,
+) {
+  if (entry.isConfirmed) return;
+  deleteEntry(entry.id);
+}
+
 // MARK: - Totals
 
 export interface TotalsTexts {
@@ -287,7 +319,9 @@ export interface TotalsTexts {
 /** Logbook totals: LogbookViewModel counts every entry and sums their durations; drafts are the unsigned entries. */
 export function totalsTexts(entries: Pick<LogbookEntry, 'durationSeconds' | 'isConfirmed'>[]): TotalsTexts {
   const count = entries.length;
-  const hours = formatDurationDecimal(entries.reduce((sum, e) => sum + e.durationSeconds, 0));
+  // A non-finite duration is skipped rather than dashing the whole total (JS-only guard: Swift's sum would be inf/nan).
+  const seconds = entries.reduce((sum, e) => (Number.isFinite(e.durationSeconds) ? sum + e.durationSeconds : sum), 0);
+  const hours = formatDurationDecimal(seconds);
   const drafts = entries.filter((e) => !e.isConfirmed).length;
   const flightsText = count === 1 ? '1 flight' : `${count} flights`;
   const draftsText = drafts === 0 ? null : drafts === 1 ? '1 draft to sign' : `${drafts} drafts to sign`;

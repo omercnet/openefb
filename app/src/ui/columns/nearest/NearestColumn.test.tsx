@@ -1,8 +1,8 @@
 // Render tests for NearestColumn: the reference rows and their accessibility, Direct and row taps, the empty, loading,
 // error and no-data states, long and Hebrew names, and the refresh hook driving the list.
-import type { ReactElement } from 'react';
 import { Text } from 'react-native';
-import { press, render } from '../../../../tests/support/ui';
+import { act, type ReactElement } from 'react';
+import { callHandler, press, render, type Rendered } from '../../../../tests/support/ui';
 import { makeAirport, type Airport } from '../../../domain/core';
 import { appStore } from '../../state/appStore';
 import { NearestColumn } from '../NearestColumn';
@@ -10,6 +10,20 @@ import { FIXTURE_OWNSHIP, createFakeAviationDatabase } from './fixture';
 import { AirportQueriesContext, defaultAirportQueries, type AirportQueries } from './sources';
 import { nearest, useNearestEntry, type NearestData } from './store';
 import { rwy } from './__fixtures__/swiftAirports';
+
+const layout = (width: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width, height: 20 } } });
+
+/** The tags the pilot sees (the visible box's children; the measuring copy is a sibling). */
+const visibleTags = (v: Rendered, icao: string) =>
+  v.all((n) => n.parent?.props?.testID === `nearest-tags-${icao}` && typeof n.props?.children === 'string');
+
+/** Deliver the layout events: the width the row gives the tags, and each tag's width in the hidden measuring copy. */
+async function measureTags(v: Rendered, icao: string, available: number, widths: Record<string, number>) {
+  await callHandler(v.byTestId(`nearest-tags-${icao}`), 'onLayout', layout(available));
+  for (const [text, width] of Object.entries(widths)) {
+    await callHandler(v.byTestId(`nearest-tags-${icao}-measure-${text}`), 'onLayout', layout(width));
+  }
+}
 
 const base = (patch: Partial<NearestData> = {}): NearestData => ({ ...nearest.store.getState(), ...patch });
 
@@ -76,6 +90,7 @@ describe('NearestColumn', () => {
     const direct = v.byTestId('Direct KPAO');
     expect(direct.props.accessibilityRole).toBe('button');
     expect(direct.props.accessibilityLabel).toBe('Direct to KPAO');
+    await measureTags(v, 'KNUQ', 160, { PVT: 38 });
     expect(v.byLabel('Private use')).toHaveLength(1);
   });
 
@@ -154,7 +169,70 @@ describe('NearestColumn', () => {
       `LLRS, ${hebrew}, 10/28  3,000' ASPH, Prior permission required, A NOTAM names this field closed`,
     );
     expect(v.text()).toContain('NOTAM CLSD');
+    await measureTags(v, 'KRHV', 160, { MIL: 38 });
     expect(v.byLabel('Military field, emergency use only')).toHaveLength(1);
+  });
+
+  it('the ident and the caution tags keep their natural width: no line limit, no squeezing (Swift .fixedSize())', async () => {
+    const entries = [
+      {
+        airport: field('LLRS', 'Rishon'),
+        distance: 1,
+        bearing: 10,
+        israel: { requiresPPR: true, closureNotamIDs: ['C1/26'], isReviewed: false },
+      },
+    ];
+    const v = await mount(base({ entries, ownship: null })).view;
+    const [ident] = v.all((n) => n.props?.children === 'LLRS');
+    expect(ident?.props.numberOfLines).toBeUndefined();
+    // In a row of its own the ident is measured on the horizontal axis, where flexShrink 0 means it is never squeezed.
+    expect(ident?.parent?.props.style).toEqual(expect.objectContaining({ flexDirection: 'row' }));
+    expect(ident?.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ flexShrink: 0 })]));
+    await measureTags(v, 'LLRS', 150, { PPR: 40, 'NOTAM CLSD': 300 }); // wider than the column
+    for (const [text, width] of [
+      ['PPR', 40],
+      ['NOTAM CLSD', 300],
+    ] as const) {
+      const [tag] = visibleTags(v, 'LLRS').filter((n) => n.props.children === text);
+      expect(tag?.props.numberOfLines).toBeUndefined();
+      // minWidth = the unconstrained width measured off screen: the badge overflows rather than wraps ('NOTAM / CLSD').
+      expect(tag?.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ minWidth: width })]));
+    }
+  });
+
+  it('tags show only once measured, then side by side when they fit, else one per line (ViewThatFits)', async () => {
+    const israel = { requiresPPR: true, closureNotamIDs: ['C1/26'], isReviewed: false };
+    const entries = [{ airport: field('LLEK', 'Tel Nof', 'military'), distance: 1, bearing: 10, israel }];
+    const { store, view } = mount(base({ entries, ownship: null }));
+    const v = await view;
+    const box = () => v.byTestId('nearest-tags-LLEK');
+    // First frame: nothing visible, a hidden copy (no width cap, out of the accessibility tree) being measured.
+    expect(visibleTags(v, 'LLEK')).toHaveLength(0);
+    const hidden = v.byTestId('nearest-tags-LLEK-measure');
+    expect(hidden.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(hidden.props.accessibilityElementsHidden).toBe(true);
+    expect(v.byLabel('Military field, emergency use only')).toHaveLength(0);
+    await callHandler(box(), 'onLayout', layout(186));
+    expect(visibleTags(v, 'LLEK')).toHaveLength(0); // the tags are not measured yet
+    // MIL 40 + PPR 40 + NOTAM CLSD 90 + two 8 pt gaps = 186 pt.
+    await measureTags(v, 'LLEK', 186, { MIL: 40, PPR: 40, 'NOTAM CLSD': 90 });
+    expect(visibleTags(v, 'LLEK').map((n) => n.props.children)).toEqual(['MIL', 'PPR', 'NOTAM CLSD']);
+    expect(box().props.style).toEqual(expect.objectContaining({ flexDirection: 'row' }));
+    expect(v.byLabel('Military field, emergency use only')).toHaveLength(1);
+    await callHandler(box(), 'onLayout', layout(185));
+    expect(box().props.style).toEqual(expect.objectContaining({ flexDirection: 'column' }));
+    await callHandler(box(), 'onLayout', layout(200)); // wider again (rotation): back to one line
+    expect(box().props.style).toEqual(expect.objectContaining({ flexDirection: 'row' }));
+    // A new tag set: hidden again until the new tag is measured, never painted in a guessed layout.
+    const pvt = {
+      ...entries[0]!,
+      airport: field('LLEK', 'Tel Nof', 'private'),
+      israel: { ...israel, requiresPPR: false },
+    };
+    await act(async () => store.setState({ entries: [pvt] }));
+    expect(visibleTags(v, 'LLEK')).toHaveLength(0);
+    await measureTags(v, 'LLEK', 200, { PVT: 38 });
+    expect(visibleTags(v, 'LLEK').map((n) => n.props.children)).toEqual(['PVT', 'NOTAM CLSD']);
   });
 
   it('a field without runway data says so', async () => {
@@ -181,5 +259,51 @@ describe('NearestColumn', () => {
     expect(store.getState().entries).toHaveLength(10);
     expect(v.byTestId('Direct KPAO')).toBeTruthy();
     expect(v.byTestId('footer').props.children).toBe('KPAO');
+  });
+
+  it('swapping the queries while a slow query is in flight keeps the new list', async () => {
+    const slow = Promise.withResolvers<Awaited<ReturnType<AirportQueries['aviation']['nearestAirports']>>>();
+    const fake = createFakeAviationDatabase();
+    const first: AirportQueries = {
+      ...defaultAirportQueries,
+      aviation: { ...fake, nearestAirports: () => slow.promise },
+    };
+    const second: AirportQueries = {
+      ...defaultAirportQueries,
+      aviation: { ...fake, nearestAirports: async (c, n) => (await fake.nearestAirports(c, n)).slice(1) },
+    };
+    const store = nearest.make(base({ entries: [], ownship: FIXTURE_OWNSHIP }));
+    const tree = (queries: AirportQueries) => (
+      <nearest.Provider store={store}>
+        <AirportQueriesContext.Provider value={queries}>
+          <NearestColumn />
+        </AirportQueriesContext.Provider>
+      </nearest.Provider>
+    );
+    const v = await render(tree(first));
+    await v.update(tree(second));
+    expect(store.getState().entries[0]?.airport.icao).toBe('KSQL');
+    slow.resolve(await fake.nearestAirports(FIXTURE_OWNSHIP, 40));
+    await v.update(tree(second));
+    expect(store.getState().entries[0]?.airport.icao).toBe('KSQL');
+  });
+
+  it('re-rendering with a fresh provider object holding the same databases does not requery', async () => {
+    const fake = createFakeAviationDatabase();
+    const nearestAirports = jest.fn(fake.nearestAirports);
+    const aviation = { ...fake, nearestAirports };
+    const store = nearest.make(base({ entries: [], ownship: FIXTURE_OWNSHIP }));
+    const tree = () => (
+      <nearest.Provider store={store}>
+        <AirportQueriesContext.Provider value={{ ...defaultAirportQueries, aviation }}>
+          <NearestColumn />
+        </AirportQueriesContext.Provider>
+      </nearest.Provider>
+    );
+    const v = await render(tree());
+    await v.update(tree());
+    await v.update(tree());
+    expect(nearestAirports).toHaveBeenCalledTimes(1);
+    expect(store.getState().entries).toHaveLength(10);
   });
 });

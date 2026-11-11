@@ -41,7 +41,10 @@ which opens the strip with `MapScreen screen="<screen>"` or renders the screen),
 `src/app/index.tsx`, the screen lists in `scripts/ios-capture.sh` and `scripts/android-capture.sh`, its floors in
 `scripts/fidelity-thresholds.json`, and `reference/ipad-<screen>.png`: the Swift app's screenshot (the `scenario-captures`
 artifact of the Swift CI job, `tools/ci/capture-screens.sh`), 2064x2752 downscaled to 1032x1376 with sharp. The fake
-behind the screen must reproduce what the reference shows.
+behind the screen must reproduce what the reference shows. The score is the leading 400 pt of the frame; a screen that is not
+a strip (the full-width Log) sets `"metric": "frame"` in its iOS floor to be gated on the whole frame (Android compares only its 400 dp strip: the
+screen is 800 dp wide, so a whole-frame crop does not line up). `tests/config/fidelityGate.test.ts`
+fails when one of the five places is missing for a gated screen.
 
 ## Router decision
 

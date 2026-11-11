@@ -1,12 +1,10 @@
-// The Log screen's data and actions (LogStackView.swift reads them from @Query, AppState and LogbookViewModel).
+// The Log screen's own data and actions (LogStackView.swift reads them from @Query and LogbookViewModel). Navigation,
+// recording, ETE and GPS availability are the strip's: the Log reads them from the shared `flightLog` slice.
 import type { FlightRecord, LogbookEntry } from '../../data/models';
-import type { RecordingStatus } from '../../domain/core/types';
-import type { GpsFix } from '../../domain/location/gpsStatus';
 import { createStoreContext } from '../state/storeContext';
-import { REFERENCE_LOG } from './fixtures';
 
 /**
- * Plain data behind the Log. Totals are not stored: like LogbookViewModel they are derived from `entries`
+ * Plain data only the Log shows. Totals are not stored: like LogbookViewModel they are derived from `entries`
  * (count, summed duration, unsigned drafts).
  */
 export interface LogData {
@@ -14,28 +12,10 @@ export interface LogData {
   flights: FlightRecord[];
   /** Logbook entries, any order (shown newest first). */
   entries: LogbookEntry[];
-  /** Route points of the active plan (the route's legs, or departure and destination); null without a plan. */
-  activePlanCodes: string[] | null;
-  /** ICAO of the Direct-To airport, if any. */
-  directToIcao: string | null;
-  /** Navigating (plan or Direct-To) without necessarily recording: Now shows. */
-  hasActiveNavigation: boolean;
-  recording: RecordingStatus;
-  /** AppState.recordingElapsedTime, seconds. */
-  recordingElapsedSeconds: number;
-  /** FlightLogStrip.nextIdent: the next waypoint (a Direct-To wins over the route); null without one. */
-  nextIdent: string | null;
-  /** AppState.estimatedTimeEnroute, seconds to the next waypoint. */
-  estimatedTimeEnrouteSeconds: number | null;
-  /** The last fix and whether the stream works, to age the ETE out once the fix is stale. */
-  ownshipFix: GpsFix | null;
-  gpsAvailable: boolean;
-  /** The clock the staleness is evaluated against; I1 ticks it once a second (the Swift TimelineView). */
-  nowMs: number;
 }
 
-/** The fake reference state until I1 feeds the repositories and AppState in. */
-export const log = createStoreContext<LogData>(REFERENCE_LOG);
+/** Nothing recorded or logged: I1 feeds the repositories in. */
+export const log = createStoreContext<LogData>({ flights: [], entries: [] });
 
 /** Navigation and logbook edits the Log triggers. No-ops until I1 wires them. */
 export interface LogActions {
@@ -50,7 +30,11 @@ export interface LogActions {
   openFlight: (flightId: string) => void;
   /** A logbook entry: editable while a draft (Sign), read-only once signed (Review). */
   openEntry: (entryId: string) => void;
-  /** Delete an unsigned entry (the swipe action); signed entries are locked. */
+  /**
+   * Delete an unsigned entry (the swipe action). The Log calls it only through `deleteUnsignedEntry` (logic.ts), which
+   * skips signed entries; the implementation (I1) MUST still re-check `isConfirmed` on the stored entry and refuse a
+   * signed one, as Swift's LogStackView.delete(_:) does: signed entries are locked.
+   */
   deleteEntry: (entryId: string) => void;
 }
 

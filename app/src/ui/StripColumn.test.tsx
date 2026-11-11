@@ -2,6 +2,7 @@ import { act } from 'react';
 import { DeviceEventEmitter, Platform, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ancestorProp, render, type Rendered } from '../../tests/support/ui';
+import { EMPTY_SEARCH, searchSlice } from './columns/search/search';
 import { appStore } from './state/appStore';
 import { StripColumn } from './StripColumn';
 
@@ -16,7 +17,10 @@ const strip = () => (
 
 describe('StripColumn', () => {
   // Reset before each test, not after: the helper unmounts the trees after each test, and an update to a mounted tree needs act.
-  beforeEach(() => appStore.setState({ stripColumn: 'log', selectedAirportId: null }));
+  beforeEach(() => {
+    appStore.setState({ stripColumn: 'log', selectedAirportId: null });
+    searchSlice.store.setState(EMPTY_SEARCH, true); // the Search column's state outlives the column
+  });
 
   it.each([
     ['nearest', 'Nearest'],
@@ -72,16 +76,10 @@ describe('StripColumn', () => {
       expect(nrst(view)).toMatchObject({ height: 80, paddingBottom: 20 });
     });
 
-    it('on iOS the column pads for the keyboard so the footer rides above it; elsewhere the window resizes', async () => {
-      const behaviour = async () => {
-        const view = await render(strip());
-        const found = ancestorProp(view.byTestId('NRST'), 'behavior');
-        await view.unmount();
-        return found;
-      };
-      expect(await behaviour()).toBe('padding');
-      jest.replaceProperty(Platform, 'OS', 'android');
-      expect(await behaviour()).toBeUndefined();
+    it.each(['ios', 'android'] as const)('on %s the column pads for the keyboard so the footer rides above it', async (os) => {
+      jest.replaceProperty(Platform, 'OS', os);
+      const view = await render(strip());
+      expect(ancestorProp(view.byTestId('NRST'), 'behavior')).toBe('padding');
     });
   });
 });

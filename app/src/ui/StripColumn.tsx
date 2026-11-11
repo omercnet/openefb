@@ -1,9 +1,11 @@
 // The 400pt leading column of the iPad map screen (efb-212/Views/Map/MapContainerView.swift regularLayout): the strip
 // column the pilot has open (flight log, airport, nearest, layers or search) over the footer, in the day or night palette.
 // Like SwiftUI, the column shrinks above the software keyboard (Search types into it), so the footer stays visible and
-// sits on the keyboard instead of under it, without the home-indicator padding the keyboard now covers.
+// sits on the keyboard instead of under it, without the home-indicator padding the keyboard now covers. `padding` on both
+// platforms: Expo apps are edge-to-edge on Android, where the window no longer resizes for the keyboard and a view
+// without a behaviour stays under it.
 import { useFonts } from 'expo-font';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { KeyboardAvoidingView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StripColumnKind } from '../domain/types';
 import { AirportColumn } from './columns/AirportColumn';
@@ -45,7 +47,7 @@ export function StripColumn({ screen, width }: { screen?: StripScreen; width: nu
   const Column = COLUMNS[column];
   return (
     <ThemeContext.Provider value={theme}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width, backgroundColor: theme.paper }}>
+      <KeyboardAvoidingView behavior="padding" style={{ width, backgroundColor: theme.paper }}>
         {/* The header band runs up under the status bar. */}
         <View style={{ height: top, backgroundColor: theme.paperSecondary }} />
         {ready ? (

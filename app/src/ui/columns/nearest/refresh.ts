@@ -1,7 +1,7 @@
 // NearestAirportViewModel.updateNearest as a refresher over the `nearest` store, and the hook that runs it on each ownship
 // or region change (MapContainerView's onChange(ownshipPosition / region)). JS-only: queries are async, so each refresh
 // carries a request token and only the latest one may write; a failure keeps the previous list and sets `error`.
-import { useContext, useEffect, useMemo } from 'react';
+import { useContext, useEffect } from 'react';
 import type { StoreApi } from 'zustand';
 import { distanceNm, hasAirportData, type Coordinate, type Region } from '../../../domain/core';
 import type { IsraelAerodrome } from '../../../data/aviation/israelTypes';
@@ -15,18 +15,25 @@ import {
   rankLandable,
   type NearestAirportEntry,
 } from './logic';
-import { AirportQueriesContext, type AirportQueries, type NotamClosureLookup } from './sources';
+import { AirportQueriesContext, sameQueries, type AirportQueries, type NotamClosureLookup } from './sources';
 import { useRegion } from '../../state/region';
 import { nearest, type NearestData } from './store';
 
 export interface NearestRefresher {
   /** Requery unless ownship moved less than REQUERY_DISTANCE_NM since the last query for the same region. */
   update(position: Coordinate, region: Region): Promise<void>;
+  /**
+   * Switch to other queries (I1 swapping the databases). Other sources (`sameQueries` false) drop every answer still in
+   * flight and forget the move threshold and the NOTAM feed, so the next `update` requeries; a fresh object around the
+   * same sources is a no-op (an inline provider value must not requery on every render).
+   */
+  setQueries(next: AirportQueries): void;
 }
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
-export function createNearestRefresher(store: StoreApi<NearestData>, queries: AirportQueries): NearestRefresher {
+export function createNearestRefresher(store: StoreApi<NearestData>, initial: AirportQueries): NearestRefresher {
+  let queries = initial;
   /** The last query that succeeded, and the last one sent (in flight or done): both gate the move threshold. */
   let succeeded: { position: Coordinate; region: Region } | null = null;
   let requested: { position: Coordinate; region: Region } | null = null;
@@ -36,6 +43,8 @@ export function createNearestRefresher(store: StoreApi<NearestData>, queries: Ai
   let notams: NotamClosureLookup | null = null;
   let notamFetchedAt: number | null = null;
   let notamInFlight = false;
+  /** Bumped with the queries, so a NOTAM answer from the previous feed is dropped. */
+  let notamGeneration = 0;
 
   const flagged = (entries: NearestAirportEntry[]): NearestAirportEntry[] =>
     entries.map((entry) => {
@@ -53,7 +62,9 @@ export function createNearestRefresher(store: StoreApi<NearestData>, queries: Ai
     if (notamFetchedAt !== null && now - notamFetchedAt < NOTAM_REFRESH_INTERVAL_MS) return;
     notamFetchedAt = now;
     notamInFlight = true;
+    const generation = notamGeneration;
     const settle = (lookup: NotamClosureLookup | null) => {
+      if (generation !== notamGeneration) return;
       notamInFlight = false;
       if (!lookup) return;
       notams = lookup;
@@ -101,17 +112,33 @@ export function createNearestRefresher(store: StoreApi<NearestData>, queries: Ai
         store.setState({ loading: false, error: message(error) });
       }
     },
+    setQueries(next) {
+      if (sameQueries(next, queries)) return;
+      queries = next;
+      token += 1;
+      requested = null;
+      succeeded = null;
+      notams = null;
+      notamFetchedAt = null;
+      notamInFlight = false;
+      notamGeneration += 1;
+      store.setState({ loading: false });
+    },
   };
 }
 
-const refreshers = new WeakMap<StoreApi<NearestData>, { queries: AirportQueries; refresher: NearestRefresher }>();
+const refreshers = new WeakMap<StoreApi<NearestData>, NearestRefresher>();
 
-/** One refresher per store and query set, so every mounted caller shares the move threshold and the request token. */
-function refresherFor(store: StoreApi<NearestData>, queries: AirportQueries): NearestRefresher {
-  const known = refreshers.get(store);
-  if (known && known.queries === queries) return known.refresher;
-  const refresher = createNearestRefresher(store, queries);
-  refreshers.set(store, { queries, refresher });
+/**
+ * One refresher per store, whatever the queries: every mounted caller shares the move threshold and the request token,
+ * and a query swap goes through `setQueries`, so an answer from the old queries can never overwrite the new list.
+ */
+export function refresherFor(store: StoreApi<NearestData>, queries: AirportQueries): NearestRefresher {
+  let refresher = refreshers.get(store);
+  if (!refresher) {
+    refresher = createNearestRefresher(store, queries);
+    refreshers.set(store, refresher);
+  }
   return refresher;
 }
 
@@ -124,10 +151,11 @@ export function useNearestAirports() {
   const queries = useContext(AirportQueriesContext);
   const ownship = nearest.useData((s) => s.ownship);
   const region = useRegion();
-  const refresher = useMemo(() => refresherFor(store, queries), [store, queries]);
   useEffect(() => {
+    const refresher = refresherFor(store, queries);
+    refresher.setQueries(queries);
     if (ownship && hasAirportData(region)) void refresher.update(ownship, region);
-  }, [refresher, ownship, region]);
+  }, [store, queries, ownship, region]);
   return {
     entries: nearest.useData((s) => s.entries),
     loading: nearest.useData((s) => s.loading),

@@ -17,7 +17,7 @@ import {
   type NearestAirportEntry,
 } from './nearest/logic';
 import { useNearestAirports } from './nearest/refresh';
-import { StatusTag } from './nearest/StatusTag';
+import { CautionTags } from './nearest/StatusTag';
 import { nearest } from './nearest/store';
 
 export interface NearestColumnProps {
@@ -133,9 +133,11 @@ function NearestRow({
         onPress={() => onAirportTap(icao)}
         style={{ flex: 1, gap: Space.xs }}
       >
-        <Text numberOfLines={1} style={[Type.rowIdent, { color: t.airspace }]}>
-          {icao}
-        </Text>
+        {/* .lineLimit(1).fixedSize(): in a row of its own the ident is laid out on the horizontal axis, where flexShrink 0
+            keeps its natural width (it overflows rather than wraps; idents are at most 7 characters). */}
+        <View style={{ flexDirection: 'row' }}>
+          <Text style={[Type.rowIdent, { color: t.airspace, flexShrink: 0 }]}>{icao}</Text>
+        </View>
         {/* One line, tail-truncated; Hebrew (right-to-left) names stay on the leading edge of the row. */}
         <Text numberOfLines={1} ellipsizeMode="tail" style={[Type.body, { color: t.inkSecondary, textAlign: 'left' }]}>
           {name}
@@ -144,13 +146,7 @@ function NearestRow({
         <Text style={[Type.data, { color: hasRunway ? t.ink : t.inkSecondary }]}>
           {hasRunway ? runway.replace(/ (\S+)$/, '\u00A0$1') : runway}
         </Text>
-        {tags.length > 0 ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Space.s }}>
-            {tags.map((tag) => (
-              <StatusTag key={tag.text} {...tag} />
-            ))}
-          </View>
-        ) : null}
+        {tags.length > 0 ? <CautionTags tags={tags} testID={`nearest-tags-${icao}`} /> : null}
       </Pressy>
       {/* Distance (NM) and bearing (degrees) */}
       <View accessible accessibilityLabel={`${distance}, ${bearing}`} style={{ alignItems: 'flex-end', gap: 2 }}>

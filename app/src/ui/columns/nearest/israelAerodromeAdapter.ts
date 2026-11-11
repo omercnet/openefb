@@ -50,16 +50,14 @@ export function israelAirport(aerodrome: IsraelAerodrome): Airport {
 
 /** The AIP gives no runway-end coordinates, so both ends sit on the reference point; nothing draws them. */
 export function israelRunway(runway: IsraelAerodromeRunway, at: IsraelAerodrome): Runway {
-  const slash = runway.designator.indexOf('/');
-  const ends =
-    slash < 0 ? [runway.designator] : [runway.designator.slice(0, slash), runway.designator.slice(slash + 1)];
+  const ends = splitOnce(runway.designator);
   return {
     id: runway.designator,
     length: runwayLengthFeet(runway), // feet
     width: runwayWidthFeet(runway), // feet
     surface: israelSurface(runway.surface),
     lighting: 'none',
-    baseEndID: ends[0] || runway.designator,
+    baseEndID: ends[0] ?? runway.designator,
     reciprocalEndID: ends[1] ?? '',
     baseEndLatitude: at.latitude,
     baseEndLongitude: at.longitude,
@@ -86,7 +84,23 @@ export function israelSurface(text: string): SurfaceType {
   }
 }
 
-/** Swift `Double(mhz)`: a plain decimal number, nothing else (no blanks, no hex). */
+/**
+ * Swift `split(separator: "/", maxSplits: 1)` (omittingEmptySubsequences: true): empty parts are dropped and do not count
+ * as the split, so "/09" is ["09"], "09//27" is ["09", "/27"] and "/" is [].
+ */
+function splitOnce(text: string): string[] {
+  const rest = text.replace(/^\/+/, '');
+  if (rest === '') return [];
+  const slash = rest.indexOf('/');
+  if (slash < 0) return [rest];
+  const tail = rest.slice(slash + 1);
+  return tail === '' ? [rest.slice(0, slash)] : [rest.slice(0, slash), tail];
+}
+
+/**
+ * The MHz text as a number, or null. JS-only: Swift's `Double(mhz)` also accepts hex floats ("0x1p3"), "inf" and "nan";
+ * this accepts plain decimals only. All 68 bundled values are plain decimals, so the two agree on the shipped data.
+ */
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
 
 /** Frequencies with a MHz value; the role comes from the AIP's wording ("TWR primary", "Airstrip operator channel"). */
