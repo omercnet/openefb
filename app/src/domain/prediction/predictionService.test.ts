@@ -1,12 +1,10 @@
+import type { IsraelAirspace, IsraelAirspaceKind, IsraelAirspaceLimit } from '../../data/aviation/israelTypes';
 import type { Airspace } from '../core/models';
 import {
   israelShortName,
   PredictionService,
   volumeFromAirspace,
   volumesFromIsraelAirspace,
-  type IsraelAirspaceInput,
-  type IsraelAirspaceKind,
-  type IsraelAirspaceLimit,
   type PredictionFix,
   type PredictionState,
 } from './predictionService';
@@ -64,25 +62,29 @@ describe('PredictionUSMapperTests', () => {
   });
 });
 
-const SFC: IsraelAirspaceLimit = { feet: 0, reference: 'SFC' };
+const SFC: IsraelAirspaceLimit = { feet: 0, reference: 'SFC', publishedText: null };
 const il = (
   kind: IsraelAirspaceKind,
   code: string | null,
   floor = SFC,
-  ceiling: IsraelAirspaceLimit = { feet: 3000, reference: 'MSL' },
-): IsraelAirspaceInput => ({
+  ceiling: IsraelAirspaceLimit = { feet: 3000, reference: 'MSL', publishedText: null },
+): IsraelAirspace => ({
   id: 7,
   kind,
   code,
+  nameEnglish: null,
+  nameHebrew: null,
+  label: null,
+  authority: null,
   floor,
   ceiling,
   polygons: [
     [
       [
-        { latitude: 32.0, longitude: 34.8 },
-        { latitude: 32.1, longitude: 34.8 },
-        { latitude: 32.1, longitude: 34.9 },
-        { latitude: 32.0, longitude: 34.8 },
+        { lat: 32.0, lon: 34.8 },
+        { lat: 32.1, lon: 34.8 },
+        { lat: 32.1, lon: 34.9 },
+        { lat: 32.0, lon: 34.8 },
       ],
     ],
   ],
@@ -90,7 +92,7 @@ const il = (
 
 describe('PredictionIsraelMapperTests', () => {
   it('aglFloorReadsAsSurface', () => {
-    const v = volumesFromIsraelAirspace(il('CTR', 'LLHA', { feet: 500, reference: 'AGL' }))[0];
+    const v = volumesFromIsraelAirspace(il('CTR', 'LLHA', { feet: 500, reference: 'AGL', publishedText: null }))[0];
     expect(v.floorFeetMSL).toBeNull();
     expect(v.ceilingFeetMSL).toBe(3000);
     expect(v.shortName).toBe('CTR LLHA');
@@ -109,7 +111,12 @@ describe('PredictionIsraelMapperTests', () => {
   });
   it('mslFloorKeptAndNonMSLCeilingUnlimited', () => {
     const v = volumesFromIsraelAirspace(
-      il('TMA', 'LLBG', { feet: 2500, reference: 'MSL' }, { feet: 95, reference: 'FL' }),
+      il(
+        'TMA',
+        'LLBG',
+        { feet: 2500, reference: 'MSL', publishedText: null },
+        { feet: 95, reference: 'FL', publishedText: null },
+      ),
     )[0];
     expect(v.floorFeetMSL).toBe(2500);
     expect(v.ceilingFeetMSL).toBeNull();
