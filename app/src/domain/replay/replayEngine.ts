@@ -87,6 +87,9 @@ export class ReplayEngine {
     ]);
     if (loadId !== this.loadCounter) return; // a newer loadFlight started meanwhile
 
+    // Prepare audio before committing anything, so a throwing prepare leaves the previous flight intact.
+    audio?.prepare?.();
+
     this.trackPoints = trackPoints;
     this.transcriptSegments = transcriptSegments;
     this.phaseMarkers = phaseMarkers;
@@ -99,10 +102,7 @@ export class ReplayEngine {
 
     this.computePhaseMarkerFractions();
 
-    if (audio) {
-      audio.prepare?.();
-      this.audioPlayer = audio;
-    }
+    if (audio) this.audioPlayer = audio;
 
     this.currentPosition = 0;
     this.updateDerivedState();
@@ -204,6 +204,7 @@ export class ReplayEngine {
 
   /** Cancel the timer, stop audio, release resources. */
   cleanup(): void {
+    this.loadCounter += 1; // a pending loadFlight must not reattach resources after cleanup
     this.cancelTimer?.();
     this.cancelTimer = null;
     this.audioPlayer?.stop();

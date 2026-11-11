@@ -125,6 +125,7 @@ export class RecordingCoordinator {
   private autoStartTask: Cancellable | null = null;
   private autoStopTask: Cancellable | null = null;
   private currentFlightID: string | null = null;
+  private startSession: symbol | null = null;
   private autoStartGate = new AutoStartGate();
   private recordingStartDate: number | null = null;
 
@@ -152,6 +153,8 @@ export class RecordingCoordinator {
     }
 
     const flightID = this.newId();
+    const session = Symbol('startRecording');
+    this.startSession = session;
     this.currentFlightID = flightID;
     this.recordingStartDate = this.clock.now();
 
@@ -163,20 +166,26 @@ export class RecordingCoordinator {
       lastError: null,
     });
 
+    let startingTracker: TrackRecorderLike | null = null;
     try {
-      const tracker = this.makeTrackRecorder(flightID);
-      this.trackRecorder = tracker;
-      tracker.setFailureHandlers({
+      startingTracker = this.makeTrackRecorder(flightID);
+      this.trackRecorder = startingTracker;
+      startingTracker.setFailureHandlers({
         onWriteFailure: () => this.handleTrackFailure('trackWriteFailed'),
         onStreamFailure: () => this.handleTrackFailure('trackStreamFailed'),
       });
-      await tracker.startTracking();
+      await startingTracker.startTracking();
     } catch (error) {
-      // JS-only guard (Swift's tracker calls do not throw): roll back so the coordinator is not stuck in recording.
-      this.trackRecorder = null;
-      this.currentFlightID = null;
-      this.recordingStartDate = null;
-      this.state.set({ recordingStatus: idleStatus });
+      // JS-only guard (Swift's tracker calls do not throw). Best-effort release of whatever the tracker acquired.
+      if (startingTracker) await startingTracker.stopTracking().catch(() => undefined);
+      // Only roll back our own start: a stop or a newer start may have replaced the session while startup was pending.
+      if (this.startSession === session) {
+        this.startSession = null;
+        this.trackRecorder = null;
+        this.currentFlightID = null;
+        this.recordingStartDate = null;
+        this.state.set({ recordingStatus: idleStatus });
+      }
       throw error;
     }
     const tracker = this.trackRecorder;
@@ -224,6 +233,7 @@ export class RecordingCoordinator {
     const startDate = this.recordingStartDate;
     if (flightID === null || startDate === null) return null;
 
+    this.startSession = null;
     this.state.set({ recordingStatus: { kind: 'stopping' } });
 
     if (this.timerTask) this.timerTask.cancelled = true;

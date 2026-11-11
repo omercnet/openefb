@@ -198,6 +198,38 @@ describe('startRecording rollback', () => {
   });
 });
 
+describe('startRecording rollback (session and cleanup)', () => {
+  test('a failed startup stops the tracker it started', async () => {
+    const { coordinator, tracker } = make();
+    let stopped = 0;
+    tracker.startTracking = async () => {
+      throw new Error('boom');
+    };
+    tracker.stopTracking = async () => {
+      stopped += 1;
+      return { trackPointCount: 0, phaseMarkers: [] };
+    };
+    await expect(coordinator.startRecording()).rejects.toThrow('boom');
+    expect(stopped).toBe(1);
+  });
+
+  test('a stale failed startup does not clear a newer recording', async () => {
+    const { coordinator, tracker } = make();
+    let rejectFirst!: (e: Error) => void;
+    tracker.startTracking = () => new Promise<void>((_, reject) => (rejectFirst = reject));
+    const first = coordinator.startRecording();
+    const firstResult = first.catch((e: Error) => e);
+    await Promise.resolve();
+    await coordinator.stopRecording();
+    tracker.startTracking = async () => {};
+    await coordinator.startRecording();
+    rejectFirst(new Error('late'));
+    expect(await firstResult).toBeInstanceOf(Error);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'recording' });
+    expect(await coordinator.stopRecording()).not.toBeNull();
+  });
+});
+
 describe('startRecording rollback (factory)', () => {
   test('makeTrackRecorder throwing rolls state back', async () => {
     const coordinator = new RecordingCoordinator({

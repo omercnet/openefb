@@ -288,4 +288,34 @@ describe('ReplayEngine loadFlight atomicity', () => {
     expect(engine.trackPointCount).toBe(10);
     expect(engine.totalDuration).toBe(9);
   });
+
+  test('cleanup invalidates a pending load', async () => {
+    const engine = new ReplayEngine(noTimer);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const slow: ReplayStore = {
+      ...makeTestStore(),
+      trackPoints: async () => {
+        await gate;
+        return makeTestStore().trackPoints('x');
+      },
+    };
+    const pending = engine.loadFlight('a', slow, null);
+    engine.cleanup();
+    release();
+    await pending;
+    expect(engine.trackPointCount).toBe(0);
+  });
+
+  test('a throwing audio prepare leaves the previous flight intact', async () => {
+    const engine = new ReplayEngine(noTimer);
+    await engine.loadFlight('a', makeTestStore(), null);
+    const bad = {
+      prepare: () => {
+        throw new Error('prep');
+      },
+    } as unknown as ReplayAudioPlayer;
+    await expect(engine.loadFlight('b', emptyStore, bad)).rejects.toThrow('prep');
+    expect(engine.trackPointCount).toBe(10);
+  });
 });
