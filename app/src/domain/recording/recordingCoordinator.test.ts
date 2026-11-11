@@ -213,20 +213,72 @@ describe('startRecording rollback (session and cleanup)', () => {
     expect(stopped).toBe(1);
   });
 
-  test('a stale failed startup does not clear a newer recording', async () => {
-    const { coordinator, tracker } = make();
+  function makeWithTrackers(trackers: FakeTrackRecorder[]) {
+    let i = 0;
+    return new RecordingCoordinator({
+      recordingStore: new FakeRecordingStore(),
+      audioRecorder: new MockAudioRecorder(),
+      transcriptionService: new MockTranscriptionService(),
+      makeTrackRecorder: () => trackers[i++]!,
+      audioFileURL: (id) => `/rec/${id}.m4a`,
+      clock: new FakeClock(),
+    });
+  }
+
+  test('a stale failed startup does not clear or stop a newer recording', async () => {
+    const t1 = new FakeTrackRecorder();
+    const t2 = new FakeTrackRecorder();
     let rejectFirst!: (e: Error) => void;
-    tracker.startTracking = () => new Promise<void>((_, reject) => (rejectFirst = reject));
-    const first = coordinator.startRecording();
-    const firstResult = first.catch((e: Error) => e);
+    t1.startTracking = () => new Promise<void>((_, reject) => (rejectFirst = reject));
+    let t2Stops = 0;
+    t2.stopTracking = async () => {
+      t2Stops += 1;
+      return { trackPointCount: 0, phaseMarkers: [] };
+    };
+    const coordinator = makeWithTrackers([t1, t2]);
+    const firstResult = coordinator.startRecording().catch((e: Error) => e);
     await Promise.resolve();
     await coordinator.stopRecording();
-    tracker.startTracking = async () => {};
     await coordinator.startRecording();
     rejectFirst(new Error('late'));
     expect(await firstResult).toBeInstanceOf(Error);
+    expect(t2Stops).toBe(0);
     expect(coordinator.state.recordingStatus).toEqual({ kind: 'recording' });
     expect(await coordinator.stopRecording()).not.toBeNull();
+  });
+
+  test('a canceled startup that later succeeds does not start more services', async () => {
+    const t1 = new FakeTrackRecorder();
+    let resolveFirst!: () => void;
+    t1.startTracking = () => new Promise<void>((resolve) => (resolveFirst = resolve));
+    const audio = new MockAudioRecorder();
+    const coordinator = new RecordingCoordinator({
+      recordingStore: new FakeRecordingStore(),
+      audioRecorder: audio,
+      transcriptionService: new MockTranscriptionService(),
+      makeTrackRecorder: () => t1,
+      audioFileURL: (id) => `/rec/${id}.m4a`,
+      clock: new FakeClock(),
+    });
+    const first = coordinator.startRecording().catch((e: Error) => e);
+    await Promise.resolve();
+    await coordinator.stopRecording();
+    resolveFirst();
+    expect(await first).toBeInstanceOf(Error);
+    expect(audio.startRecordingCalled).toBe(false);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+  });
+
+  test('a synchronously throwing tracker cleanup does not replace the startup error', async () => {
+    const { coordinator, tracker } = make();
+    tracker.startTracking = async () => {
+      throw new Error('start failed');
+    };
+    tracker.stopTracking = () => {
+      throw new Error('cleanup failed');
+    };
+    await expect(coordinator.startRecording()).rejects.toThrow('start failed');
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
   });
 });
 

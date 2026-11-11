@@ -177,7 +177,7 @@ export class RecordingCoordinator {
       await startingTracker.startTracking();
     } catch (error) {
       // JS-only guard (Swift's tracker calls do not throw). Best-effort release of whatever the tracker acquired.
-      if (startingTracker) await startingTracker.stopTracking().catch(() => undefined);
+      await bestEffort(() => startingTracker?.stopTracking());
       // Only roll back our own start: a stop or a newer start may have replaced the session while startup was pending.
       if (this.startSession === session) {
         this.startSession = null;
@@ -188,7 +188,12 @@ export class RecordingCoordinator {
       }
       throw error;
     }
-    const tracker = this.trackRecorder;
+    const tracker = startingTracker;
+    if (this.startSession !== session) {
+      // Stopped (or replaced) while the tracker was starting: release it and do not start more services.
+      await bestEffort(() => tracker.stopTracking());
+      throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
+    }
 
     const audioURL = this.audioFileURL(flightID);
 
@@ -221,6 +226,16 @@ export class RecordingCoordinator {
       await this.transcription.startTranscription(flightID);
     } catch {
       // Continue without transcription.
+    }
+
+    if (this.startSession !== session) {
+      // Stopped while audio or transcription were starting. If nothing newer took over, release what just started.
+      await bestEffort(() => tracker.stopTracking());
+      if (this.startSession === null) {
+        await bestEffort(() => this.audio.stopRecording());
+        await bestEffort(() => this.transcription.stopTranscription());
+      }
+      throw new AppFailure({ kind: 'recordingFailed', cause: new RecordingError('invalidState') });
     }
 
     this.startTimer();
@@ -420,4 +435,13 @@ function asAppError(error: unknown): AppError {
   if (error instanceof AppFailure) return error.error;
   if (typeof error === 'object' && error !== null && 'kind' in error) return error as AppError;
   return { kind: 'recordingFailed', cause: error };
+}
+
+/** Runs cleanup that may throw synchronously or reject; never lets it replace the caller's error. */
+async function bestEffort(fn: () => Promise<unknown> | undefined): Promise<void> {
+  try {
+    await fn();
+  } catch {
+    // ignored on purpose
+  }
 }
