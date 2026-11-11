@@ -91,7 +91,18 @@ jobs:
             gitleaks = "8.30.1"
       - name: Install plistutil
         # libplist lints plists and project.pbxproj off macOS (tools/hooks/plist-lint.sh). shellcheck and python3 ship with the runner.
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libplist-utils
+        # security.ubuntu.com is sometimes unresolvable from hosted runners: retry, then fall back to the
+        # release pocket, which the runner's own mirror serves.
+        run: |
+          for attempt in 1 2 3; do
+            sudo apt-get update -qq || true
+            sudo apt-get install -y -qq -o Acquire::Retries=3 libplist-utils && exit 0
+            echo "apt install attempt $attempt failed; retrying" >&2
+            sleep 15
+          done
+          codename="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+          echo "falling back to the $codename release pocket" >&2
+          sudo apt-get install -y -qq -o Acquire::Retries=3 -t "$codename" libplist-utils
       - name: Conventional Commits (pull requests)
         if: github.event_name == 'pull_request'
         run: tools/hooks/commit-msg.sh --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
