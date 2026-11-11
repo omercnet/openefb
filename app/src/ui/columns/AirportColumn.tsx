@@ -33,7 +33,11 @@ function AirportTitle() {
       accessible
       accessibilityRole="header"
       accessibilityLabel={`${a.ident}, flight category ${a.flightCategory}, ${a.name}`}
-      style={{ flex: 1, paddingVertical: Space.xs }}
+      // No `flex: 1`: ColumnHeader's wrapper already takes the row's width. React Native lays Yoga out with YGErrataAll, and
+      // under it a flexing block inside that wrapper is stretched to the header row's 60 pt minimum instead of hugging its
+      // content (61.5 pt): the text stays put but the band ended 1.5 pt short and every row below sat 1.5 pt high on iOS and
+      // Android (run 43102552494).
+      style={{ paddingVertical: Space.xs }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.s }}>
         <Text numberOfLines={1} style={[Type.title, { color: t.airspace }]}>
