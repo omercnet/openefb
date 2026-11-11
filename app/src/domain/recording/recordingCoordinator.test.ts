@@ -5,6 +5,7 @@ import { AppFailure } from '../errors';
 import { RecordingCoordinator } from './recordingCoordinator';
 import {
   FakeClock,
+  flush,
   FakeRecordingStore,
   FakeTrackRecorder,
   MockAudioRecorder,
@@ -266,6 +267,29 @@ describe('startRecording rollback (session and cleanup)', () => {
     resolveFirst();
     expect(await first).toBeInstanceOf(Error);
     expect(audio.startRecordingCalled).toBe(false);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+  });
+
+  test('a stop that lands while audio is starting releases audio and transcription and rejects', async () => {
+    const audio = new MockAudioRecorder();
+    let resolveAudio!: () => void;
+    audio.startRecording = async () => {
+      audio.startRecordingCalled = true;
+      await new Promise<void>((resolve) => (resolveAudio = resolve));
+    };
+    const transcription = new MockTranscriptionService();
+    const { coordinator } = make({ audio, transcription });
+    const start = coordinator.startRecording().catch((e: Error) => e);
+    await flush();
+    expect(audio.startRecordingCalled).toBe(true);
+    await coordinator.stopRecording();
+    const stopsAfterStop = audio.stopRecordingCallCount;
+    const transcriptionStopsAfterStop = transcription.stopTranscriptionCallCount;
+    resolveAudio();
+    expect(await start).toBeInstanceOf(Error);
+    // The late start released what it had just started.
+    expect(audio.stopRecordingCallCount).toBe(stopsAfterStop + 1);
+    expect(transcription.stopTranscriptionCallCount).toBe(transcriptionStopsAfterStop + 1);
     expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
   });
 
