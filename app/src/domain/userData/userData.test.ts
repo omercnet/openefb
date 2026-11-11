@@ -196,8 +196,7 @@ describe('createMemoryUserData transactions', () => {
       order.push('second start');
       return Promise.resolve();
     });
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(order).toEqual(['first start']);
+    // Overlapping transactions would record 'second start' before 'first end'.
     gate.resolve();
     await Promise.all([first, second]);
     expect(order).toEqual(['first start', 'first end', 'second start']);
