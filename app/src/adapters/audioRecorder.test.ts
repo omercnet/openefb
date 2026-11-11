@@ -269,6 +269,30 @@ describe('createAudioRecorder on expo-audio', () => {
     expect(jest.getTimerCount()).toBe(0);
   });
 
+  it('a rejected native stop still releases the recorder, logs, and moves the staged file', async () => {
+    const log = jest.fn();
+    const recorder = createAudioRecorder({ pollMs: 100, log });
+    await recorder.start('f1', 'standard', OUT);
+    const [r] = mockRecorders;
+    r.stop.mockRejectedValueOnce(new Error('native stop failed'));
+    await expect(recorder.stop()).resolves.toBe(OUT);
+    expect(r.release).toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith('audio stop failed; keeping staged file', expect.any(Error));
+    expect(mockMoves).toEqual([
+      { from: 'file:///docs/ExpoAudio/flight-F1.m4a', to: OUT, options: { overwrite: true } },
+    ]);
+  });
+
+  it('a recorder with no staged uri releases, moves nothing and falls back to the output URI', async () => {
+    const { recorder } = started();
+    await recorder.start('f1', 'standard', OUT);
+    const [r] = mockRecorders;
+    r.uri = null;
+    await expect(recorder.stop()).resolves.toBe(OUT);
+    expect(r.release).toHaveBeenCalled();
+    expect(mockMoves).toEqual([]);
+  });
+
   it('a failed move returns the staging URI so the audio is not lost', async () => {
     const { recorder } = started();
     await recorder.start('f1', 'standard', OUT);

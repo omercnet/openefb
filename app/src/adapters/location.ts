@@ -93,6 +93,8 @@ export function createLocationSource(): LocationSource {
       const fail = (e: unknown) => {
         if (stopped) return;
         stopped = true;
+        watch?.remove(); // a later stop() is a no-op once failed, so release the native watch here
+        watch = null;
         if (request.background) stopBackground(listener);
         listener.onError(e instanceof Error ? e : new Error(String(e)));
       };

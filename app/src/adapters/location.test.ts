@@ -120,15 +120,17 @@ describe('createLocationSource', () => {
 
   it('foreground: a watch error fails the subscription once', async () => {
     let onErr: (reason: string) => void = () => undefined;
+    const remove = jest.fn();
     Location.watchPositionAsync.mockImplementation(async (_o, _cb, err) => {
       onErr = err!;
-      return { remove: jest.fn() };
+      return { remove };
     });
     const l = listener();
     adapter.createLocationSource().subscribe({ activity: 'otherNavigation', background: false }, l);
     await flush();
     onErr('kCLErrorDomain 1');
     onErr('again');
+    expect(remove).toHaveBeenCalledTimes(1);
     expect(l.onError).toHaveBeenCalledTimes(1);
     expect(l.onError).toHaveBeenCalledWith(new Error('kCLErrorDomain 1'));
   });
