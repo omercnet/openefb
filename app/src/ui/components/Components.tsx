@@ -321,7 +321,7 @@ export function SearchBar({
         returnKeyType="search"
         onSubmitEditing={onSubmit}
         accessibilityLabel={placeholder}
-        style={[Type.body, { flex: 1, color: t.ink, minHeight: StripMetrics.cell, padding: 0 }]}
+        style={[Type.body, { flex: 1, color: t.ink, minHeight: StripMetrics.cell - 2, padding: 0 }]} // the 1 pt border is inside the 60 pt box
       />
       {text.length > 0 ? (
         <Pressy

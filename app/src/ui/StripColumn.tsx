@@ -1,7 +1,9 @@
 // The 400pt leading column of the iPad map screen (efb-212/Views/Map/MapContainerView.swift regularLayout): the strip
 // column the pilot has open (flight log, airport, nearest, layers or search) over the footer, in the day or night palette.
+// Like SwiftUI, the column shrinks above the software keyboard (Search types into it), so the footer stays visible and
+// sits on the keyboard instead of under it, without the home-indicator padding the keyboard now covers.
 import { useFonts } from 'expo-font';
-import { View } from 'react-native';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StripColumnKind } from '../domain/types';
 import { AirportColumn } from './columns/AirportColumn';
@@ -13,9 +15,10 @@ import { FlightLogStrip } from './flightLog/FlightLogStrip';
 import { ThemeContext } from './Primitives';
 import { useAppStore } from './state/appStore';
 import { Day, FontFiles, Night } from './tokens';
+import { useKeyboardVisible } from './useKeyboardVisible';
 
 /** The kanaf-dev://<screen> routes the fidelity gate captures; `night` is the flight log in the night palette. */
-export type StripScreen = 'map' | 'airport' | 'night' | 'layers';
+export type StripScreen = 'map' | 'airport' | 'night' | 'layers' | 'nearest' | 'search';
 
 const COLUMNS: Record<StripColumnKind, () => React.JSX.Element> = {
   log: FlightLogStrip,
@@ -34,6 +37,7 @@ export function StripColumn({ screen, width }: { screen?: StripScreen; width: nu
   const [fontsLoaded, fontError] = useFonts(FontFiles);
   const insets = useSafeAreaInsets();
   const column = useAppStore((s) => s.stripColumn);
+  const keyboardVisible = useKeyboardVisible();
   const top = insets.top || FALLBACK_INSETS.top;
   const bottom = insets.bottom || FALLBACK_INSETS.bottom;
   // Until the bundled faces are registered, show the bare paper: no text in a fallback face.
@@ -41,7 +45,7 @@ export function StripColumn({ screen, width }: { screen?: StripScreen; width: nu
   const Column = COLUMNS[column];
   return (
     <ThemeContext.Provider value={theme}>
-      <View style={{ width, backgroundColor: theme.paper }}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ width, backgroundColor: theme.paper }}>
         {/* The header band runs up under the status bar. */}
         <View style={{ height: top, backgroundColor: theme.paperSecondary }} />
         {ready ? (
@@ -49,10 +53,10 @@ export function StripColumn({ screen, width }: { screen?: StripScreen; width: nu
             <View style={{ flex: 1 }}>
               <Column />
             </View>
-            <FlightLogFooter width={width} bottomInset={bottom} />
+            <FlightLogFooter width={width} bottomInset={keyboardVisible ? 0 : bottom} />
           </>
         ) : null}
-      </View>
+      </KeyboardAvoidingView>
     </ThemeContext.Provider>
   );
 }

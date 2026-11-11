@@ -9,12 +9,18 @@
       "interim": 0.8,
       "reason": "U2 raised iOS airport from 0.717 to 0.8218 (run 42886165382); remaining gap to 0.85 is the header and text-width residual"
     },
-    "layers": { "min": 0.85 }
+    "layers": { "min": 0.85 },
+    "nearest": { "min": 0.85 },
+    "search": { "min": 0.85 },
+    "log": { "min": 0.85 }
   },
   "android": {
     "map": { "min": 0.85 },
     "night": { "min": 0.85 },
     "airport": { "min": 0.8 },
-    "layers": { "min": 0.8 }
+    "layers": { "min": 0.8 },
+    "nearest": { "min": 0.8 },
+    "search": { "min": 0.8 },
+    "log": { "min": 0.8 }
   }
 }

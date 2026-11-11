@@ -1,6 +1,7 @@
 import { act } from 'react';
+import { DeviceEventEmitter, Platform, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { render, type Rendered } from '../../tests/support/ui';
+import { ancestorProp, render, type Rendered } from '../../tests/support/ui';
 import { appStore } from './state/appStore';
 import { StripColumn } from './StripColumn';
 
@@ -56,5 +57,31 @@ describe('StripColumn', () => {
     expect(logStrip(view)).toHaveLength(0);
     await act(async () => appStore.getState().setStripColumn('log'));
     expect(logStrip(view).length).toBeGreaterThan(0);
+  });
+
+  describe('with the software keyboard', () => {
+    afterEach(() => jest.restoreAllMocks());
+    const nrst = (view: Rendered) => StyleSheet.flatten(view.byTestId('NRST').props.style);
+
+    it('the footer keeps the home-indicator padding until the keyboard covers it', async () => {
+      const view = await render(strip());
+      expect(nrst(view)).toMatchObject({ height: 80, paddingBottom: 20 });
+      await act(async () => DeviceEventEmitter.emit('keyboardWillShow', {}));
+      expect(nrst(view)).toMatchObject({ height: 60, paddingBottom: 0 });
+      await act(async () => DeviceEventEmitter.emit('keyboardWillHide', {}));
+      expect(nrst(view)).toMatchObject({ height: 80, paddingBottom: 20 });
+    });
+
+    it('on iOS the column pads for the keyboard so the footer rides above it; elsewhere the window resizes', async () => {
+      const behaviour = async () => {
+        const view = await render(strip());
+        const found = ancestorProp(view.byTestId('NRST'), 'behavior');
+        await view.unmount();
+        return found;
+      };
+      expect(await behaviour()).toBe('padding');
+      jest.replaceProperty(Platform, 'OS', 'android');
+      expect(await behaviour()).toBeUndefined();
+    });
   });
 });

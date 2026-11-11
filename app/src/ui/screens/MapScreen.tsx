@@ -14,6 +14,8 @@ const OPENS_WITH: Record<StripScreen, { stripColumn: StripColumnKind; selectedAi
   night: { stripColumn: 'log', selectedAirportId: null },
   airport: { stripColumn: 'airport', selectedAirportId: 'KSQL' },
   layers: { stripColumn: 'layers', selectedAirportId: null },
+  nearest: { stripColumn: 'nearest', selectedAirportId: null },
+  search: { stripColumn: 'search', selectedAirportId: null },
 };
 
 /**
