@@ -476,3 +476,44 @@ test('a damaged read-state file reads as nothing read', async () => {
   storage.files.set(NOTAM_READ_KEYS_STORAGE_KEY, '{"a":1}');
   expect((await NotamReadStateStore.open(storage)).readKeys.size).toBe(0);
 });
+
+// Cached and saved feeds belong to the URL they came from.
+test('a feed from relay A is never served for relay B, in memory or from the saved copy', async () => {
+  const storage = new MemoryTextStorage();
+  const clock = new TestClock(generatedAt);
+  let url = 'https://a.example/notams.json';
+  let failing = false;
+  const fetch = fakeFetch((u): StubReply => {
+    if (failing) throw new TypeError('Network request failed');
+    return { body: feedJSON(u.includes('a.example') ? '2026-11-01T12:00:00.000Z' : '2026-11-01T11:00:00.000Z') };
+  });
+  const service = new IsraelNotamService({ fetch, feedUrl: () => url, now: clock.now, storage });
+  const a = await service.fetchFeed();
+  url = 'https://b.example/notams.json';
+  const b = await service.fetchFeed(); // inside the 5 minute window, but another source: must fetch
+  expect(fetch.calls.map((c) => c.url)).toEqual(['https://a.example/notams.json', 'https://b.example/notams.json']);
+  expect(b.feed.generatedAt).not.toBe(a.feed.generatedAt);
+
+  failing = true;
+  clock.advance(1_000);
+  url = 'https://c.example/notams.json';
+  await service.flush();
+  await expect(service.fetchFeed()).rejects.toBeInstanceOf(AppFailure); // nothing saved for C: A's and B's copies are not offered
+  url = 'https://b.example/notams.json';
+  const stale = await new IsraelNotamService({ fetch, feedUrl: () => url, now: clock.now, storage }).fetchFeed();
+  expect(stale.refreshFailed).toBe(true);
+  expect(stale.feed.generatedAt).toBe(b.feed.generatedAt); // B's own saved copy is
+});
+
+test('a body read that fails offline is networkUnavailable, not undecodable', async () => {
+  const fetch = async () => ({
+    status: 200,
+    text: async (): Promise<string> => {
+      throw new TypeError('Network request failed');
+    },
+    arrayBuffer: async () => new ArrayBuffer(0),
+  });
+  await expect(new IsraelNotamService({ fetch }).fetchFeed()).rejects.toMatchObject({
+    error: { kind: 'networkUnavailable' },
+  });
+});

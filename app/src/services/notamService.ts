@@ -96,6 +96,8 @@ interface CacheEntry {
 export class NotamService implements NotamServiceLike {
   /** All parsed NOTAMs per location query value; filtered for effectiveness on every read. */
   private cache = new Map<string, CacheEntry>();
+  /** Bumped by clearCache: a download that started before it must not repopulate the cache. */
+  private generation = 0;
   private readonly inFlight = new Map<string, Promise<NotamReport>>();
   private readonly now: Clock;
 
@@ -132,7 +134,9 @@ export class NotamService implements NotamServiceLike {
   }
 
   clearCache(): void {
+    this.generation += 1;
     this.cache = new Map();
+    this.inFlight.clear(); // a call after the clear starts a fresh download instead of joining an older one
   }
 
   private async download(
@@ -141,6 +145,7 @@ export class NotamService implements NotamServiceLike {
     credentials: NotamCredentials,
     now: number,
   ): Promise<NotamReport> {
+    const generation = this.generation;
     const all: Notam[] = [];
     let incomplete = false;
     try {
@@ -180,7 +185,7 @@ export class NotamService implements NotamServiceLike {
     }
 
     const fetchedAt = this.now();
-    this.cache.set(location, { notams: all, fetchedAt, incomplete });
+    if (generation === this.generation) this.cache.set(location, { notams: all, fetchedAt, incomplete });
     this.options.log?.(`Fetched ${all.length} NOTAMs for ${location}${incomplete ? ' (incomplete)' : ''}`);
     return {
       location,
@@ -224,8 +229,16 @@ export class NotamService implements NotamServiceLike {
     }
 
     if (response.status >= 200 && response.status <= 299) {
+      let body: string;
       try {
-        return parseNotamResponse(await response.text());
+        body = await response.text();
+      } catch (error) {
+        // A connection lost while the body streams is offline, like a failed request.
+        if (isOfflineError(error)) throw new AppFailure({ kind: 'networkUnavailable' });
+        throw new AppFailure({ kind: 'weatherFetchFailed', cause: error });
+      }
+      try {
+        return parseNotamResponse(body);
       } catch (error) {
         throw new AppFailure({ kind: 'weatherFetchFailed', cause: error });
       }

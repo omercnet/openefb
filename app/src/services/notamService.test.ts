@@ -369,3 +369,48 @@ test('briefing order is a consistent comparator and breaks ties by number', () =
   expect(compareBriefingOrder(mk('1', 5), mk('1', 5))).toBe(0);
   expect(compareBriefingOrder(mk('1', null), mk('2', 1))).toBe(1);
 });
+
+test('a body read that fails offline is networkUnavailable, not an unreadable page', async () => {
+  const fetch = async () => ({
+    status: 200,
+    text: async (): Promise<string> => {
+      throw new TypeError('Network request failed');
+    },
+    arrayBuffer: async () => new ArrayBuffer(0),
+  });
+  const service = new NotamService({ fetch, credentials: async () => creds });
+  await expect(service.fetchNotams(kpao)).rejects.toMatchObject({ error: { kind: 'networkUnavailable' } });
+});
+
+test('activeSorted returns copies: editing a result cannot change the cache', async () => {
+  const fetch = fakeFetch(() => ({ body: permanentPage('01/001', 1, 1) }));
+  const service = makeService(fetch);
+  const first = await service.fetchNotams(kpao);
+  first.notams[0].effectiveEnd = 1; // would make the cached entry ineffective
+  first.notams[0].text = 'EDITED';
+  const second = await service.fetchNotams(kpao);
+  expect(second.notams).toHaveLength(1);
+  expect(second.notams[0].text).toBe('AD AP BCN OPS CHANGED');
+});
+
+test('a download that started before clearCache does not repopulate the cache', async () => {
+  let release: (r: StubReply) => void = () => undefined;
+  let call = 0;
+  const fetch = fakeFetch(() => {
+    call += 1;
+    return call === 1
+      ? new Promise<StubReply>((resolve) => (release = resolve))
+      : { body: permanentPage('02/002', 1, 1) };
+  });
+  const service = makeService(fetch);
+  const old = service.fetchNotams(kpao);
+  await Promise.resolve();
+  await Promise.resolve();
+  service.clearCache();
+  const fresh = await service.fetchNotams(kpao); // starts its own download, does not join the cleared one
+  expect(fresh.notams[0].number).toBe('02/002');
+  release({ body: permanentPage('01/001', 1, 1) });
+  await old;
+  expect((await service.fetchNotams(kpao)).notams[0].number).toBe('02/002'); // the late result did not overwrite
+  expect(fetch.calls).toHaveLength(2);
+});
