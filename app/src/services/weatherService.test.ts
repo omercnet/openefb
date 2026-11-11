@@ -1,7 +1,6 @@
 // Port of ServiceTests/WeatherServiceTests.swift (21 tests; 2 staleness cases belong to L1's WeatherCache),
 // ServiceTests/WeatherParsingTests.swift (5) and CharacterizationTests/WeatherCacheClockCharacterizationTests.swift (7).
-import { makeWeatherCache } from '../domain/core/models';
-import { weatherCacheAge, weatherCacheIsStale } from '../domain/core/models';
+import { makeWeatherCache, weatherCacheAge, weatherCacheIsStale } from '../domain/core/models';
 import { AppFailure } from '../domain/errors';
 import { computeFlightCategory, parseMetarResponse } from './weather';
 import { WeatherService } from './weatherService';
