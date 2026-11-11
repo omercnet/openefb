@@ -10,8 +10,8 @@
 
 import { newFlightRecord, newLogbookEntry } from '../../data/defaults';
 import { RECOVERED_NOTE, TRACK_UNREADABLE_NOTE } from '../../data/models';
-import type { FlightRecord, LogbookEntry } from '../../data/models';
-import type { Repository } from '../../data/repositories/table';
+import type { Db } from '../../data/db';
+import { flightRecordRepository, logbookRepository } from '../../data/repositories';
 import type { TrackPoint } from './types';
 import type { FlightRecordingSummary } from './recordingCoordinator';
 
@@ -41,8 +41,8 @@ export interface PersistenceRecordingStore {
 
 export interface FlightPersistenceDeps {
   recordingStore: PersistenceRecordingStore;
-  flights: Repository<FlightRecord>;
-  logbook: Repository<LogbookEntry>;
+  /** The main (SwiftData-equivalent) database; both rows are inserted in one transaction on it. */
+  db: Db;
   /** null = aviation database unavailable: departure and arrival stay empty. */
   airports: AirportLookup | null;
   /** Deletes a file; failures are ignored by the caller (Swift try?). */
@@ -147,8 +147,11 @@ export class FlightPersistenceService {
     // Saved explicitly: a kill right after stop must not lose the History row while track and audio stay. On failure the
     // recording data is untouched, so launch-time recovery rebuilds the record.
     try {
-      await this.deps.flights.insert(flight);
-      await this.deps.logbook.insert(entry);
+      // One transaction, like Swift's single context save: a failed logbook insert rolls the flight back too.
+      await this.deps.db.transaction(async (tx) => {
+        await flightRecordRepository(tx).insert(flight);
+        await logbookRepository(tx).insert(entry);
+      });
     } catch {
       return 'saveFailed';
     }

@@ -59,6 +59,7 @@ class FakeFiles implements RecoveryAudioFiles {
 interface Fixture {
   rdb: Db;
   recording: RecordingDatabase;
+  mainDb: Db;
   flightsRepo: ReturnType<typeof flightRecordRepository>;
   logbookRepo: ReturnType<typeof logbookRepository>;
   files: FakeFiles;
@@ -76,15 +77,14 @@ async function makeFixture(): Promise<Fixture> {
   const service = (airports: NearbyAirport[] | null = null): FlightPersistenceService =>
     new FlightPersistenceService({
       recordingStore: recording,
-      flights: flightsRepo,
-      logbook: logbookRepo,
+      db: mainDb,
       airports: airports === null ? null : { nearestAirports: async () => airports },
       removeFile: (p) => files.remove(p),
       appSupportRoot: '/app',
       now: () => start,
       newId: uuid,
     });
-  return { rdb, recording, flightsRepo, logbookRepo, files, service };
+  return { rdb, recording, mainDb, flightsRepo, logbookRepo, files, service };
 }
 
 function summary(
@@ -311,6 +311,20 @@ describe('Characterization: FlightPersistence stop path', () => {
     await f.flightsRepo.insert(newFlightRecord({ id: flightID, now: () => start }));
     expect(await f.service(null).persist(summary(flightID, 60, 2), null, null)).toBe('saveFailed');
     expect(await f.recording.trackPoints(flightID)).toHaveLength(2);
+  });
+});
+
+describe('FlightPersistence transaction', () => {
+  // Not in Swift: Swift saved both rows in one context save; here one db transaction gives the same atomicity.
+  test('a failing logbook insert rolls the flight row back', async () => {
+    const f = await makeFixture();
+    const flightID = uuid();
+    await insertTrack(f, flightID, 2);
+    await f.mainDb.run('DROP TABLE logbook_entry');
+
+    expect(await f.service(null).persist(summary(flightID, 60, 2), null, null)).toBe('saveFailed');
+    expect(await f.flightsRepo.list()).toHaveLength(0);
+    expect(await f.recording.trackPoints(flightID)).toHaveLength(2); // recording data untouched
   });
 });
 
