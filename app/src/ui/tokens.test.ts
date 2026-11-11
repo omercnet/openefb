@@ -97,4 +97,19 @@ describe('DesignTokens parity', () => {
     expect(AccentDayHighContrast).toBe('#0C4091');
     expect(Day.accent).toBe('#1556B8');
   });
+
+  it('accentText is the AccentColor asset, light and dark', () => {
+    type Entry = { appearances?: { appearance: string; value: string }[]; color: { components: Record<string, string> } };
+    const asset = JSON.parse(
+      readFileSync(join(__dirname, '../../../efb-212/Assets.xcassets/AccentColor.colorset/Contents.json'), 'utf8'),
+    ) as { colors: Entry[] };
+    const colour = (entry: Entry | undefined) => {
+      const c = entry?.color.components;
+      return c ? hex([c.red, c.green, c.blue].reduce((n, v) => n * 256 + Math.round(Number(v) * 255), 0)) : undefined;
+    };
+    const light = asset.colors.find((e) => !e.appearances);
+    const dark = asset.colors.find((e) => e.appearances?.length === 1 && e.appearances[0].value === 'dark');
+    expect(Day.accentText).toBe(colour(light));
+    expect(Night.accentText).toBe(colour(dark));
+  });
 });
