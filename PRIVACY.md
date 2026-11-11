@@ -1,9 +1,9 @@
 # Kanaf privacy policy
 
-Last updated: 2026-11-11. Contact: kanaf@omer.io
+Last updated: 2026-11-07. Contact: kanaf@omer.io
 
 Kanaf is a free, open-source flight-planning app for iPad and iPhone. It has no account, no ads and no cross-app tracking. It
-sends anonymous usage counts (below), which you can turn off. The developer does not receive your
+sends anonymous usage and crash summaries (below), which you can turn off. The developer does not receive your
 location, audio, transcripts, flights or logbook.
 
 ## What stays on your device
@@ -11,8 +11,8 @@ location, audio, transcripts, flights or logbook.
 - **Location.** Used for the moving map, nearest airports and flight track recording. Stored in the app's local
   database. Never put in a network request.
 - **Audio and transcripts.** Cockpit audio is recorded only during a flight recording. Transcription runs on the
-  device (Apple SpeechAnalyzer on iOS; on Android the on-device speech recognizer, which needs Android 13 or later, so
-  older Android versions have no transcription). Nothing is sent to Apple, Google or anyone else.
+  device (Apple SpeechAnalyzer, or SFSpeechRecognizer set to on-device recognition). Nothing is sent to Apple or anyone
+  else.
 - **Debrief.** The post-flight debrief uses Apple Foundation Models on the device. No request goes to any AI service.
 - **Flights, logbook, aircraft and pilot profiles.** Stored on the device (SwiftData and SQLite). iCloud sync is not
   enabled.
@@ -28,49 +28,24 @@ location, audio, transcripts, flights or logbook.
 | tiles.openfreemap.org, tiles.arcgis.com | Map tiles (Street, FAA sectional) | the map area on screen, your IP address |
 | openefb-notam-relay.omerc.workers.dev (Cloudflare, run by the developer) | Israel NOTAM feed | your IP address; the app asks for the whole-country feed and sends no position |
 | pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev (Cloudflare R2, run by the developer) | Israel chart and diagram packs | the file requested and your IP address |
-| openefb-telemetry.omerc.workers.dev (Cloudflare, run by the developer) | Anonymous usage counts (below) | the counts, your IP address |
+| nom.telemetrydeck.com (TelemetryDeck) | Anonymous usage and crash summaries (below) | the summaries, your IP address |
 
 Every host above sees your IP address, as any website does. Map tile hosts also see which map area you are looking at.
-Cloudflare operates the three hosts the developer runs; the relay and counter code read no request header and store no
-data about you beyond the counts described below, but Cloudflare's own logs are outside the developer's control and are
-covered by Cloudflare's privacy policy.
+Cloudflare operates the two hosts the developer runs; the relay code reads no request header and stores no data about
+you, but Cloudflare's own logs are outside the developer's control and are covered by Cloudflare's privacy policy.
 The app never sends your GPS coordinates to any host.
 
-## Anonymous usage counts
+## Anonymous usage and crash summaries
 
-Kanaf counts how often its features are used, so the developer can see which ones matter and whether an update made the
-app worse. It does this with a small counter service that the developer runs on Cloudflare Workers. No third-party
-analytics or crash-reporting service is used.
+Kanaf uses [TelemetryDeck](https://telemetrydeck.com/privacy/) to count how features are used and to learn about
+crashes and hangs. It sends short event names (for example "a recording started", "the Flights tab was opened"), the
+app version, iOS version, device model, the selected region (US or Israel) and the iOS vendor identifier, hashed on the
+device so it cannot be read back. Crash and hang summaries come from Apple MetricKit: the exception type and code,
+signal, hang duration and the top frames of the stack as binary names and offsets. No location, airport or route,
+aircraft, name, audio, transcript or other flight data is ever included.
+The data is not linked to you and is not used for tracking.
 
-A count is one of these events, how many times it happened, and four labels (below):
-
-| Event | Extra detail |
-|---|---|
-| `App.launched` | none |
-| `Navigation.screen` | which screen: map or log |
-| `Recording.started` | none |
-| `Recording.stopped` | the length in minutes, in one of three ranges: 0-15, 15-60 or 60+ |
-| `FlightPlan.activated` | none |
-| `Debrief.generated` | none |
-| `ChartPack.installed` | the name and edition of the chart pack |
-| `Israel.briefingOpened` | none |
-| `Israel.fplShared` | how it was shared: share or email |
-
-The four labels are the app version (for example 1.2.0), the platform (iOS or Android), the over-the-air update the app is
-running (an update id, or "embedded" for the version as installed from the store) and the selected region (US or Israel).
-
-Nothing else is sent. There is no user, device, installation or session identifier (the hashed iOS vendor identifier that
-earlier versions sent is gone), and no location, airport or route, aircraft, name, audio, transcript or other flight data.
-The app adds the counts up on the device and sends them in batches, so a count says that something happened, not when or
-to whom. The counter service reads no request header and stores each count with the time its batch arrived; the counts
-cannot be linked to you, so counts already sent cannot be looked up or deleted one by one. Cloudflare keeps them for
-three months.
-
-Kanaf does not collect crash or hang reports. The App Store and Google Play give the developer their own crash statistics
-for people who share them with those stores.
-
-Turn it off in Settings > Privacy > Share anonymous usage data. Sending stops at once, and counts still waiting on the
-device are deleted.
+Turn it off in Settings > Privacy > Share anonymous usage data. Sending stops at once.
 
 ## Permissions
 
