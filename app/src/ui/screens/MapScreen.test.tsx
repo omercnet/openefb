@@ -10,6 +10,12 @@ jest.mock(
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
 jest.mock('../map/MapSurface', () => ({ MapSurface: () => null }));
+// scenarioFeed reads the surface's status holder, which imports the native MapLibre module.
+jest.mock('../map/mapStatus', () => ({ getCurrentMapStatus: () => null }));
+// The launch-argument reader needs the native SettingsManager.
+jest.mock('react-native/Libraries/Settings/Settings', () => ({ __esModule: true, default: { get: () => undefined } }));
+// The aviation database is a native asset; the screen only opens it in the background.
+jest.mock('../../adapters/aviationDb', () => ({ openAviationDatabase: () => new Promise(() => undefined) }));
 
 const hasBackButton = (view: Awaited<ReturnType<typeof render>>) =>
   view.all((n) => n.props?.testID === 'column-back-to-log').length > 0;

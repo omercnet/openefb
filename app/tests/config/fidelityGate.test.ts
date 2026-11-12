@@ -30,7 +30,8 @@ const referenceNames = Object.fromEntries(
 );
 const referenceFile = (screen: string) => `reference/${referenceNames[screen] ?? `ipad-${screen}.png`}`;
 /** Captured for another reason than the gate (the native sheet probe). */
-const NOT_GATED = ['sheet'];
+// Captured but not compared with a SwiftUI reference: the sheet probe and M1's map-layers (no Swift counterpart).
+const NOT_GATED = ['sheet', 'map-layers'];
 
 describe('fidelity gate registration', () => {
   const screens = Object.keys(thresholds.ios);

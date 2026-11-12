@@ -71,7 +71,7 @@ wait_map() {
   sleep 2   # symbol fade-in
 }
 
-for screen in map airport night layers nearest search log sheet; do
+for screen in map map-layers airport night layers nearest search log sheet; do
   stamp "screen $screen"
   rm -f "$DOCS/map-status.json"
   launch -KanafScreen "$screen"
