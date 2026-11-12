@@ -14,8 +14,18 @@ import {
   type AviationInstallPlatform,
 } from '../../../src/data/aviation';
 
+// Every directory made here is removed when the importing test file finishes. Jest gives each test file its own module
+// registry, so this hook is registered once per file, at import time (hooks cannot be added from inside a test).
+// Without it each run leaked one directory per call (two bundled database copies each) into the shared /tmp.
+const createdTempDirs: string[] = [];
+afterAll(() => {
+  for (const dir of createdTempDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
 export function makeTempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'efb-avdb-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'efb-avdb-'));
+  createdTempDirs.push(dir);
+  return dir;
 }
 
 export function sha256OfFile(file: string): string {
