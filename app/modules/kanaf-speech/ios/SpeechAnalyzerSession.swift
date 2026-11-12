@@ -237,16 +237,27 @@ final class SpeechAnalyzerSession: @unchecked Sendable {
         ]
     }
 
+    /// Restarts the engine after a route change or an interruption. The check of `stopped` and the restart run under the
+    /// lock `stop()` takes to set it, so a `stop()` on another thread either runs first (nothing restarts) or waits until the
+    /// restart is done and then stops that engine; the microphone cannot be left capturing with no owner. The failure event is
+    /// sent after the lock is released.
     private func recover() {
-        if stopped.withLock({ $0 }) { return }
-        do {
-            engine.stop()
-            try activateAudioSession()
-            try installTap()
-            engine.prepare()
-            try engine.start()
-        } catch {
-            emit("onFailure", ["message": "The audio engine could not restart: \(error.localizedDescription)"])
+        // `withLock`'s body must be Sendable and this one uses the engine, which is only ever touched under this lock.
+        let failure: Error? = stopped.withLockUnchecked { isStopped in
+            if isStopped { return nil }
+            do {
+                engine.stop()
+                try activateAudioSession()
+                try installTap()
+                engine.prepare()
+                try engine.start()
+                return nil
+            } catch {
+                return error
+            }
+        }
+        if let failure {
+            emit("onFailure", ["message": "The audio engine could not restart: \(failure.localizedDescription)"])
         }
     }
 

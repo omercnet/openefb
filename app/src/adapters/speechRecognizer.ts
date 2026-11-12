@@ -59,12 +59,19 @@ function failureKind(code: string): SpeechFailure['kind'] {
   }
 }
 
+/** How long after our own abort() an end event is still taken for the aborted session's. */
+export const STALE_END_WINDOW_MS = 1000;
+
 export function createRecognizerEngine(options: RecognizerEngineOptions = {}): SpeechEngine {
   const now = options.now ?? Date.now;
   const apiLevel = options.apiLevel ?? Platform.Version;
   const recognizer: SpeechRecognitionModule = options.module ?? ExpoSpeechRecognitionModule;
   let subscriptions: EventSubscription[] = [];
   let permitted = false;
+  // Android's abort() emits an "end" after the JS call has returned, even when nothing was listening. A restart starts again in
+  // the same turn, so the new session's end listener would take that stale end for the end of its own session. Only an end
+  // that arrives soon after our own abort, before the new session produced a result, is dropped, and only once.
+  let abortedAt: number | null = null;
 
   function unsubscribe(): void {
     subscriptions.forEach((subscription) => subscription.remove());
@@ -95,6 +102,7 @@ export function createRecognizerEngine(options: RecognizerEngineOptions = {}): S
         recognizer.addListener('result', (event) => {
           const best = event.results[0];
           if (!best || best.transcript.trim() === '') return;
+          abortedAt = null; // the new session is running: whatever end follows is its own
           const at = (now() - began) / 1000;
           utteranceStart ??= at;
           if (!event.isFinal) {
@@ -117,7 +125,12 @@ export function createRecognizerEngine(options: RecognizerEngineOptions = {}): S
           sink.failure({ kind: failureKind(event.error), message: `${event.error}: ${event.message}` });
         }),
         // A recogniser session ends after an utterance (continuous mode needs Android 13) or after silence.
-        recognizer.addListener('end', () => sink.failure({ kind: 'ended', message: 'recognition ended' })),
+        recognizer.addListener('end', () => {
+          const stale = abortedAt !== null && now() - abortedAt < STALE_END_WINDOW_MS;
+          abortedAt = null;
+          if (stale) return; // the end of the session our stop() aborted
+          sink.failure({ kind: 'ended', message: 'recognition ended' });
+        }),
       ];
       try {
         recognizer.start({
@@ -138,6 +151,7 @@ export function createRecognizerEngine(options: RecognizerEngineOptions = {}): S
       unsubscribe();
       try {
         recognizer.abort();
+        abortedAt = now();
       } catch {
         // Nothing is running that could be aborted.
       }

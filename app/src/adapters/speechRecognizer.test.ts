@@ -13,7 +13,12 @@ import { FakeClock, flush } from '../domain/recording/testSupport';
 import { ENDED_RESTART_DELAY_MS, TranscriptionSession } from '../domain/transcriptionSession';
 import { Platform } from 'react-native';
 
-import { createRecognizerEngine, MIN_ON_DEVICE_API_LEVEL, type SpeechRecognitionModule } from './speechRecognizer';
+import {
+  createRecognizerEngine,
+  MIN_ON_DEVICE_API_LEVEL,
+  STALE_END_WINDOW_MS,
+  type SpeechRecognitionModule,
+} from './speechRecognizer';
 
 // The real module is imported for its default; its native half does not exist under Jest.
 jest.mock('expo-speech-recognition', () => ({
@@ -410,6 +415,75 @@ describe('createRecognizerEngine', () => {
       expect(recognizer.listenerCount).toBe(0);
       expect(log.results).toHaveLength(0);
       expect(log.failures).toHaveLength(0);
+    });
+
+    describe('the end that Android emits for an aborted session', () => {
+      async function restarted(clock: { t: number }, recognizer: FakeRecognizer, log: ReturnType<typeof sinkLog>) {
+        const engine = createRecognizerEngine({ module: recognizer, apiLevel: 33, now: () => clock.t });
+        await engine.start(config, sinkLog().sink);
+        await engine.stop(); // abort(): its end arrives after this returns
+        await engine.start(config, log.sink); // the restart, in the same turn
+        return engine;
+      }
+
+      test('is not taken for the end of the restarted session', async () => {
+        const clock = { t: 0 };
+        const recognizer = new FakeRecognizer();
+        const log = sinkLog();
+        await restarted(clock, recognizer, log);
+        clock.t = 20;
+        recognizer.end(); // stale
+        expect(log.failures).toEqual([]);
+      });
+
+      test('is dropped once: the next end is a real one', async () => {
+        const clock = { t: 0 };
+        const recognizer = new FakeRecognizer();
+        const log = sinkLog();
+        await restarted(clock, recognizer, log);
+        recognizer.end();
+        clock.t = 500;
+        recognizer.end();
+        expect(log.failures).toEqual([{ kind: 'ended', message: 'recognition ended' }]);
+      });
+
+      test('is not dropped when it comes after the window, or after the new session produced a result', async () => {
+        const late = { t: 0 };
+        const recognizerLate = new FakeRecognizer();
+        const logLate = sinkLog();
+        await restarted(late, recognizerLate, logLate);
+        late.t = STALE_END_WINDOW_MS;
+        recognizerLate.end();
+        expect(logLate.failures).toHaveLength(1);
+
+        const clock = { t: 0 };
+        const recognizer = new FakeRecognizer();
+        const log = sinkLog();
+        await restarted(clock, recognizer, log);
+        recognizer.result(true, 'cleared to land');
+        recognizer.end();
+        expect(log.failures).toHaveLength(1);
+      });
+
+      test('does not hide the error and end of a start that is refused before it begins', async () => {
+        const clock = { t: 0 };
+        const recognizer = new FakeRecognizer();
+        const log = sinkLog();
+        const engine = await restarted(clock, recognizer, log);
+        recognizer.error('not-allowed', 'no microphone');
+        expect(log.failures.map((f) => f.kind)).toEqual(['fatal']);
+        void engine;
+      });
+
+      test('is not expected when the abort threw (nothing was aborted)', async () => {
+        const clock = { t: 0 };
+        const recognizer = new FakeRecognizer();
+        recognizer.abortError = new Error('not running');
+        const log = sinkLog();
+        await restarted(clock, recognizer, log);
+        recognizer.end();
+        expect(log.failures).toHaveLength(1);
+      });
     });
 
     test('does not reject when the abort throws', async () => {
