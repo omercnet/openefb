@@ -1,0 +1,167 @@
+// Port of efb-212Tests/ServiceTests/AviationVocabularyTests.swift (11 cases, same names, inputs and assertions), then
+// the exact outputs of the Swift implementation, including its quirks (docs/port-notes/A3.md).
+import { AVIATION_CONTEXTUAL_STRINGS, processAviationVocabulary as process } from './aviationVocabulary';
+
+describe('AviationVocabulary Tests', () => {
+  test('nNumberConversion', () => {
+    expect(process('november seven three two papa')).toContain('N732P');
+  });
+
+  test('ninerToNine', () => {
+    expect(process('squawk one two zero niner')).toContain('1209');
+  });
+
+  test('frequencyFormat', () => {
+    expect(process('one two three point four five')).toContain('123.45');
+  });
+
+  test('flightLevelFormat', () => {
+    expect(process('flight level three five zero')).toContain('FL350');
+  });
+
+  test('runwayFormat', () => {
+    expect(process('runway two seven left')).toContain('Runway 27L');
+  });
+
+  test('squawkCode', () => {
+    expect(process('squawk one two zero zero')).toContain('1200');
+  });
+
+  test('altitudeFormat', () => {
+    const result = process('maintain four thousand five hundred');
+    expect(result.includes('4,500') || result.includes('4500')).toBe(true);
+  });
+
+  test('headingFormat', () => {
+    expect(process('heading three six zero')).toContain('360');
+  });
+
+  test('atisLetter', () => {
+    const result = process('atis information bravo');
+    expect(result.includes('B') || result.includes('Bravo')).toBe(true);
+  });
+
+  test('noChangeForNormalText', () => {
+    expect(process('hello world')).toBe('hello world');
+  });
+
+  test('multipleCorrections', () => {
+    const result = process('november seven three two papa contact one two three point four five');
+    expect(result).toContain('N732P');
+    expect(result).toContain('123.45');
+  });
+});
+
+describe('exact output', () => {
+  test.each([
+    ['november seven three two papa', 'N732P'],
+    ['november alpha bravo', 'NAB'],
+    ['november one two x-ray', 'N12X'],
+    ['squawk seven seven zero zero', 'Squawk 7700'],
+    ['one two three point four five', '123.45'],
+    ['one one eight point seven', '118.7'],
+    ['flight level three five zero', 'FL350'],
+    ['flight level nine zero', 'FL90'],
+    ['runway two seven left', 'Runway 27L'],
+    ['runway one zero right', 'Runway 10R'],
+    ['runway three six center', 'Runway 36C'],
+    ['runway one eight', 'Runway 18'],
+    ['maintain four thousand five hundred', 'maintain 4,500'],
+    ['maintain seven thousand', 'maintain 7,000'],
+    ['climb twelve thousand', 'climb 12,000'],
+    ['descend one thousand five hundred', 'descend 1,500'],
+    ['altitude two thousand', 'altitude 2,000'],
+    ['maintain hundred', 'maintain 100'],
+    ['heading three six zero', 'heading 360'],
+    ['heading zero one zero', 'heading 010'],
+    ['one two niner point five', '129.5'],
+    ['atis information bravo', 'ATIS Information B'],
+    ['information charlie', 'ATIS Information C'],
+    ['information x-ray', 'ATIS Information X'],
+    ['information whiskey', 'ATIS Information W'],
+  ])('%s -> %s', (input, expected) => {
+    expect(process(input)).toBe(expected);
+  });
+
+  test('text is lower-cased first, so capitals in the recogniser output are lost (Swift lowercased() before anything)', () => {
+    expect(process('November Seven Three Two Papa')).toBe('N732P');
+    expect(process('Cleared To Land')).toBe('cleared to land');
+  });
+
+  test('every correction in a longer phrase applies, in the same pass', () => {
+    // Flight levels convert first, so the squawk group swallows the space before FL350; "left" ends the runway
+    // pattern without whitespace, so the space after Runway 27L stays.
+    expect(process('runway two seven left squawk one two zero zero flight level three five zero')).toBe(
+      'Runway 27L Squawk 1200FL350',
+    );
+  });
+});
+
+describe('quirks kept from Swift', () => {
+  test('a converted phrase swallows the whitespace after it (the regex group ends in \\s*)', () => {
+    expect(process('squawk one two zero zero and ident')).toBe('Squawk 1200and ident');
+    expect(process('november seven three two papa contact tower')).toBe('N732Pcontact tower');
+    expect(process('heading three six zero then descend')).toBe('heading 360then descend');
+  });
+
+  test('an N-number takes at most six words after november; the rest stays as words', () => {
+    expect(process('november one two three four five six seven')).toBe('N123456seven');
+  });
+
+  // The digit alternation lists "nine" before "niner", and a regex alternation takes the first alternative that lets the
+  // whole pattern match. Wherever the pattern can end right after "nine", "niner" becomes 9 plus a stray "r". Only the
+  // frequency pattern, which needs whitespace after each whole digit, falls back to "niner" ('one two niner point five'
+  // above). AviationVocabularyTests.ninerToNine passes because it only checks that "1209" appears. Swift bug, kept.
+  test.each([
+    ['squawk one two zero niner', 'Squawk 1209r'],
+    ['runway niner', 'Runway 9r'],
+    ['heading zero niner zero', 'heading 09r zero'],
+    ['flight level two niner zero', 'FL29r zero'],
+    ['november seven three two niner', 'N7329r'],
+  ])('"niner" leaves a stray r: %s -> %s', (input, expected) => {
+    expect(process(input)).toBe(expected);
+  });
+
+  // The altitude pattern has the same ordering problem: the number words list "four", "six", "seven", "eight", "nine" before
+  // "fourteen", "sixteen", ..., "niner", and nothing after the group forces a backtrack, so the short word wins and the rest of
+  // the word stays in the text. "fifteen" works because "five" does not match its start. Swift bug (same pattern), kept.
+  test.each([
+    ['climb fourteen thousand', 'climb 4teen thousand'],
+    ['descend sixteen hundred', 'descend 6teen hundred'],
+    ['at seventeen thousand', 'at 7teen thousand'],
+    ['maintain nineteen thousand five hundred', 'maintain 9teen thousand five hundred'],
+    ['maintain niner thousand', 'maintain 9r thousand'],
+    ['climb fifteen thousand', 'climb 15,000'],
+  ])('altitude words that start with a shorter number word: %s -> %s', (input, expected) => {
+    expect(process(input)).toBe(expected);
+  });
+
+  test('"at" matches inside other words, so a number word after one is converted', () => {
+    expect(process('that five')).toBe('that 5');
+  });
+
+  test.each([
+    ['one digit word is too few for a flight level', 'flight level one'],
+    ['one whole digit is too few for a frequency', 'one point five'],
+    ['a squawk needs exactly four digits', 'squawk one two zero'],
+    ['"to", "tree", "fife" and "fower" are in the digit table but not in the patterns', 'squawk one two to zero'],
+    ['november alone is not an N-number', 'november'],
+    ['a heading needs two or three digits', 'heading three'],
+    ['a number word with nothing after the prefix', 'maintain'],
+  ])('%s', (_name, input) => {
+    expect(process(input)).toBe(input);
+  });
+
+  test('words glued together without a space still match, but their digits are lost', () => {
+    expect(process('flight level onetwo')).toBe('FL');
+  });
+});
+
+describe('AVIATION_CONTEXTUAL_STRINGS', () => {
+  test('are the 24 terms Swift gave SFSpeechRecognizer', () => {
+    expect(AVIATION_CONTEXTUAL_STRINGS).toHaveLength(24);
+    expect(AVIATION_CONTEXTUAL_STRINGS).toEqual(
+      expect.arrayContaining(['november', 'niner', 'squawk', 'flight level']),
+    );
+  });
+});

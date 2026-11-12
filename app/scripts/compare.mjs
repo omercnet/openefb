@@ -110,11 +110,13 @@ if (gate) {
     const metric = t.metric ?? 'strip';
     if (metric !== 'strip' && metric !== 'frame') { console.error(`compare: ${gate} ${screen}: unknown metric '${metric}' (strip or frame)`); process.exit(2); }
     const got = r ? r[metric].ssim : null;
+    // "referencePending": the SwiftUI reference is not in the repo yet (Q6 / PR #48): no gate until it lands and the entry is dropped.
+    if (t.referencePending && !r) return { screen, metric, floor, target: t.min, ssim: null, pass: true, pending: true };
     return { screen, metric, floor, target: t.min, ssim: got, pass: got !== null && got >= floor };
   });
   for (const v of verdicts) {
     const what = v.metric === 'strip' ? 'ssim' : `${v.metric} ssim`;
-    console.error(`fidelity ${gate} ${v.screen}: ${what} ${v.ssim ?? 'MISSING'} floor ${v.floor} (target ${v.target}) ${v.pass ? 'ok' : 'FAIL'}`);
+    console.error(v.pending ? `fidelity ${gate} ${v.screen}: reference pending (Q6), not gated` : `fidelity ${gate} ${v.screen}: ${what} ${v.ssim ?? 'MISSING'} floor ${v.floor} (target ${v.target}) ${v.pass ? 'ok' : 'FAIL'}`);
   }
   failed = verdicts.some((v) => !v.pass);
   for (const r of results) r.gate = verdicts.find((v) => v.screen === basename(r.screenshot, '.png')) ?? null;

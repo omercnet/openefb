@@ -6,13 +6,15 @@
     "night": { "min": 0.9 },
     "airport": { "min": 0.85 },
     "layers": { "min": 0.85 },
-    "nearest": { "min": 0.85 },
+    "nearest": { "referencePending": true, "min": 0.85 },
     "search": {
+      "referencePending": true,
       "min": 0.85,
       "interim": 0.75,
       "reason": "not yet measured on iOS: the reference has the software keyboard with the footer on it (StripColumn is keyboard-aware now) and nobody has seen whether the CI simulator shows it for this app"
     },
     "log": {
+      "referencePending": true,
       "min": 0.93,
       "interim": 0.9,
       "metric": "frame",
@@ -24,8 +26,8 @@
     "night": { "min": 0.85 },
     "airport": { "min": 0.8 },
     "layers": { "min": 0.8 },
-    "nearest": { "min": 0.8 },
-    "search": { "min": 0.8 },
-    "log": { "min": 0.8 }
+    "nearest": { "referencePending": true, "min": 0.8 },
+    "search": { "referencePending": true, "min": 0.8 },
+    "log": { "referencePending": true, "min": 0.8 }
   }
 }

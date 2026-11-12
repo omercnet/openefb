@@ -9,7 +9,7 @@ const root = join(__dirname, '../..');
 const read = (path: string) => readFileSync(join(root, path), 'utf8');
 const words = (list: string) => list.trim().split(/\s+/);
 
-type Floor = { min: number; interim?: number; reason?: string; metric?: string };
+type Floor = { min: number; interim?: number; reason?: string; metric?: string; referencePending?: boolean };
 const thresholds = JSON.parse(read('scripts/fidelity-thresholds.json')) as {
   ios: Record<string, Floor>;
   android: Record<string, Floor>;
@@ -52,7 +52,10 @@ describe('fidelity gate registration', () => {
     if (screen !== 'map') expect(launchScreens).toContain(screen);
     expect(iosCaptured).toContain(screen);
     expect(androidCaptured).toContain(screen);
-    expect(existsSync(join(root, referenceFile(screen)))).toBe(true);
+    // A screen whose SwiftUI reference arrives with Q6 (#48) says so in both platforms' floors and is not gated until then.
+    const pending = [thresholds.ios[screen], thresholds.android[screen]].map((e) => e?.referencePending === true);
+    expect(pending[0]).toBe(pending[1]);
+    expect(existsSync(join(root, referenceFile(screen))) || pending[0]).toBe(true);
   });
 
   it('gates everything it captures, except the sheet probe', () => {
