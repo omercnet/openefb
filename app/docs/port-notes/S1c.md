@@ -89,3 +89,21 @@ Chart packs carry the precomputed georeferencing; nothing is computed on the dev
 
 - Pure-JS SHA-256 speed on Hermes with a real MBTiles pack (hashed once per download and once per launch).
 - `Directory.move` and `File.downloadFileAsync` semantics on both platforms; backup exclusion; resume.
+
+## Corner order for the map track (M4)
+
+`clipCorners` keeps Swift's `MLNCoordinateQuad` order: top-left, bottom-left, bottom-right, top-right. MapLibre JS / React Native
+`ImageSource` wants top-left, top-right, bottom-right, bottom-left as `[lon, lat]`; `clipCornersForImageSource` does that mapping.
+
+## Review follow-ups (PR #51)
+
+- Abort during the final commit: the abort is checked before the old copy is replaced and again before `installed.json` is written;
+  if it is seen after the stage was moved, the stage is moved back (kept for resume) and the call rejects. An abort never installs.
+  Once the record is written the install is committed (the point of no return).
+- `DownloadRequest.maxBytes`: chart files are limited to the manifest size, d-TPP metafile and PDFs to 64 MiB. An over-size body is
+  cut off, its file removed, and the download fails (`ResponseTooLargeError`, not retried). The metafile size is also checked
+  before it is read into memory.
+- `adapters/fileDownloader.ts`: an idle deadline (30 s, restarted by every progress report, first window = connect) fails a stalled
+  transfer as a transport error that the service retries; pause/remove still abort at once. The logic is `charts/idleDeadline.ts`
+  (unit-tested); the adapter itself is device-checked (I3).
+- `chartFileSystem.join` keeps a `file:///` root (new `charts/pathJoin.ts`); the old collapse turned `file:///data` into `file://data`.

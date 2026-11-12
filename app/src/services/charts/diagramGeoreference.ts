@@ -114,8 +114,9 @@ export function pagePointForCoordinate(g: AirportDiagramGeoreference, position: 
   return { x: (g.d * x - g.c * y) / det, y: (-g.b * x + g.a * y) / det };
 }
 
-/** Ground corners of the clip box in the order MapLibre's image-source coordinates expect: top-left, bottom-left,
- * bottom-right, top-right of the rendered image. */
+/** Ground corners of the clip box in the order of Swift's MLNCoordinateQuad: top-left, bottom-left, bottom-right,
+ * top-right of the rendered image. NOT the order of MapLibre JS / React Native ImageSource (TL, TR, BR, BL): use
+ * `clipCornersForImageSource` for that. */
 export function clipCorners(g: AirportDiagramGeoreference): [LatLon, LatLon, LatLon, LatLon] {
   const { x, y, width, height } = g.clipBox;
   const minX = Math.min(x, x + width);
@@ -128,6 +129,13 @@ export function clipCorners(g: AirportDiagramGeoreference): [LatLon, LatLon, Lat
     coordinateForPagePoint(g, { x: maxX, y: minY }),
     coordinateForPagePoint(g, { x: maxX, y: maxY }),
   ];
+}
+
+/** The clip box corners in MapLibre ImageSource order: top-left, top-right, bottom-right, bottom-left, each as
+ * [lon, lat] (GeoJSON order, as the ImageSource `coordinates` option takes them). */
+export function clipCornersForImageSource(g: AirportDiagramGeoreference): [number, number][] {
+  const [tl, bl, br, tr] = clipCorners(g);
+  return [tl, tr, br, bl].map((c) => [c.lon, c.lat]);
 }
 
 // MARK: Decoding (Swift Codable semantics)

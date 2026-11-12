@@ -458,3 +458,51 @@ test('a non-200 index or a malformed manifest is chartDownloadFailed; a transpor
     error: { kind: 'networkUnavailable' },
   });
 });
+
+// Review follow-ups (PR #51)
+
+test('an abort during the final move rolls the stage back: nothing is installed and the partial is kept for resume', async () => {
+  const manifest = decode(manifestJSON());
+  const controller = new AbortController();
+  const { service, fs } = rig(() => ({ status: 200, body: packBytes }));
+  const move = fs.move.bind(fs);
+  fs.move = async (from: string, to: string) => {
+    await move(from, to);
+    if (to.endsWith('/2025-02')) controller.abort(); // the pilot pauses while the stage is being moved into place
+  };
+  await expect(service.download(manifest, { signal: controller.signal })).rejects.toBeInstanceOf(CancelledError);
+  expect(await service.installed()).toBeNull();
+  expect(fs.exists(`${ROOT}/israel-cvfr/installed.json`)).toBe(false);
+  expect(fs.size(`${ROOT}/israel-cvfr/.partial-2025-02/${PACK_FILE}`)).toBe(packBytes.length); // put back
+});
+
+test('an abort right before the final move or the record write never installs', async () => {
+  const manifest = decode(manifestJSON());
+  const controller = new AbortController();
+  const { service, fs } = rig(() => ({ status: 200, body: packBytes }));
+  const remove = fs.remove.bind(fs);
+  fs.remove = async (path: string) => {
+    await remove(path);
+    if (path.endsWith('/2025-02')) controller.abort(); // the old-edition removal is the first final-commit step
+  };
+  let moves = 0;
+  const move = fs.move.bind(fs);
+  fs.move = async (from: string, to: string) => {
+    moves += 1;
+    await move(from, to);
+  };
+  await expect(service.download(manifest, { signal: controller.signal })).rejects.toBeInstanceOf(CancelledError);
+  expect(await service.installed()).toBeNull();
+  expect(moves).toBe(0); // the abort is seen before the stage is moved
+});
+
+test('a body larger than the manifest says is rejected, removed, sent with a byte limit, and not retried', async () => {
+  const manifest = decode(manifestJSON());
+  const { service, fs, downloader } = rig(() => ({ status: 200, body: new Uint8Array(packBytes.length + 500) }), {
+    retry: { maxAttempts: 3, baseDelayMs: 1 },
+  });
+  await expect(service.download(manifest)).rejects.toMatchObject({ error: { kind: 'chartDownloadFailed' } });
+  expect(downloader.requests).toHaveLength(1);
+  expect(downloader.requests[0].maxBytes).toBe(packBytes.length);
+  expect(fs.exists(`${ROOT}/israel-cvfr/.partial-2025-02/${PACK_FILE}`)).toBe(false);
+});

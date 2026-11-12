@@ -3,6 +3,7 @@
 import type { ChartPackServiceLike } from './chartPackService';
 import {
   clipCorners,
+  clipCornersForImageSource,
   coordinateForPagePoint,
   decodeGeoreference,
   metresPerDegree,
@@ -248,4 +249,18 @@ test('an index with a wrong-typed field is rejected', () => {
     ),
   ).toThrow();
   expect(() => decodeDiagramIndex('[]')).toThrow();
+});
+
+test('clipCornersForImageSource reorders the Swift quad (TL, BL, BR, TR) to ImageSource order (TL, TR, BR, BL) as [lon, lat]', () => {
+  const [tl, bl, br, tr] = clipCorners(georeference);
+  expect(clipCornersForImageSource(georeference)).toEqual([
+    [tl.lon, tl.lat],
+    [tr.lon, tr.lat],
+    [br.lon, br.lat],
+    [bl.lon, bl.lat],
+  ]);
+  const [a, b, c, d] = clipCornersForImageSource(georeference);
+  expect(a[1]).toBeGreaterThan(d[1]); // top above bottom
+  expect(a[0]).toBeLessThan(b[0]); // left west of right
+  expect(c[0]).toBeGreaterThan(d[0]);
 });

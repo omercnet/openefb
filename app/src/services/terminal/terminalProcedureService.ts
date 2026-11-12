@@ -25,6 +25,10 @@ import {
 export const DTPP_INFO_URL = 'https://external-api.faa.gov/apra/dtpp/info';
 export const DTPP_BASE_URL = 'https://aeronav.faa.gov/d-tpp';
 export const DTPP_INDEX_FILE = 'index.json';
+/** The metafile is about 16 MB; refuse anything past this before it is read into memory. */
+export const DTPP_METAFILE_MAX_BYTES = 64 * 1024 * 1024;
+/** A single chart PDF is a few MB; refuse anything past this. */
+export const DTPP_PDF_MAX_BYTES = 64 * 1024 * 1024;
 /** Swift: timeoutIntervalForRequest 30 s. */
 export const DTPP_REQUEST_TIMEOUT_MS = 30_000;
 
@@ -111,6 +115,7 @@ export class TerminalProcedureService implements TerminalProcedureServiceLike {
           url: `${DTPP_BASE_URL}/${chart.cycle}/${fileName}`,
           destination: temp,
           rangeStart: 0,
+          maxBytes: DTPP_PDF_MAX_BYTES,
         }));
       } catch (error) {
         this.options.log?.(
@@ -201,8 +206,11 @@ export class TerminalProcedureService implements TerminalProcedureServiceLike {
         url: `${DTPP_BASE_URL}/${cycle.code}/xml_data/d-tpp_Metafile.xml`,
         destination: temp,
         rangeStart: 0,
+        maxBytes: DTPP_METAFILE_MAX_BYTES,
       });
       if (status < 200 || status > 299) throw new AppFailure({ kind: 'chartDownloadFailed', region: DTPP_REGION });
+      if ((fs.size(temp) ?? 0) > DTPP_METAFILE_MAX_BYTES)
+        throw new AppFailure({ kind: 'chartCorrupted', region: DTPP_REGION });
       const xml = await fs.readText(temp);
       if (xml === null) throw new AppFailure({ kind: 'chartCorrupted', region: DTPP_REGION });
       return parseMetafile(xml, cycle);
