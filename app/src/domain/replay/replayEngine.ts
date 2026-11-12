@@ -102,7 +102,17 @@ export class ReplayEngine {
 
     this.computePhaseMarkerFractions();
 
-    if (audio) this.audioPlayer = audio;
+    // The previous flight's player is the engine's to stop: left attached it would go on playing a flight it no longer
+    // belongs to, and a flight without audio would inherit it. (Swift only assigned a non-nil player and kept the old one;
+    // there each flight had its own engine.) Here, after the supersession check, so a failed or superseded load changes nothing.
+    if (this.audioPlayer !== audio) {
+      try {
+        this.audioPlayer?.stop();
+      } catch {
+        // a player that cannot stop is dropped all the same
+      }
+      this.audioPlayer = audio;
+    }
 
     this.currentPosition = 0;
     this.updateDerivedState();
