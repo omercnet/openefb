@@ -204,6 +204,9 @@ export function createSettingsStore(deps: SettingsDeps) {
       write: (() => Promise<void>) | null,
     ) => {
       const applyFailure = apply === null ? null : notify(apply);
+      // The failure flags belong to the operation that set them: queuing a change or retry takes and clears them, so a later
+      // operation never reads (or leaves) an earlier one's state.
+      prefFailed[owner] = { apply: false, save: false };
       pendingPrefWrites[owner] += 1;
       return enqueue(() =>
         persist(owner, write, applyFailure).finally(() => {
@@ -345,6 +348,8 @@ export function createSettingsStore(deps: SettingsDeps) {
         if (owner === null) return Promise.resolve();
         // Repeat the step that failed, with the value the user chose: the app callback, the save, or both.
         const failed = prefFailed[owner];
+        // Nothing failed that is not already being repeated (a change or retry is queued): its own result decides the warning.
+        if (!failed.apply && !failed.save) return Promise.resolve();
         if (owner === 'displayMode') {
           const mode = get().displayMode;
           return changePreference(
