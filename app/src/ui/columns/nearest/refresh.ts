@@ -43,8 +43,10 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
   /** The last query that succeeded, and the last one sent (in flight or done): both gate the move threshold. */
   let succeeded: { position: Coordinate; region: Region } | null = null;
   let requested: { position: Coordinate; region: Region } | null = null;
-  /** The region the published entries belong to; null for entries nobody queried (the store's seed). */
-  let entriesRegion: Region | null = null;
+  /** The region the published entries belong to. The store's seed is the Bay Area fixture, so it belongs to 'us'. */
+  let entriesRegion: Region | null = store.getState().entries.length > 0 ? 'us' : null;
+  /** False while the entries are still the unqueried seed: a failed first query must not keep showing it. */
+  let entriesQueried = false;
   let token = 0;
   // Israel (IL-4): the curated aerodromes behind the current entries, for re-flagging when a NOTAM feed arrives.
   let israelAerodromes = new Map<string, IsraelAerodrome>();
@@ -107,6 +109,7 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
     requested = null;
     if (staleEntries) {
       entriesRegion = null;
+      entriesQueried = false;
       succeeded = null;
       store.setState({ entries: [], loading: false, error: null });
     } else store.setState({ loading: false });
@@ -138,6 +141,7 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
         }
         succeeded = { position, region };
         entriesRegion = region;
+        entriesQueried = true;
         if (region === 'israel') refreshNotamsIfNeeded();
       } catch (error) {
         if (mine !== token) return;
@@ -145,7 +149,7 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
         requested = succeeded;
         // Entries that did not come from this region (another region's list, or the store's seed) are not "the last good
         // list" for it: clear them and forget the success so the next fix requeries.
-        if (entriesRegion !== region) {
+        if (entriesRegion !== region || !entriesQueried) {
           succeeded = null;
           requested = null;
           entriesRegion = null;

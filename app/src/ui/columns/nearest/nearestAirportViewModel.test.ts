@@ -241,6 +241,15 @@ describe('refresh policy', () => {
     expect(store.getState().entries).toEqual([]);
   });
 
+  test('a region change before any successful query drops the seeded Bay Area list, with no position', () => {
+    const store = nearest.make({ ...EMPTY, entries: [{ airport: kpao, distance: 2, bearing: 116 }] });
+    const refresher = createNearestRefresher(store, defaultAirportQueries);
+    refresher.setRegion('us'); // the seed is the US fixture: unchanged
+    expect(store.getState().entries).toHaveLength(1);
+    refresher.setRegion('israel');
+    expect(store.getState().entries).toEqual([]);
+  });
+
   test('a failed refresh of the same region keeps its list', async () => {
     const query = jest.fn(createFakeAviationDatabase().nearestAirports);
     const store = nearest.make(EMPTY);
