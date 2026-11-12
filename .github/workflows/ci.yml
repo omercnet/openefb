@@ -127,6 +127,8 @@ jobs:
             commands: npm test && npm run typecheck
           - package: interviews
             commands: npm run lint
+          - package: telemetry
+            commands: npm test && npm run typecheck
     defaults:
       run:
         working-directory: web/${{ matrix.package }}
