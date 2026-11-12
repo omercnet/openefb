@@ -11,6 +11,7 @@ import type { CameraCommand } from '../../domain/map/camera';
 import { EMPTY_COLLECTION, type FeatureCollection } from '../../domain/map/geojson';
 import { isLayerVisible, type LayerSpec, type StyleValue } from '../../domain/map/layerSpec';
 import { OWNSHIP_LIVE_ICON, OWNSHIP_STALE_ICON, TRACK_RULER_TICK_ICON } from '../../domain/map/layers';
+import { isTileFailureLog } from '../../domain/map/tileLog';
 import { PROBED_LAYERS, useMapStatus } from './mapStatus';
 import { groupBySource, resolveLayerProps, styleFor, type LayerOverrides } from './surfaceModel';
 
@@ -30,6 +31,8 @@ export interface MapSurfaceProps {
   /** Runtime visibility of the FAA sectional (MapService.setMapStyle sectional flag). */
   sectional: boolean;
   region: Region;
+  /** Local glyph URL template (see adapters/glyphInstall.ts); labels render with no network. */
+  glyphsUrl: string;
   visibleLayers: ReadonlySet<MapLayer>;
   /** Layer registry in draw order (core + Israel). Sources used by the specs are rendered, in first-use order. */
   layers: readonly LayerSpec[];
@@ -42,6 +45,8 @@ export interface MapSurfaceProps {
   camera: { seq: number; command: CameraCommand | null };
   onViewChange?: (change: MapViewChange) => void;
   onStyleLoaded?: () => void;
+  /** Basemap tile health: 'error' for a native log line that looks like a failed request, 'ok' once the map is fully rendered. */
+  onTileHealth?: (event: 'error' | 'ok') => void;
 }
 
 type AnyLayerProps = Parameters<typeof Layer>[0];
@@ -67,6 +72,7 @@ export function MapSurface({
   night,
   sectional,
   region,
+  glyphsUrl,
   visibleLayers,
   layers,
   sources,
@@ -75,12 +81,19 @@ export function MapSurface({
   camera,
   onViewChange,
   onStyleLoaded,
+  onTileHealth,
 }: MapSurfaceProps) {
   const mapRef = useRef<MapRef>(null);
   const cameraRef = useRef<CameraRef>(null);
-  const mapStyle = useMemo(() => styleFor(night, sectional), [night, sectional]);
+  const mapStyle = useMemo(() => styleFor(night, sectional, glyphsUrl), [night, sectional, glyphsUrl]);
   const groups = useMemo(() => groupBySource(layers), [layers]);
-  const reporter = useMapStatus(night);
+  const onNativeLog = useCallback(
+    (level: string, message: string) => {
+      if (isTileFailureLog(level, message)) onTileHealth?.('error');
+    },
+    [onTileHealth],
+  );
+  const reporter = useMapStatus(night, onNativeLog);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -127,6 +140,7 @@ export function MapSurface({
       onDidFinishLoadingStyle={() => reporter.report('didFinishLoadingStyle')}
       onDidFailLoadingMap={() => reporter.report('didFailLoadingMap')}
       onDidFinishRenderingMapFully={() => {
+        onTileHealth?.('ok'); // fully rendered: every tile for this view arrived (cache or network)
         if (reporter.has('didFinishRenderingMapFully')) return;
         reporter.report('didFinishRenderingMapFully');
         // Give symbol placement a moment, count what each layer placed, then tell CI the map is ready.

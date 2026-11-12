@@ -10,6 +10,9 @@ jest.mock(
 );
 jest.mock('../map/MapSurface', () => ({ MapSurface: () => null }));
 // scenarioFeed reads the surface's status holder, which imports the native MapLibre module.
+jest.mock('../../adapters/glyphInstall', () => ({
+  useLocalGlyphs: () => ({ status: 'ready', url: 'file:///g/{fontstack}/{range}.pbf' }),
+}));
 jest.mock('../map/mapStatus', () => ({ getCurrentMapStatus: () => null }));
 // The launch-argument reader needs the native SettingsManager.
 jest.mock('react-native/Libraries/Settings/Settings', () => ({ __esModule: true, default: { get: () => undefined } }));
