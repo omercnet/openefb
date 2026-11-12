@@ -60,7 +60,9 @@ export function FlightLogFooter({ width, bottomInset }: { width: number; bottomI
     );
   };
 
-  const shared = width - 3 * StripMetrics.cell - 4;
+  // Never negative: the 104 pt iPhone rail is the compact footer (U5); until then a narrow strip clips instead of laying out
+  // negative widths.
+  const shared = Math.max(0, width - 3 * StripMetrics.cell - 4);
   const gpsWidth = Math.min(GPS_MAX_WIDTH, shared / 2);
   const tint = gpsTint(status, t);
   // Swift: lineLimit(1) + minimumScaleFactor(0.7). Plex is monospaced, so the fit is computed (no web fallback needed).

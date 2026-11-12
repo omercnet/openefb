@@ -283,7 +283,10 @@ function ClosureStatusRow({ status, now }: { status: LayersData['closureStatus']
       </View>
     );
   }
-  const drawable = status.level === 'fresh' || status.level === 'old';
+  // From `now`, the clock AgeLine's badge uses, not the level stored when the feed loaded: a feed that aged past the NOTAM
+  // limit while the column was open must hide its closures in step with the badge.
+  const { level } = evaluateFreshness('notam', { observed: status.generatedAt, now });
+  const drawable = level === 'fresh' || level === 'old';
   return (
     <View style={[padded, { flexDirection: 'row', alignItems: 'center', gap: Space.xs }]}>
       <AgeLine product="notam" input={{ observed: status.generatedAt, now }} />

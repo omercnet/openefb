@@ -51,6 +51,8 @@ export function SegmentRow<T extends string>({
             key={option}
             accessibilityLabel={`${label}, ${title(option)}`}
             accessibilityState={{ selected: on }}
+            // `selected` maps to aria-selected on web, which the button role does not support: add the pressed state too.
+            aria-pressed={on}
             onPress={() => onSelect(option)}
             style={{
               flex: 1,
