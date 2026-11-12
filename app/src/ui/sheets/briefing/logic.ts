@@ -256,8 +256,17 @@ export function distanceText(distanceNM: number | null): string | null {
 
 export const isReplacement = (notam: IsraelNotam): boolean => notam.type?.toUpperCase() === 'NOTAMR';
 
-export const rowAccessibilityLabel = (notam: IsraelNotam, read: boolean): string =>
-  `${notam.id}, ${notam.location}, ${read ? 'read' : 'unread'}`;
+/**
+ * The row's spoken label: id, location and read state (Swift's `.accessibilityLabel`), then the closure status. Swift keeps
+ * the badges as separate children (`children: .contain`); the row here is one element that hides its children, so
+ * CLOSED, PARTIAL, CHECK NOTAM and "other network" are spoken in the label instead.
+ */
+export function rowAccessibilityLabel(notam: IsraelNotam, read: boolean, row?: BriefingRow): string {
+  const base = `${notam.id}, ${notam.location}, ${read ? 'read' : 'unread'}`;
+  if (!row) return base;
+  const status = closureBadge(row)?.text ?? otherRouteLabel(row)?.accessibilityLabel ?? null;
+  return status ? `${base}, ${status}` : base;
+}
 
 export interface BadgeSpec {
   text: string;

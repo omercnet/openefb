@@ -41,6 +41,7 @@ export function IsraelFlightPlanSheet({ openURL = defaultOpenURL, share = defaul
   const network = useIsraelPlan((s) => s.network);
   const plan = useIsraelPlan((s) => s.plan);
   const routeError = useIsraelPlan((s) => s.routeError);
+  const networkFailure = useIsraelPlan((s) => s.lastNetworkFailure);
   const [showPreview, setShowPreview] = useState(false);
 
   // onAppear: configure() reads the profiles (the active aircraft's usual network preselects the planner).
@@ -57,6 +58,18 @@ export function IsraelFlightPlanSheet({ openURL = defaultOpenURL, share = defaul
           <DepartureTime />
           {network === 'lsa' ? <LsaWeekendSection /> : null}
           <RouteOptions />
+          {networkFailure ? (
+            <View
+              testID="il-network-failure"
+              accessibilityRole="alert"
+              style={{ padding: Space.l, borderRadius: Radius.m, backgroundColor: `${t.warning}1F` }}
+            >
+              <Text style={[Type.systemHeadline, { color: t.warning }]}>The route network could not be loaded</Text>
+              <Text style={[Type.systemSubheadline, { color: t.primaryText }]}>
+                Change the aerodromes or the network to try again.
+              </Text>
+            </View>
+          ) : null}
           {routeError ? <NoRouteBanner error={routeError} /> : null}
           {plan ? (
             <>
@@ -568,6 +581,7 @@ function Actions({
   const store = useIsraelPlanStore();
   const canFile = useIsraelPlan((s) => s.canFile);
   const isActive = useIsraelPlan((s) => s.isActive);
+  const isRouting = useIsraelPlan((s) => s.isRouting);
   const windy = windyURL(plan);
   return (
     <View style={{ gap: Space.m }}>
@@ -579,7 +593,7 @@ function Actions({
         <Button
           title={isActive ? 'Active' : 'Activate'}
           testID="il-activate"
-          disabled={!canFile || isActive}
+          disabled={!canFile || isActive || isRouting}
           onPress={() => store.getState().activate()}
         />
         {windy ? <Button title="Route weather" onPress={() => openURL(windy)} /> : null}

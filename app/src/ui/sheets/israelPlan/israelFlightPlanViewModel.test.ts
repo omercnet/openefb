@@ -235,6 +235,132 @@ describe('Israel flight plan view model', () => {
 
 // MARK: - Israel LSA view model (IsraelLSAPlannerTests.swift)
 
+describe('Israel flight plan view model: review fixes (PR #58)', () => {
+  const pts = [
+    planPoint(1, 'LLHZ', { kind: 'arp', lat: 32.18, lon: 34.83 }),
+    planPoint(2, 'MIDAA', { lat: 32.3, lon: 34.9 }),
+    planPoint(3, 'LLIB', { kind: 'arp', lat: 32.98, lon: 35.57 }),
+  ];
+  const segs = [planSegment(1, pts[0], pts[1], { nm: 10 }), planSegment(2, pts[1], pts[2], { nm: 40 })];
+  const baseDb = () => createFakeIsraelPlanDatabase({ points: pts, segments: segs, aerodromes: AERODROMES });
+
+  /** A fileable store with hooks: the database (and its reporting-point lookup) and the NOTAM feed can be held or failed. */
+  function harness(o: { burn?: number | null } = {}) {
+    const aircraft = newAircraftProfile('4X-CXA', { isActive: true });
+    if (o.burn !== undefined) aircraft.fuelBurnGPH = o.burn;
+    const pilots: PilotProfile[] = [newPilotProfile({ name: 'Israel Israeli', isActive: true })];
+    const ctl = {
+      failDatabase: false,
+      lookupGate: null as PromiseWithResolvers<void> | null,
+      notamGate: null as PromiseWithResolvers<void> | null,
+    };
+    const db = baseDb();
+    const activations: { fuelGallons: number | null }[] = [];
+    const map = { showRoute: jest.fn(), clearRoute: jest.fn(), setPlanUsesLSA: jest.fn(), zoomToRoute: jest.fn() };
+    const store = createIsraelPlanStore({
+      database: async () => {
+        if (ctl.failDatabase) throw new Error('database unavailable');
+        return {
+          ...db,
+          reportingPoint: async (code, net) => {
+            await ctl.lookupGate?.promise;
+            return db.reportingPoint(code, net);
+          },
+        };
+      },
+      fetchNotams: async () => {
+        await ctl.notamGate?.promise;
+        return report([]);
+      },
+      now: () => NOW,
+      profiles: () => ({ aircraft: [aircraft], pilots }),
+      networkPreferences: null,
+      navigation: {
+        activate: (a) => activations.push({ fuelGallons: a.fuelGallons }),
+        hasActiveRoute: () => false,
+        clear: () => {},
+      },
+      map: map as never,
+    });
+    store.getState().configure();
+    return { store, ctl, pilots, activations, map, db };
+  }
+
+  async function routed(h: ReturnType<typeof harness>) {
+    h.store.getState().selectDeparture((await h.db.aerodrome('LLHZ'))!);
+    h.store.getState().selectDestination((await h.db.aerodrome('LLIB'))!);
+    await h.store.getState().computeRoute();
+    expect(h.store.getState().plan).not.toBeNull();
+  }
+
+  test('aNonPositiveFuelBurnPublishesNoFuelEstimate', async () => {
+    for (const burn of [0, -5]) {
+      const h = harness({ burn });
+      await routed(h);
+      h.store.getState().activate();
+      expect(h.activations).toEqual([{ fuelGallons: null }]);
+    }
+    const ok = harness({ burn: 10 });
+    await routed(ok);
+    ok.store.getState().activate();
+    expect(ok.activations[0]!.fuelGallons).toBeGreaterThan(0);
+  });
+
+  test('aViaLookupThatFinishesAfterANetworkSwitchChangesNothing', async () => {
+    const h = harness();
+    h.ctl.lookupGate = Promise.withResolvers<void>();
+    const pending = h.store.getState().addVia('MIDAA');
+    h.store.getState().selectNetwork('lsa'); // clears the via state for the new network
+    h.ctl.lookupGate.resolve();
+    await pending;
+    expect(h.store.getState().viaCodes).toEqual([]);
+    expect(h.store.getState().viaError).toBeNull();
+  });
+
+  test('activateIsIgnoredWhileTheRouteIsBeingRecomputed', async () => {
+    const h = harness();
+    await routed(h);
+    h.ctl.notamGate = Promise.withResolvers<void>();
+    h.store.getState().reroute(); // waits for the NOTAM feed
+    await Promise.resolve();
+    expect(h.store.getState().isRouting).toBe(true);
+    h.store.getState().activate();
+    expect(h.activations).toEqual([]);
+    h.ctl.notamGate.resolve();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(h.store.getState().isRouting).toBe(false);
+    h.store.getState().activate();
+    expect(h.activations).toHaveLength(1);
+  });
+
+  test('aNetworkLoadFailureLeavesNoStaleMessageOrMapRoute', async () => {
+    const h = harness();
+    await routed(h);
+    expect(h.store.getState().mailURL()).not.toBeNull();
+    h.ctl.failDatabase = true;
+    h.store.getState().selectNetwork('lsa'); // a network that is not cached: the load fails
+    await new Promise((resolve) => setImmediate(resolve));
+    const s = h.store.getState();
+    expect(s.plan).toBeNull();
+    expect(s.lastNetworkFailure).toBe('database unavailable');
+    expect(s.fplText).toBe('');
+    expect(s.hebrewSummary).toBe('');
+    expect(s.mailURL()).toBeNull();
+    expect(h.map.clearRoute).toHaveBeenCalled();
+    expect(h.map.setPlanUsesLSA).toHaveBeenLastCalledWith(false);
+  });
+
+  test('editingTheProfilesAfterRoutingBlocksActivation', async () => {
+    const h = harness();
+    await routed(h);
+    expect(h.store.getState().canFile).toBe(true);
+    h.pilots[0]!.name = ''; // the pilot edits the profile after routing
+    h.store.getState().activate();
+    expect(h.activations).toEqual([]);
+    expect(h.store.getState().canFile).toBe(false);
+  });
+});
+
 describe('Israel LSA view model', () => {
   /** LSAFixture.israel: Israel local time in November (UTC+2). */
   const israel = (day: number, hour: number) => Date.UTC(2026, 10, day, hour - 2);

@@ -121,3 +121,18 @@ No reference and no gate registration in this change: the `ipad-israel-plan` ref
 `israel-plan` is not in `LAUNCH_SCREENS` (src/app/index.tsx) nor in scripts/fidelity-thresholds.json; add both with the
 reference, and align the fixture to the capture seed then. Web preview: the route renders the fixture plan (summary,
 12 legs, the amber "closures were not checked" note, actions).
+
+## Review decisions (PR #58)
+
+Fixed, each with a test that fails without the change: a zero or negative fuel burn publishes no fuel estimate (Swift
+multiplies it through); an `addVia` lookup that finishes after a network switch changes nothing; Activate is ignored while
+the route is being recomputed (the button is disabled too) and re-validates against the CURRENT profiles first
+(`refreshMessage`), so a profile edited after routing cannot be activated on a stale `canFile`; a network load failure also
+clears the FPL text and Hebrew summary (so no e-mail draft carries the old route), clears the map route and the LSA
+emphasis, and shows "The route network could not be loaded" in the sheet. Briefing row labels now speak CLOSED, PARTIAL,
+CHECK NOTAM and the other-network status (Swift keeps the badges as separate children, `children: .contain`; the RN row is
+one element with hidden children).
+
+Not done: while a reroute is in flight the previous plan stays visible (dimming it is a UI choice; activation is blocked
+instead), and a reroute does not re-sync an already active plan with navigation: Swift's `isActive` also drops on reroute
+(`isActive: false`) and the pilot activates again.

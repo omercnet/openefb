@@ -271,7 +271,8 @@ export function planActivation(plan: IsraelRoutePlan, aircraft: AircraftProfile 
       { lat: first.from.latitude, lon: first.from.longitude },
       { lat: first.to.latitude, lon: first.to.longitude },
     ),
-    fuelGallons: burn != null ? (planTotalETESeconds(plan) / 3600) * burn : null,
+    // A zero or negative burn is a profile typo, not an estimate: no fuel figure (Swift multiplies it through).
+    fuelGallons: burn != null && burn > 0 ? (planTotalETESeconds(plan) / 3600) * burn : null,
   };
 }
 

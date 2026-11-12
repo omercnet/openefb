@@ -326,7 +326,7 @@ function NotamRow({
     <Pressy
       testID={`briefing-row-${notam.id}`}
       accessibilityRole="none"
-      accessibilityLabel={rowAccessibilityLabel(notam, read)}
+      accessibilityLabel={rowAccessibilityLabel(notam, read, row)}
       onPress={onMarkRead}
       style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Space.m, paddingVertical: Space.xs }}
     >

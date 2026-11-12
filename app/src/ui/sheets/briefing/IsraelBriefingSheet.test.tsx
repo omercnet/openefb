@@ -46,13 +46,31 @@ describe('IsraelBriefingSheet', () => {
     expect(text).toContain('HEL ROUTE CLSD');
     expect(text).toContain('Aerodromes on route');
     expect(text).toContain('REPLACES');
-    expect(view.byLabel('C2311/26, LLLL, unread')).toHaveLength(1);
+    expect(view.byLabel('C2311/26, LLLL, unread, CLOSED')).toHaveLength(1); // the closure status is spoken in the row label
     await press(view.byTestId('briefing-row-C2311/26'));
-    expect(view.byLabel('C2311/26, LLLL, read')).toHaveLength(1);
+    expect(view.byLabel('C2311/26, LLLL, read, CLOSED')).toHaveLength(1);
     expect(model.unreadCount).toBeGreaterThan(0);
     await press(view.byTestId('briefing-mark-all-read'));
     expect(model.unreadCount).toBe(0);
     expect(readStore.keys.size).toBeGreaterThan(1);
+  });
+
+  it('speaks CLOSED, PARTIAL and the other-network status in the row labels, not only in the badges', async () => {
+    const { view } = await renderSheet();
+    await press(view.byTestId('briefing-show-stale'));
+    const labels = view
+      .all((n) => String(n.props?.testID ?? '').startsWith('briefing-row-'))
+      .map((n) => String(n.props.accessibilityLabel));
+    expect(labels.some((l) => l.endsWith(', CLOSED'))).toBe(true);
+    expect(labels.some((l) => l.endsWith(', PARTIAL'))).toBe(true);
+    expect(labels.some((l) => l.includes('routes closed. Not your route network.'))).toBe(true);
+    // Every row that shows a closure badge speaks it.
+    for (const badge of ['CLOSED', 'PARTIAL', 'CHECK NOTAM']) {
+      const shown = view.all(
+        (n) => n.props?.testID === `briefing-badge-${badge.toLowerCase().replaceAll(' ', '-')}`,
+      ).length;
+      expect(labels.filter((l) => l.endsWith(`, ${badge}`)).length).toBe(shown);
+    }
   });
 
   it('expands the raw text and opens the filters', async () => {

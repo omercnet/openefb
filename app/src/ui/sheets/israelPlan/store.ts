@@ -342,6 +342,8 @@ export function createIsraelPlanStore(deps: IsraelPlanDeps): StoreApi<IsraelPlan
             (point) => point !== null,
             () => false,
           );
+        // The lookup ran against `network`: if the pilot switched networks meanwhile, the answer is for the old one.
+        if (get().network !== network) return;
         if (!known) {
           set({ viaError: viaRefusal(code, network) });
           return;
@@ -400,12 +402,18 @@ export function createIsraelPlanStore(deps: IsraelPlanDeps): StoreApi<IsraelPlan
             if (run !== generation) return;
             closures = new Map();
             unresolved = [];
+            // No plan means no message either: the preview and the e-mail draft must not carry the previous route.
             update({
               plan: null,
               routeError: null,
               issues: [],
+              fplText: '',
+              hebrewSummary: '',
+              isActive: false,
               lastNetworkFailure: error instanceof Error ? error.message : String(error),
             });
+            deps.map?.clearRoute();
+            deps.map?.setPlanUsesLSA(false);
             return;
           }
           if (run !== generation) return;
@@ -469,6 +477,10 @@ export function createIsraelPlanStore(deps: IsraelPlanDeps): StoreApi<IsraelPlan
       },
 
       activate() {
+        // A plan still being recomputed is the previous route: never send it to navigation.
+        if (get().isRouting) return;
+        // Profiles may have been edited since the route was computed: validate against the current ones.
+        get().refreshMessage();
         const s = get();
         if (!s.plan || !s.canFile) return;
         const activation = planActivation(s.plan, aircraft());
