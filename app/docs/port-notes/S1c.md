@@ -89,3 +89,8 @@ Chart packs carry the precomputed georeferencing; nothing is computed on the dev
 
 - Pure-JS SHA-256 speed on Hermes with a real MBTiles pack (hashed once per download and once per launch).
 - `Directory.move` and `File.downloadFileAsync` semantics on both platforms; backup exclusion; resume.
+
+## Corner order for the map track (M4)
+
+`clipCorners` keeps Swift's `MLNCoordinateQuad` order: top-left, bottom-left, bottom-right, top-right. MapLibre JS / React Native
+`ImageSource` wants top-left, top-right, bottom-right, bottom-left as `[lon, lat]`; `clipCornersForImageSource` does that mapping.
