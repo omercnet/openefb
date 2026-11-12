@@ -61,7 +61,10 @@ export function createLogbookEntryStore(deps: LogbookEntryDeps): LogbookEntrySto
           if (error instanceof LogbookError && error.reason === 'locked') {
             // Confirmed elsewhere since this editor opened: show the entry as it is now.
             const stored = await deps.userData.logbook.get(id).catch(() => null);
-            set(stored === null ? { error: error.message } : { entry: stored, error: error.message });
+            // The entry is confirmed even when it cannot be read again: never leave the stale draft editable.
+            const current = get().entry;
+            const locked = stored ?? (current === null ? null : { ...current, isConfirmed: true });
+            set(locked === null ? { error: error.message } : { entry: locked, error: error.message });
             return 'locked';
           }
           set({ error: `Could not ${confirm ? 'confirm' : 'save'} the logbook entry: ${describeError(error)}` });

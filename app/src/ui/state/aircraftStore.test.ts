@@ -171,6 +171,46 @@ describe('save', () => {
     expect(await prefs.get('israel.routeNetwork.a1')).toBeNull();
   });
 
+  it('when the route network cannot be saved for an existing aircraft, the profile is put back as it was', async () => {
+    const data = await seeded();
+    const failingPrefs = {
+      get: () => Promise.resolve(null),
+      set: () => Promise.reject(new Error('prefs down')),
+      remove: () => Promise.resolve(),
+    };
+    const { store } = setup({ networkPreference: preferencesNetworkPreference(failingPrefs) }, data);
+    expect(
+      await store.getState().save('a1', form({ nNumber: 'n9', aircraftType: 'PA-28', routeNetwork: 'cvfr' })),
+    ).toBe('failed');
+    expect(await data.aircraft.get('a1')).toMatchObject({ nNumber: 'N1', aircraftType: '' });
+    expect(store.getState().error).toContain('prefs down');
+  });
+
+  it('a route network setting that could not be cleared after a failed insert is cleared before the next save', async () => {
+    const data = createMemoryUserData();
+    const prefs = new FakePreferences();
+    const realRemove = prefs.remove.bind(prefs);
+    let clearing: 'fails' | 'works' = 'fails';
+    prefs.remove = (key) => (clearing === 'fails' ? Promise.reject(new Error('prefs down')) : realRemove(key));
+    let broken = true;
+    const flaky: UserData = {
+      ...data,
+      atomically: (fn) => data.atomically(fn),
+      aircraft: {
+        ...data.aircraft,
+        insert: (r) => (broken ? Promise.reject(new Error('disk full')) : data.aircraft.insert(r)),
+      },
+    };
+    const { store } = setup({ networkPreference: preferencesNetworkPreference(prefs) }, flaky);
+    expect(await store.getState().save(null, form({ routeNetwork: 'cvfr' }))).toBe('failed');
+    expect(store.getState().error).toContain('could not be cleared');
+    expect(await prefs.get('israel.routeNetwork.new-1')).toBe('cvfr');
+    clearing = 'works';
+    broken = false;
+    expect(await store.getState().save(null, form({ routeNetwork: 'none' }))).toBe('saved');
+    expect(await prefs.get('israel.routeNetwork.new-1')).toBeNull();
+  });
+
   it('a write that fails is reported and nothing is half done: no profile is created', async () => {
     const data = createMemoryUserData();
     const broken: UserData = {
@@ -295,11 +335,11 @@ describe('routeNetworkFor', () => {
   it('reads the stored choice for an aircraft', async () => {
     const { store, prefs } = setup();
     await prefs.set('israel.routeNetwork.a1', 'cvfr');
-    expect(await store.getState().routeNetworkFor('a1')).toBe('cvfr');
-    expect(await store.getState().routeNetworkFor('a2')).toBeNull();
+    expect(await store.getState().routeNetworkFor('a1')).toEqual({ network: 'cvfr' });
+    expect(await store.getState().routeNetworkFor('a2')).toEqual({ network: null });
   });
 
-  it('a read that fails reads as none and says so', async () => {
+  it('a read that fails is reported as unreadable, never as none', async () => {
     const failingPrefs = {
       get: () => Promise.reject(new Error('prefs down')),
       set: () => Promise.resolve(),

@@ -113,6 +113,18 @@ describe('save', () => {
     expect(store.getState().error).toBe('This entry has been confirmed and is locked.');
   });
 
+  it('a confirmed entry that cannot be read again is still shown locked, never as the stale editable draft', async () => {
+    const data = await seeded();
+    const { store, form } = await open(data);
+    await data.logbook.update('e1', { isConfirmed: true });
+    const unreadable = { ...data, logbook: { ...data.logbook, get: () => Promise.reject(new Error('db locked')) } };
+    const lockedStore = createLogbookEntryStore({ userData: unreadable });
+    lockedStore.setState({ entry: store.getState().entry, loaded: true });
+    expect(await lockedStore.getState().save(edit(form, { notes: 'late edit' }))).toBe('locked');
+    expect(lockedStore.getState().entry?.isConfirmed).toBe(true);
+    expect(lockedStore.getState().error).toBe('This entry has been confirmed and is locked.');
+  });
+
   it('a write that fails is reported and the stored entry is unchanged', async () => {
     const data = await seeded();
     const { form } = await open(data);
