@@ -43,7 +43,7 @@ struct CaptureRouteHost: View {
         case .disclaimers: CaptureDisclaimersView()
         case .aircraft: AircraftListView()
         case .aircraftedit:
-            if let aircraft = aircraft.first {
+            if let aircraft = aircraft.first(where: { $0.nNumber == "N172KF" }) ?? aircraft.first {
                 AircraftEditView(profile: aircraft, onSave: {}, onAddNew: { _ in aircraft })
             }
         case .pilot: PilotProfileView()
