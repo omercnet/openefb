@@ -16,6 +16,7 @@
 
 import Foundation
 import SwiftData
+import Security
 import GRDB
 
 enum CaptureSeed {
@@ -58,7 +59,11 @@ enum CaptureSeed {
         try clearRecordings(db: db, audioDirectory: audioDirectory)
         // A NOTAM credential left by -OpenEFBSeed small|full must not show in the fresh install.
         let store = KeychainStore(service: "quartermint.efb-212.faa-notam-api")
-        for account in ["client_id", "client_secret"] { try store.removeValue(forAccount: account) }
+        for account in ["client_id", "client_secret"] {
+            do { try store.removeValue(forAccount: account) } catch KeychainError.unexpectedStatus(errSecMissingEntitlement) {
+                // The unit-test host has no Keychain entitlement, so no credential can have been stored there.
+            }
+        }
         guard profile == "capture" else { try context.save(); return }
 
         for (i, n) in ["N172KF", "N28PA", "4X-ABC"].enumerated() {
