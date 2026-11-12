@@ -9,19 +9,19 @@ Source files: 177 (40795 lines). Test files: 114 (20607 lines, 1180 cases).
 
 ### By bucket
 
-| Bucket | Files | Lines | Meaning |
-|---|---|---|---|
-| portable | 43 | 7123 | imports only Foundation, GRDB, os, OSLog, Observation, Combine, SQLite3, CoreGraphics, ImageIO |
-| platform-adapter | 60 | 13604 | imports any other Apple framework (CoreLocation, SwiftData, AVFoundation, Speech, Security, ...) |
-| UI | 74 | 20068 | imports SwiftUI, UIKit, MapLibre or PDFKit |
+| Bucket           | Files | Lines | Meaning                                                                                          |
+| ---------------- | ----- | ----- | ------------------------------------------------------------------------------------------------ |
+| portable         | 43    | 7123  | imports only Foundation, GRDB, os, OSLog, Observation, Combine, SQLite3, CoreGraphics, ImageIO   |
+| platform-adapter | 60    | 13604 | imports any other Apple framework (CoreLocation, SwiftData, AVFoundation, Speech, Security, ...) |
+| UI               | 74    | 20068 | imports SwiftUI, UIKit, MapLibre or PDFKit                                                       |
 
 ### Re-verification of cross-platform.md (43 / 60 / 74 files)
 
-| Bucket | Doc files | Script files | Diff | Doc lines | Script lines | Diff |
-|---|---|---|---|---|---|---|
-| portable | 43 | 43 | 0 | 7123 | 7123 | 0 |
-| platform-adapter | 60 | 60 | 0 | 13604 | 13604 | 0 |
-| UI | 74 | 74 | 0 | 20067 | 20068 | 1 |
+| Bucket           | Doc files | Script files | Diff | Doc lines | Script lines | Diff |
+| ---------------- | --------- | ------------ | ---- | --------- | ------------ | ---- |
+| portable         | 43        | 43           | 0    | 7123      | 7123         | 0    |
+| platform-adapter | 60        | 60           | 0    | 13604     | 13604        | 0    |
+| UI               | 74        | 74           | 0    | 20067     | 20068        | 1    |
 
 Views/ holds 56 files (12246 lines). UI-bucket files outside Views/: 18 (7822 lines): ContentView.swift, Core/DesignTokens.swift, Core/DisplayMode.swift, Core/Interaction.swift, Services/AirportDiagramGeoreferencer.swift, Services/AirportDiagramOverlay.swift, Services/IsraelBriefingMapHighlight.swift, Services/IsraelChartOverlay.swift, Services/IsraelChartStyle.swift, Services/IsraelLSAOverlay.swift, Services/IsraelOfficialChartLayer.swift, Services/MapService.swift, Services/OfflineMapService.swift, Services/Recording/AudioRecorder.swift, ViewModels/FlightPlanViewModel.swift, ViewModels/IsraelFlightPlanViewModel.swift, ViewModels/MapViewModel.swift, efb_212App.swift.
 The plan (5.1) cites 175 source files; the tree holds 177 Swift files under efb-212/. The doc total 43+60+74 = 177.
@@ -31,120 +31,120 @@ Of the 60 platform-adapter files, 38 (10002 lines) are "thin": their only non-po
 
 ### By track
 
-| Track | Name | Source files | Lines | portable | platform-adapter | UI | Tests (files) | Test cases | Cases kept | Cases dropped |
-|---|---|---|---|---|---|---|---|---|---|---|
-| D | Data | 13 | 2591 | 1 | 12 | 0 | 22 | 210 | 210 | 0 |
-| L | Domain logic | 41 | 7187 | 19 | 22 | 0 | 65 | 781 | 763 | 18 |
-| M | Map | 19 | 8046 | 2 | 2 | 15 | 0 | 0 | 0 | 0 |
-| A | Adapters | 9 | 2354 | 1 | 7 | 1 | 10 | 68 | 68 | 0 |
-| U | UI | 67 | 13954 | 5 | 5 | 57 | 5 | 34 | 34 | 0 |
-| S | Services glue | 21 | 5694 | 14 | 7 | 0 | 8 | 82 | 82 | 0 |
-| none | No Phase 1 track | 7 | 969 | 1 | 5 | 1 | 4 | 5 | 0 | 5 |
+| Track | Name             | Source files | Lines | portable | platform-adapter | UI  | Tests (files) | Test cases | Cases kept | Cases dropped |
+| ----- | ---------------- | ------------ | ----- | -------- | ---------------- | --- | ------------- | ---------- | ---------- | ------------- |
+| D     | Data             | 13           | 2591  | 1        | 12               | 0   | 22            | 210        | 210        | 0             |
+| L     | Domain logic     | 41           | 7187  | 19       | 22               | 0   | 65            | 781        | 763        | 18            |
+| M     | Map              | 19           | 8046  | 2        | 2                | 15  | 0             | 0          | 0          | 0             |
+| A     | Adapters         | 9            | 2354  | 1        | 7                | 1   | 10            | 68         | 68         | 0             |
+| U     | UI               | 67           | 13954 | 5        | 5                | 57  | 5             | 34         | 34         | 0             |
+| S     | Services glue    | 21           | 5694  | 14       | 7                | 0   | 8             | 82         | 82         | 0             |
+| none  | No Phase 1 track | 7            | 969   | 1        | 5                | 1   | 4             | 5          | 0          | 5             |
 
 ### By ticket
 
-| Ticket | Scope | Source files | Lines | Covering test files (ported) | Their cases |
-|---|---|---|---|---|---|
-| A1 | location adapter | 3 | 608 | 5 | 61 |
-| A2 | audio recorder adapter | 1 | 451 | 1 | 11 |
-| A3 | speech adapter + vocabulary | 2 | 821 | 2 | 19 |
-| A4 | secret store | 1 | 83 | 0 | 0 |
-| A5 | telemetry/crash | 1 | 148 | 6 | 55 |
-| A6 | AI debrief adapter | 1 | 243 | 1 | 9 |
-| D2 | schema, migrations, repositories | 8 | 731 | 13 | 152 |
-| D4 | recording DB port | 1 | 444 | 15 | 137 |
-| D5 | aviation/Israel DB access | 4 | 1416 | 19 | 337 |
-| L1 | geometry/region/units/metar/taf | 15 | 2072 | 56 | 754 |
-| L2 | route planner, flight plan model | 1 | 125 | 4 | 87 |
-| L3 | Israel rules (route, LSA, closure, briefing, alerts) | 9 | 1938 | 14 | 276 |
-| L4 | recording logic | 6 | 1115 | 14 | 130 |
-| L5 | debrief | 5 | 1155 | 5 | 59 |
-| L6 | currency + logbook rules | 1 | 95 | 1 | 21 |
-| L7 | prediction | 3 | 382 | 5 | 67 |
-| L8 | replay engine | 1 | 305 | 1 | 20 |
-| M1 | map surface and layers | 12 | 4709 | 11 | 241 |
-| M2 | follow mode, ownship, camera | 1 | 41 | 1 | 5 |
-| M3 | offline packs | 2 | 886 | 3 | 55 |
-| M4 | airport diagram, PDF charts | 4 | 2410 | 12 | 125 |
-| S1 | data services, remote config, chart packs | 21 | 5694 | 33 | 541 |
-| U1 | tokens, primitives, display mode | 11 | 1027 | 2 | 25 |
-| U3 | flight log strip/columns | 9 | 3671 | 6 | 58 |
-| U4 | search/nearest/weather/briefing/planning sheets | 22 | 4131 | 14 | 198 |
-| U5 | app shell, iPhone layout | 1 | 69 | 0 | 0 |
-| U7 | settings, profiles, logbook, onboarding | 13 | 2410 | 3 | 22 |
-| U8 | recording, replay, debrief UI | 11 | 2646 | 3 | 32 |
+| Ticket | Scope                                                | Source files | Lines | Covering test files (ported) | Their cases |
+| ------ | ---------------------------------------------------- | ------------ | ----- | ---------------------------- | ----------- |
+| A1     | location adapter                                     | 3            | 608   | 5                            | 61          |
+| A2     | audio recorder adapter                               | 1            | 451   | 1                            | 11          |
+| A3     | speech adapter + vocabulary                          | 2            | 821   | 2                            | 19          |
+| A4     | secret store                                         | 1            | 83    | 0                            | 0           |
+| A5     | telemetry/crash                                      | 1            | 148   | 6                            | 55          |
+| A6     | AI debrief adapter                                   | 1            | 243   | 1                            | 9           |
+| D2     | schema, migrations, repositories                     | 8            | 731   | 13                           | 152         |
+| D4     | recording DB port                                    | 1            | 444   | 15                           | 137         |
+| D5     | aviation/Israel DB access                            | 4            | 1416  | 19                           | 337         |
+| L1     | geometry/region/units/metar/taf                      | 15           | 2072  | 56                           | 754         |
+| L2     | route planner, flight plan model                     | 1            | 125   | 4                            | 87          |
+| L3     | Israel rules (route, LSA, closure, briefing, alerts) | 9            | 1938  | 14                           | 276         |
+| L4     | recording logic                                      | 6            | 1115  | 14                           | 130         |
+| L5     | debrief                                              | 5            | 1155  | 5                            | 59          |
+| L6     | currency + logbook rules                             | 1            | 95    | 1                            | 21          |
+| L7     | prediction                                           | 3            | 382   | 5                            | 67          |
+| L8     | replay engine                                        | 1            | 305   | 1                            | 20          |
+| M1     | map surface and layers                               | 12           | 4709  | 11                           | 241         |
+| M2     | follow mode, ownship, camera                         | 1            | 41    | 1                            | 5           |
+| M3     | offline packs                                        | 2            | 886   | 3                            | 55          |
+| M4     | airport diagram, PDF charts                          | 4            | 2410  | 12                           | 125         |
+| S1     | data services, remote config, chart packs            | 21           | 5694  | 33                           | 541         |
+| U1     | tokens, primitives, display mode                     | 11           | 1027  | 2                            | 25          |
+| U3     | flight log strip/columns                             | 9            | 3671  | 6                            | 58          |
+| U4     | search/nearest/weather/briefing/planning sheets      | 22           | 4131  | 14                           | 198         |
+| U5     | app shell, iPhone layout                             | 1            | 69    | 0                            | 0           |
+| U7     | settings, profiles, logbook, onboarding              | 13           | 2410  | 3                            | 22          |
+| U8     | recording, replay, debrief UI                        | 11           | 2646  | 3                            | 32          |
 
 Per-ticket test counts overlap: a test file covering several tickets is counted under each. Per-track counts above assign each test file to exactly one track, so they sum to the total.
 
 ### Tests by directory
 
-| Directory | Files | Cases | Kept | Dropped |
-|---|---|---|---|---|
-| (root) | 2 | 6 | 1 | 5 |
-| CharacterizationTests | 9 | 99 | 99 | 0 |
-| DataTests | 15 | 150 | 150 | 0 |
-| IntegrationTests | 2 | 17 | 17 | 0 |
-| Mocks | 17 | 0 | 0 | 0 |
-| ServiceTests | 53 | 774 | 774 | 0 |
-| Simulation | 2 | 9 | 0 | 9 |
-| ViewModelTests | 14 | 125 | 116 | 9 |
+| Directory             | Files | Cases | Kept | Dropped |
+| --------------------- | ----- | ----- | ---- | ------- |
+| (root)                | 2     | 6     | 1    | 5       |
+| CharacterizationTests | 9     | 99    | 99   | 0       |
+| DataTests             | 15    | 150   | 150  | 0       |
+| IntegrationTests      | 2     | 17    | 17   | 0       |
+| Mocks                 | 17    | 0     | 0    | 0       |
+| ServiceTests          | 53    | 774   | 774  | 0       |
+| Simulation            | 2     | 9     | 0    | 9       |
+| ViewModelTests        | 14    | 125   | 116  | 9       |
 
 Cases that become TypeScript characterisation tests: 1157 of 1180 (plan 5.2 expects 700 to 900 of about 1,100; the automated drop rules are conservative and flag only whole-file and name-matched cases, so the real ratio needs a per-case review pass by each track owner). Cases counted: one per `@Test` or `func test*`; parameterised cases count once.
 
 ## Files that fit no Phase 1 track
 
-| File | Bucket | Lines | Reason |
-|---|---|---|---|
-| Core/AppState.swift | platform-adapter | 218 | app state/navigation/DI spine: Phase 0 (F), not a Phase 1 track |
-| Core/Extensions/AppState+Navigation.swift | platform-adapter | 96 | app state/navigation/DI spine: Phase 0 (F), not a Phase 1 track |
-| Core/Protocols.swift | platform-adapter | 188 | app state/navigation/DI spine: Phase 0 (F), not a Phase 1 track |
-| Services/Simulation/FlightScenario.swift | platform-adapter | 179 | scenario sims (plan 5.3), no Phase 1 ticket |
-| Services/Simulation/ScenarioPlayback.swift | platform-adapter | 187 | scenario sims (plan 5.3), no Phase 1 ticket |
-| Services/Simulation/ScreenCaptureHooks.swift | portable | 56 | scenario sims (plan 5.3), no Phase 1 ticket |
-| efb_212App.swift | UI | 45 | app entry point and composition root: Phase 0 (F) |
+| File                                         | Bucket           | Lines | Reason                                                          |
+| -------------------------------------------- | ---------------- | ----- | --------------------------------------------------------------- |
+| Core/AppState.swift                          | platform-adapter | 218   | app state/navigation/DI spine: Phase 0 (F), not a Phase 1 track |
+| Core/Extensions/AppState+Navigation.swift    | platform-adapter | 96    | app state/navigation/DI spine: Phase 0 (F), not a Phase 1 track |
+| Core/Protocols.swift                         | platform-adapter | 188   | app state/navigation/DI spine: Phase 0 (F), not a Phase 1 track |
+| Services/Simulation/FlightScenario.swift     | platform-adapter | 179   | scenario sims (plan 5.3), no Phase 1 ticket                     |
+| Services/Simulation/ScenarioPlayback.swift   | platform-adapter | 187   | scenario sims (plan 5.3), no Phase 1 ticket                     |
+| Services/Simulation/ScreenCaptureHooks.swift | portable         | 56    | scenario sims (plan 5.3), no Phase 1 ticket                     |
+| efb_212App.swift                             | UI               | 45    | app entry point and composition root: Phase 0 (F)               |
 
 ## Tests proposed for dropping
 
 Whole files:
 
-| Test file | Cases | Reason |
-|---|---|---|
-| Mocks/MockAirSigmetService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockAudioRecorder.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockDatabaseManager.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockIsraelAviationDatabase.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockIsraelNotamService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockLocationManager.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockNetworkManager.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockNotamService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockPirepService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockRecordingDatabase.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockRemoteConfigService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockTFRService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockTerminalProcedureService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockTranscriptionService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockWeatherService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/MockWindsAloftService.swift | 0 | test double, replaced by a TS fake |
-| Mocks/StubURLProtocol.swift | 0 | test double, replaced by a TS fake |
-| PrivacyManifestTests.swift | 5 | replaced by an app.config.ts privacy manifest assertion |
-| Simulation/ScenarioFlightTests.swift | 9 | scenario harness, replaced by scenario sims (plan 5.3) |
-| Simulation/ScenarioRun.swift | 0 | scenario harness, replaced by scenario sims (plan 5.3) |
-| ViewModelTests/FlightLogNextTests.swift | 5 | covers only SwiftUI view types under Views/ |
+| Test file                                | Cases | Reason                                                  |
+| ---------------------------------------- | ----- | ------------------------------------------------------- |
+| Mocks/MockAirSigmetService.swift         | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockAudioRecorder.swift            | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockDatabaseManager.swift          | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockIsraelAviationDatabase.swift   | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockIsraelNotamService.swift       | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockLocationManager.swift          | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockNetworkManager.swift           | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockNotamService.swift             | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockPirepService.swift             | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockRecordingDatabase.swift        | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockRemoteConfigService.swift      | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockTFRService.swift               | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockTerminalProcedureService.swift | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockTranscriptionService.swift     | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockWeatherService.swift           | 0     | test double, replaced by a TS fake                      |
+| Mocks/MockWindsAloftService.swift        | 0     | test double, replaced by a TS fake                      |
+| Mocks/StubURLProtocol.swift              | 0     | test double, replaced by a TS fake                      |
+| PrivacyManifestTests.swift               | 5     | replaced by an app.config.ts privacy manifest assertion |
+| Simulation/ScenarioFlightTests.swift     | 9     | scenario harness, replaced by scenario sims (plan 5.3)  |
+| Simulation/ScenarioRun.swift             | 0     | scenario harness, replaced by scenario sims (plan 5.3)  |
+| ViewModelTests/FlightLogNextTests.swift  | 5     | covers only SwiftUI view types under Views/             |
 
 Review (no source type referenced, so no track could be proposed; kept until a human decides):
 
-| Test file | Cases |
-|---|---|
-| efb_212Tests.swift | 1 |
+| Test file          | Cases |
+| ------------------ | ----- |
+| efb_212Tests.swift | 1     |
 
 Individual cases (selected by name; review before dropping):
 
-| Test file:line | Case | Reason |
-|---|---|---|
-| ViewModelTests/IsraelNearestAndSearchTests.swift:267 | frequencyRolesFollowTheAIPWording | asserts UI wording, not a domain decision |
+| Test file:line                                       | Case                                                | Reason                                    |
+| ---------------------------------------------------- | --------------------------------------------------- | ----------------------------------------- |
+| ViewModelTests/IsraelNearestAndSearchTests.swift:267 | frequencyRolesFollowTheAIPWording                   | asserts UI wording, not a domain decision |
 | ViewModelTests/IsraelNearestAndSearchTests.swift:285 | runwayTextShowsMetresFeetSurfaceAndHeadingReference | asserts UI wording, not a domain decision |
-| ViewModelTests/PredictionRowsTests.swift:137 | spokenTitleOnlyNamesAirspaceClasses | asserts UI wording, not a domain decision |
-| ViewModelTests/WeatherRefreshFailureTests.swift:113 | readsTheEndOfTheValidPeriodFromTheTafText | asserts UI wording, not a domain decision |
+| ViewModelTests/PredictionRowsTests.swift:137         | spokenTitleOnlyNamesAirspaceClasses                 | asserts UI wording, not a domain decision |
+| ViewModelTests/WeatherRefreshFailureTests.swift:113  | readsTheEndOfTheValidPeriodFromTheTafText           | asserts UI wording, not a domain decision |
 
 ## Test cases per track (to be translated to TypeScript)
 
@@ -152,87 +152,87 @@ Files are assigned to the track with the most covered non-UI source files; ties 
 
 ### D Data (210 cases)
 
-| Test file | Cases | Dropped | Covers |
-|---|---|---|---|
-| CharacterizationTests/AviationDatabaseInstallCharacterizationTests.swift | 10 | 0 | AviationDatabase |
-| CharacterizationTests/RecordingDatabaseChainMigrationCharacterizationTests.swift | 5 | 0 | RecordingDatabase |
-| CharacterizationTests/SwiftDataMigrationCharacterizationTests.swift | 9 | 0 | AircraftProfile, FlightPlanRecord, FlightRecord, LogbookEntry |
-| DataTests/AviationDatabaseRobustnessTests.swift | 16 | 0 | AviationDatabase, DatabaseManager |
-| DataTests/BundledAviationDataTests.swift | 3 | 0 | AviationDatabase |
-| DataTests/IsraelAerodromeDatabaseTests.swift | 16 | 0 | IsraelAviationDatabase, IsraelAviationModels |
-| DataTests/IsraelLSADatabaseTests.swift | 7 | 0 | IsraelAviationDatabase, IsraelAviationModels |
-| DataTests/LogbookEntryTests.swift | 10 | 0 | LogbookEntry, UserSettings |
-| DataTests/ProfileModelTests.swift | 9 | 0 | AircraftProfile, FlightPlanRecord, PilotProfile, UserSettings |
-| DataTests/RecordingDatabaseMigrationTests.swift | 3 | 0 | RecordingDatabase |
-| ServiceTests/AutoStartTests.swift | 6 | 0 | RecordingDatabase |
-| ServiceTests/DebriefSchemaTests.swift | 6 | 0 | RecordingDatabase |
-| ServiceTests/FlightPersistenceTests.swift | 3 | 0 | FlightRecord, LogbookEntry, UserSettings, RecordingDatabase |
-| ServiceTests/FlightRecoveryTests.swift | 5 | 0 | FlightRecord, LogbookEntry, UserSettings, RecordingDatabase |
-| ServiceTests/IsraelLSAPlannerTests.swift | 25 | 0 | IsraelAviationDatabase, IsraelAviationModels, AircraftProfile, PilotProfile |
-| ServiceTests/IsraelNotamClosureMapperTests.swift | 9 | 0 | IsraelAviationDatabase |
-| ServiceTests/ReplayEngineTests.swift | 20 | 0 | IsraelAviationDatabase, RecordingDatabase |
-| ViewModelTests/FlightPlanViewModelTests.swift | 24 | 0 | DatabaseManager, AircraftProfile, FlightPlanRecord, UserSettings |
-| ViewModelTests/FlownEntryActionTests.swift | 5 | 0 | LogbookEntry, UserSettings |
-| ViewModelTests/IsraelFlightPlanViewModelTests.swift | 8 | 0 | IsraelAviationModels, AircraftProfile, PilotProfile, UserSettings |
-| ViewModelTests/LogbookViewModelTests.swift | 11 | 0 | LogbookEntry, PilotProfile, UserSettings |
+| Test file                                                                        | Cases | Dropped | Covers                                                                      |
+| -------------------------------------------------------------------------------- | ----- | ------- | --------------------------------------------------------------------------- |
+| CharacterizationTests/AviationDatabaseInstallCharacterizationTests.swift         | 10    | 0       | AviationDatabase                                                            |
+| CharacterizationTests/RecordingDatabaseChainMigrationCharacterizationTests.swift | 5     | 0       | RecordingDatabase                                                           |
+| CharacterizationTests/SwiftDataMigrationCharacterizationTests.swift              | 9     | 0       | AircraftProfile, FlightPlanRecord, FlightRecord, LogbookEntry               |
+| DataTests/AviationDatabaseRobustnessTests.swift                                  | 16    | 0       | AviationDatabase, DatabaseManager                                           |
+| DataTests/BundledAviationDataTests.swift                                         | 3     | 0       | AviationDatabase                                                            |
+| DataTests/IsraelAerodromeDatabaseTests.swift                                     | 16    | 0       | IsraelAviationDatabase, IsraelAviationModels                                |
+| DataTests/IsraelLSADatabaseTests.swift                                           | 7     | 0       | IsraelAviationDatabase, IsraelAviationModels                                |
+| DataTests/LogbookEntryTests.swift                                                | 10    | 0       | LogbookEntry, UserSettings                                                  |
+| DataTests/ProfileModelTests.swift                                                | 9     | 0       | AircraftProfile, FlightPlanRecord, PilotProfile, UserSettings               |
+| DataTests/RecordingDatabaseMigrationTests.swift                                  | 3     | 0       | RecordingDatabase                                                           |
+| ServiceTests/AutoStartTests.swift                                                | 6     | 0       | RecordingDatabase                                                           |
+| ServiceTests/DebriefSchemaTests.swift                                            | 6     | 0       | RecordingDatabase                                                           |
+| ServiceTests/FlightPersistenceTests.swift                                        | 3     | 0       | FlightRecord, LogbookEntry, UserSettings, RecordingDatabase                 |
+| ServiceTests/FlightRecoveryTests.swift                                           | 5     | 0       | FlightRecord, LogbookEntry, UserSettings, RecordingDatabase                 |
+| ServiceTests/IsraelLSAPlannerTests.swift                                         | 25    | 0       | IsraelAviationDatabase, IsraelAviationModels, AircraftProfile, PilotProfile |
+| ServiceTests/IsraelNotamClosureMapperTests.swift                                 | 9     | 0       | IsraelAviationDatabase                                                      |
+| ServiceTests/ReplayEngineTests.swift                                             | 20    | 0       | IsraelAviationDatabase, RecordingDatabase                                   |
+| ViewModelTests/FlightPlanViewModelTests.swift                                    | 24    | 0       | DatabaseManager, AircraftProfile, FlightPlanRecord, UserSettings            |
+| ViewModelTests/FlownEntryActionTests.swift                                       | 5     | 0       | LogbookEntry, UserSettings                                                  |
+| ViewModelTests/IsraelFlightPlanViewModelTests.swift                              | 8     | 0       | IsraelAviationModels, AircraftProfile, PilotProfile, UserSettings           |
+| ViewModelTests/LogbookViewModelTests.swift                                       | 11    | 0       | LogbookEntry, PilotProfile, UserSettings                                    |
 
 ### L Domain logic (763 cases)
 
-| Test file | Cases | Dropped | Covers |
-|---|---|---|---|
-| CharacterizationTests/DataFreshnessEdgeCharacterizationTests.swift | 17 | 0 | DataFreshness |
-| CharacterizationTests/FlightPersistenceStopPathCharacterizationTests.swift | 8 | 0 | AviationModels, Types, DebriefTypes, FlightPersistenceService |
-| CharacterizationTests/RecordingStopPathCharacterizationTests.swift | 8 | 0 | Types, RecordingCoordinator |
-| DataTests/AviationDatabaseTests.swift | 13 | 0 | AviationModels, Types |
-| DataTests/AviationModelTests.swift | 24 | 0 | AviationModels, Types |
-| DataTests/BundledAirportQueriesTests.swift | 10 | 0 | AviationModels, Types, LandableAirportFilter |
-| DataTests/EFBErrorTests.swift | 5 | 0 | AviationModels, EFBError |
-| DataTests/IsraelAviationDatabaseTests.swift | 21 | 0 | AviationModels, EFBError, Region, IsraelNotamClosureMapper |
-| DataTests/OverlayStalenessTests.swift | 4 | 0 | OverlayStaleness |
-| DataTests/TileFailureTrackerTests.swift | 3 | 0 | TileFailureTracker |
-| IntegrationTests/CrossCountryFlowTests.swift | 4 | 0 | AviationModels, Types |
-| IntegrationTests/MapLoadingFlowTests.swift | 13 | 0 | AviationModels, EFBError |
-| ServiceTests/AirportDiagramGeoreferencerTests.swift | 11 | 0 | AviationModels |
-| ServiceTests/AirportDiagramVectorScanTests.swift | 4 | 0 | AviationModels |
-| ServiceTests/AirspacePredictorTests.swift | 16 | 0 | IsraelAlertEvaluator, AirspacePredictor, PredictedEvent |
-| ServiceTests/AudioRecorderTests.swift | 11 | 0 | Types, RecordingCoordinator |
-| ServiceTests/CVFRDebriefTests.swift | 34 | 0 | CVFRDebrief, CVFRDebriefLoader, DebriefTypes, FlightSummaryBuilder |
-| ServiceTests/CurrencyServiceTests.swift | 21 | 0 | CurrencyService |
-| ServiceTests/DataFreshnessTests.swift | 13 | 0 | DataFreshness |
-| ServiceTests/FlightPhaseDetectorTests.swift | 12 | 0 | Types, FlightPhaseDetector, RecordingCoordinator, VerticalSpeedEstimator |
-| ServiceTests/FlightSummaryBuilderTests.swift | 6 | 0 | AviationModels, Types, DebriefTypes, FlightSummaryBuilder |
-| ServiceTests/IsraelAlertTests.swift | 37 | 0 | ActiveRoute, AviationModels, Region, IsraelAlertEvaluator |
-| ServiceTests/IsraelBriefingFilterTests.swift | 20 | 0 | IsraelBriefingFilter |
-| ServiceTests/IsraelChartFeaturesTests.swift | 38 | 0 | AviationModels, Region, Types |
-| ServiceTests/IsraelFlightPlanMessageTests.swift | 16 | 0 | IsraelFlightPlanMessage, IsraelRoutePlanner |
-| ServiceTests/IsraelNotamServiceTests.swift | 23 | 0 | EFBError |
-| ServiceTests/IsraelRouteFollowingTests.swift | 19 | 0 | ActiveRoute, IsraelRouteFollowing |
-| ServiceTests/IsraelRoutePlannerTests.swift | 24 | 0 | IsraelFlightPlanMessage, IsraelNotamClosureMapper, IsraelRoutePlanner |
-| ServiceTests/LandableAirportFilterTests.swift | 16 | 0 | AviationModels, Types, LandableAirportFilter |
-| ServiceTests/LiveNavigationProgressTests.swift | 7 | 0 | ActiveRoute |
-| ServiceTests/MapGPSRecordingFixesTests.swift | 22 | 0 | Types, AutoStartGate, FlightPhaseDetector, RecordingCoordinator |
-| ServiceTests/MapQueryRegionTests.swift | 17 | 0 | AviationModels, Region, Types |
-| ServiceTests/MetarVisibilityTests.swift | 8 | 0 | MetarVisibility |
-| ServiceTests/NotamServiceTests.swift | 14 | 0 | AviationModels |
-| ServiceTests/OfflineMapTests.swift | 20 | 0 | EFBError |
-| ServiceTests/PirepServiceTests.swift | 19 | 0 | EFBError |
-| ServiceTests/PredictionServiceTests.swift | 14 | 0 | AviationModels, Types, IsraelAlertEvaluator, AirspacePredictor |
-| ServiceTests/ProximityAlertAltitudeTests.swift | 10 | 0 | AviationModels, EFBError, Types |
-| ServiceTests/RecordingCoordinatorTests.swift | 11 | 0 | EFBError, RecordingCoordinator |
-| ServiceTests/RegionTests.swift | 19 | 0 | Region, RegionStore, Types, PredictedEvent |
-| ServiceTests/TFRServiceTests.swift | 20 | 0 | AviationModels, PolygonGeometry, Types |
-| ServiceTests/TerminalProcedureServiceTests.swift | 15 | 0 | AviationModels, EFBError, RecordingCoordinator |
-| ServiceTests/VerticalSpeedEstimatorTests.swift | 6 | 0 | VerticalSpeedEstimator |
-| ServiceTests/WeatherParsingTests.swift | 5 | 0 | PredictedEvent |
-| ServiceTests/WeatherServiceTests.swift | 21 | 0 | AviationModels, EFBError, Types |
-| ServiceTests/WindsAloftServiceTests.swift | 21 | 0 | EFBError |
-| ViewModelTests/IsraelBriefingViewModelTests.swift | 12 | 0 | EFBError, IsraelBriefingFilter |
-| ViewModelTests/IsraelDiagramSettingsSummaryTests.swift | 1 | 0 | Region |
-| ViewModelTests/IsraelNearestAndSearchTests.swift | 18 | 2 | Region, IsraelAerodromeAdapter, LandableAirportFilter |
-| ViewModelTests/MapViewModelTests.swift | 4 | 0 | AviationModels |
-| ViewModelTests/NearestAirportViewModelTests.swift | 6 | 0 | AviationModels |
-| ViewModelTests/PredictionRowsTests.swift | 14 | 1 | IsraelAlertEvaluator, PredictedEvent |
-| ViewModelTests/WeatherRefreshFailureTests.swift | 12 | 1 | AviationModels, TAFValidity |
+| Test file                                                                  | Cases | Dropped | Covers                                                                   |
+| -------------------------------------------------------------------------- | ----- | ------- | ------------------------------------------------------------------------ |
+| CharacterizationTests/DataFreshnessEdgeCharacterizationTests.swift         | 17    | 0       | DataFreshness                                                            |
+| CharacterizationTests/FlightPersistenceStopPathCharacterizationTests.swift | 8     | 0       | AviationModels, Types, DebriefTypes, FlightPersistenceService            |
+| CharacterizationTests/RecordingStopPathCharacterizationTests.swift         | 8     | 0       | Types, RecordingCoordinator                                              |
+| DataTests/AviationDatabaseTests.swift                                      | 13    | 0       | AviationModels, Types                                                    |
+| DataTests/AviationModelTests.swift                                         | 24    | 0       | AviationModels, Types                                                    |
+| DataTests/BundledAirportQueriesTests.swift                                 | 10    | 0       | AviationModels, Types, LandableAirportFilter                             |
+| DataTests/EFBErrorTests.swift                                              | 5     | 0       | AviationModels, EFBError                                                 |
+| DataTests/IsraelAviationDatabaseTests.swift                                | 21    | 0       | AviationModels, EFBError, Region, IsraelNotamClosureMapper               |
+| DataTests/OverlayStalenessTests.swift                                      | 4     | 0       | OverlayStaleness                                                         |
+| DataTests/TileFailureTrackerTests.swift                                    | 3     | 0       | TileFailureTracker                                                       |
+| IntegrationTests/CrossCountryFlowTests.swift                               | 4     | 0       | AviationModels, Types                                                    |
+| IntegrationTests/MapLoadingFlowTests.swift                                 | 13    | 0       | AviationModels, EFBError                                                 |
+| ServiceTests/AirportDiagramGeoreferencerTests.swift                        | 11    | 0       | AviationModels                                                           |
+| ServiceTests/AirportDiagramVectorScanTests.swift                           | 4     | 0       | AviationModels                                                           |
+| ServiceTests/AirspacePredictorTests.swift                                  | 16    | 0       | IsraelAlertEvaluator, AirspacePredictor, PredictedEvent                  |
+| ServiceTests/AudioRecorderTests.swift                                      | 11    | 0       | Types, RecordingCoordinator                                              |
+| ServiceTests/CVFRDebriefTests.swift                                        | 34    | 0       | CVFRDebrief, CVFRDebriefLoader, DebriefTypes, FlightSummaryBuilder       |
+| ServiceTests/CurrencyServiceTests.swift                                    | 21    | 0       | CurrencyService                                                          |
+| ServiceTests/DataFreshnessTests.swift                                      | 13    | 0       | DataFreshness                                                            |
+| ServiceTests/FlightPhaseDetectorTests.swift                                | 12    | 0       | Types, FlightPhaseDetector, RecordingCoordinator, VerticalSpeedEstimator |
+| ServiceTests/FlightSummaryBuilderTests.swift                               | 6     | 0       | AviationModels, Types, DebriefTypes, FlightSummaryBuilder                |
+| ServiceTests/IsraelAlertTests.swift                                        | 37    | 0       | ActiveRoute, AviationModels, Region, IsraelAlertEvaluator                |
+| ServiceTests/IsraelBriefingFilterTests.swift                               | 20    | 0       | IsraelBriefingFilter                                                     |
+| ServiceTests/IsraelChartFeaturesTests.swift                                | 38    | 0       | AviationModels, Region, Types                                            |
+| ServiceTests/IsraelFlightPlanMessageTests.swift                            | 16    | 0       | IsraelFlightPlanMessage, IsraelRoutePlanner                              |
+| ServiceTests/IsraelNotamServiceTests.swift                                 | 23    | 0       | EFBError                                                                 |
+| ServiceTests/IsraelRouteFollowingTests.swift                               | 19    | 0       | ActiveRoute, IsraelRouteFollowing                                        |
+| ServiceTests/IsraelRoutePlannerTests.swift                                 | 24    | 0       | IsraelFlightPlanMessage, IsraelNotamClosureMapper, IsraelRoutePlanner    |
+| ServiceTests/LandableAirportFilterTests.swift                              | 16    | 0       | AviationModels, Types, LandableAirportFilter                             |
+| ServiceTests/LiveNavigationProgressTests.swift                             | 7     | 0       | ActiveRoute                                                              |
+| ServiceTests/MapGPSRecordingFixesTests.swift                               | 22    | 0       | Types, AutoStartGate, FlightPhaseDetector, RecordingCoordinator          |
+| ServiceTests/MapQueryRegionTests.swift                                     | 17    | 0       | AviationModels, Region, Types                                            |
+| ServiceTests/MetarVisibilityTests.swift                                    | 8     | 0       | MetarVisibility                                                          |
+| ServiceTests/NotamServiceTests.swift                                       | 14    | 0       | AviationModels                                                           |
+| ServiceTests/OfflineMapTests.swift                                         | 20    | 0       | EFBError                                                                 |
+| ServiceTests/PirepServiceTests.swift                                       | 19    | 0       | EFBError                                                                 |
+| ServiceTests/PredictionServiceTests.swift                                  | 14    | 0       | AviationModels, Types, IsraelAlertEvaluator, AirspacePredictor           |
+| ServiceTests/ProximityAlertAltitudeTests.swift                             | 10    | 0       | AviationModels, EFBError, Types                                          |
+| ServiceTests/RecordingCoordinatorTests.swift                               | 11    | 0       | EFBError, RecordingCoordinator                                           |
+| ServiceTests/RegionTests.swift                                             | 19    | 0       | Region, RegionStore, Types, PredictedEvent                               |
+| ServiceTests/TFRServiceTests.swift                                         | 20    | 0       | AviationModels, PolygonGeometry, Types                                   |
+| ServiceTests/TerminalProcedureServiceTests.swift                           | 15    | 0       | AviationModels, EFBError, RecordingCoordinator                           |
+| ServiceTests/VerticalSpeedEstimatorTests.swift                             | 6     | 0       | VerticalSpeedEstimator                                                   |
+| ServiceTests/WeatherParsingTests.swift                                     | 5     | 0       | PredictedEvent                                                           |
+| ServiceTests/WeatherServiceTests.swift                                     | 21    | 0       | AviationModels, EFBError, Types                                          |
+| ServiceTests/WindsAloftServiceTests.swift                                  | 21    | 0       | EFBError                                                                 |
+| ViewModelTests/IsraelBriefingViewModelTests.swift                          | 12    | 0       | EFBError, IsraelBriefingFilter                                           |
+| ViewModelTests/IsraelDiagramSettingsSummaryTests.swift                     | 1     | 0       | Region                                                                   |
+| ViewModelTests/IsraelNearestAndSearchTests.swift                           | 18    | 2       | Region, IsraelAerodromeAdapter, LandableAirportFilter                    |
+| ViewModelTests/MapViewModelTests.swift                                     | 4     | 0       | AviationModels                                                           |
+| ViewModelTests/NearestAirportViewModelTests.swift                          | 6     | 0       | AviationModels                                                           |
+| ViewModelTests/PredictionRowsTests.swift                                   | 14    | 1       | IsraelAlertEvaluator, PredictedEvent                                     |
+| ViewModelTests/WeatherRefreshFailureTests.swift                            | 12    | 1       | AviationModels, TAFValidity                                              |
 
 ### M Map (0 cases)
 
@@ -240,37 +240,37 @@ None.
 
 ### A Adapters (68 cases)
 
-| Test file | Cases | Dropped | Covers |
-|---|---|---|---|
-| CharacterizationTests/LocationServiceCharacterizationTests.swift | 15 | 0 | GPSStatus, LocationService |
-| ServiceTests/AviationVocabularyTests.swift | 11 | 0 | AviationVocabulary |
-| ServiceTests/DebriefAvailabilityTests.swift | 9 | 0 | DebriefEngine |
-| ServiceTests/FollowModeStateTests.swift | 5 | 0 | TelemetryService |
-| ServiceTests/GPSStatusTests.swift | 14 | 0 | GPSStatus |
-| ServiceTests/TelemetryTests.swift | 4 | 0 | TelemetryService |
-| ServiceTests/TrackRecorderTests.swift | 2 | 0 | TrackRecorder |
-| ServiceTests/TranscriptionServiceTests.swift | 8 | 0 | AviationVocabulary, TranscriptionService, TelemetryService |
+| Test file                                                        | Cases | Dropped | Covers                                                     |
+| ---------------------------------------------------------------- | ----- | ------- | ---------------------------------------------------------- |
+| CharacterizationTests/LocationServiceCharacterizationTests.swift | 15    | 0       | GPSStatus, LocationService                                 |
+| ServiceTests/AviationVocabularyTests.swift                       | 11    | 0       | AviationVocabulary                                         |
+| ServiceTests/DebriefAvailabilityTests.swift                      | 9     | 0       | DebriefEngine                                              |
+| ServiceTests/FollowModeStateTests.swift                          | 5     | 0       | TelemetryService                                           |
+| ServiceTests/GPSStatusTests.swift                                | 14    | 0       | GPSStatus                                                  |
+| ServiceTests/TelemetryTests.swift                                | 4     | 0       | TelemetryService                                           |
+| ServiceTests/TrackRecorderTests.swift                            | 2     | 0       | TrackRecorder                                              |
+| ServiceTests/TranscriptionServiceTests.swift                     | 8     | 0       | AviationVocabulary, TranscriptionService, TelemetryService |
 
 ### U UI (34 cases)
 
-| Test file | Cases | Dropped | Covers |
-|---|---|---|---|
-| CharacterizationTests/OfflinePackStatusCharacterizationTests.swift | 20 | 0 |  |
-| ServiceTests/DisplayModeResolverTests.swift | 8 | 0 | DisplayMode |
-| ViewModelTests/RecordingProblemSeverityTests.swift | 2 | 0 | RecordingViewModel |
-| ViewModelTests/ZoomStepperTests.swift | 3 | 0 | FlightLogFooter |
-| efb_212Tests.swift | 1 | 0 |  |
+| Test file                                                          | Cases | Dropped | Covers             |
+| ------------------------------------------------------------------ | ----- | ------- | ------------------ |
+| CharacterizationTests/OfflinePackStatusCharacterizationTests.swift | 20    | 0       |                    |
+| ServiceTests/DisplayModeResolverTests.swift                        | 8     | 0       | DisplayMode        |
+| ViewModelTests/RecordingProblemSeverityTests.swift                 | 2     | 0       | RecordingViewModel |
+| ViewModelTests/ZoomStepperTests.swift                              | 3     | 0       | FlightLogFooter    |
+| efb_212Tests.swift                                                 | 1     | 0       |                    |
 
 ### S Services glue (82 cases)
 
-| Test file | Cases | Dropped | Covers |
-|---|---|---|---|
-| CharacterizationTests/WeatherCacheClockCharacterizationTests.swift | 7 | 0 | WeatherService |
-| DataTests/DataRefreshSchedulerTests.swift | 6 | 0 | DataRefreshScheduler |
-| ServiceTests/AirSigmetServiceTests.swift | 12 | 0 | AirSigmetService |
-| ServiceTests/IsraelAirportDiagramTests.swift | 12 | 0 | IsraelChartManifest, IsraelChartService, IsraelDiagramPack, TerminalProcedureService |
-| ServiceTests/IsraelChartServiceTests.swift | 18 | 0 | IsraelChartManifest, IsraelChartService |
-| ServiceTests/RemoteConfigTests.swift | 27 | 0 | RemoteConfig, RemoteConfigService, RemoteConfigStore |
+| Test file                                                          | Cases | Dropped | Covers                                                                               |
+| ------------------------------------------------------------------ | ----- | ------- | ------------------------------------------------------------------------------------ |
+| CharacterizationTests/WeatherCacheClockCharacterizationTests.swift | 7     | 0       | WeatherService                                                                       |
+| DataTests/DataRefreshSchedulerTests.swift                          | 6     | 0       | DataRefreshScheduler                                                                 |
+| ServiceTests/AirSigmetServiceTests.swift                           | 12    | 0       | AirSigmetService                                                                     |
+| ServiceTests/IsraelAirportDiagramTests.swift                       | 12    | 0       | IsraelChartManifest, IsraelChartService, IsraelDiagramPack, TerminalProcedureService |
+| ServiceTests/IsraelChartServiceTests.swift                         | 18    | 0       | IsraelChartManifest, IsraelChartService                                              |
+| ServiceTests/RemoteConfigTests.swift                               | 27    | 0       | RemoteConfig, RemoteConfigService, RemoteConfigStore                                 |
 
 ### No track (0 cases)
 
@@ -280,304 +280,304 @@ None.
 
 Columns: layer, bucket, lines, track/ticket, imports (CoreLocation marked "coord" when it is the only non-portable import), covering tests.
 
-| File | Layer | Bucket | Lines | Track | Ticket | Imports | Tests |
-|---|---|---|---|---|---|---|---|
-| ContentView.swift | App | UI | 69 | U | U5 | SwiftData, SwiftUI | - |
-| Core/ActiveRoute.swift | Core | platform-adapter | 125 | L | L2 | CoreLocation, Foundation | IsraelAlertTests, IsraelRouteFollowingTests, LiveNavigationProgressTests +2 |
-| Core/AppState.swift | Core | platform-adapter | 218 | - | - | CoreLocation, Observation | LocationServiceCharacterizationTests, AviationDatabaseRobustnessTests, MapLoadingFlowTests +14 |
-| Core/AviationModels.swift | Core | platform-adapter | 510 | L | L1 | CoreLocation, Foundation | FlightPersistenceStopPathCharacterizationTests, AviationDatabaseTests, AviationModelTests +30 |
-| Core/DataFreshness.swift | Core | portable | 154 | L | L1 | Foundation | DataFreshnessEdgeCharacterizationTests, DataFreshnessTests |
-| Core/DataRefreshScheduler.swift | Core | portable | 62 | S | S1 | Foundation | DataRefreshSchedulerTests |
-| Core/DesignTokens.swift | Core | UI | 366 | U | U1 | SwiftUI | MapQueryRegionTests |
-| Core/Disclaimers.swift | Core | portable | 49 | U | U7 | Foundation | - |
-| Core/DisplayMode.swift | Core | UI | 134 | U | U1 | CoreLocation, Foundation, SwiftUI | DisplayModeResolverTests |
-| Core/EFBError.swift | Core | portable | 220 | L | L1 | Foundation | AviationDatabaseInstallCharacterizationTests, AviationDatabaseRobustnessTests, EFBErrorTests +21 |
-| Core/Extensions/AppState+Navigation.swift | Core | platform-adapter | 96 | - | - | CoreLocation, Foundation | - |
-| Core/Extensions/CLLocation+Aviation.swift | Core | platform-adapter | 68 | L | L1 | CoreLocation | - |
-| Core/Extensions/CLLocationCoordinate2D+GreatCircle.swift | Core | platform-adapter | 63 | L | L1 | CoreLocation | - |
-| Core/Extensions/Date+Aviation.swift | Core | portable | 82 | L | L1 | Foundation | - |
-| Core/Interaction.swift | Core | UI | 41 | U | U1 | SwiftUI, UIKit | - |
-| Core/MetarVisibility.swift | Core | portable | 35 | L | L1 | Foundation | MetarVisibilityTests |
-| Core/OverlayStaleness.swift | Core | portable | 29 | L | L1 | Foundation | OverlayStalenessTests |
-| Core/PolygonGeometry.swift | Core | platform-adapter | 89 | L | L1 | CoreLocation, Foundation | TFRServiceTests |
-| Core/Protocols.swift | Core | platform-adapter | 188 | - | - | CoreLocation, Foundation | MapLoadingFlowTests, MockAudioRecorder, MockDatabaseManager +6 |
-| Core/Region.swift | Core | platform-adapter | 221 | L | L1 | CoreLocation, Foundation | SwiftDataMigrationCharacterizationTests, IsraelAviationDatabaseTests, IsraelAirportDiagramTests +6 |
-| Core/RegionStore.swift | Core | platform-adapter | 71 | L | L1 | Foundation, SwiftData | RegionTests |
-| Core/RemoteConfig.swift | Core | portable | 257 | S | S1 | Foundation | AirspacePredictorTests, PredictionServiceTests, RemoteConfigTests +1 |
-| Core/TAFValidity.swift | Core | portable | 38 | L | L1 | Foundation | WeatherRefreshFailureTests |
-| Core/TileFailureTracker.swift | Core | portable | 23 | L | L1 | Foundation | TileFailureTrackerTests |
-| Core/Types.swift | Core | platform-adapter | 387 | L | L1 | CoreLocation, Foundation | FlightPersistenceStopPathCharacterizationTests, RecordingStopPathCharacterizationTests, AviationDatabaseTests +21 |
-| Data/AviationDatabase.swift | Data | platform-adapter | 579 | D | D5 | CoreLocation, CryptoKit, Foundation, GRDB | AviationDatabaseInstallCharacterizationTests, AviationDatabaseRobustnessTests, AviationDatabaseTests +2 |
-| Data/DatabaseManager.swift | Data | platform-adapter | 115 | D | D2 | CoreLocation, Foundation | AviationDatabaseRobustnessTests, FlightPlanViewModelTests |
-| Data/IsraelAviationDatabase.swift | Data | platform-adapter | 398 | D | D5 | CoreLocation, Foundation, GRDB | IsraelAerodromeDatabaseTests, IsraelAviationDatabaseTests, IsraelLSADatabaseTests +8 |
-| Data/IsraelAviationDatabaseProtocol.swift | Data | platform-adapter | 53 | D | D5 | CoreLocation, Foundation | MockIsraelAviationDatabase |
-| Data/IsraelAviationModels.swift | Data | platform-adapter | 386 | D | D5 | CoreLocation, Foundation | IsraelAerodromeDatabaseTests, IsraelAviationDatabaseTests, IsraelLSADatabaseTests +11 |
-| Data/Models/AircraftProfile.swift | Data/Models | platform-adapter | 80 | D | D2 | Foundation, SwiftData | SwiftDataMigrationCharacterizationTests, ProfileModelTests, IsraelLSAPlannerTests +2 |
-| Data/Models/FlightPlanRecord.swift | Data/Models | platform-adapter | 142 | D | D2 | Foundation, SwiftData | SwiftDataMigrationCharacterizationTests, ProfileModelTests, FlightPlanViewModelTests |
-| Data/Models/FlightRecord.swift | Data/Models | platform-adapter | 95 | D | D2 | Foundation, SwiftData | FlightPersistenceStopPathCharacterizationTests, SwiftDataMigrationCharacterizationTests, FlightPersistenceTests +1 |
-| Data/Models/LogbookEntry.swift | Data/Models | platform-adapter | 76 | D | D2 | Foundation, SwiftData | FlightPersistenceStopPathCharacterizationTests, SwiftDataMigrationCharacterizationTests, LogbookEntryTests +4 |
-| Data/Models/ModelContainerFactory.swift | Data/Models | platform-adapter | 55 | D | D2 | Foundation, OSLog, SwiftData | SwiftDataMigrationCharacterizationTests |
-| Data/Models/PilotProfile.swift | Data/Models | platform-adapter | 106 | D | D2 | Foundation, SwiftData | SwiftDataMigrationCharacterizationTests, ProfileModelTests, IsraelLSAPlannerTests +2 |
-| Data/Models/UserSettings.swift | Data/Models | platform-adapter | 62 | D | D2 | Foundation, SwiftData | FlightPersistenceStopPathCharacterizationTests, SwiftDataMigrationCharacterizationTests, LogbookEntryTests +9 |
-| Data/RecordingDatabase.swift | Data | portable | 444 | D | D4 | Foundation, GRDB | FlightPersistenceStopPathCharacterizationTests, RecordingDatabaseChainMigrationCharacterizationTests, RecordingStopPathCharacterizationTests +14 |
-| Services/AirSigmetService.swift | Services | portable | 332 | S | S1 | Foundation, os | MockAirSigmetService, AirSigmetServiceTests |
-| Services/AirportDiagramGeoreferencer.swift | Services | UI | 1604 | M | M4 | CoreGraphics, Foundation, ImageIO, PDFKit, Vision | MockAudioRecorder, MockIsraelAviationDatabase, MockIsraelNotamService +12 |
-| Services/AirportDiagramOverlay.swift | Services | UI | 519 | M | M4 | MapLibre, UIKit, os | LogbookEntryTests, AirportDiagramGeoreferencerTests, IsraelAirportDiagramTests +1 |
-| Services/CurrencyService.swift | Services | portable | 95 | L | L6 | Foundation | CurrencyServiceTests |
-| Services/Debrief/CVFRDebrief.swift | Services/Debrief | platform-adapter | 678 | L | L5 | CoreLocation, Foundation | CVFRDebriefTests, ScenarioRun |
-| Services/Debrief/CVFRDebriefLoader.swift | Services/Debrief | platform-adapter | 71 | L | L5 | CoreLocation, Foundation | CVFRDebriefTests |
-| Services/Debrief/DebriefEngine.swift | Services/Debrief | platform-adapter | 243 | A | A6 | Foundation, FoundationModels, os | DebriefAvailabilityTests |
-| Services/Debrief/DebriefTypes.swift | Services/Debrief | platform-adapter | 155 | L | L5 | Foundation, FoundationModels, GRDB | FlightPersistenceStopPathCharacterizationTests, RecordingDatabaseChainMigrationCharacterizationTests, MockRecordingDatabase +3 |
-| Services/Debrief/FlightSummaryBuilder.swift | Services/Debrief | portable | 187 | L | L5 | Foundation | MockRecordingDatabase, CVFRDebriefTests, FlightSummaryBuilderTests |
-| Services/Debrief/TranscriptTextMatcher.swift | Services/Debrief | portable | 64 | L | L5 | Foundation | CVFRDebriefTests |
-| Services/FollowModeState.swift | Services | portable | 41 | M | M2 | Foundation | FollowModeStateTests |
-| Services/GPSStatus.swift | Services | platform-adapter | 174 | A | A1 | CoreLocation, Foundation | LocationServiceCharacterizationTests, GPSStatusTests, MapGPSRecordingFixesTests +1 |
-| Services/IsraelAerodromeAdapter.swift | Services | platform-adapter | 133 | L | L3 | CoreLocation, Foundation | IsraelNearestAndSearchTests |
-| Services/IsraelAircraftNetworkPreference.swift | Services | portable | 31 | L | L3 | Foundation | IsraelLSAPlannerTests |
-| Services/IsraelAlertEvaluator.swift | Services | platform-adapter | 335 | L | L3 | CoreLocation, Foundation | AirspacePredictorTests, IsraelAlertTests, PredictionServiceTests +2 |
-| Services/IsraelAlertService.swift | Services | platform-adapter | 221 | S | S1 | CoreLocation, Foundation, Observation, os | IsraelAlertTests, ScenarioRun |
-| Services/IsraelBriefingFilter.swift | Services | portable | 322 | L | L3 | Foundation | IsraelBriefingFilterTests, IsraelBriefingViewModelTests |
-| Services/IsraelBriefingMapHighlight.swift | Services | UI | 122 | M | M1 | CoreLocation, MapLibre, UIKit | IsraelBriefingFilterTests |
-| Services/IsraelChartDetails.swift | Services | portable | 182 | M | M1 | Foundation | IsraelChartFeaturesTests |
-| Services/IsraelChartFeatures.swift | Services | platform-adapter | 472 | M | M1 | CoreLocation, Foundation | IsraelAlertTests, IsraelChartFeaturesTests, IsraelLSAPlannerTests +2 |
-| Services/IsraelChartManifest.swift | Services | portable | 146 | S | S1 | Foundation | LogbookEntryTests, PrivacyManifestTests, IsraelAirportDiagramTests +3 |
-| Services/IsraelChartOverlay.swift | Services | UI | 754 | M | M1 | MapLibre, OSLog, Observation, UIKit | - |
-| Services/IsraelChartService.swift | Services | platform-adapter | 370 | S | S1 | CryptoKit, Foundation | IsraelAirportDiagramTests, IsraelChartServiceTests |
-| Services/IsraelChartStore.swift | Services | portable | 123 | S | S1 | Foundation, Observation | - |
-| Services/IsraelChartStyle.swift | Services | UI | 227 | M | M1 | UIKit | IsraelChartFeaturesTests |
-| Services/IsraelDiagramPack.swift | Services | portable | 106 | S | S1 | Foundation | IsraelAirportDiagramTests |
-| Services/IsraelDiagramStore.swift | Services | portable | 104 | S | S1 | Foundation, Observation | - |
-| Services/IsraelFlightPlanMessage.swift | Services | portable | 290 | L | L3 | Foundation | IsraelFlightPlanMessageTests, IsraelLSAPlannerTests, IsraelRoutePlannerTests |
-| Services/IsraelLSAOverlay.swift | Services | UI | 197 | M | M1 | CoreLocation, Foundation, MapLibre, OSLog, UIKit | - |
-| Services/IsraelLSATimeRules.swift | Services | portable | 70 | L | L3 | Foundation | IsraelLSAPlannerTests, ScenarioFlightTests |
-| Services/IsraelNotamClosureMapper.swift | Services | portable | 89 | L | L3 | Foundation | IsraelAviationDatabaseTests, IsraelNotamClosureMapperTests, IsraelRoutePlannerTests |
-| Services/IsraelNotamService.swift | Services | portable | 392 | S | S1 | Foundation, os | IsraelAviationDatabaseTests, MockIsraelNotamService, IsraelAlertTests +9 |
-| Services/IsraelOfficialChartLayer.swift | Services | UI | 70 | M | M1 | Foundation, MapLibre | - |
-| Services/IsraelRouteFollowing.swift | Services | platform-adapter | 180 | L | L3 | CoreLocation, Foundation | IsraelRouteFollowingTests, ScenarioFlightTests |
-| Services/IsraelRoutePlanner.swift | Services | platform-adapter | 488 | L | L3 | CoreLocation, Foundation | CVFRDebriefTests, IsraelFlightPlanMessageTests, IsraelLSAPlannerTests +2 |
-| Services/KeychainStore.swift | Services | platform-adapter | 83 | A | A4 | Foundation, Security | - |
-| Services/LandableAirportFilter.swift | Services | portable | 82 | L | L1 | Foundation | BundledAirportQueriesTests, LandableAirportFilterTests, IsraelNearestAndSearchTests |
-| Services/LocationService.swift | Services | platform-adapter | 239 | A | A1 | CoreLocation | LocationServiceCharacterizationTests, ScenarioRun |
-| Services/MapQueryRegion.swift | Services | platform-adapter | 145 | M | M1 | CoreLocation, Foundation | MapLoadingFlowTests, MapQueryRegionTests |
-| Services/MapService.swift | Services | UI | 1093 | M | M1 | MapLibre, SwiftUI, UIKit | MapLoadingFlowTests, RegionTests, FlightPlanViewModelTests +1 |
-| Services/NotamReadStateStore.swift | Services | portable | 71 | S | S1 | Foundation, Observation | IsraelBriefingViewModelTests |
-| Services/NotamService.swift | Services | portable | 520 | S | S1 | Foundation, os | MockNotamService, NotamServiceTests |
-| Services/OfflineMapService.swift | Services | UI | 622 | M | M3 | CoreLocation, Foundation, MapLibre, Observation | OfflinePackStatusCharacterizationTests, OfflineMapTests, TerminalProcedureServiceTests |
-| Services/PirepService.swift | Services | platform-adapter | 330 | S | S1 | CoreLocation, Foundation, os | MockPirepService, PirepServiceTests |
-| Services/Prediction/AirspacePredictor.swift | Services/Prediction | platform-adapter | 123 | L | L7 | CoreLocation, Foundation | AirspacePredictorTests, PredictionServiceTests |
-| Services/Prediction/PredictedEvent.swift | Services/Prediction | platform-adapter | 89 | L | L7 | CoreLocation, Foundation | AirspacePredictorTests, PredictionServiceTests, RegionTests +2 |
-| Services/Prediction/PredictionService.swift | Services/Prediction | platform-adapter | 170 | L | L7 | CoreLocation, Foundation | PredictionServiceTests |
-| Services/ProximityAlertService.swift | Services | platform-adapter | 248 | S | S1 | CoreLocation, Foundation, os | ProximityAlertAltitudeTests, TFRServiceTests |
-| Services/ReachabilityService.swift | Services | platform-adapter | 39 | S | S1 | Foundation, Network | - |
-| Services/Recording/AudioRecorder.swift | Services/Recording | UI | 451 | A | A2 | AVFoundation, Foundation, UIKit, os | AudioRecorderTests |
-| Services/Recording/AutoStartGate.swift | Services/Recording | portable | 30 | L | L4 | Foundation | MapGPSRecordingFixesTests |
-| Services/Recording/AviationVocabulary.swift | Services/Recording | portable | 396 | A | A3 | Foundation | AviationVocabularyTests, TranscriptionServiceTests |
-| Services/Recording/FlightPersistenceService.swift | Services/Recording | platform-adapter | 192 | L | L4 | CoreLocation, Foundation, OSLog, SwiftData | FlightPersistenceStopPathCharacterizationTests, FlightPersistenceTests, FlightRecoveryTests |
-| Services/Recording/FlightPhaseDetector.swift | Services/Recording | portable | 206 | L | L4 | Foundation | FlightPhaseDetectorTests, MapGPSRecordingFixesTests |
-| Services/Recording/FlightRecoveryService.swift | Services/Recording | platform-adapter | 154 | L | L4 | AVFoundation, Foundation, OSLog, SwiftData | PrivacyManifestTests, FlightRecoveryTests |
-| Services/Recording/RecordingCoordinator.swift | Services/Recording | platform-adapter | 465 | L | L4 | AVFoundation, Foundation, os | FlightPersistenceStopPathCharacterizationTests, RecordingStopPathCharacterizationTests, LogbookEntryTests +11 |
-| Services/Recording/TrackRecorder.swift | Services/Recording | platform-adapter | 195 | A | A1 | CoreLocation, Foundation | RecordingStopPathCharacterizationTests, TrackRecorderTests, ScenarioRun |
-| Services/Recording/TranscriptionService.swift | Services/Recording | platform-adapter | 425 | A | A3 | AVFoundation, CoreMedia, Foundation, Speech, os | TranscriptionServiceTests |
-| Services/Recording/VerticalSpeedEstimator.swift | Services/Recording | portable | 68 | L | L4 | Foundation | FlightPhaseDetectorTests, VerticalSpeedEstimatorTests |
-| Services/RemoteConfigService.swift | Services | portable | 63 | S | S1 | Foundation, os | MockRemoteConfigService, RemoteConfigTests |
-| Services/RemoteConfigStore.swift | Services | portable | 200 | S | S1 | Foundation, Observation, os | RemoteConfigTests |
-| Services/Replay/ReplayEngine.swift | Services/Replay | platform-adapter | 305 | L | L8 | AVFoundation, CoreLocation, Foundation, Observation | ReplayEngineTests |
-| Services/Simulation/FlightScenario.swift | Services/Simulation | platform-adapter | 179 | - | - | CoreLocation, Foundation | CVFRDebriefTests, IsraelAlertTests, IsraelBriefingFilterTests +5 |
-| Services/Simulation/ScenarioPlayback.swift | Services/Simulation | platform-adapter | 187 | - | - | CoreLocation, Foundation, OSLog | ScenarioRun |
-| Services/Simulation/ScreenCaptureHooks.swift | Services/Simulation | portable | 56 | - | - | Foundation | - |
-| Services/TFRService.swift | Services | platform-adapter | 522 | S | S1 | CoreLocation, Foundation, os | MockTFRService, TFRServiceTests |
-| Services/TelemetryService.swift | Services | platform-adapter | 148 | A | A5 | Foundation, MetricKit, TelemetryDeck, os | MockAudioRecorder, MockTranscriptionService, AudioRecorderTests +5 |
-| Services/TerminalProcedureService.swift | Services | portable | 566 | S | S1 | Foundation, os | MockTerminalProcedureService, IsraelAirportDiagramTests, TerminalProcedureServiceTests |
-| Services/WeatherService.swift | Services | portable | 336 | S | S1 | Foundation, os | WeatherCacheClockCharacterizationTests, MetarVisibilityTests, RegionTests +2 |
-| Services/WindsAloftService.swift | Services | platform-adapter | 686 | S | S1 | CoreLocation, Foundation, os | MockWindsAloftService, WindsAloftServiceTests |
-| ViewModels/AircraftProfileViewModel.swift | ViewModels | platform-adapter | 129 | U | U7 | Foundation, Observation, SwiftData | - |
-| ViewModels/FlightPlanViewModel.swift | ViewModels | UI | 325 | U | U4 | CoreLocation, Foundation, MapLibre, Observation, SwiftData, UIKit | FlightPlanViewModelTests |
-| ViewModels/IsraelBriefingViewModel.swift | ViewModels | portable | 168 | U | U4 | Foundation, Observation | IsraelBriefingViewModelTests |
-| ViewModels/IsraelFlightPlanViewModel.swift | ViewModels | UI | 433 | U | U4 | CoreLocation, Foundation, MapLibre, Observation, SwiftData, UIKit | IsraelLSAPlannerTests, IsraelFlightPlanViewModelTests |
-| ViewModels/LogbookViewModel.swift | ViewModels | platform-adapter | 168 | U | U7 | Foundation, Observation, SwiftData | LogbookEntryTests, LogbookViewModelTests |
-| ViewModels/MapViewModel.swift | ViewModels | UI | 750 | M | M1 | CoreLocation, Foundation, MapLibre, Observation | MapLoadingFlowTests, RegionTests, MapViewModelTests |
-| ViewModels/NearestAirportViewModel.swift | ViewModels | platform-adapter | 271 | U | U4 | CoreLocation, Foundation, Observation | LandableAirportFilterTests, LiveNavigationProgressTests, MapGPSRecordingFixesTests +2 |
-| ViewModels/PilotProfileViewModel.swift | ViewModels | platform-adapter | 183 | U | U7 | Foundation, Observation, SwiftData | - |
-| ViewModels/RecordingViewModel.swift | ViewModels | platform-adapter | 226 | U | U8 | AVFoundation, CoreLocation, Foundation, Observation, SwiftData | MapGPSRecordingFixesTests, RecordingProblemSeverityTests |
-| ViewModels/ReplayViewModel.swift | ViewModels | portable | 115 | U | U8 | Foundation, Observation | - |
-| ViewModels/SearchViewModel.swift | ViewModels | portable | 103 | U | U4 | Foundation | IsraelNearestAndSearchTests |
-| ViewModels/WeatherViewModel.swift | ViewModels | portable | 176 | U | U4 | Foundation, Observation | CrossCountryFlowTests, MetarVisibilityTests, RegionTests +1 |
-| Views/Aircraft/AircraftEditView.swift | Views/Aircraft | UI | 276 | U | U7 | SwiftData, SwiftUI | - |
-| Views/Aircraft/AircraftListView.swift | Views/Aircraft | UI | 171 | U | U7 | SwiftData, SwiftUI | - |
-| Views/Aircraft/PilotEditView.swift | Views/Aircraft | UI | 170 | U | U7 | SwiftData, SwiftUI | - |
-| Views/Aircraft/PilotProfileView.swift | Views/Aircraft | UI | 309 | U | U7 | SwiftData, SwiftUI | - |
-| Views/Briefing/IsraelBriefingView.swift | Views/Briefing | UI | 403 | U | U4 | CoreLocation, SwiftUI, _LocationEssentials | IsraelBriefingFilterTests |
-| Views/Components/CurrencyBadge.swift | Views/Components | UI | 64 | U | U1 | SwiftUI | - |
-| Views/Components/DataAgeBadge.swift | Views/Components | UI | 82 | U | U1 | SwiftUI | - |
-| Views/Components/DatabaseUnavailableBanner.swift | Views/Components | UI | 55 | U | U1 | SwiftUI | - |
-| Views/Components/FlightCategoryDot.swift | Views/Components | UI | 59 | U | U1 | SwiftUI | - |
-| Views/Components/OpacitySlider.swift | Views/Components | UI | 39 | U | U1 | SwiftUI | - |
-| Views/Components/RemoteConfigBanner.swift | Views/Components | UI | 80 | U | U1 | SwiftUI | - |
-| Views/Components/SearchBar.swift | Views/Components | UI | 63 | U | U1 | SwiftUI | - |
-| Views/Flights/CVFRDebriefContent.swift | Views/Flights | UI | 150 | U | U8 | SwiftUI | - |
-| Views/Flights/CVFRDebriefProfileView.swift | Views/Flights | UI | 410 | U | U8 | SwiftUI | - |
-| Views/Flights/DebriefView.swift | Views/Flights | UI | 373 | U | U8 | SwiftUI | - |
-| Views/Flights/FlightDetailView.swift | Views/Flights | UI | 312 | U | U8 | SwiftData, SwiftUI | MapGPSRecordingFixesTests |
-| Views/Flights/ReplayMapView.swift | Views/Flights | UI | 109 | U | U8 | MapLibre, SwiftUI | - |
-| Views/Flights/ReplayView.swift | Views/Flights | UI | 386 | U | U8 | SwiftUI | - |
-| Views/Flights/TimelineScrubBar.swift | Views/Flights | UI | 131 | U | U8 | SwiftUI | - |
-| Views/Flights/TranscriptPanelView.swift | Views/Flights | UI | 152 | U | U8 | SwiftUI | - |
-| Views/Log/AirportColumnView.swift | Views/Log | UI | 619 | U | U3 | SwiftUI | - |
-| Views/Log/FlightLogFooter.swift | Views/Log | UI | 190 | U | U3 | MapLibre, SwiftUI | ZoomStepperTests |
-| Views/Log/FlightLogRows.swift | Views/Log | UI | 753 | U | U3 | CoreLocation, SwiftUI | PredictionRowsTests |
-| Views/Log/FlightLogStrip.swift | Views/Log | UI | 649 | U | U3 | SwiftUI | LiveNavigationProgressTests, MapGPSRecordingFixesTests, FlightLogNextTests +2 |
-| Views/Log/LayersColumnView.swift | Views/Log | UI | 412 | U | U3 | SwiftUI | - |
-| Views/Log/LogStackRows.swift | Views/Log | UI | 257 | U | U3 | SwiftUI | FlownEntryActionTests |
-| Views/Log/LogStackView.swift | Views/Log | UI | 414 | U | U3 | SwiftData, SwiftUI | - |
-| Views/Log/NearestColumnView.swift | Views/Log | UI | 283 | U | U3 | SwiftUI | - |
-| Views/Log/SearchColumnView.swift | Views/Log | UI | 94 | U | U3 | SwiftUI | - |
-| Views/Logbook/LogbookEntryEditView.swift | Views/Logbook | UI | 251 | U | U7 | SwiftData, SwiftUI | - |
-| Views/Map/AirportChartsSection.swift | Views/Map | UI | 139 | M | M4 | SwiftUI | TerminalProcedureServiceTests |
-| Views/Map/AirspaceCheckUnavailableBanner.swift | Views/Map | UI | 29 | U | U4 | SwiftUI | - |
-| Views/Map/ChartPDFView.swift | Views/Map | UI | 148 | M | M4 | PDFKit, SwiftUI | - |
-| Views/Map/CurrencyWarningBanner.swift | Views/Map | UI | 139 | U | U4 | SwiftData, SwiftUI | - |
-| Views/Map/DisplayModeModifier.swift | Views/Map | UI | 44 | U | U1 | Combine, CoreLocation, SwiftUI | - |
-| Views/Map/GPSFailureNotice.swift | Views/Map | UI | 50 | U | U4 | SwiftUI | - |
-| Views/Map/IsraelAerodromeSection.swift | Views/Map | UI | 211 | U | U4 | SwiftUI | IsraelNearestAndSearchTests |
-| Views/Map/IsraelAlertBanner.swift | Views/Map | UI | 98 | U | U4 | SwiftUI | - |
-| Views/Map/IsraelChartHintBanner.swift | Views/Map | UI | 49 | U | U4 | SwiftUI | RegionTests |
-| Views/Map/IsraelChartSheets.swift | Views/Map | UI | 166 | U | U4 | SwiftUI | - |
-| Views/Map/IsraelDiagramSection.swift | Views/Map | UI | 117 | U | U4 | PDFKit, SwiftUI | - |
-| Views/Map/MapContainerView.swift | Views/Map | UI | 499 | M | M1 | CoreLocation, SwiftData, SwiftUI | ScenarioRun |
-| Views/Map/MapView.swift | Views/Map | UI | 198 | M | M1 | MapLibre, SwiftUI | - |
-| Views/Map/NotamSection.swift | Views/Map | UI | 196 | U | U4 | SwiftUI | - |
-| Views/Map/OverlayStalenessBadges.swift | Views/Map | UI | 90 | U | U4 | SwiftUI | - |
-| Views/Map/PirepSection.swift | Views/Map | UI | 192 | U | U4 | CoreLocation, SwiftUI | - |
-| Views/Map/RecordingOverlayView.swift | Views/Map | UI | 282 | U | U8 | SwiftUI, UIKit | RecordingStopPathCharacterizationTests |
-| Views/Map/WindsAloftSection.swift | Views/Map | UI | 166 | U | U4 | SwiftUI | - |
-| Views/Onboarding/OnboardingView.swift | Views/Onboarding | UI | 105 | U | U7 | SwiftUI | - |
-| Views/Planning/FlightPlanSummaryCard.swift | Views/Planning | UI | 90 | U | U4 | SwiftUI | - |
-| Views/Planning/FlightPlanView.swift | Views/Planning | UI | 264 | U | U4 | SwiftData, SwiftUI | - |
-| Views/Planning/IsraelFlightPlanView.swift | Views/Planning | UI | 395 | U | U4 | SwiftData, SwiftUI | - |
-| Views/Settings/IsraelChartDownloadSection.swift | Views/Settings | UI | 110 | U | U7 | SwiftUI | - |
-| Views/Settings/IsraelDiagramDownloadSection.swift | Views/Settings | UI | 99 | U | U7 | SwiftUI | IsraelDiagramSettingsSummaryTests |
-| Views/Settings/OfflineMapsView.swift | Views/Settings | UI | 264 | M | M3 | SwiftUI | - |
-| Views/Settings/SettingsView.swift | Views/Settings | UI | 390 | U | U7 | SwiftData, SwiftUI | - |
-| efb_212App.swift | App | UI | 45 | - | - | SwiftData, SwiftUI | - |
+| File                                                     | Layer               | Bucket           | Lines | Track | Ticket | Imports                                                           | Tests                                                                                                                                            |
+| -------------------------------------------------------- | ------------------- | ---------------- | ----- | ----- | ------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ContentView.swift                                        | App                 | UI               | 69    | U     | U5     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Core/ActiveRoute.swift                                   | Core                | platform-adapter | 125   | L     | L2     | CoreLocation, Foundation                                          | IsraelAlertTests, IsraelRouteFollowingTests, LiveNavigationProgressTests +2                                                                      |
+| Core/AppState.swift                                      | Core                | platform-adapter | 218   | -     | -      | CoreLocation, Observation                                         | LocationServiceCharacterizationTests, AviationDatabaseRobustnessTests, MapLoadingFlowTests +14                                                   |
+| Core/AviationModels.swift                                | Core                | platform-adapter | 510   | L     | L1     | CoreLocation, Foundation                                          | FlightPersistenceStopPathCharacterizationTests, AviationDatabaseTests, AviationModelTests +30                                                    |
+| Core/DataFreshness.swift                                 | Core                | portable         | 154   | L     | L1     | Foundation                                                        | DataFreshnessEdgeCharacterizationTests, DataFreshnessTests                                                                                       |
+| Core/DataRefreshScheduler.swift                          | Core                | portable         | 62    | S     | S1     | Foundation                                                        | DataRefreshSchedulerTests                                                                                                                        |
+| Core/DesignTokens.swift                                  | Core                | UI               | 366   | U     | U1     | SwiftUI                                                           | MapQueryRegionTests                                                                                                                              |
+| Core/Disclaimers.swift                                   | Core                | portable         | 49    | U     | U7     | Foundation                                                        | -                                                                                                                                                |
+| Core/DisplayMode.swift                                   | Core                | UI               | 134   | U     | U1     | CoreLocation, Foundation, SwiftUI                                 | DisplayModeResolverTests                                                                                                                         |
+| Core/EFBError.swift                                      | Core                | portable         | 220   | L     | L1     | Foundation                                                        | AviationDatabaseInstallCharacterizationTests, AviationDatabaseRobustnessTests, EFBErrorTests +21                                                 |
+| Core/Extensions/AppState+Navigation.swift                | Core                | platform-adapter | 96    | -     | -      | CoreLocation, Foundation                                          | -                                                                                                                                                |
+| Core/Extensions/CLLocation+Aviation.swift                | Core                | platform-adapter | 68    | L     | L1     | CoreLocation                                                      | -                                                                                                                                                |
+| Core/Extensions/CLLocationCoordinate2D+GreatCircle.swift | Core                | platform-adapter | 63    | L     | L1     | CoreLocation                                                      | -                                                                                                                                                |
+| Core/Extensions/Date+Aviation.swift                      | Core                | portable         | 82    | L     | L1     | Foundation                                                        | -                                                                                                                                                |
+| Core/Interaction.swift                                   | Core                | UI               | 41    | U     | U1     | SwiftUI, UIKit                                                    | -                                                                                                                                                |
+| Core/MetarVisibility.swift                               | Core                | portable         | 35    | L     | L1     | Foundation                                                        | MetarVisibilityTests                                                                                                                             |
+| Core/OverlayStaleness.swift                              | Core                | portable         | 29    | L     | L1     | Foundation                                                        | OverlayStalenessTests                                                                                                                            |
+| Core/PolygonGeometry.swift                               | Core                | platform-adapter | 89    | L     | L1     | CoreLocation, Foundation                                          | TFRServiceTests                                                                                                                                  |
+| Core/Protocols.swift                                     | Core                | platform-adapter | 188   | -     | -      | CoreLocation, Foundation                                          | MapLoadingFlowTests, MockAudioRecorder, MockDatabaseManager +6                                                                                   |
+| Core/Region.swift                                        | Core                | platform-adapter | 221   | L     | L1     | CoreLocation, Foundation                                          | SwiftDataMigrationCharacterizationTests, IsraelAviationDatabaseTests, IsraelAirportDiagramTests +6                                               |
+| Core/RegionStore.swift                                   | Core                | platform-adapter | 71    | L     | L1     | Foundation, SwiftData                                             | RegionTests                                                                                                                                      |
+| Core/RemoteConfig.swift                                  | Core                | portable         | 257   | S     | S1     | Foundation                                                        | AirspacePredictorTests, PredictionServiceTests, RemoteConfigTests +1                                                                             |
+| Core/TAFValidity.swift                                   | Core                | portable         | 38    | L     | L1     | Foundation                                                        | WeatherRefreshFailureTests                                                                                                                       |
+| Core/TileFailureTracker.swift                            | Core                | portable         | 23    | L     | L1     | Foundation                                                        | TileFailureTrackerTests                                                                                                                          |
+| Core/Types.swift                                         | Core                | platform-adapter | 387   | L     | L1     | CoreLocation, Foundation                                          | FlightPersistenceStopPathCharacterizationTests, RecordingStopPathCharacterizationTests, AviationDatabaseTests +21                                |
+| Data/AviationDatabase.swift                              | Data                | platform-adapter | 579   | D     | D5     | CoreLocation, CryptoKit, Foundation, GRDB                         | AviationDatabaseInstallCharacterizationTests, AviationDatabaseRobustnessTests, AviationDatabaseTests +2                                          |
+| Data/DatabaseManager.swift                               | Data                | platform-adapter | 115   | D     | D2     | CoreLocation, Foundation                                          | AviationDatabaseRobustnessTests, FlightPlanViewModelTests                                                                                        |
+| Data/IsraelAviationDatabase.swift                        | Data                | platform-adapter | 398   | D     | D5     | CoreLocation, Foundation, GRDB                                    | IsraelAerodromeDatabaseTests, IsraelAviationDatabaseTests, IsraelLSADatabaseTests +8                                                             |
+| Data/IsraelAviationDatabaseProtocol.swift                | Data                | platform-adapter | 53    | D     | D5     | CoreLocation, Foundation                                          | MockIsraelAviationDatabase                                                                                                                       |
+| Data/IsraelAviationModels.swift                          | Data                | platform-adapter | 386   | D     | D5     | CoreLocation, Foundation                                          | IsraelAerodromeDatabaseTests, IsraelAviationDatabaseTests, IsraelLSADatabaseTests +11                                                            |
+| Data/Models/AircraftProfile.swift                        | Data/Models         | platform-adapter | 80    | D     | D2     | Foundation, SwiftData                                             | SwiftDataMigrationCharacterizationTests, ProfileModelTests, IsraelLSAPlannerTests +2                                                             |
+| Data/Models/FlightPlanRecord.swift                       | Data/Models         | platform-adapter | 142   | D     | D2     | Foundation, SwiftData                                             | SwiftDataMigrationCharacterizationTests, ProfileModelTests, FlightPlanViewModelTests                                                             |
+| Data/Models/FlightRecord.swift                           | Data/Models         | platform-adapter | 95    | D     | D2     | Foundation, SwiftData                                             | FlightPersistenceStopPathCharacterizationTests, SwiftDataMigrationCharacterizationTests, FlightPersistenceTests +1                               |
+| Data/Models/LogbookEntry.swift                           | Data/Models         | platform-adapter | 76    | D     | D2     | Foundation, SwiftData                                             | FlightPersistenceStopPathCharacterizationTests, SwiftDataMigrationCharacterizationTests, LogbookEntryTests +4                                    |
+| Data/Models/ModelContainerFactory.swift                  | Data/Models         | platform-adapter | 55    | D     | D2     | Foundation, OSLog, SwiftData                                      | SwiftDataMigrationCharacterizationTests                                                                                                          |
+| Data/Models/PilotProfile.swift                           | Data/Models         | platform-adapter | 106   | D     | D2     | Foundation, SwiftData                                             | SwiftDataMigrationCharacterizationTests, ProfileModelTests, IsraelLSAPlannerTests +2                                                             |
+| Data/Models/UserSettings.swift                           | Data/Models         | platform-adapter | 62    | D     | D2     | Foundation, SwiftData                                             | FlightPersistenceStopPathCharacterizationTests, SwiftDataMigrationCharacterizationTests, LogbookEntryTests +9                                    |
+| Data/RecordingDatabase.swift                             | Data                | portable         | 444   | D     | D4     | Foundation, GRDB                                                  | FlightPersistenceStopPathCharacterizationTests, RecordingDatabaseChainMigrationCharacterizationTests, RecordingStopPathCharacterizationTests +14 |
+| Services/AirSigmetService.swift                          | Services            | portable         | 332   | S     | S1     | Foundation, os                                                    | MockAirSigmetService, AirSigmetServiceTests                                                                                                      |
+| Services/AirportDiagramGeoreferencer.swift               | Services            | UI               | 1604  | M     | M4     | CoreGraphics, Foundation, ImageIO, PDFKit, Vision                 | MockAudioRecorder, MockIsraelAviationDatabase, MockIsraelNotamService +12                                                                        |
+| Services/AirportDiagramOverlay.swift                     | Services            | UI               | 519   | M     | M4     | MapLibre, UIKit, os                                               | LogbookEntryTests, AirportDiagramGeoreferencerTests, IsraelAirportDiagramTests +1                                                                |
+| Services/CurrencyService.swift                           | Services            | portable         | 95    | L     | L6     | Foundation                                                        | CurrencyServiceTests                                                                                                                             |
+| Services/Debrief/CVFRDebrief.swift                       | Services/Debrief    | platform-adapter | 678   | L     | L5     | CoreLocation, Foundation                                          | CVFRDebriefTests, ScenarioRun                                                                                                                    |
+| Services/Debrief/CVFRDebriefLoader.swift                 | Services/Debrief    | platform-adapter | 71    | L     | L5     | CoreLocation, Foundation                                          | CVFRDebriefTests                                                                                                                                 |
+| Services/Debrief/DebriefEngine.swift                     | Services/Debrief    | platform-adapter | 243   | A     | A6     | Foundation, FoundationModels, os                                  | DebriefAvailabilityTests                                                                                                                         |
+| Services/Debrief/DebriefTypes.swift                      | Services/Debrief    | platform-adapter | 155   | L     | L5     | Foundation, FoundationModels, GRDB                                | FlightPersistenceStopPathCharacterizationTests, RecordingDatabaseChainMigrationCharacterizationTests, MockRecordingDatabase +3                   |
+| Services/Debrief/FlightSummaryBuilder.swift              | Services/Debrief    | portable         | 187   | L     | L5     | Foundation                                                        | MockRecordingDatabase, CVFRDebriefTests, FlightSummaryBuilderTests                                                                               |
+| Services/Debrief/TranscriptTextMatcher.swift             | Services/Debrief    | portable         | 64    | L     | L5     | Foundation                                                        | CVFRDebriefTests                                                                                                                                 |
+| Services/FollowModeState.swift                           | Services            | portable         | 41    | M     | M2     | Foundation                                                        | FollowModeStateTests                                                                                                                             |
+| Services/GPSStatus.swift                                 | Services            | platform-adapter | 174   | A     | A1     | CoreLocation, Foundation                                          | LocationServiceCharacterizationTests, GPSStatusTests, MapGPSRecordingFixesTests +1                                                               |
+| Services/IsraelAerodromeAdapter.swift                    | Services            | platform-adapter | 133   | L     | L3     | CoreLocation, Foundation                                          | IsraelNearestAndSearchTests                                                                                                                      |
+| Services/IsraelAircraftNetworkPreference.swift           | Services            | portable         | 31    | L     | L3     | Foundation                                                        | IsraelLSAPlannerTests                                                                                                                            |
+| Services/IsraelAlertEvaluator.swift                      | Services            | platform-adapter | 335   | L     | L3     | CoreLocation, Foundation                                          | AirspacePredictorTests, IsraelAlertTests, PredictionServiceTests +2                                                                              |
+| Services/IsraelAlertService.swift                        | Services            | platform-adapter | 221   | S     | S1     | CoreLocation, Foundation, Observation, os                         | IsraelAlertTests, ScenarioRun                                                                                                                    |
+| Services/IsraelBriefingFilter.swift                      | Services            | portable         | 322   | L     | L3     | Foundation                                                        | IsraelBriefingFilterTests, IsraelBriefingViewModelTests                                                                                          |
+| Services/IsraelBriefingMapHighlight.swift                | Services            | UI               | 122   | M     | M1     | CoreLocation, MapLibre, UIKit                                     | IsraelBriefingFilterTests                                                                                                                        |
+| Services/IsraelChartDetails.swift                        | Services            | portable         | 182   | M     | M1     | Foundation                                                        | IsraelChartFeaturesTests                                                                                                                         |
+| Services/IsraelChartFeatures.swift                       | Services            | platform-adapter | 472   | M     | M1     | CoreLocation, Foundation                                          | IsraelAlertTests, IsraelChartFeaturesTests, IsraelLSAPlannerTests +2                                                                             |
+| Services/IsraelChartManifest.swift                       | Services            | portable         | 146   | S     | S1     | Foundation                                                        | LogbookEntryTests, PrivacyManifestTests, IsraelAirportDiagramTests +3                                                                            |
+| Services/IsraelChartOverlay.swift                        | Services            | UI               | 754   | M     | M1     | MapLibre, OSLog, Observation, UIKit                               | -                                                                                                                                                |
+| Services/IsraelChartService.swift                        | Services            | platform-adapter | 370   | S     | S1     | CryptoKit, Foundation                                             | IsraelAirportDiagramTests, IsraelChartServiceTests                                                                                               |
+| Services/IsraelChartStore.swift                          | Services            | portable         | 123   | S     | S1     | Foundation, Observation                                           | -                                                                                                                                                |
+| Services/IsraelChartStyle.swift                          | Services            | UI               | 227   | M     | M1     | UIKit                                                             | IsraelChartFeaturesTests                                                                                                                         |
+| Services/IsraelDiagramPack.swift                         | Services            | portable         | 106   | S     | S1     | Foundation                                                        | IsraelAirportDiagramTests                                                                                                                        |
+| Services/IsraelDiagramStore.swift                        | Services            | portable         | 104   | S     | S1     | Foundation, Observation                                           | -                                                                                                                                                |
+| Services/IsraelFlightPlanMessage.swift                   | Services            | portable         | 290   | L     | L3     | Foundation                                                        | IsraelFlightPlanMessageTests, IsraelLSAPlannerTests, IsraelRoutePlannerTests                                                                     |
+| Services/IsraelLSAOverlay.swift                          | Services            | UI               | 197   | M     | M1     | CoreLocation, Foundation, MapLibre, OSLog, UIKit                  | -                                                                                                                                                |
+| Services/IsraelLSATimeRules.swift                        | Services            | portable         | 70    | L     | L3     | Foundation                                                        | IsraelLSAPlannerTests, ScenarioFlightTests                                                                                                       |
+| Services/IsraelNotamClosureMapper.swift                  | Services            | portable         | 89    | L     | L3     | Foundation                                                        | IsraelAviationDatabaseTests, IsraelNotamClosureMapperTests, IsraelRoutePlannerTests                                                              |
+| Services/IsraelNotamService.swift                        | Services            | portable         | 392   | S     | S1     | Foundation, os                                                    | IsraelAviationDatabaseTests, MockIsraelNotamService, IsraelAlertTests +9                                                                         |
+| Services/IsraelOfficialChartLayer.swift                  | Services            | UI               | 70    | M     | M1     | Foundation, MapLibre                                              | -                                                                                                                                                |
+| Services/IsraelRouteFollowing.swift                      | Services            | platform-adapter | 180   | L     | L3     | CoreLocation, Foundation                                          | IsraelRouteFollowingTests, ScenarioFlightTests                                                                                                   |
+| Services/IsraelRoutePlanner.swift                        | Services            | platform-adapter | 488   | L     | L3     | CoreLocation, Foundation                                          | CVFRDebriefTests, IsraelFlightPlanMessageTests, IsraelLSAPlannerTests +2                                                                         |
+| Services/KeychainStore.swift                             | Services            | platform-adapter | 83    | A     | A4     | Foundation, Security                                              | -                                                                                                                                                |
+| Services/LandableAirportFilter.swift                     | Services            | portable         | 82    | L     | L1     | Foundation                                                        | BundledAirportQueriesTests, LandableAirportFilterTests, IsraelNearestAndSearchTests                                                              |
+| Services/LocationService.swift                           | Services            | platform-adapter | 239   | A     | A1     | CoreLocation                                                      | LocationServiceCharacterizationTests, ScenarioRun                                                                                                |
+| Services/MapQueryRegion.swift                            | Services            | platform-adapter | 145   | M     | M1     | CoreLocation, Foundation                                          | MapLoadingFlowTests, MapQueryRegionTests                                                                                                         |
+| Services/MapService.swift                                | Services            | UI               | 1093  | M     | M1     | MapLibre, SwiftUI, UIKit                                          | MapLoadingFlowTests, RegionTests, FlightPlanViewModelTests +1                                                                                    |
+| Services/NotamReadStateStore.swift                       | Services            | portable         | 71    | S     | S1     | Foundation, Observation                                           | IsraelBriefingViewModelTests                                                                                                                     |
+| Services/NotamService.swift                              | Services            | portable         | 520   | S     | S1     | Foundation, os                                                    | MockNotamService, NotamServiceTests                                                                                                              |
+| Services/OfflineMapService.swift                         | Services            | UI               | 622   | M     | M3     | CoreLocation, Foundation, MapLibre, Observation                   | OfflinePackStatusCharacterizationTests, OfflineMapTests, TerminalProcedureServiceTests                                                           |
+| Services/PirepService.swift                              | Services            | platform-adapter | 330   | S     | S1     | CoreLocation, Foundation, os                                      | MockPirepService, PirepServiceTests                                                                                                              |
+| Services/Prediction/AirspacePredictor.swift              | Services/Prediction | platform-adapter | 123   | L     | L7     | CoreLocation, Foundation                                          | AirspacePredictorTests, PredictionServiceTests                                                                                                   |
+| Services/Prediction/PredictedEvent.swift                 | Services/Prediction | platform-adapter | 89    | L     | L7     | CoreLocation, Foundation                                          | AirspacePredictorTests, PredictionServiceTests, RegionTests +2                                                                                   |
+| Services/Prediction/PredictionService.swift              | Services/Prediction | platform-adapter | 170   | L     | L7     | CoreLocation, Foundation                                          | PredictionServiceTests                                                                                                                           |
+| Services/ProximityAlertService.swift                     | Services            | platform-adapter | 248   | S     | S1     | CoreLocation, Foundation, os                                      | ProximityAlertAltitudeTests, TFRServiceTests                                                                                                     |
+| Services/ReachabilityService.swift                       | Services            | platform-adapter | 39    | S     | S1     | Foundation, Network                                               | -                                                                                                                                                |
+| Services/Recording/AudioRecorder.swift                   | Services/Recording  | UI               | 451   | A     | A2     | AVFoundation, Foundation, UIKit, os                               | AudioRecorderTests                                                                                                                               |
+| Services/Recording/AutoStartGate.swift                   | Services/Recording  | portable         | 30    | L     | L4     | Foundation                                                        | MapGPSRecordingFixesTests                                                                                                                        |
+| Services/Recording/AviationVocabulary.swift              | Services/Recording  | portable         | 396   | A     | A3     | Foundation                                                        | AviationVocabularyTests, TranscriptionServiceTests                                                                                               |
+| Services/Recording/FlightPersistenceService.swift        | Services/Recording  | platform-adapter | 192   | L     | L4     | CoreLocation, Foundation, OSLog, SwiftData                        | FlightPersistenceStopPathCharacterizationTests, FlightPersistenceTests, FlightRecoveryTests                                                      |
+| Services/Recording/FlightPhaseDetector.swift             | Services/Recording  | portable         | 206   | L     | L4     | Foundation                                                        | FlightPhaseDetectorTests, MapGPSRecordingFixesTests                                                                                              |
+| Services/Recording/FlightRecoveryService.swift           | Services/Recording  | platform-adapter | 154   | L     | L4     | AVFoundation, Foundation, OSLog, SwiftData                        | PrivacyManifestTests, FlightRecoveryTests                                                                                                        |
+| Services/Recording/RecordingCoordinator.swift            | Services/Recording  | platform-adapter | 465   | L     | L4     | AVFoundation, Foundation, os                                      | FlightPersistenceStopPathCharacterizationTests, RecordingStopPathCharacterizationTests, LogbookEntryTests +11                                    |
+| Services/Recording/TrackRecorder.swift                   | Services/Recording  | platform-adapter | 195   | A     | A1     | CoreLocation, Foundation                                          | RecordingStopPathCharacterizationTests, TrackRecorderTests, ScenarioRun                                                                          |
+| Services/Recording/TranscriptionService.swift            | Services/Recording  | platform-adapter | 425   | A     | A3     | AVFoundation, CoreMedia, Foundation, Speech, os                   | TranscriptionServiceTests                                                                                                                        |
+| Services/Recording/VerticalSpeedEstimator.swift          | Services/Recording  | portable         | 68    | L     | L4     | Foundation                                                        | FlightPhaseDetectorTests, VerticalSpeedEstimatorTests                                                                                            |
+| Services/RemoteConfigService.swift                       | Services            | portable         | 63    | S     | S1     | Foundation, os                                                    | MockRemoteConfigService, RemoteConfigTests                                                                                                       |
+| Services/RemoteConfigStore.swift                         | Services            | portable         | 200   | S     | S1     | Foundation, Observation, os                                       | RemoteConfigTests                                                                                                                                |
+| Services/Replay/ReplayEngine.swift                       | Services/Replay     | platform-adapter | 305   | L     | L8     | AVFoundation, CoreLocation, Foundation, Observation               | ReplayEngineTests                                                                                                                                |
+| Services/Simulation/FlightScenario.swift                 | Services/Simulation | platform-adapter | 179   | -     | -      | CoreLocation, Foundation                                          | CVFRDebriefTests, IsraelAlertTests, IsraelBriefingFilterTests +5                                                                                 |
+| Services/Simulation/ScenarioPlayback.swift               | Services/Simulation | platform-adapter | 187   | -     | -      | CoreLocation, Foundation, OSLog                                   | ScenarioRun                                                                                                                                      |
+| Services/Simulation/ScreenCaptureHooks.swift             | Services/Simulation | portable         | 56    | -     | -      | Foundation                                                        | -                                                                                                                                                |
+| Services/TFRService.swift                                | Services            | platform-adapter | 522   | S     | S1     | CoreLocation, Foundation, os                                      | MockTFRService, TFRServiceTests                                                                                                                  |
+| Services/TelemetryService.swift                          | Services            | platform-adapter | 148   | A     | A5     | Foundation, MetricKit, TelemetryDeck, os                          | MockAudioRecorder, MockTranscriptionService, AudioRecorderTests +5                                                                               |
+| Services/TerminalProcedureService.swift                  | Services            | portable         | 566   | S     | S1     | Foundation, os                                                    | MockTerminalProcedureService, IsraelAirportDiagramTests, TerminalProcedureServiceTests                                                           |
+| Services/WeatherService.swift                            | Services            | portable         | 336   | S     | S1     | Foundation, os                                                    | WeatherCacheClockCharacterizationTests, MetarVisibilityTests, RegionTests +2                                                                     |
+| Services/WindsAloftService.swift                         | Services            | platform-adapter | 686   | S     | S1     | CoreLocation, Foundation, os                                      | MockWindsAloftService, WindsAloftServiceTests                                                                                                    |
+| ViewModels/AircraftProfileViewModel.swift                | ViewModels          | platform-adapter | 129   | U     | U7     | Foundation, Observation, SwiftData                                | -                                                                                                                                                |
+| ViewModels/FlightPlanViewModel.swift                     | ViewModels          | UI               | 325   | U     | U4     | CoreLocation, Foundation, MapLibre, Observation, SwiftData, UIKit | FlightPlanViewModelTests                                                                                                                         |
+| ViewModels/IsraelBriefingViewModel.swift                 | ViewModels          | portable         | 168   | U     | U4     | Foundation, Observation                                           | IsraelBriefingViewModelTests                                                                                                                     |
+| ViewModels/IsraelFlightPlanViewModel.swift               | ViewModels          | UI               | 433   | U     | U4     | CoreLocation, Foundation, MapLibre, Observation, SwiftData, UIKit | IsraelLSAPlannerTests, IsraelFlightPlanViewModelTests                                                                                            |
+| ViewModels/LogbookViewModel.swift                        | ViewModels          | platform-adapter | 168   | U     | U7     | Foundation, Observation, SwiftData                                | LogbookEntryTests, LogbookViewModelTests                                                                                                         |
+| ViewModels/MapViewModel.swift                            | ViewModels          | UI               | 750   | M     | M1     | CoreLocation, Foundation, MapLibre, Observation                   | MapLoadingFlowTests, RegionTests, MapViewModelTests                                                                                              |
+| ViewModels/NearestAirportViewModel.swift                 | ViewModels          | platform-adapter | 271   | U     | U4     | CoreLocation, Foundation, Observation                             | LandableAirportFilterTests, LiveNavigationProgressTests, MapGPSRecordingFixesTests +2                                                            |
+| ViewModels/PilotProfileViewModel.swift                   | ViewModels          | platform-adapter | 183   | U     | U7     | Foundation, Observation, SwiftData                                | -                                                                                                                                                |
+| ViewModels/RecordingViewModel.swift                      | ViewModels          | platform-adapter | 226   | U     | U8     | AVFoundation, CoreLocation, Foundation, Observation, SwiftData    | MapGPSRecordingFixesTests, RecordingProblemSeverityTests                                                                                         |
+| ViewModels/ReplayViewModel.swift                         | ViewModels          | portable         | 115   | U     | U8     | Foundation, Observation                                           | -                                                                                                                                                |
+| ViewModels/SearchViewModel.swift                         | ViewModels          | portable         | 103   | U     | U4     | Foundation                                                        | IsraelNearestAndSearchTests                                                                                                                      |
+| ViewModels/WeatherViewModel.swift                        | ViewModels          | portable         | 176   | U     | U4     | Foundation, Observation                                           | CrossCountryFlowTests, MetarVisibilityTests, RegionTests +1                                                                                      |
+| Views/Aircraft/AircraftEditView.swift                    | Views/Aircraft      | UI               | 276   | U     | U7     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Aircraft/AircraftListView.swift                    | Views/Aircraft      | UI               | 171   | U     | U7     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Aircraft/PilotEditView.swift                       | Views/Aircraft      | UI               | 170   | U     | U7     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Aircraft/PilotProfileView.swift                    | Views/Aircraft      | UI               | 309   | U     | U7     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Briefing/IsraelBriefingView.swift                  | Views/Briefing      | UI               | 403   | U     | U4     | CoreLocation, SwiftUI, _LocationEssentials                        | IsraelBriefingFilterTests                                                                                                                        |
+| Views/Components/CurrencyBadge.swift                     | Views/Components    | UI               | 64    | U     | U1     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Components/DataAgeBadge.swift                      | Views/Components    | UI               | 82    | U     | U1     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Components/DatabaseUnavailableBanner.swift         | Views/Components    | UI               | 55    | U     | U1     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Components/FlightCategoryDot.swift                 | Views/Components    | UI               | 59    | U     | U1     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Components/OpacitySlider.swift                     | Views/Components    | UI               | 39    | U     | U1     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Components/RemoteConfigBanner.swift                | Views/Components    | UI               | 80    | U     | U1     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Components/SearchBar.swift                         | Views/Components    | UI               | 63    | U     | U1     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Flights/CVFRDebriefContent.swift                   | Views/Flights       | UI               | 150   | U     | U8     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Flights/CVFRDebriefProfileView.swift               | Views/Flights       | UI               | 410   | U     | U8     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Flights/DebriefView.swift                          | Views/Flights       | UI               | 373   | U     | U8     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Flights/FlightDetailView.swift                     | Views/Flights       | UI               | 312   | U     | U8     | SwiftData, SwiftUI                                                | MapGPSRecordingFixesTests                                                                                                                        |
+| Views/Flights/ReplayMapView.swift                        | Views/Flights       | UI               | 109   | U     | U8     | MapLibre, SwiftUI                                                 | -                                                                                                                                                |
+| Views/Flights/ReplayView.swift                           | Views/Flights       | UI               | 386   | U     | U8     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Flights/TimelineScrubBar.swift                     | Views/Flights       | UI               | 131   | U     | U8     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Flights/TranscriptPanelView.swift                  | Views/Flights       | UI               | 152   | U     | U8     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Log/AirportColumnView.swift                        | Views/Log           | UI               | 619   | U     | U3     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Log/FlightLogFooter.swift                          | Views/Log           | UI               | 190   | U     | U3     | MapLibre, SwiftUI                                                 | ZoomStepperTests                                                                                                                                 |
+| Views/Log/FlightLogRows.swift                            | Views/Log           | UI               | 753   | U     | U3     | CoreLocation, SwiftUI                                             | PredictionRowsTests                                                                                                                              |
+| Views/Log/FlightLogStrip.swift                           | Views/Log           | UI               | 649   | U     | U3     | SwiftUI                                                           | LiveNavigationProgressTests, MapGPSRecordingFixesTests, FlightLogNextTests +2                                                                    |
+| Views/Log/LayersColumnView.swift                         | Views/Log           | UI               | 412   | U     | U3     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Log/LogStackRows.swift                             | Views/Log           | UI               | 257   | U     | U3     | SwiftUI                                                           | FlownEntryActionTests                                                                                                                            |
+| Views/Log/LogStackView.swift                             | Views/Log           | UI               | 414   | U     | U3     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Log/NearestColumnView.swift                        | Views/Log           | UI               | 283   | U     | U3     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Log/SearchColumnView.swift                         | Views/Log           | UI               | 94    | U     | U3     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Logbook/LogbookEntryEditView.swift                 | Views/Logbook       | UI               | 251   | U     | U7     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Map/AirportChartsSection.swift                     | Views/Map           | UI               | 139   | M     | M4     | SwiftUI                                                           | TerminalProcedureServiceTests                                                                                                                    |
+| Views/Map/AirspaceCheckUnavailableBanner.swift           | Views/Map           | UI               | 29    | U     | U4     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Map/ChartPDFView.swift                             | Views/Map           | UI               | 148   | M     | M4     | PDFKit, SwiftUI                                                   | -                                                                                                                                                |
+| Views/Map/CurrencyWarningBanner.swift                    | Views/Map           | UI               | 139   | U     | U4     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Map/DisplayModeModifier.swift                      | Views/Map           | UI               | 44    | U     | U1     | Combine, CoreLocation, SwiftUI                                    | -                                                                                                                                                |
+| Views/Map/GPSFailureNotice.swift                         | Views/Map           | UI               | 50    | U     | U4     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Map/IsraelAerodromeSection.swift                   | Views/Map           | UI               | 211   | U     | U4     | SwiftUI                                                           | IsraelNearestAndSearchTests                                                                                                                      |
+| Views/Map/IsraelAlertBanner.swift                        | Views/Map           | UI               | 98    | U     | U4     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Map/IsraelChartHintBanner.swift                    | Views/Map           | UI               | 49    | U     | U4     | SwiftUI                                                           | RegionTests                                                                                                                                      |
+| Views/Map/IsraelChartSheets.swift                        | Views/Map           | UI               | 166   | U     | U4     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Map/IsraelDiagramSection.swift                     | Views/Map           | UI               | 117   | U     | U4     | PDFKit, SwiftUI                                                   | -                                                                                                                                                |
+| Views/Map/MapContainerView.swift                         | Views/Map           | UI               | 499   | M     | M1     | CoreLocation, SwiftData, SwiftUI                                  | ScenarioRun                                                                                                                                      |
+| Views/Map/MapView.swift                                  | Views/Map           | UI               | 198   | M     | M1     | MapLibre, SwiftUI                                                 | -                                                                                                                                                |
+| Views/Map/NotamSection.swift                             | Views/Map           | UI               | 196   | U     | U4     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Map/OverlayStalenessBadges.swift                   | Views/Map           | UI               | 90    | U     | U4     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Map/PirepSection.swift                             | Views/Map           | UI               | 192   | U     | U4     | CoreLocation, SwiftUI                                             | -                                                                                                                                                |
+| Views/Map/RecordingOverlayView.swift                     | Views/Map           | UI               | 282   | U     | U8     | SwiftUI, UIKit                                                    | RecordingStopPathCharacterizationTests                                                                                                           |
+| Views/Map/WindsAloftSection.swift                        | Views/Map           | UI               | 166   | U     | U4     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Onboarding/OnboardingView.swift                    | Views/Onboarding    | UI               | 105   | U     | U7     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Planning/FlightPlanSummaryCard.swift               | Views/Planning      | UI               | 90    | U     | U4     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Planning/FlightPlanView.swift                      | Views/Planning      | UI               | 264   | U     | U4     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Planning/IsraelFlightPlanView.swift                | Views/Planning      | UI               | 395   | U     | U4     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| Views/Settings/IsraelChartDownloadSection.swift          | Views/Settings      | UI               | 110   | U     | U7     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Settings/IsraelDiagramDownloadSection.swift        | Views/Settings      | UI               | 99    | U     | U7     | SwiftUI                                                           | IsraelDiagramSettingsSummaryTests                                                                                                                |
+| Views/Settings/OfflineMapsView.swift                     | Views/Settings      | UI               | 264   | M     | M3     | SwiftUI                                                           | -                                                                                                                                                |
+| Views/Settings/SettingsView.swift                        | Views/Settings      | UI               | 390   | U     | U7     | SwiftData, SwiftUI                                                | -                                                                                                                                                |
+| efb_212App.swift                                         | App                 | UI               | 45    | -     | -      | SwiftData, SwiftUI                                                | -                                                                                                                                                |
 
 ## Test files
 
-| File | Cases | Lines | Track | Disposition | Imports |
-|---|---|---|---|---|---|
-| CharacterizationTests/AviationDatabaseInstallCharacterizationTests.swift | 10 | 211 | D | port | Foundation, GRDB, efb_212 |
-| CharacterizationTests/DataFreshnessEdgeCharacterizationTests.swift | 17 | 181 | L | port | Foundation, efb_212 |
-| CharacterizationTests/FlightPersistenceStopPathCharacterizationTests.swift | 8 | 251 | L | port | Foundation, GRDB, SwiftData, efb_212 |
-| CharacterizationTests/LocationServiceCharacterizationTests.swift | 15 | 339 | A | port | CoreLocation, Foundation, efb_212 |
-| CharacterizationTests/OfflinePackStatusCharacterizationTests.swift | 20 | 210 | U | port | CoreLocation, Foundation, MapLibre, efb_212 |
-| CharacterizationTests/RecordingDatabaseChainMigrationCharacterizationTests.swift | 5 | 297 | D | port | Foundation, GRDB, efb_212 |
-| CharacterizationTests/RecordingStopPathCharacterizationTests.swift | 8 | 241 | L | port | CoreLocation, Foundation, GRDB, efb_212 |
-| CharacterizationTests/SwiftDataMigrationCharacterizationTests.swift | 9 | 265 | D | port | Foundation, SwiftData, efb_212 |
-| CharacterizationTests/WeatherCacheClockCharacterizationTests.swift | 7 | 156 | S | port | Foundation, efb_212 |
-| DataTests/AviationDatabaseRobustnessTests.swift | 16 | 341 | D | port | CoreLocation, Foundation, GRDB, efb_212 |
-| DataTests/AviationDatabaseTests.swift | 13 | 423 | L | port | CoreLocation, Foundation, GRDB, efb_212 |
-| DataTests/AviationModelTests.swift | 24 | 273 | L | port | CoreLocation, Foundation, efb_212 |
-| DataTests/BundledAirportQueriesTests.swift | 10 | 160 | L | port | CoreLocation, Foundation, efb_212 |
-| DataTests/BundledAviationDataTests.swift | 3 | 72 | D | port | Foundation, SQLite3, efb_212 |
-| DataTests/DataRefreshSchedulerTests.swift | 6 | 66 | S | port | Foundation, efb_212 |
-| DataTests/EFBErrorTests.swift | 5 | 110 | L | port | Foundation, efb_212 |
-| DataTests/IsraelAerodromeDatabaseTests.swift | 16 | 183 | D | port | CoreLocation, Foundation, efb_212 |
-| DataTests/IsraelAviationDatabaseTests.swift | 21 | 267 | L | port | CoreLocation, Foundation, efb_212 |
-| DataTests/IsraelLSADatabaseTests.swift | 7 | 89 | D | port | Foundation, efb_212 |
-| DataTests/LogbookEntryTests.swift | 10 | 170 | D | port | Foundation, SwiftData, efb_212 |
-| DataTests/OverlayStalenessTests.swift | 4 | 35 | L | port | Foundation, efb_212 |
-| DataTests/ProfileModelTests.swift | 9 | 105 | D | port | Foundation, efb_212 |
-| DataTests/RecordingDatabaseMigrationTests.swift | 3 | 111 | D | port | Foundation, GRDB, efb_212 |
-| DataTests/TileFailureTrackerTests.swift | 3 | 33 | L | port | efb_212 |
-| IntegrationTests/CrossCountryFlowTests.swift | 4 | 104 | L | port | Foundation, SwiftData, efb_212 |
-| IntegrationTests/MapLoadingFlowTests.swift | 13 | 309 | L | port | CoreLocation, Foundation, efb_212 |
-| Mocks/MockAirSigmetService.swift | 0 | 24 | L | drop | Foundation, efb_212 |
-| Mocks/MockAudioRecorder.swift | 0 | 63 | L | drop | Foundation, efb_212 |
-| Mocks/MockDatabaseManager.swift | 0 | 54 | L | drop | CoreLocation, Foundation, efb_212 |
-| Mocks/MockIsraelAviationDatabase.swift | 0 | 97 | D | drop | CoreLocation, Foundation, efb_212 |
-| Mocks/MockIsraelNotamService.swift | 0 | 29 | S | drop | Foundation, efb_212 |
-| Mocks/MockLocationManager.swift | 0 | 29 | - | drop | Combine, CoreLocation, Foundation, efb_212 |
-| Mocks/MockNetworkManager.swift | 0 | 17 | - | drop | Foundation, efb_212 |
-| Mocks/MockNotamService.swift | 0 | 24 | L | drop | Foundation, efb_212 |
-| Mocks/MockPirepService.swift | 0 | 32 | L | drop | CoreLocation, Foundation, efb_212 |
-| Mocks/MockRecordingDatabase.swift | 0 | 43 | L | drop | Foundation, efb_212 |
-| Mocks/MockRemoteConfigService.swift | 0 | 42 | S | drop | Foundation, efb_212 |
-| Mocks/MockTFRService.swift | 0 | 24 | L | drop | Foundation, efb_212 |
-| Mocks/MockTerminalProcedureService.swift | 0 | 31 | L | drop | Foundation, efb_212 |
-| Mocks/MockTranscriptionService.swift | 0 | 47 | A | drop | Foundation, efb_212 |
-| Mocks/MockWeatherService.swift | 0 | 71 | L | drop | Foundation, efb_212 |
-| Mocks/MockWindsAloftService.swift | 0 | 28 | L | drop | CoreLocation, Foundation, efb_212 |
-| Mocks/StubURLProtocol.swift | 0 | 52 | - | drop | Foundation |
-| PrivacyManifestTests.swift | 5 | 149 | L | drop | Foundation |
-| ServiceTests/AirSigmetServiceTests.swift | 12 | 231 | S | port | Foundation, efb_212, os |
-| ServiceTests/AirportDiagramGeoreferencerTests.swift | 11 | 258 | L | port | CoreGraphics, Foundation, efb_212 |
-| ServiceTests/AirportDiagramVectorScanTests.swift | 4 | 125 | L | port | CoreGraphics, Foundation, efb_212 |
-| ServiceTests/AirspacePredictorTests.swift | 16 | 190 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/AudioRecorderTests.swift | 11 | 101 | L | port | Foundation, efb_212 |
-| ServiceTests/AutoStartTests.swift | 6 | 107 | D | port | Foundation, GRDB, efb_212 |
-| ServiceTests/AviationVocabularyTests.swift | 11 | 101 | A | port | Foundation, efb_212 |
-| ServiceTests/CVFRDebriefTests.swift | 34 | 604 | L | port | CoreLocation, Foundation, GRDB, efb_212 |
-| ServiceTests/CurrencyServiceTests.swift | 21 | 182 | L | port | Foundation, efb_212 |
-| ServiceTests/DataFreshnessTests.swift | 13 | 137 | L | port | Foundation, efb_212 |
-| ServiceTests/DebriefAvailabilityTests.swift | 9 | 74 | A | port | Foundation, efb_212 |
-| ServiceTests/DebriefSchemaTests.swift | 6 | 185 | D | port | Foundation, GRDB, efb_212 |
-| ServiceTests/DisplayModeResolverTests.swift | 8 | 75 | U | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/FlightPersistenceTests.swift | 3 | 134 | D | port | Foundation, SwiftData, efb_212 |
-| ServiceTests/FlightPhaseDetectorTests.swift | 12 | 265 | L | port | Foundation, efb_212 |
-| ServiceTests/FlightRecoveryTests.swift | 5 | 150 | D | port | Foundation, GRDB, SwiftData, efb_212 |
-| ServiceTests/FlightSummaryBuilderTests.swift | 6 | 279 | L | port | Foundation, efb_212 |
-| ServiceTests/FollowModeStateTests.swift | 5 | 49 | A | port | efb_212 |
-| ServiceTests/GPSStatusTests.swift | 14 | 131 | A | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/IsraelAirportDiagramTests.swift | 12 | 210 | S | port | CoreGraphics, CoreLocation, Foundation, efb_212 |
-| ServiceTests/IsraelAlertTests.swift | 37 | 511 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/IsraelBriefingFilterTests.swift | 20 | 253 | L | port | Foundation, efb_212 |
-| ServiceTests/IsraelChartFeaturesTests.swift | 38 | 483 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/IsraelChartServiceTests.swift | 18 | 302 | S | port | CryptoKit, Foundation, efb_212 |
-| ServiceTests/IsraelFlightPlanMessageTests.swift | 16 | 213 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/IsraelLSAPlannerTests.swift | 25 | 435 | D | port | CoreLocation, Foundation, SwiftData, efb_212 |
-| ServiceTests/IsraelNotamClosureMapperTests.swift | 9 | 115 | D | port | Foundation, efb_212 |
-| ServiceTests/IsraelNotamServiceTests.swift | 23 | 375 | L | port | Foundation, efb_212, os |
-| ServiceTests/IsraelRouteFollowingTests.swift | 19 | 232 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/IsraelRoutePlannerTests.swift | 24 | 283 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/LandableAirportFilterTests.swift | 16 | 149 | L | port | Foundation, efb_212 |
-| ServiceTests/LiveNavigationProgressTests.swift | 7 | 163 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/MapGPSRecordingFixesTests.swift | 22 | 256 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/MapQueryRegionTests.swift | 17 | 168 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/MetarVisibilityTests.swift | 8 | 79 | L | port | Foundation, efb_212 |
-| ServiceTests/NotamServiceTests.swift | 14 | 437 | L | port | Foundation, efb_212 |
-| ServiceTests/OfflineMapTests.swift | 20 | 188 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/PirepServiceTests.swift | 19 | 255 | L | port | CoreLocation, Foundation, efb_212, os |
-| ServiceTests/PredictionServiceTests.swift | 14 | 224 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/ProximityAlertAltitudeTests.swift | 10 | 154 | L | port | CoreLocation, Foundation, efb_212 |
-| ServiceTests/RecordingCoordinatorTests.swift | 11 | 227 | L | port | Foundation, GRDB, efb_212 |
-| ServiceTests/RegionTests.swift | 19 | 242 | L | port | CoreLocation, Foundation, SwiftData, efb_212 |
-| ServiceTests/RemoteConfigTests.swift | 27 | 410 | S | port | Foundation, efb_212 |
-| ServiceTests/ReplayEngineTests.swift | 20 | 447 | D | port | CoreLocation, Foundation, GRDB, efb_212 |
-| ServiceTests/TFRServiceTests.swift | 20 | 559 | L | port | CoreLocation, Foundation, efb_212, os |
-| ServiceTests/TelemetryTests.swift | 4 | 118 | A | port | Foundation, efb_212 |
-| ServiceTests/TerminalProcedureServiceTests.swift | 15 | 340 | L | port | Foundation, efb_212, os |
-| ServiceTests/TrackRecorderTests.swift | 2 | 100 | A | port | CoreLocation, Foundation, GRDB, efb_212 |
-| ServiceTests/TranscriptionServiceTests.swift | 8 | 192 | A | port | CoreMedia, Foundation, GRDB, Speech, efb_212 |
-| ServiceTests/VerticalSpeedEstimatorTests.swift | 6 | 101 | L | port | Foundation, efb_212 |
-| ServiceTests/WeatherParsingTests.swift | 5 | 70 | L | port | Foundation, efb_212 |
-| ServiceTests/WeatherServiceTests.swift | 21 | 251 | L | port | Foundation, efb_212 |
-| ServiceTests/WindsAloftServiceTests.swift | 21 | 356 | L | port | CoreLocation, Foundation, efb_212, os |
-| Simulation/ScenarioFlightTests.swift | 9 | 235 | L | drop | CoreLocation, Foundation, efb_212 |
-| Simulation/ScenarioRun.swift | 0 | 199 | A | drop | CoreLocation, Foundation, GRDB, efb_212 |
-| ViewModelTests/FlightLogNextTests.swift | 5 | 50 | - | drop | Foundation, efb_212 |
-| ViewModelTests/FlightPlanViewModelTests.swift | 24 | 462 | D | port | CoreLocation, Foundation, SwiftData, efb_212 |
-| ViewModelTests/FlownEntryActionTests.swift | 5 | 51 | D | port | Foundation, efb_212 |
-| ViewModelTests/IsraelBriefingViewModelTests.swift | 12 | 156 | L | port | Foundation, efb_212 |
-| ViewModelTests/IsraelDiagramSettingsSummaryTests.swift | 1 | 24 | L | port | efb_212 |
-| ViewModelTests/IsraelFlightPlanViewModelTests.swift | 8 | 186 | D | port | CoreLocation, Foundation, SwiftData, efb_212 |
-| ViewModelTests/IsraelNearestAndSearchTests.swift | 18 | 306 | L | port | CoreLocation, Foundation, efb_212 |
-| ViewModelTests/LogbookViewModelTests.swift | 11 | 179 | D | port | Foundation, SwiftData, efb_212 |
-| ViewModelTests/MapViewModelTests.swift | 4 | 89 | L | port | CoreLocation, Foundation, efb_212 |
-| ViewModelTests/NearestAirportViewModelTests.swift | 6 | 151 | L | port | CoreLocation, Foundation, efb_212 |
-| ViewModelTests/PredictionRowsTests.swift | 14 | 156 | L | port | CoreLocation, Foundation, efb_212 |
-| ViewModelTests/RecordingProblemSeverityTests.swift | 2 | 25 | U | port | efb_212 |
-| ViewModelTests/WeatherRefreshFailureTests.swift | 12 | 153 | L | port | Foundation, efb_212 |
-| ViewModelTests/ZoomStepperTests.swift | 3 | 34 | U | port | efb_212 |
-| efb_212Tests.swift | 1 | 17 | U | port | efb_212 |
+| File                                                                             | Cases | Lines | Track | Disposition | Imports                                         |
+| -------------------------------------------------------------------------------- | ----- | ----- | ----- | ----------- | ----------------------------------------------- |
+| CharacterizationTests/AviationDatabaseInstallCharacterizationTests.swift         | 10    | 211   | D     | port        | Foundation, GRDB, efb_212                       |
+| CharacterizationTests/DataFreshnessEdgeCharacterizationTests.swift               | 17    | 181   | L     | port        | Foundation, efb_212                             |
+| CharacterizationTests/FlightPersistenceStopPathCharacterizationTests.swift       | 8     | 251   | L     | port        | Foundation, GRDB, SwiftData, efb_212            |
+| CharacterizationTests/LocationServiceCharacterizationTests.swift                 | 15    | 339   | A     | port        | CoreLocation, Foundation, efb_212               |
+| CharacterizationTests/OfflinePackStatusCharacterizationTests.swift               | 20    | 210   | U     | port        | CoreLocation, Foundation, MapLibre, efb_212     |
+| CharacterizationTests/RecordingDatabaseChainMigrationCharacterizationTests.swift | 5     | 297   | D     | port        | Foundation, GRDB, efb_212                       |
+| CharacterizationTests/RecordingStopPathCharacterizationTests.swift               | 8     | 241   | L     | port        | CoreLocation, Foundation, GRDB, efb_212         |
+| CharacterizationTests/SwiftDataMigrationCharacterizationTests.swift              | 9     | 265   | D     | port        | Foundation, SwiftData, efb_212                  |
+| CharacterizationTests/WeatherCacheClockCharacterizationTests.swift               | 7     | 156   | S     | port        | Foundation, efb_212                             |
+| DataTests/AviationDatabaseRobustnessTests.swift                                  | 16    | 341   | D     | port        | CoreLocation, Foundation, GRDB, efb_212         |
+| DataTests/AviationDatabaseTests.swift                                            | 13    | 423   | L     | port        | CoreLocation, Foundation, GRDB, efb_212         |
+| DataTests/AviationModelTests.swift                                               | 24    | 273   | L     | port        | CoreLocation, Foundation, efb_212               |
+| DataTests/BundledAirportQueriesTests.swift                                       | 10    | 160   | L     | port        | CoreLocation, Foundation, efb_212               |
+| DataTests/BundledAviationDataTests.swift                                         | 3     | 72    | D     | port        | Foundation, SQLite3, efb_212                    |
+| DataTests/DataRefreshSchedulerTests.swift                                        | 6     | 66    | S     | port        | Foundation, efb_212                             |
+| DataTests/EFBErrorTests.swift                                                    | 5     | 110   | L     | port        | Foundation, efb_212                             |
+| DataTests/IsraelAerodromeDatabaseTests.swift                                     | 16    | 183   | D     | port        | CoreLocation, Foundation, efb_212               |
+| DataTests/IsraelAviationDatabaseTests.swift                                      | 21    | 267   | L     | port        | CoreLocation, Foundation, efb_212               |
+| DataTests/IsraelLSADatabaseTests.swift                                           | 7     | 89    | D     | port        | Foundation, efb_212                             |
+| DataTests/LogbookEntryTests.swift                                                | 10    | 170   | D     | port        | Foundation, SwiftData, efb_212                  |
+| DataTests/OverlayStalenessTests.swift                                            | 4     | 35    | L     | port        | Foundation, efb_212                             |
+| DataTests/ProfileModelTests.swift                                                | 9     | 105   | D     | port        | Foundation, efb_212                             |
+| DataTests/RecordingDatabaseMigrationTests.swift                                  | 3     | 111   | D     | port        | Foundation, GRDB, efb_212                       |
+| DataTests/TileFailureTrackerTests.swift                                          | 3     | 33    | L     | port        | efb_212                                         |
+| IntegrationTests/CrossCountryFlowTests.swift                                     | 4     | 104   | L     | port        | Foundation, SwiftData, efb_212                  |
+| IntegrationTests/MapLoadingFlowTests.swift                                       | 13    | 309   | L     | port        | CoreLocation, Foundation, efb_212               |
+| Mocks/MockAirSigmetService.swift                                                 | 0     | 24    | L     | drop        | Foundation, efb_212                             |
+| Mocks/MockAudioRecorder.swift                                                    | 0     | 63    | L     | drop        | Foundation, efb_212                             |
+| Mocks/MockDatabaseManager.swift                                                  | 0     | 54    | L     | drop        | CoreLocation, Foundation, efb_212               |
+| Mocks/MockIsraelAviationDatabase.swift                                           | 0     | 97    | D     | drop        | CoreLocation, Foundation, efb_212               |
+| Mocks/MockIsraelNotamService.swift                                               | 0     | 29    | S     | drop        | Foundation, efb_212                             |
+| Mocks/MockLocationManager.swift                                                  | 0     | 29    | -     | drop        | Combine, CoreLocation, Foundation, efb_212      |
+| Mocks/MockNetworkManager.swift                                                   | 0     | 17    | -     | drop        | Foundation, efb_212                             |
+| Mocks/MockNotamService.swift                                                     | 0     | 24    | L     | drop        | Foundation, efb_212                             |
+| Mocks/MockPirepService.swift                                                     | 0     | 32    | L     | drop        | CoreLocation, Foundation, efb_212               |
+| Mocks/MockRecordingDatabase.swift                                                | 0     | 43    | L     | drop        | Foundation, efb_212                             |
+| Mocks/MockRemoteConfigService.swift                                              | 0     | 42    | S     | drop        | Foundation, efb_212                             |
+| Mocks/MockTFRService.swift                                                       | 0     | 24    | L     | drop        | Foundation, efb_212                             |
+| Mocks/MockTerminalProcedureService.swift                                         | 0     | 31    | L     | drop        | Foundation, efb_212                             |
+| Mocks/MockTranscriptionService.swift                                             | 0     | 47    | A     | drop        | Foundation, efb_212                             |
+| Mocks/MockWeatherService.swift                                                   | 0     | 71    | L     | drop        | Foundation, efb_212                             |
+| Mocks/MockWindsAloftService.swift                                                | 0     | 28    | L     | drop        | CoreLocation, Foundation, efb_212               |
+| Mocks/StubURLProtocol.swift                                                      | 0     | 52    | -     | drop        | Foundation                                      |
+| PrivacyManifestTests.swift                                                       | 5     | 149   | L     | drop        | Foundation                                      |
+| ServiceTests/AirSigmetServiceTests.swift                                         | 12    | 231   | S     | port        | Foundation, efb_212, os                         |
+| ServiceTests/AirportDiagramGeoreferencerTests.swift                              | 11    | 258   | L     | port        | CoreGraphics, Foundation, efb_212               |
+| ServiceTests/AirportDiagramVectorScanTests.swift                                 | 4     | 125   | L     | port        | CoreGraphics, Foundation, efb_212               |
+| ServiceTests/AirspacePredictorTests.swift                                        | 16    | 190   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/AudioRecorderTests.swift                                            | 11    | 101   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/AutoStartTests.swift                                                | 6     | 107   | D     | port        | Foundation, GRDB, efb_212                       |
+| ServiceTests/AviationVocabularyTests.swift                                       | 11    | 101   | A     | port        | Foundation, efb_212                             |
+| ServiceTests/CVFRDebriefTests.swift                                              | 34    | 604   | L     | port        | CoreLocation, Foundation, GRDB, efb_212         |
+| ServiceTests/CurrencyServiceTests.swift                                          | 21    | 182   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/DataFreshnessTests.swift                                            | 13    | 137   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/DebriefAvailabilityTests.swift                                      | 9     | 74    | A     | port        | Foundation, efb_212                             |
+| ServiceTests/DebriefSchemaTests.swift                                            | 6     | 185   | D     | port        | Foundation, GRDB, efb_212                       |
+| ServiceTests/DisplayModeResolverTests.swift                                      | 8     | 75    | U     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/FlightPersistenceTests.swift                                        | 3     | 134   | D     | port        | Foundation, SwiftData, efb_212                  |
+| ServiceTests/FlightPhaseDetectorTests.swift                                      | 12    | 265   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/FlightRecoveryTests.swift                                           | 5     | 150   | D     | port        | Foundation, GRDB, SwiftData, efb_212            |
+| ServiceTests/FlightSummaryBuilderTests.swift                                     | 6     | 279   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/FollowModeStateTests.swift                                          | 5     | 49    | A     | port        | efb_212                                         |
+| ServiceTests/GPSStatusTests.swift                                                | 14    | 131   | A     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/IsraelAirportDiagramTests.swift                                     | 12    | 210   | S     | port        | CoreGraphics, CoreLocation, Foundation, efb_212 |
+| ServiceTests/IsraelAlertTests.swift                                              | 37    | 511   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/IsraelBriefingFilterTests.swift                                     | 20    | 253   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/IsraelChartFeaturesTests.swift                                      | 38    | 483   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/IsraelChartServiceTests.swift                                       | 18    | 302   | S     | port        | CryptoKit, Foundation, efb_212                  |
+| ServiceTests/IsraelFlightPlanMessageTests.swift                                  | 16    | 213   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/IsraelLSAPlannerTests.swift                                         | 25    | 435   | D     | port        | CoreLocation, Foundation, SwiftData, efb_212    |
+| ServiceTests/IsraelNotamClosureMapperTests.swift                                 | 9     | 115   | D     | port        | Foundation, efb_212                             |
+| ServiceTests/IsraelNotamServiceTests.swift                                       | 23    | 375   | L     | port        | Foundation, efb_212, os                         |
+| ServiceTests/IsraelRouteFollowingTests.swift                                     | 19    | 232   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/IsraelRoutePlannerTests.swift                                       | 24    | 283   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/LandableAirportFilterTests.swift                                    | 16    | 149   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/LiveNavigationProgressTests.swift                                   | 7     | 163   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/MapGPSRecordingFixesTests.swift                                     | 22    | 256   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/MapQueryRegionTests.swift                                           | 17    | 168   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/MetarVisibilityTests.swift                                          | 8     | 79    | L     | port        | Foundation, efb_212                             |
+| ServiceTests/NotamServiceTests.swift                                             | 14    | 437   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/OfflineMapTests.swift                                               | 20    | 188   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/PirepServiceTests.swift                                             | 19    | 255   | L     | port        | CoreLocation, Foundation, efb_212, os           |
+| ServiceTests/PredictionServiceTests.swift                                        | 14    | 224   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/ProximityAlertAltitudeTests.swift                                   | 10    | 154   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ServiceTests/RecordingCoordinatorTests.swift                                     | 11    | 227   | L     | port        | Foundation, GRDB, efb_212                       |
+| ServiceTests/RegionTests.swift                                                   | 19    | 242   | L     | port        | CoreLocation, Foundation, SwiftData, efb_212    |
+| ServiceTests/RemoteConfigTests.swift                                             | 27    | 410   | S     | port        | Foundation, efb_212                             |
+| ServiceTests/ReplayEngineTests.swift                                             | 20    | 447   | D     | port        | CoreLocation, Foundation, GRDB, efb_212         |
+| ServiceTests/TFRServiceTests.swift                                               | 20    | 559   | L     | port        | CoreLocation, Foundation, efb_212, os           |
+| ServiceTests/TelemetryTests.swift                                                | 4     | 118   | A     | port        | Foundation, efb_212                             |
+| ServiceTests/TerminalProcedureServiceTests.swift                                 | 15    | 340   | L     | port        | Foundation, efb_212, os                         |
+| ServiceTests/TrackRecorderTests.swift                                            | 2     | 100   | A     | port        | CoreLocation, Foundation, GRDB, efb_212         |
+| ServiceTests/TranscriptionServiceTests.swift                                     | 8     | 192   | A     | port        | CoreMedia, Foundation, GRDB, Speech, efb_212    |
+| ServiceTests/VerticalSpeedEstimatorTests.swift                                   | 6     | 101   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/WeatherParsingTests.swift                                           | 5     | 70    | L     | port        | Foundation, efb_212                             |
+| ServiceTests/WeatherServiceTests.swift                                           | 21    | 251   | L     | port        | Foundation, efb_212                             |
+| ServiceTests/WindsAloftServiceTests.swift                                        | 21    | 356   | L     | port        | CoreLocation, Foundation, efb_212, os           |
+| Simulation/ScenarioFlightTests.swift                                             | 9     | 235   | L     | drop        | CoreLocation, Foundation, efb_212               |
+| Simulation/ScenarioRun.swift                                                     | 0     | 199   | A     | drop        | CoreLocation, Foundation, GRDB, efb_212         |
+| ViewModelTests/FlightLogNextTests.swift                                          | 5     | 50    | -     | drop        | Foundation, efb_212                             |
+| ViewModelTests/FlightPlanViewModelTests.swift                                    | 24    | 462   | D     | port        | CoreLocation, Foundation, SwiftData, efb_212    |
+| ViewModelTests/FlownEntryActionTests.swift                                       | 5     | 51    | D     | port        | Foundation, efb_212                             |
+| ViewModelTests/IsraelBriefingViewModelTests.swift                                | 12    | 156   | L     | port        | Foundation, efb_212                             |
+| ViewModelTests/IsraelDiagramSettingsSummaryTests.swift                           | 1     | 24    | L     | port        | efb_212                                         |
+| ViewModelTests/IsraelFlightPlanViewModelTests.swift                              | 8     | 186   | D     | port        | CoreLocation, Foundation, SwiftData, efb_212    |
+| ViewModelTests/IsraelNearestAndSearchTests.swift                                 | 18    | 306   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ViewModelTests/LogbookViewModelTests.swift                                       | 11    | 179   | D     | port        | Foundation, SwiftData, efb_212                  |
+| ViewModelTests/MapViewModelTests.swift                                           | 4     | 89    | L     | port        | CoreLocation, Foundation, efb_212               |
+| ViewModelTests/NearestAirportViewModelTests.swift                                | 6     | 151   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ViewModelTests/PredictionRowsTests.swift                                         | 14    | 156   | L     | port        | CoreLocation, Foundation, efb_212               |
+| ViewModelTests/RecordingProblemSeverityTests.swift                               | 2     | 25    | U     | port        | efb_212                                         |
+| ViewModelTests/WeatherRefreshFailureTests.swift                                  | 12    | 153   | L     | port        | Foundation, efb_212                             |
+| ViewModelTests/ZoomStepperTests.swift                                            | 3     | 34    | U     | port        | efb_212                                         |
+| efb_212Tests.swift                                                               | 1     | 17    | U     | port        | efb_212                                         |
 
 ## Swift behaviour differences found while porting
 
