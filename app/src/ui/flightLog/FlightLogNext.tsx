@@ -1,7 +1,8 @@
 // FlightLogNext (efb-212/Views/Log/FlightLogStrip.swift): the next waypoint with its time-to in the largest type on
 // screen, then the later route points; with no navigation, the nearest airport as a quiet row and Plan a flight. With
 // predictions on (stage 2) predicted airspace entries join the rows in time order: the soonest item is the loud top row
-// (an amber or red block when it is an event), at most 3 later rows, then "+N more". The iPhone rail (`compact`) is U5.
+// (an amber or red block when it is an event), at most 3 later rows, then "+N more". `compact` is the 104pt iPhone rail
+// (FlightLogRail): at most 2 later rows, no section detail, the idents over their times in row sizes so the times fit.
 import { Text, View } from 'react-native';
 import type { PredictedEvent } from '../../domain/prediction';
 import { destinationCode, type ActiveRouteLeg } from '../../domain/route';
@@ -29,11 +30,12 @@ import {
 import { Diamond } from './parts';
 
 const LATER_CAP = 3;
+const LATER_CAP_RAIL = 2;
 const hidden = { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' } as const;
 /** lineLimit(1).minimumScaleFactor(scale): RN shrinks the text instead of truncating (native only; web truncates). */
 const shrink = (scale: number) => ({ numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: scale }) as const;
 
-export function FlightLogNext() {
+export function FlightLogNext({ compact = false }: { compact?: boolean }) {
   const t = useTheme();
   const { data, stale, showsPredictions, nearestEntry } = useFlightLog();
   const ete = data.estimatedTimeEnroute; // seconds
@@ -57,7 +59,8 @@ export function FlightLogNext() {
     return ete + (distance / data.groundSpeed) * 3600;
   };
   const waypointTimes = ident == null ? [] : [quiet ? null : ete, ...legs.map((_, i) => cumulativeTime(i))];
-  const rows = splitNext(nextItems(events, waypointTimes), LATER_CAP);
+  const rows = splitNext(nextItems(events, waypointTimes), compact ? LATER_CAP_RAIL : LATER_CAP);
+  const pad = compact ? Space.s : Space.m; // points
 
   // Israel routes read their ETA in Israel time (the route-following ETA); Direct-To and US plans in device time.
   let eta: number | null = null;
@@ -80,33 +83,47 @@ export function FlightLogNext() {
     return parts.join(' \u00B7 ');
   };
 
-  // The time-to is the big element; without a meaningful time the ident takes its place and "---" stays small.
+  // The time-to is the big element; without a meaningful time the ident takes its place and "---" stays small. The rail
+  // keeps the ident over the time-to in row sizes so the full time fits.
   const nextRow = (id: string) => {
+    let timeType = Type.nextTime;
+    if (quiet) timeType = Type.data;
+    else if (compact) timeType = Type.rowTime;
+    let identShrink = 0.6;
+    if (compact) identShrink = 0.5;
+    else if (quiet) identShrink = 0.3;
     const time = (
-      <Text
-        {...hidden}
-        {...shrink(0.3)}
-        style={[quiet ? Type.data : Type.nextTime, { color: quiet ? t.inkSecondary : t.ink }]}
-      >
+      <Text {...hidden} {...shrink(compact ? 0.5 : 0.3)} style={[timeType, { color: quiet ? t.inkSecondary : t.ink }]}>
         {quiet || ete == null ? '---' : timeToText(ete)}
       </Text>
     );
     const identText = (
       <Text
-        {...shrink(quiet ? 0.3 : 0.6)}
+        {...shrink(identShrink)}
         accessibilityLabel={spokenLine(id)}
         testID={nextTestID}
-        style={[quiet ? Type.nextTime : Type.rowIdent, { color: stale ? t.inkSecondary : t.ink, flexShrink: 1 }]}
+        style={[
+          quiet && !compact ? Type.nextTime : Type.rowIdent,
+          { color: stale ? t.inkSecondary : t.ink, flexShrink: 1 },
+        ]}
       >
         {id}
       </Text>
     );
+    const line = compact ? (
+      <View style={{ gap: Space.xs }}>
+        {identText}
+        {time}
+      </View>
+    ) : (
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m }}>
+        {quiet ? identText : time}
+        {quiet ? time : identText}
+      </View>
+    );
     return (
-      <View style={{ padding: Space.m, backgroundColor: t.activeCell }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m }}>
-          {quiet ? identText : time}
-          {quiet ? time : identText}
-        </View>
+      <View style={{ padding: pad, backgroundColor: t.activeCell }}>
+        {line}
         <Text {...hidden} style={[Type.data, { color: t.inkSecondary, marginTop: Space.xs }]}>
           {dataText}
         </Text>
@@ -127,21 +144,34 @@ export function FlightLogNext() {
     let fill = t.cautionFill;
     if (t.night) fill = t.activeCell;
     else if (warning) fill = t.warning;
+    const time = (
+      <Text {...shrink(compact ? 0.5 : 0.3)} style={[compact ? Type.rowTime : Type.nextTime, { color: ink }]}>
+        {timeToText(event.secondsAhead)}
+      </Text>
+    );
+    const title = (
+      <Text {...shrink(0.5)} numberOfLines={compact ? 2 : 1} style={[Type.rowIdent, { color: ink, flexShrink: 1 }]}>
+        {event.title}
+      </Text>
+    );
     return (
       <View
         accessible
         accessibilityLabel={spokenEvent(event)}
         testID="next-predicted-event"
-        style={{ padding: Space.m, paddingLeft: Space.m + (t.night ? 5 : 0), backgroundColor: fill }}
+        style={{ padding: pad, paddingLeft: pad + (t.night ? 5 : 0), backgroundColor: fill }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m }}>
-          <Text {...shrink(0.3)} style={[Type.nextTime, { color: ink }]}>
-            {timeToText(event.secondsAhead)}
-          </Text>
-          <Text {...shrink(0.5)} style={[Type.rowIdent, { color: ink, flexShrink: 1 }]}>
-            {event.title}
-          </Text>
-        </View>
+        {compact ? (
+          <View style={{ gap: Space.xs }}>
+            {title}
+            {time}
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m }}>
+            {time}
+            {title}
+          </View>
+        )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xs, marginTop: Space.xs }}>
           <WarningTriangle color={ink} bang={fill} />
           <Text style={[Type.data, { color: ink, flexShrink: 1 }]}>{holdText(event.assumption)}</Text>
@@ -153,34 +183,49 @@ export function FlightLogNext() {
     );
   };
 
-  /** A later row: time-to in row size beside the ident and a data line; `toneColor` adds the event diamond. */
-  const laterLayout = (timeTo: number | null, toneColor: string | null, title: string, detail: string) => (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Space.s,
-        paddingHorizontal: Space.m,
-        paddingVertical: Space.s,
-      }}
-    >
-      {toneColor ? <Diamond color={toneColor} /> : null}
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m, flexShrink: 1 }}>
-        <Text
-          {...shrink(0.5)}
-          style={[Type.rowTime, { color: timeTo == null ? t.inkSecondary : (toneColor ?? t.ink) }]}
-        >
-          {timeTo == null ? '---' : timeToText(timeTo)}
+  /**
+   * A later row: time-to in row size beside the ident and a data line (in the rail, ident and data line over the time);
+   * `toneColor` adds the event diamond and colours the time.
+   */
+  const laterLayout = (timeTo: number | null, toneColor: string | null, title: string, detail: string) => {
+    const time = (
+      <Text {...shrink(0.5)} style={[Type.rowTime, { color: timeTo == null ? t.inkSecondary : (toneColor ?? t.ink) }]}>
+        {timeTo == null ? '---' : timeToText(timeTo)}
+      </Text>
+    );
+    const text = (
+      <View style={{ flexShrink: 1 }}>
+        <Text {...shrink(0.6)} style={[Type.rowIdent, { color: t.ink }]}>
+          {title}
         </Text>
-        <View style={{ flexShrink: 1 }}>
-          <Text {...shrink(0.6)} style={[Type.rowIdent, { color: t.ink }]}>
-            {title}
-          </Text>
-          <Text style={[Type.data, { color: t.inkSecondary }]}>{detail}</Text>
-        </View>
+        <Text style={[Type.data, { color: t.inkSecondary }]}>{detail}</Text>
       </View>
-    </View>
-  );
+    );
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: Space.s,
+          paddingHorizontal: pad,
+          paddingVertical: Space.s,
+        }}
+      >
+        {toneColor ? <Diamond color={toneColor} /> : null}
+        {compact ? (
+          <View style={{ flexShrink: 1 }}>
+            {text}
+            {time}
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m, flexShrink: 1 }}>
+            {time}
+            {text}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   const eventRow = (event: PredictedEvent) => (
     <View accessible accessibilityLabel={spokenEvent(event)} testID="next-predicted-event-row">
@@ -232,7 +277,7 @@ export function FlightLogNext() {
 
   return (
     <View>
-      <SectionBand title="Next" detail={sectionDetail} />
+      <SectionBand title="Next" detail={compact ? undefined : sectionDetail} />
       {rows.top ? item(rows.top, true) : null}
       {rows.later.map((row, index) => (
         // Swift ids are not unique when one volume is predicted twice: the index keeps React keys apart.
@@ -246,7 +291,7 @@ export function FlightLogNext() {
           <ColumnRule />
           <Text
             testID="next-more-points"
-            style={[Type.data, { color: t.inkSecondary, paddingHorizontal: Space.m, paddingVertical: Space.s }]}
+            style={[Type.data, { color: t.inkSecondary, paddingHorizontal: pad, paddingVertical: Space.s }]}
           >
             {`+${rows.hiddenCount} more` + (destination != null ? ` to ${destination}` : '')}
           </Text>
@@ -255,7 +300,7 @@ export function FlightLogNext() {
       {ident == null ? (
         <>
           {rows.top ? <ColumnRule /> : null}
-          <Text accessibilityLabel={nearestSpoken} style={[Type.data, { color: t.inkSecondary, padding: Space.m }]}>
+          <Text accessibilityLabel={nearestSpoken} style={[Type.data, { color: t.inkSecondary, padding: pad }]}>
             {nearestText}
           </Text>
           <Pressy
@@ -263,7 +308,7 @@ export function FlightLogNext() {
             onPress={data.actions.openLog}
             testID="plan-a-flight"
             style={{
-              marginHorizontal: Space.m,
+              marginHorizontal: pad,
               marginBottom: Space.m,
               minHeight: StripMetrics.cell,
               alignItems: 'center',

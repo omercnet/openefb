@@ -1,4 +1,5 @@
 import { act, type ReactElement } from 'react';
+import { StyleSheet, type StyleProp, type TextStyle } from 'react-native';
 import { callHandler, press, render, type Rendered } from '../../../tests/support/ui';
 import { makeAirport } from '../../domain/core';
 import type { GpsData } from '../state/gps';
@@ -7,10 +8,11 @@ import { panels, type PanelsData } from '../state/panels';
 import { appStore } from '../state/appStore';
 import { nearest, type NearestAirportEntry } from '../columns/nearest/store';
 import { ThemeContext } from '../Primitives';
-import { Day, Night, type Theme } from '../tokens';
+import { Day, Night, Space, StripMetrics, type Theme } from '../tokens';
 import { dayFixture, noNavigationFixture, predictedEvents, routeFixture } from './fixtures';
 import { FlightLogHeader } from './FlightLogHeader';
-import { FlightLogStrip } from './FlightLogStrip';
+import { FlightLogNowCell } from './FlightLogNow';
+import { FlightLogRail, FlightLogStrip } from './FlightLogStrip';
 import { flightLog, type FlightLogActions, type FlightLogData } from './store';
 
 const DOT = ' \u00B7 ';
@@ -508,5 +510,88 @@ describe('FlightLogStrip, review fixes', () => {
       await callHandler(content(view), 'onLayout', layout(420));
       expect(scrolls(view)).toBe(true);
     });
+  });
+});
+
+const flat = (node: { props: { style?: unknown } }): TextStyle =>
+  StyleSheet.flatten(node.props.style as StyleProp<TextStyle>) ?? {};
+
+describe('FlightLogRail (iPhone, compact NEXT)', () => {
+  const rail = <FlightLogRail />;
+
+  it('is a 104 pt column labelled Flight log, NEXT without its detail', async () => {
+    const { view } = await renderStrip({ element: rail });
+    const column = view.byTestId('flight-log-rail');
+    expect(column.props.accessibilityLabel).toBe('Flight log');
+    expect(flat(column).width).toBe(StripMetrics.railWidth);
+    expect(view.text()).toContain('Next');
+    expect(view.text()).not.toContain('direct');
+  });
+
+  it('puts the ident over the time-to, the time in row size, and speaks the row as one element', async () => {
+    const { view } = await renderStrip({ element: rail });
+    expect(view.text()).toContain('KOAK 9:12');
+    const time = view.all((n) => n.props.accessibilityElementsHidden === true && n.props.children === '9:12')[0];
+    expect(flat(time).fontSize).toBe(44);
+    expect(label(view, 'next-waypoint')).toBe(
+      `NEXT KOAK${DOT}in 9 minutes 12 seconds${DOT}14.9 NM${DOT}349\u00B0${DOT}ETA 18:11`,
+    );
+  });
+
+  it('caps the later rows at 2 and counts the rest to the destination', async () => {
+    const { view } = await renderStrip({
+      element: rail,
+      data: { ...routeFixture, predictedEvents },
+      panels: { showsPredictions: true },
+    });
+    expect(view.text()).toContain('+3 more to LLIB');
+  });
+
+  it('stacks the predicted event: what is met over the time-to; later rows stop at 2', async () => {
+    const { view } = await renderStrip({
+      element: rail,
+      data: { predictedEvents },
+      panels: { showsPredictions: true },
+    });
+    expect(view.byTestId('next-predicted-event')).toBeTruthy();
+    expect(view.text()).toContain('B floor 3,000 1:50');
+    // Later: KOAK (9:12) and C floor 1,500 (10:00); R 107 is counted.
+    expect(label(view, 'next-waypoint')).toContain('NEXT KOAK');
+    expect(view.all((n) => n.props.testID === 'next-predicted-event-row')).toHaveLength(1);
+    expect(view.text()).toContain('+1 more');
+  });
+
+  it('no navigation: the nearest row and Plan a flight at the rail padding', async () => {
+    const { view } = await renderStrip({ element: rail, data: noNavigationFixture });
+    expect(view.text()).toContain('Plan a flight');
+    expect(flat(view.byTestId('plan-a-flight')).marginHorizontal).toBe(Space.s);
+  });
+});
+
+describe('FlightLogNowCell compact (iPhone, full width under the chart)', () => {
+  // The three readout digits are the only text at 30 pt or more.
+  const readoutSizes = (view: Rendered) =>
+    view.all((n) => typeof n.props.children === 'string' && (flat(n).fontSize ?? 0) >= 30).map((n) => flat(n).fontSize);
+
+  it('draws the readouts at 38 pt with the tighter padding', async () => {
+    const { view } = await renderStrip({ element: <FlightLogNowCell compact /> });
+    expect(readoutSizes(view)).toEqual([38, 38, 38]);
+    expect(flat(view.byTestId('flight-log-now')).padding).toBe(Space.s);
+    expect(valueOf(view, 'Ground speed')).toBe('96 knots');
+  });
+
+  it('the strip keeps 42 pt', async () => {
+    const { view } = await renderStrip({ element: <FlightLogNowCell /> });
+    expect(readoutSizes(view)).toEqual([42, 42, 42]);
+  });
+});
+
+describe('FlightLogHeader compact', () => {
+  it('the record control shows its glyph only; the elapsed time is still spoken', async () => {
+    const { view } = await renderStrip({ element: <FlightLogHeader compact /> });
+    expect(view.text()).not.toContain('00:00:06');
+    expect(view.byTestId('record-button').props.accessibilityValue).toEqual({ text: 'Recording, 00:00:06' });
+    const regular = await renderStrip({ element: <FlightLogHeader /> });
+    expect(regular.view.text()).toContain('00:00:06');
   });
 });

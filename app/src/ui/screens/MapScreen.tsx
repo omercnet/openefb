@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useState } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { openAviationDatabase } from '../../adapters/aviationDb';
 import type { MapLayer } from '../../domain/core';
@@ -8,15 +8,17 @@ import type { MapDataSource } from '../../domain/map/mapDataController';
 import { fixtureAdvisory, fixtureTfr } from '../../fixtures/mapLayers';
 import { scenario } from '../../fixtures/scenario';
 import { useLocalGlyphs } from '../../adapters/glyphInstall';
+import { CompactMapLayout } from '../CompactMapLayout';
+import { useWidthClass, usesCompactLayout } from '../layout';
 import { MapSurface } from '../map/MapSurface';
 import { REMOTE_GLYPHS_URL } from '../map/surfaceModel';
 import { scenarioWeather, useAnimateFlag, useScenarioOwnship } from '../map/scenarioFeed';
 import { useMapController, useMapModel } from '../map/useMapData';
 import type { StripColumnKind } from '../../domain/types';
 import { appStore } from '../state/appStore';
+import { panels } from '../state/panels';
 import { StripColumn, type StripScreen } from '../StripColumn';
-
-export const STRIP_WIDTH_PT = 400; // matches the SwiftUI strip (docs/DESIGN.md)
+import { StripMetrics } from '../tokens';
 
 /** Aviation database opened in the background: the screen mounts without waiting for the copy-on-first-launch. */
 const lazyDb = (): MapDataSource => {
@@ -60,9 +62,10 @@ const OPENS_WITH: Record<StripScreen, { stripColumn: StripColumnKind; selectedAi
 };
 
 /**
- * The map-first layout: strip column beside the chart. A capture route passes `screen`, which decides what the strip
- * opens with and whether it is night; without it the strip just follows the app store. The map runs on the fixture
- * scenario (ownship, weather, layer set) until I1 wires the real app state; the surface and hooks are final.
+ * The map-first layout (MapContainerView.swift): on a regular window the 400pt strip column beside the chart; on a
+ * compact window (iPhone, narrow Split View) or with the flight log hidden, the compact layout with the 104pt NEXT rail
+ * and NOW and the footer under the chart. A capture route passes `screen`, which decides what the strip opens with and
+ * whether it is night; without it the strip just follows the app store.
  */
 export function MapScreen({ screen, allLayers = false }: { screen?: StripScreen; allLayers?: boolean }) {
   // After the first commit but before paint (a layout effect): writing the store during render would update the strip of
@@ -71,8 +74,8 @@ export function MapScreen({ screen, allLayers = false }: { screen?: StripScreen;
   useLayoutEffect(() => {
     if (screen) appStore.setState(OPENS_WITH[screen]);
   }, [screen]);
-  const { width } = useWindowDimensions();
-  const stripWidth = width < 600 ? 104 : STRIP_WIDTH_PT; // iPhone rail is 104pt; the spike targets iPad
+  const { widthClass, width } = useWidthClass();
+  const showsFlightLog = panels.useData((s) => s.showsFlightLog);
   const night = screen === 'night';
   const glyphs = useLocalGlyphs();
   if (glyphs.status === 'failed') console.warn('local glyph install failed; labels need a network', glyphs.error);
@@ -108,29 +111,33 @@ export function MapScreen({ screen, allLayers = false }: { screen?: StripScreen;
     route: allLayers ? SCENARIO_ROUTE : null,
   });
 
+  const chart =
+    glyphs.status === 'loading' ? null : (
+      <MapSurface
+        night={night}
+        glyphsUrl={glyphs.status === 'ready' ? glyphs.url : REMOTE_GLYPHS_URL}
+        sectional
+        region={model.snapshot.region}
+        visibleLayers={model.snapshot.visibleLayers}
+        layers={layerSpecsFor(model.snapshot.region)}
+        sources={model.sources}
+        initialView={INITIAL_VIEW}
+        camera={model.camera}
+        onViewChange={model.onViewChange}
+        onStyleLoaded={model.onStyleLoaded}
+        onTileHealth={model.onTileHealth}
+      />
+    );
   return (
     <SafeAreaProvider>
-      <View style={styles.row}>
-        <StripColumn screen={screen} width={stripWidth} />
-        <View style={styles.map}>
-          {glyphs.status === 'loading' ? null : (
-            <MapSurface
-              night={night}
-              glyphsUrl={glyphs.status === 'ready' ? glyphs.url : REMOTE_GLYPHS_URL}
-              sectional
-              region={model.snapshot.region}
-              visibleLayers={model.snapshot.visibleLayers}
-              layers={layerSpecsFor(model.snapshot.region)}
-              sources={model.sources}
-              initialView={INITIAL_VIEW}
-              camera={model.camera}
-              onViewChange={model.onViewChange}
-              onStyleLoaded={model.onStyleLoaded}
-              onTileHealth={model.onTileHealth}
-            />
-          )}
+      {usesCompactLayout(widthClass, showsFlightLog) ? (
+        <CompactMapLayout screen={screen} width={width} compact={widthClass === 'compact'} chart={chart} />
+      ) : (
+        <View style={styles.row}>
+          <StripColumn screen={screen} width={StripMetrics.width} />
+          <View style={styles.map}>{chart}</View>
         </View>
-      </View>
+      )}
     </SafeAreaProvider>
   );
 }

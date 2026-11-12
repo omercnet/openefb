@@ -1,7 +1,7 @@
 // FlightLogNowCell + LegProgressBar (efb-212/Views/Log/FlightLogRows.swift): the active leg with its progress, GS / TRK /
 // ALT with VS, the altitude tape, the Israel route cautions and the route controls. Stale rules: "---" without a fix,
-// values grey and announced ", stale" when the fix is lost, ALT and VS dashed without a vertical fix. The iPhone
-// variant (`compact`, 38pt readouts) is U5.
+// values grey and announced ", stale" when the fix is lost, ALT and VS dashed without a vertical fix. `compact` (the
+// iPhone layout: full width under the chart, no NOW band): tighter padding and 38pt readouts.
 import { Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { currentLeg, isLastLeg } from '../../domain/route';
@@ -25,6 +25,7 @@ import {
 import { ControlButton } from './parts';
 
 const READOUT_PT = 42; // readout digits, points
+const READOUT_PT_COMPACT = 38; // points
 
 export function FlightLogNow() {
   return (
@@ -35,7 +36,7 @@ export function FlightLogNow() {
   );
 }
 
-export function FlightLogNowCell() {
+export function FlightLogNowCell({ compact = false }: { compact?: boolean }) {
   const t = useTheme();
   const { data, stale, showsPredictions } = useFlightLog();
   const route = followedRoute(data);
@@ -70,8 +71,13 @@ export function FlightLogNowCell() {
   const altitudeCaution =
     !stale && following?.isAltitudeCaution && leg ? altitudeText(following, leg.altitudeText) : null;
 
+  const readoutSize = compact ? READOUT_PT_COMPACT : READOUT_PT;
   return (
-    <View accessibilityLabel="Now" style={{ padding: Space.m, gap: Space.s, backgroundColor: t.activeCell }}>
+    <View
+      accessibilityLabel="Now"
+      testID="flight-log-now"
+      style={{ padding: compact ? Space.s : Space.m, gap: Space.s, backgroundColor: t.activeCell }}
+    >
       {route && leg ? (
         <View style={{ gap: Space.xs }}>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: Space.s }}>
@@ -92,8 +98,15 @@ export function FlightLogNowCell() {
         <LegText from={data.directTo == null ? (data.planDeparture ?? 'PPOS') : 'DIRECT'} to={ident} />
       ) : null}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Readout label="GS kt" value={gsValue} name="Ground speed" unit="knots" dimmed={stale} />
-        <Readout label={'TRK \u00B0T'} value={trkValue} name="Track" unit="degrees true" dimmed={stale} />
+        <Readout label="GS kt" value={gsValue} name="Ground speed" unit="knots" dimmed={stale} size={readoutSize} />
+        <Readout
+          label={'TRK \u00B0T'}
+          value={trkValue}
+          name="Track"
+          unit="degrees true"
+          dimmed={stale}
+          size={readoutSize}
+        />
         <View
           accessible
           accessibilityLabel="Altitude"
@@ -103,7 +116,7 @@ export function FlightLogNowCell() {
         >
           <ReadoutLabel text="ALT ft MSL" />
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.xs }}>
-            <Text style={[Type.readout(READOUT_PT), { color: altDimmed ? t.inkSecondary : t.ink }]}>{altValue}</Text>
+            <Text style={[Type.readout(readoutSize), { color: altDimmed ? t.inkSecondary : t.ink }]}>{altValue}</Text>
             {/* The arrow is out of flow so the row aligns on the "+475" baseline. */}
             <View style={{ paddingLeft: vsArrow && !altDimmed ? 16 : 0 }}>
               <Text style={[Type.dataEmphasis, { color: altDimmed ? t.inkSecondary : t.ink }]}>{vsValue}</Text>
@@ -248,12 +261,15 @@ function Readout({
   name,
   unit,
   dimmed,
+  size,
 }: {
   label: string;
   value: string;
   name: string;
   unit: string;
   dimmed: boolean;
+  /** Digits, points. */
+  size: number;
 }) {
   const t = useTheme();
   return (
@@ -263,7 +279,7 @@ function Readout({
       accessibilityValue={{ text: `${value} ${unit}${dimmed ? ', stale' : ''}` }}
     >
       <ReadoutLabel text={label} />
-      <Text numberOfLines={1} style={[Type.readout(READOUT_PT), { color: dimmed ? t.inkSecondary : t.ink }]}>
+      <Text numberOfLines={1} style={[Type.readout(size), { color: dimmed ? t.inkSecondary : t.ink }]}>
         {value}
       </Text>
     </View>

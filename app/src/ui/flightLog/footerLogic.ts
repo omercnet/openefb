@@ -39,6 +39,58 @@ export function monoFitScale(glyphs: number, size: number, room: number, minScal
   return need > 0 ? Math.max(minScale, Math.min(1, room / need)) : 1;
 }
 
+/** Greedy word wrap of monospaced text at `perLine` glyphs; a word longer than a line is broken (as Core Text does). */
+export function wrapMono(text: string, perLine: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.split(' ').filter((w) => w.length > 0)) {
+    if (word.length > perLine) {
+      if (line) lines.push(line);
+      let rest = word;
+      while (rest.length > perLine) {
+        lines.push(rest.slice(0, perLine));
+        rest = rest.slice(perLine);
+      }
+      line = rest;
+    } else if (!line) line = word;
+    else if (line.length + 1 + word.length <= perLine) line += ` ${word}`;
+    else {
+      lines.push(line);
+      line = word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/**
+ * SwiftUI lineLimit(maxLines) + minimumScaleFactor(minScale) for monospaced text: wrapped at full size when the lines
+ * fit, otherwise shrunk to the largest scale at which they do, never below `minScale`. Text that does not fit even then
+ * keeps `maxLines` lines at `minScale` with the last one cut by an ellipsis (SwiftUI's tail truncation).
+ */
+export function monoWrapFit(
+  text: string,
+  size: number,
+  room: number,
+  maxLines: number,
+  minScale: number,
+): { scale: number; lines: string[] } {
+  const advance = PLEX_ADVANCE * size; // points per glyph at full size
+  // 1e-9: a line that fills the room exactly fits (no floating-point shortfall).
+  const perLine = (scale: number) => Math.floor(room / (advance * scale) + 1e-9);
+  // More glyphs per line means a smaller scale: the first count whose lines fit is the largest scale.
+  const most = perLine(minScale);
+  if (most < 1) return { scale: minScale, lines: [text] };
+  for (let glyphs = Math.max(1, perLine(1)); glyphs <= most; glyphs++) {
+    const lines = wrapMono(text, glyphs);
+    if (lines.length <= maxLines) return { scale: Math.min(1, room / (glyphs * advance)), lines };
+  }
+  const lines = wrapMono(text, most);
+  const kept = lines.slice(0, maxLines - 1);
+  const last = lines.slice(maxLines - 1).join(' ');
+  return { scale: minScale, lines: [...kept, `${last.slice(0, most - 1)}\u2026`] };
+}
+
 /**
  * Run a map action from a tap. A throw or a rejection (map not ready) must not escape the press handler (fatal in an
  * RN release build); `onFail` undoes what the tap assumed.
