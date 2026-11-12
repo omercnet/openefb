@@ -1,9 +1,10 @@
 // Parity of tokens.ts with efb-212/Core/DesignTokens.swift (read in place, Swift stays until cutover). Not a port of a
 // Swift test: nothing in efb-212Tests covers the tokens directly, so the Swift source is the oracle.
 import { readFileSync } from 'node:fs';
+import { Platform } from 'react-native';
 import { join } from 'node:path';
 
-import { AccentDayHighContrast, Day, MapControlMetrics, Night, Radius, Space, StripMetrics } from './tokens';
+import { AccentDayHighContrast, Day, MapControlMetrics, Night, Radius, Space, StripMetrics, lineHeight } from './tokens';
 
 const swift = readFileSync(join(__dirname, '../../../efb-212/Core/DesignTokens.swift'), 'utf8');
 
@@ -96,5 +97,49 @@ describe('DesignTokens parity', () => {
     expect(Night.infoFill).toBe('rgba(46,74,110,0.35)'); // accentNight at 0.35
     expect(AccentDayHighContrast).toBe('#0C4091');
     expect(Day.accent).toBe('#1556B8');
+  });
+
+  it('accentText is the AccentColor asset, light and dark', () => {
+    type Entry = { appearances?: { appearance: string; value: string }[]; color: { components: Record<string, string> } };
+    const asset = JSON.parse(
+      readFileSync(join(__dirname, '../../../efb-212/Assets.xcassets/AccentColor.colorset/Contents.json'), 'utf8'),
+    ) as { colors: Entry[] };
+    const colour = (entry: Entry | undefined) => {
+      const c = entry?.color.components;
+      return c ? hex([c.red, c.green, c.blue].reduce((n, v) => n * 256 + Math.round(Number(v) * 255), 0)) : undefined;
+    };
+    const light = asset.colors.find((e) => !e.appearances);
+    const dark = asset.colors.find((e) => e.appearances?.length === 1 && e.appearances[0].value === 'dark');
+    expect(Day.accentText).toBe(colour(light));
+    expect(Night.accentText).toBe(colour(dark));
+  });
+});
+
+// Not a port of a Swift test: the rule was measured on the CI simulator and emulator against the Swift references, and
+// swapping the platforms' rules costs 0.04 to 0.12 SSIM (see the comment on `lineHeight`).
+describe('lineHeight per platform', () => {
+  afterEach(() => jest.restoreAllMocks());
+  const sizes = [
+    // [label, font size, em, natural height]
+    ['11 pt Archivo label', 11, 1.088, 11.968],
+    ['13 pt Archivo caption', 13, 1.088, 14.144],
+    ['15 pt Plex Mono data', 15, 1.3, 19.5],
+    ['34 pt Archivo title', 34, 1.088, 36.992],
+  ] as const;
+  const cases: [string, 'ios' | 'android' | 'web', number[]][] = [
+    ['iOS: just below the natural height, which RN ceils to the same grid line as SwiftUI', 'ios', [11.958, 14.134, 19.49, 36.982]],
+    ['Android: the natural height to the nearest 0.5 pt (the rule that matched the reference within 1 dp)', 'android', [12, 14, 19.5, 37]],
+    ['web: rounded up to the 0.5 pt grid like SwiftUI', 'web', [12, 14.5, 19.5, 37]],
+  ];
+  it.each(cases)('%s', (_name, os, expected) => {
+    jest.replaceProperty(Platform, 'OS', os);
+    expect(sizes.map(([, size, em]) => lineHeight(size, em))).toEqual(expected);
+  });
+
+  it('stays within 0.5 pt of the natural height on every platform', () => {
+    for (const os of ['ios', 'android', 'web'] as const) {
+      jest.replaceProperty(Platform, 'OS', os);
+      for (const [, size, em, natural] of sizes) expect(Math.abs(lineHeight(size, em) - natural)).toBeLessThanOrEqual(0.5);
+    }
   });
 });

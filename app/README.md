@@ -30,6 +30,20 @@ tests/         Jest helpers and tests that span layers (Db contract on Node sqli
 
 `ios/` and `android/` are generated (CNG) and gitignored; native customisation goes in config plugins.
 
+## UI data and fidelity screens
+
+Screens read their data through hooks over Zustand slices made with `src/ui/state/storeContext.tsx`
+(`createStoreContext(fixture)`): the default store is seeded with a fake, tests and capture routes swap it with the
+slice's `Provider`, and the integration ticket (I1) feeds the real services in with `store.setState(...)`. Component
+tests use `test-renderer` through `tests/support/ui.tsx` (`render`, `press`, `callHandler`).
+
+A screen joins the fidelity gate (plan 5.4, `scripts/compare.mjs`) in five places: its route (`src/app/<screen>.tsx`,
+which opens the strip with `MapScreen screen="<screen>"` or renders the screen), `LAUNCH_SCREENS` in
+`src/app/index.tsx`, the screen lists in `scripts/ios-capture.sh` and `scripts/android-capture.sh`, its floors in
+`scripts/fidelity-thresholds.json`, and `reference/ipad-<screen>.png`: the Swift app's screenshot (the `scenario-captures`
+artifact of the Swift CI job, `tools/ci/capture-screens.sh`), 2064x2752 downscaled to 1032x1376 with sharp. The fake
+behind the screen must reproduce what the reference shows.
+
 ## Router decision
 
 expo-router (the plan's default), with a `Slot` root layout: one screen at a time, the previous route unmounts, so only one
