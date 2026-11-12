@@ -34,6 +34,7 @@ struct ContentView: View {
         }
         #if DEBUG
         .onAppear { ScreenCaptureHooks.apply(to: appState) }
+        .overlay { CaptureRouteHost() }
         #endif
         .task { await checkRemoteConfig() }
         .onChange(of: scenePhase) { _, phase in

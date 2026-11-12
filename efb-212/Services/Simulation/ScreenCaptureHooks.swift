@@ -7,18 +7,41 @@
 //    -OpenEFBStripColumn log|nearest|layers|search|airport:<ICAO>
 //    -OpenEFBDisplayMode day|night
 //    -OpenEFBDirectTo <ICAO>             direct to this airport, as the Nearest list's Direct does
+//    -OpenEFBRoute settings|disclaimers|aircraft|planner|offline-maps|logbook|flight|replay
+//                                        a full-screen page over the app (CaptureRouteHost); logbook, flight and replay
+//                                        show the first stored entry, so launch with -OpenEFBSeed small as well
+//    -OpenEFBBriefing YES                the Israel NOTAM briefing sheet over the map
+//    -OpenEFBLayers all                  every map layer on (the all-layers map)
 //  Unknown values are ignored; without the arguments nothing changes.
 //
 
 #if DEBUG
 
 import Foundation
+import Observation
+
+/// What CaptureRouteHost shows; set by ScreenCaptureHooks.apply.
+@Observable
+@MainActor
+final class CaptureRouteModel {
+    static let shared = CaptureRouteModel()
+    var route: ScreenCaptureHooks.Route?
+}
 
 enum ScreenCaptureHooks {
     static let screenKey = "OpenEFBScreen"
     static let stripColumnKey = "OpenEFBStripColumn"
     static let displayModeKey = "OpenEFBDisplayMode"
     static let directToKey = "OpenEFBDirectTo"
+    static let routeKey = "OpenEFBRoute"
+    static let briefingKey = "OpenEFBBriefing"
+    static let layersKey = "OpenEFBLayers"
+
+    /// The pages -OpenEFBRoute opens; the raw value is the launch argument value.
+    enum Route: String, CaseIterable {
+        case settings, disclaimers, aircraft, planner, logbook, flight, replay
+        case offlineMaps = "offline-maps"
+    }
 
     @MainActor
     static func apply(to appState: AppState, defaults: UserDefaults = .standard) {
@@ -44,6 +67,13 @@ enum ScreenCaptureHooks {
         case "night": appState.displayMode = .night
         default: break
         }
+        if defaults.string(forKey: layersKey) == "all" {
+            appState.visibleLayers = Set(MapLayer.allCases)
+        }
+        if defaults.string(forKey: briefingKey) == "YES" {
+            appState.isPresentingIsraelBriefing = true
+        }
+        CaptureRouteModel.shared.route = defaults.string(forKey: routeKey).flatMap(Route.init(rawValue:))
         if let icao = defaults.string(forKey: directToKey),
            let airport = try? appState.getOrCreateDatabaseService().airport(byICAO: icao.uppercased()) {
             appState.directToAirport = airport

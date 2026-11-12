@@ -8,6 +8,9 @@
 # shots go direct to KOAK so NEXT shows a waypoint, map-noplan does not),
 # screenshots it as <device>-<shot>.png (device ipad|iphone) and fails when the app is not running after the wait or
 # a crash report appears. Image content is not asserted. The iPad also gets the Israel route (il-map-day).
+# Wave 2 shots (iPad only, named after the React Native screens): onboarding, map-layers (every layer on), briefing,
+# and, last because -OpenEFBSeed small leaves its data in the simulator, the seeded pages (-OpenEFBRoute: settings,
+# disclaimers, aircraft, planner, offline-maps, logbook, flight, replay) and currency (the expired medical banner).
 # Recording runs without the microphone (-OpenEFBNoAudio), as in tools/ci/fly-scenarios.sh.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -94,7 +97,7 @@ shot() {
   [ "$first_launch" -eq 1 ] && deadline=300
   first_launch=0
   limited "$deadline" xcrun simctl launch --terminate-running-process "$sim" "$BUNDLE" \
-    -hasSeenOnboarding YES -OpenEFBNoAudio YES -OpenEFBScenario "$SCENARIOS/$scenario.json" \
+    -hasSeenOnboarding "${seen_onboarding:-YES}" -OpenEFBNoAudio YES -OpenEFBScenario "$SCENARIOS/$scenario.json" \
     -OpenEFBScenarioSpeed 1 -OpenEFBScenarioStart "$start" "$@" >/dev/null || problems+=("launch failed or timed out")
   if [ ${#problems[@]} -eq 0 ]; then
     sleep "$WAIT"   # the map, the first frame and a few fixes
@@ -148,6 +151,18 @@ shots "$IPAD" ipad
 # Herzliya to Rosh Pina from 600 s: on the CVFR route at 1500 ft.
 shot "$IPAD" ipad il-map-day il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day
 shot "$IPAD" ipad il-map-predictions il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -showsPredictions YES
+# Wave 2 screens. The map-layers and briefing shots need no stored data; onboarding is the first-run screen.
+shot "$IPAD" ipad map-layers us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -OpenEFBLayers all
+shot "$IPAD" ipad briefing il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBBriefing YES
+seen_onboarding=NO
+shot "$IPAD" ipad onboarding us-kpao-ksql 150
+seen_onboarding=YES
+# Seeded: the fictional data set of SeedDataHook (aircraft, pilots with an expired medical, a flight, logbook entries).
+seed=(-OpenEFBSeed small)
+shot "$IPAD" ipad currency us-kpao-ksql 150 "${seed[@]}" -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day
+for route in settings disclaimers aircraft planner offline-maps logbook flight replay; do
+  shot "$IPAD" ipad "$route" us-kpao-ksql 150 "${seed[@]}" -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute "$route"
+done
 echo "::endgroup::"
 
 # The iPad is done: shut it down so the iPhone boots on a runner with only one simulator running.
