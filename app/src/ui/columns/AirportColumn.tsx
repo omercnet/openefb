@@ -3,67 +3,83 @@
 // hint and the FAA chart rows. Text set in SF by the SwiftUI views uses the platform system font here.
 import type { ReactNode } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { scenario } from '../fixtures/scenario';
-import { Airplane, ArrowClockwise, ArrowUp, ArrowUpRight, Chevron, FuelPump, Key, WarningTriangle } from './Icons';
-import { ColumnRule, Pressy, SectionLabel, useTheme } from './Primitives';
-import { Space, StripMetrics, Type } from './tokens';
+import { scenario } from '../../fixtures/scenario';
+import { Airplane, ArrowClockwise, ArrowUp, ArrowUpRight, Chevron, FuelPump, Key, WarningTriangle } from '../Icons';
+import { ColumnRule, Pressy, SectionLabel, useTheme } from '../Primitives';
+import { ColumnHeader } from './ColumnHeader';
+import { Space, StripMetrics, Type } from '../tokens';
 
 const a = scenario.airport;
 const LABEL_COLUMN = 80; // minWidth of the label column, points
 /** AirportColumnView.frequencySpokenName: so VoiceOver does not spell "TWR" / "CD". */
 const SPOKEN: Record<string, string> = {
-  CTAF: 'C TAF', TWR: 'Tower', GND: 'Ground', CD: 'Clearance delivery', APP: 'Approach', DEP: 'Departure',
-  UNICOM: 'Unicom', MULTICOM: 'Multicom', CTR: 'Center', FSS: 'Flight service',
+  CTAF: 'C TAF',
+  TWR: 'Tower',
+  GND: 'Ground',
+  CD: 'Clearance delivery',
+  APP: 'Approach',
+  DEP: 'Departure',
+  UNICOM: 'Unicom',
+  MULTICOM: 'Multicom',
+  CTR: 'Center',
+  FSS: 'Flight service',
 };
 
-export function AirportHeader() {
+/** The airport title block: identifier, flight category dot and word, then the name. */
+function AirportTitle() {
   const t = useTheme();
   return (
     <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Space.s,
-        paddingHorizontal: Space.s,
-        minHeight: StripMetrics.cell,
-        backgroundColor: t.paperSecondary,
-      }}
+      accessible
+      accessibilityRole="header"
+      accessibilityLabel={`${a.ident}, flight category ${a.flightCategory}, ${a.name}`}
+      // No `flex: 1`: ColumnHeader's wrapper already takes the row's width. React Native lays Yoga out with YGErrataAll, and
+      // under it a flexing block inside that wrapper is stretched to the header row's 60 pt minimum instead of hugging its
+      // content (61.5 pt): the text stays put but the band ended 1.5 pt short and every row below sat 1.5 pt high on iOS and
+      // Android (run 43102552494).
+      style={{ paddingVertical: Space.xs }}
     >
-      <Pressy
-        accessibilityLabel="Back to flight log"
-        style={{ minWidth: StripMetrics.cell, minHeight: StripMetrics.cell, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 11 }}
-      >
-        <Chevron dir="left" color={t.ink} />
-        <Text style={[Type.label, { color: t.ink }]}>Log</Text>
-      </Pressy>
-      <View accessible accessibilityRole="header" accessibilityLabel={`${a.ident}, flight category ${a.flightCategory}, ${a.name}`} style={{ flex: 1, paddingVertical: Space.xs }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.s }}>
-          <Text numberOfLines={1} style={[Type.title, { color: t.airspace }]}>
-            {a.ident}
-          </Text>
-          {/* Dot out of flow so the container's baseline is the "MVFR" text baseline (SwiftUI firstTextBaseline);
-              as a first child the dot's bottom edge became the baseline on iOS. 12pt dot + Space.xs. */}
-          <View style={{ paddingLeft: 12 + Space.xs }}>
-            <Text style={[Type.systemHeadline, { color: t.primaryText }]}>{a.flightCategory}</Text>
-            <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, justifyContent: 'center' }}>
-              <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: t.categoryMVFR }} />
-            </View>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.s }}>
+        <Text numberOfLines={1} style={[Type.title, { color: t.airspace }]}>
+          {a.ident}
+        </Text>
+        {/* Dot out of flow so the container's baseline is the "MVFR" text baseline (SwiftUI firstTextBaseline);
+            as a first child the dot's bottom edge became the baseline on iOS. 12pt dot + Space.xs. */}
+        <View style={{ paddingLeft: 12 + Space.xs }}>
+          <Text style={[Type.systemHeadline, { color: t.primaryText }]}>{a.flightCategory}</Text>
+          <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, justifyContent: 'center' }}>
+            <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: t.categoryMVFR }} />
           </View>
         </View>
-        <Text numberOfLines={2} style={[Type.body, { color: t.inkSecondary }]}>
-          {a.name}
-        </Text>
       </View>
-      <ColumnRule style={{ position: 'absolute', left: 0, right: 0, bottom: 0 }} />
+      <Text numberOfLines={2} style={[Type.body, { color: t.inkSecondary }]}>
+        {a.name}
+      </Text>
     </View>
   );
 }
 
+/** The whole airport column: the shared header over the scrolling body. */
 export function AirportColumn() {
+  return (
+    <>
+      <ColumnHeader>
+        <AirportTitle />
+      </ColumnHeader>
+      <AirportBody />
+    </>
+  );
+}
+
+function AirportBody() {
   const t = useTheme();
   const rule = <ColumnRule />;
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: Space.l, gap: Space.l }} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ padding: Space.l, gap: Space.l }}
+      showsVerticalScrollIndicator={false}
+    >
       <Pressy
         accessibilityLabel={`Direct to ${a.ident}`}
         style={{
@@ -107,7 +123,9 @@ export function AirportColumn() {
             style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m }}
           >
             <Text style={[Type.dataEmphasis, { color: t.ink, minWidth: LABEL_COLUMN }]}>{r.ident}</Text>
-            <Text style={[Type.data, { color: t.ink }]}>{`${r.lengthFt.toLocaleString('en-US')}' x ${r.widthFt}'`}</Text>
+            <Text
+              style={[Type.data, { color: t.ink }]}
+            >{`${r.lengthFt.toLocaleString('en-US')}' x ${r.widthFt}'`}</Text>
             <Text style={[Type.body, { color: t.inkSecondary }]}>{r.surface}</Text>
           </View>
         ))}
@@ -162,10 +180,25 @@ function Chip({ icon, text }: { icon: ReactNode; text: string }) {
  * iOS baseline alignment otherwise made every row 20 pt, 0.5 pt per row of drift (12 pt down the column, SSIM 0.72;
  * the reference pitch is 27.5 pt = 19.5 + the 8 pt gap).
  */
-function Row({ label, spoken, value, children }: { label: string; spoken: string; value: string; children: ReactNode }) {
+function Row({
+  label,
+  spoken,
+  value,
+  children,
+}: {
+  label: string;
+  spoken: string;
+  value: string;
+  children: ReactNode;
+}) {
   const t = useTheme();
   return (
-    <View accessible accessibilityLabel={spoken} accessibilityValue={{ text: value }} style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m, height: Type.data.lineHeight }}>
+    <View
+      accessible
+      accessibilityLabel={spoken}
+      accessibilityValue={{ text: value }}
+      style={{ flexDirection: 'row', alignItems: 'baseline', gap: Space.m, height: Type.data.lineHeight }}
+    >
       <Text style={[Type.label, { color: t.inkSecondary, minWidth: LABEL_COLUMN }]}>{label}</Text>
       {children}
     </View>
@@ -191,12 +224,25 @@ function Weather() {
           accessible
           accessibilityLabel="METAR age"
           accessibilityValue={{ text: `${a.weatherAgeMin} min` }}
-          style={{ paddingHorizontal: Space.s, paddingVertical: Space.xs, borderRadius: 999, backgroundColor: t.night ? 'rgba(235,235,245,0.12)' : 'rgba(60,60,67,0.12)' }}
+          style={{
+            paddingHorizontal: Space.s,
+            paddingVertical: Space.xs,
+            borderRadius: 999,
+            backgroundColor: t.night ? 'rgba(235,235,245,0.12)' : 'rgba(60,60,67,0.12)',
+          }}
         >
           <Text style={[Type.systemFootnoteSemibold, { color: t.secondaryText }]}>{a.weatherAgeMin} min</Text>
         </View>
         <View style={{ flex: 1 }} />
-        <Pressy accessibilityLabel="Refresh weather" style={{ width: StripMetrics.cell, height: StripMetrics.cell, alignItems: 'center', justifyContent: 'center' }}>
+        <Pressy
+          accessibilityLabel="Refresh weather"
+          style={{
+            width: StripMetrics.cell,
+            height: StripMetrics.cell,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <ArrowClockwise color={t.inkSecondary} size={16} />
         </Pressy>
       </View>
@@ -209,14 +255,21 @@ function Weather() {
         <Pressy
           accessibilityLabel="Raw METAR"
           accessibilityValue={{ text: 'Collapsed' }}
-          style={{ minHeight: StripMetrics.cell, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+          style={{
+            minHeight: StripMetrics.cell,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
         >
           <Text style={[Type.label, { color: t.inkSecondary }]}>Raw METAR</Text>
           <Chevron dir="down" color={t.inkSecondary} />
         </Pressy>
       </View>
       {/* 15pt row: the caption-size SF triangle's frame (reference: the TAF row is 19.2pt with its 4pt top padding). */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingTop: Space.xs, minHeight: Space.xs + 15 }}>
+      <View
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 9, paddingTop: Space.xs, minHeight: Space.xs + 15 }}
+      >
         <WarningTriangle color={t.caution} bang={t.night ? '#000000' : '#FFFFFF'} />
         <Text style={[Type.caption, { color: t.caution }]}>TAF not loaded</Text>
       </View>
@@ -243,7 +296,13 @@ function ChartGroup({ title, charts }: { title: string; charts: readonly string[
         <Pressy
           key={name}
           accessibilityLabel={name}
-          style={{ minHeight: 44, marginVertical: Space.xs, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+          style={{
+            minHeight: 44,
+            marginVertical: Space.xs,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
         >
           <Text style={[Type.systemSubheadline, { color: t.primaryText }]}>{name}</Text>
           <Chevron dir="right" color={t.secondaryText} />

@@ -3,6 +3,7 @@
 import { distanceNm, type Coordinate } from '../core/geometry';
 import type { Airspace } from '../core/models';
 import type { Region } from '../core/region';
+import type { IsraelAirspace, IsraelAirspaceKind } from '../../data/aviation/israelTypes';
 import { PredictionStabilizer, predictEvents } from './airspacePredictor';
 import type { PredictableVolume, PredictedEvent, PredictedSeverity } from './predictedEvent';
 import { predictedEventsEqual } from './predictedEvent';
@@ -11,25 +12,7 @@ export const QUERY_INTERVAL_SECONDS = 10;
 export const QUERY_DISTANCE_NM = 2;
 const FEET_PER_METRE = 3.28084;
 
-// ---- Israel airspace input (structural; the Israel data models are ported by their own ticket) ----
-
-export type IsraelAirspaceKind = 'CTR' | 'ATZ' | 'CTA' | 'TMA' | 'P' | 'R' | 'D' | 'FIR';
-export type IsraelAltitudeReference = 'SFC' | 'MSL' | 'AGL' | 'FL' | 'UNL';
-
-export interface IsraelAirspaceLimit {
-  feet: number | null;
-  reference: IsraelAltitudeReference | null;
-}
-
-export interface IsraelAirspaceInput {
-  id: number;
-  kind: IsraelAirspaceKind;
-  code: string | null;
-  floor: IsraelAirspaceLimit;
-  ceiling: IsraelAirspaceLimit;
-  /** polygons -> rings -> vertices. */
-  polygons: { latitude: number; longitude: number }[][][];
-}
+// ---- Israel airspace input: the data layer's model (L3 replaced the structural stand-in) ----
 
 // ---- Mappers ----
 
@@ -81,7 +64,7 @@ export function israelShortName(kind: IsraelAirspaceKind, code: string | null): 
 }
 
 /** One volume per polygon; FIR is skipped; only SFC and MSL floors and MSL ceilings are usable. */
-export function volumesFromIsraelAirspace(a: IsraelAirspaceInput): PredictableVolume[] {
+export function volumesFromIsraelAirspace(a: IsraelAirspace): PredictableVolume[] {
   if (a.kind === 'FIR') return [];
   const shortName = israelShortName(a.kind, a.code);
   let floor: number | null;
@@ -93,7 +76,7 @@ export function volumesFromIsraelAirspace(a: IsraelAirspaceInput): PredictableVo
   return a.polygons.map((rings, index) => ({
     id: a.polygons.length === 1 ? `il-${a.id}` : `il-${a.id}-${index}`,
     shortName,
-    shape: { kind: 'polygon', rings: rings.map((ring) => ring.map((v) => [v.latitude, v.longitude])) },
+    shape: { kind: 'polygon', rings: rings.map((ring) => ring.map((v) => [v.lat, v.lon])) },
     floorFeetMSL: floor,
     ceilingFeetMSL: ceiling,
     severity,
@@ -126,7 +109,7 @@ export interface VerticalSpeedSource {
 export interface PredictionAirspaceSources {
   usAirspaces(near: Coordinate, radiusNM: number): Airspace[];
   /** The caller owns the Israel source's lifecycle (opening, caching). A throw is caught and yields no Israel volumes for that query. */
-  israelAirspaces(near: Coordinate, radiusNM: number): IsraelAirspaceInput[];
+  israelAirspaces(near: Coordinate, radiusNM: number): IsraelAirspace[];
 }
 
 export class PredictionService {
