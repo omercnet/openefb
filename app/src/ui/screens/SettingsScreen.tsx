@@ -110,7 +110,12 @@ export function SettingsScreen({
           disabled={!s.loaded}
           testID="region-picker"
         />
-        {s.regionSaveError ? <NoteRow tone="caution" text={s.regionSaveError} /> : null}
+        {s.regionSaveError ? (
+          <>
+            <NoteRow tone="caution" text={s.regionSaveError} />
+            <ButtonRow title="Try Saving Again" onPress={() => void s.setRegion(s.region)} testID="region-retry" />
+          </>
+        ) : null}
         {s.regionDataError ? <NoteRow text={s.regionDataError} testID="region-data-unavailable-text" /> : null}
       </FormSection>
 
@@ -133,6 +138,9 @@ export function SettingsScreen({
           disabled={!s.loaded}
           testID="display-mode-picker"
         />
+        {s.preferenceError && s.preferenceErrorFor === 'displayMode' ? (
+          <NoteRow tone="caution" text={s.preferenceError} />
+        ) : null}
       </FormSection>
 
       {isLayerAvailable(s.region, 'sectional') ? (
@@ -192,7 +200,9 @@ export function SettingsScreen({
           disabled={!s.loaded}
           testID="share-usage-data-toggle"
         />
-        {s.preferenceError ? <NoteRow tone="caution" text={s.preferenceError} /> : null}
+        {s.preferenceError && s.preferenceErrorFor === 'shareUsageData' ? (
+          <NoteRow tone="caution" text={s.preferenceError} />
+        ) : null}
       </FormSection>
 
       <FormSection header="Legal">

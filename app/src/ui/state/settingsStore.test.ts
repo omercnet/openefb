@@ -510,3 +510,72 @@ describe('app notifications that throw', () => {
     expect(store.getState().regionDataError).toBe('corrupt database');
   });
 });
+
+describe('review fixes on #45', () => {
+  it('a region whose save failed can be saved again, without telling the app twice', async () => {
+    const inner = createMemoryUserData();
+    let broken = true;
+    const userData = withSettings(inner, {
+      update: (patch) => (broken ? Promise.reject(new Error('disk full')) : inner.settings.update(patch)),
+    });
+    const { store, onRegionChange } = setup({}, userData);
+    await store.getState().load();
+    await store.getState().setRegion('us');
+    expect(store.getState().regionSaveError).toContain('could not be saved');
+    broken = false;
+    await store.getState().setRegion('us');
+    expect(store.getState().regionSaveError).toBeNull();
+    expect((await inner.settings.get())?.regionRaw).toBe('us');
+    expect(onRegionChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('a load that reads before a queued region write does not put the old region back', async () => {
+    const { store, userData } = setup();
+    await store.getState().load();
+    const loading = store.getState().load();
+    const changing = store.getState().setRegion('us');
+    await Promise.all([loading, changing]);
+    expect(store.getState().region).toBe('us');
+    expect((await userData.settings.get())?.regionRaw).toBe('us');
+  });
+
+  it('a failed display mode save keeps its warning when a later privacy write succeeds', async () => {
+    const prefs = new FakePreferences();
+    const real = prefs.set.bind(prefs);
+    prefs.set = (key, value) =>
+      key.toLowerCase().includes('display') ? Promise.reject(new Error('full')) : real(key, value);
+    const { store } = setup({ prefs });
+    await store.getState().load();
+    await store.getState().setDisplayMode('night');
+    await store.getState().setShareUsageData(false);
+    expect(store.getState().preferenceError).toContain('could not be saved');
+    expect(store.getState().preferenceErrorFor).toBe('displayMode');
+  });
+
+  it('credentials typed while the first load is reading are kept', async () => {
+    const { store, secrets } = setup();
+    await secrets.set(NOTAM_CLIENT_ID_KEY, 'saved-id');
+    await secrets.set(NOTAM_CLIENT_SECRET_KEY, 'saved-secret');
+    const loading = store.getState().load();
+    store.getState().setNotamClientID('typing');
+    await loading;
+    expect(store.getState().notam.clientID).toBe('typing');
+    expect(store.getState().notam.configured).toBe(true);
+  });
+
+  it('a saved key that cannot be read back is not reported as plain "Saved" nor as absent', async () => {
+    const inner = new FakeSecretStore();
+    const secrets: SecretStore = {
+      set: (k, v) => inner.set(k, v),
+      get: () => Promise.resolve(null),
+      remove: (k) => inner.remove(k),
+    };
+    const { store } = setup({ secrets });
+    await store.getState().load();
+    store.getState().setNotamClientID('id');
+    store.getState().setNotamClientSecret('secret');
+    await store.getState().saveNotamKey();
+    expect(store.getState().notam.configured).toBe(true);
+    expect(store.getState().notam.message).toContain('could not be read back');
+  });
+});

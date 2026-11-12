@@ -57,19 +57,19 @@ export function createMemoryUserData(seed: MemoryUserDataSeed = {}): UserData {
   const aircraft: Store<AircraftProfile> = {
     rows: new Map(),
     compare: (a, b) => a.createdAt - b.createdAt,
-    columns: {},
+    columns: { id: 'id' },
     name: 'aircraft_profile',
   };
   const pilots: Store<PilotProfile> = {
     rows: new Map(),
     compare: (a, b) => a.createdAt - b.createdAt,
-    columns: {},
+    columns: { id: 'id' },
     name: 'pilot_profile',
   };
   const logbook: Store<LogbookEntry> = {
     rows: new Map(),
     compare: (a, b) => b.date - a.date,
-    columns: { flight_id: 'flightID' },
+    columns: { id: 'id', flight_id: 'flightID' },
     name: 'logbook_entry',
   };
   let settingsRow: UserSettings | null = null;
@@ -85,11 +85,13 @@ export function createMemoryUserData(seed: MemoryUserDataSeed = {}): UserData {
       settingsRow ??= newUserSettings({ ...factory, id: 1 });
       return clone(settingsRow);
     },
-    async update(patch) {
-      const current = await settings.getOrCreate();
+    update(patch) {
+      // Read and write in one step: a second update that starts before this one finishes must merge into its result.
+      settingsRow ??= newUserSettings({ id: 1 });
+      const current = settingsRow;
       const defined = Object.entries(patch).filter(([, v]) => v !== undefined);
       settingsRow = { ...current, ...Object.fromEntries(defined) } as UserSettings;
-      return clone(settingsRow);
+      return Promise.resolve(clone(settingsRow));
     },
   };
 
@@ -101,24 +103,32 @@ export function createMemoryUserData(seed: MemoryUserDataSeed = {}): UserData {
     logbook: { ...logbookBase, byFlightId: (flightID) => logbookBase.listWhere('flight_id', flightID) },
   };
 
+  // One transaction at a time, like the single SQLite connection: a rollback must not undo another transaction's writes.
+  let tail: Promise<unknown> = Promise.resolve();
   return {
     ...repos,
-    async atomically(fn) {
-      const saved = {
-        aircraft: new Map(aircraft.rows),
-        pilots: new Map(pilots.rows),
-        logbook: new Map(logbook.rows),
-        settings: settingsRow,
-      };
-      try {
-        return await fn(repos);
-      } catch (error) {
-        aircraft.rows = saved.aircraft;
-        pilots.rows = saved.pilots;
-        logbook.rows = saved.logbook;
-        settingsRow = saved.settings;
-        throw error;
-      }
+    atomically(fn) {
+      const run = tail.then(() => transaction(fn));
+      tail = run.catch(() => undefined);
+      return run;
     },
   };
+
+  async function transaction<R>(fn: (repos: UserDataRepos) => Promise<R>): Promise<R> {
+    const saved = {
+      aircraft: new Map(aircraft.rows),
+      pilots: new Map(pilots.rows),
+      logbook: new Map(logbook.rows),
+      settings: settingsRow,
+    };
+    try {
+      return await fn(repos);
+    } catch (error) {
+      aircraft.rows = saved.aircraft;
+      pilots.rows = saved.pilots;
+      logbook.rows = saved.logbook;
+      settingsRow = saved.settings;
+      throw error;
+    }
+  }
 }

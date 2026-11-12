@@ -150,3 +150,34 @@ describe('createMemoryUserData seed', () => {
     expect((await data.settings.get())?.regionRaw).toBe('us');
   });
 });
+
+describe('createMemoryUserData concurrency and columns (#45 review)', () => {
+  it('listWhere accepts the id column, as SQL does', async () => {
+    const pilot = newPilotProfile({ id: 'p1' });
+    const data = createMemoryUserData({ pilots: [pilot] });
+    expect((await data.pilots.listWhere('id', 'p1')).map((p) => p.id)).toEqual(['p1']);
+  });
+
+  it('two settings updates started together both land', async () => {
+    const data = createMemoryUserData();
+    await Promise.all([
+      data.settings.update({ regionRaw: 'us' }),
+      data.settings.update({ displayModeRaw: 'night' } as never),
+    ]);
+    expect(await data.settings.get()).toMatchObject({ regionRaw: 'us' });
+  });
+
+  it('a rollback does not undo another transaction that committed meanwhile', async () => {
+    const data = createMemoryUserData();
+    const gate = Promise.withResolvers<void>();
+    const a = data.atomically(async () => {
+      await gate.promise;
+      throw new Error('fail');
+    });
+    const b = data.atomically((r) => r.settings.update({ regionRaw: 'us' }));
+    gate.resolve();
+    await expect(a).rejects.toThrow('fail');
+    await b;
+    expect((await data.settings.get())?.regionRaw).toBe('us');
+  });
+});

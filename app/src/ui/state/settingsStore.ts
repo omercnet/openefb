@@ -87,6 +87,8 @@ export interface SettingsState {
   regionSaveError: string | null;
   /** A display-mode or privacy change that could not be saved (JS-only: Swift's AppStorage cannot fail). */
   preferenceError: string | null;
+  /** The preference that error is about, so the screen shows it next to that setting. */
+  preferenceErrorFor: 'displayMode' | 'shareUsageData' | null;
   /** Something that could not be read at load (JS-only; Swift reads with try? and shows defaults). */
   loadError: string | null;
   /** Medical, flight review and night currency of the active pilot that are not current. */
@@ -133,17 +135,45 @@ export function createSettingsStore(deps: SettingsDeps) {
   const unavailableFor = (region: Region): Promise<string | null> =>
     deps.regionDataUnavailable(region).catch(describeError);
 
+  /** Region writes queued but not finished: a load that reads storage meanwhile must not put the old region back. */
+  let pendingRegionWrites = 0;
+  /** Which preference the shown preferenceError belongs to: a later success of another one must not clear it. */
+  let errorOwner: 'displayMode' | 'shareUsageData' | null = null;
+
   return createStore<SettingsState>()((set, get) => {
     const setNotam = (patch: Partial<NotamState>) => set((s) => ({ notam: { ...s.notam, ...patch } }));
 
     /** Saves a preference and records the failure next to the setting that changed. */
-    const persist = async (write: () => Promise<void>, applyFailure: string | null) => {
+    const persist = async (
+      owner: 'displayMode' | 'shareUsageData',
+      write: () => Promise<void>,
+      applyFailure: string | null,
+    ) => {
+      const show = (message: string | null) => {
+        if (message === null && errorOwner !== owner) return; // another setting's failure stays
+        errorOwner = message === null ? null : owner;
+        set({ preferenceError: message, preferenceErrorFor: message === null ? null : owner });
+      };
       try {
         await write();
-        set({ preferenceError: applyFailure && `Changed, but the app could not apply it: ${applyFailure}` });
+        show(applyFailure && `Changed, but the app could not apply it: ${applyFailure}`);
       } catch (error) {
-        set({ preferenceError: `Changed, but it could not be saved: ${describeError(error)}` });
+        show(`Changed, but it could not be saved: ${describeError(error)}`);
       }
+    };
+
+    const saveRegion = async (region: Region, applyFailure: string | null) => {
+      let message: string | null = applyFailure && `Region changed, but the app could not apply it: ${applyFailure}`;
+      try {
+        await deps.userData.settings.update({ regionRaw: region });
+      } catch (error) {
+        message = `Region changed, but it could not be saved: ${describeError(error)}`;
+      }
+      set({
+        regionSaveError: message,
+        dataAttribution: await attributionFor(region),
+        regionDataError: await unavailableFor(region),
+      });
     };
 
     return {
@@ -155,6 +185,7 @@ export function createSettingsStore(deps: SettingsDeps) {
       regionDataError: null,
       regionSaveError: null,
       preferenceError: null,
+      preferenceErrorFor: null,
       loadError: null,
       currencyToRenew: 0,
       dataCycle: null,
@@ -179,9 +210,11 @@ export function createSettingsStore(deps: SettingsDeps) {
           const credentials = await read(() => loadNotamCredentials(deps.secrets), null);
           const pilots = await read(() => deps.userData.pilots.list(), []);
           const cycle = await deps.loadDataCycle().catch(() => null);
+          const typing = get().notam;
+          const untouched = typing.clientID === '' && typing.clientSecret === '';
           set({
             loaded: true,
-            region,
+            region: pendingRegionWrites > 0 ? get().region : region,
             displayMode: DISPLAY_MODES.find((m) => m === rawMode) ?? 'auto',
             shareUsageData: share,
             dataAttribution: await attributionFor(region),
@@ -191,43 +224,44 @@ export function createSettingsStore(deps: SettingsDeps) {
             loadError: problems.length > 0 ? problems.join('; ') : null,
             notam: {
               ...get().notam,
-              clientID: credentials?.clientID ?? '',
-              clientSecret: credentials?.clientSecret ?? '',
+              // What the user is typing is not replaced by a slow read.
+              clientID: untouched ? (credentials?.clientID ?? '') : typing.clientID,
+              clientSecret: untouched ? (credentials?.clientSecret ?? '') : typing.clientSecret,
               configured: credentials !== null,
             },
           });
         }),
 
       setRegion: (region) => {
-        if (region === get().region) return Promise.resolve(); // guard newRegion != appState.region
+        // Guard newRegion != appState.region; but a region whose save failed may be saved again (the picker offers Retry).
+        const retry = region === get().region && get().regionSaveError !== null;
+        if (region === get().region && !retry) return Promise.resolve();
         set({ region });
-        const applyFailure = notify(() => deps.onRegionChange?.(region));
+        const applyFailure = retry ? null : notify(() => deps.onRegionChange?.(region));
+        pendingRegionWrites += 1;
         return enqueue(async () => {
-          let message: string | null =
-            applyFailure && `Region changed, but the app could not apply it: ${applyFailure}`;
           try {
-            await deps.userData.settings.update({ regionRaw: region });
-          } catch (error) {
-            message = `Region changed, but it could not be saved: ${describeError(error)}`;
+            await saveRegion(region, applyFailure);
+          } finally {
+            pendingRegionWrites -= 1;
           }
-          set({
-            regionSaveError: message,
-            dataAttribution: await attributionFor(region),
-            regionDataError: await unavailableFor(region),
-          });
         });
       },
 
       setDisplayMode: (mode) => {
         set({ displayMode: mode });
         const applyFailure = notify(() => deps.onDisplayModeChange?.(mode));
-        return enqueue(() => persist(() => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode), applyFailure));
+        return enqueue(() =>
+          persist('displayMode', () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode), applyFailure),
+        );
       },
 
       setShareUsageData: (enabled) => {
         set({ shareUsageData: enabled });
         const applyFailure = notify(() => deps.setTelemetryEnabled(enabled, get().region));
-        return enqueue(() => persist(() => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled), applyFailure));
+        return enqueue(() =>
+          persist('shareUsageData', () => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled), applyFailure),
+        );
       },
 
       setNotamClientID: (clientID) => setNotam({ clientID }),
@@ -239,8 +273,16 @@ export function createSettingsStore(deps: SettingsDeps) {
         return enqueue(async () => {
           try {
             await saveNotamCredentials(deps.secrets, credentials);
-            const configured = (await loadNotamCredentials(deps.secrets)) !== null;
-            setNotam({ ...credentials, configured, message: 'Saved. NOTAMs appear in the airport sheet.' });
+            const readBack = await loadNotamCredentials(deps.secrets);
+            // Both writes succeeded; a read that comes back empty means the store cannot be read, not that no key is saved.
+            setNotam({
+              ...credentials,
+              configured: true,
+              message:
+                readBack === null
+                  ? 'Saved, but the key could not be read back to check it.'
+                  : 'Saved. NOTAMs appear in the airport sheet.',
+            });
           } catch (error) {
             setNotam({ message: describeError(error) });
           }
