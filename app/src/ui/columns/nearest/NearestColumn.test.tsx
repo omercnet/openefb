@@ -5,6 +5,7 @@ import { act, type ReactElement } from 'react';
 import { callHandler, press, render, type Rendered } from '../../../../tests/support/ui';
 import { makeAirport, type Airport } from '../../../domain/core';
 import { appStore } from '../../state/appStore';
+import { regionSlice } from '../../state/region';
 import { NearestColumn } from '../NearestColumn';
 import { FIXTURE_OWNSHIP, createFakeAviationDatabase } from './fixture';
 import { AirportQueriesContext, defaultAirportQueries, type AirportQueries } from './sources';
@@ -315,5 +316,26 @@ describe('NearestColumn', () => {
     await v.update(tree());
     expect(nearestAirports).toHaveBeenCalledTimes(1);
     expect(store.getState().entries).toHaveLength(10);
+  });
+
+  it("a region change clears the other region's airports even with no position, then the new region fills it", async () => {
+    const region = regionSlice.make({ region: 'us' });
+    const store = nearest.make(base({ entries: [], ownship: FIXTURE_OWNSHIP }));
+    const tree = (
+      <regionSlice.Provider store={region}>
+        <nearest.Provider store={store}>
+          <AirportQueriesContext.Provider value={defaultAirportQueries}>
+            <NearestColumn />
+          </AirportQueriesContext.Provider>
+        </nearest.Provider>
+      </regionSlice.Provider>
+    );
+    const v = await render(tree);
+    await act(async () => undefined);
+    expect(store.getState().entries.length).toBeGreaterThan(0);
+    await act(async () => store.setState({ ownship: null })); // no fix: the hook cannot requery
+    await act(async () => region.setState({ region: 'israel' }));
+    expect(store.getState().entries).toEqual([]);
+    expect(v.text()).not.toContain('KSQL');
   });
 });

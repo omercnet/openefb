@@ -222,6 +222,35 @@ describe('refresh policy', () => {
     expect(store.getState().error).toBe('database is locked');
   });
 
+  test("a region change drops the other region's list at once, with no position and with a late old answer", async () => {
+    const slow = deferred();
+    const query = jest.fn(createFakeAviationDatabase().nearestAirports);
+    const store = nearest.make(EMPTY);
+    const refresher = createNearestRefresher(store, queriesWith(query));
+    await refresher.update(FIXTURE_OWNSHIP, 'us');
+    expect(store.getState().entries.length).toBeGreaterThan(0);
+    refresher.setRegion('israel'); // the hook calls this even before there is a position
+    expect(store.getState().entries).toEqual([]);
+    refresher.setRegion('israel'); // idempotent
+    // A US query still in flight when the region flips must not repopulate it.
+    query.mockReturnValueOnce(slow.promise);
+    const late = refresher.update({ lat: 40, lon: -100 }, 'us');
+    refresher.setRegion('israel');
+    slow.resolve(FIXTURE_AIRPORTS);
+    await late;
+    expect(store.getState().entries).toEqual([]);
+  });
+
+  test('a failed refresh of the same region keeps its list', async () => {
+    const query = jest.fn(createFakeAviationDatabase().nearestAirports);
+    const store = nearest.make(EMPTY);
+    const refresher = createNearestRefresher(store, queriesWith(query));
+    await refresher.update(FIXTURE_OWNSHIP, 'us');
+    const before = store.getState().entries;
+    refresher.setRegion('us');
+    expect(store.getState().entries).toBe(before);
+  });
+
   test('a slow earlier query never overwrites a later one', async () => {
     const slow = deferred();
     const query = jest.fn(createFakeAviationDatabase().nearestAirports);

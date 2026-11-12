@@ -28,6 +28,12 @@ export interface NearestRefresher {
    * same sources is a no-op (an inline provider value must not requery on every render).
    */
   setQueries(next: AirportQueries): void;
+  /**
+   * The region the column now serves. Entries that were queried for another region are dropped at once (also with no
+   * position yet, and for a region without airport data): they must never read as this region's nearest airports. A
+   * failed refresh of the SAME region keeps its list.
+   */
+  setRegion(region: Region): void;
 }
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -93,9 +99,26 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
     return { ranked, aerodromes: new Map(aerodromes.map((a) => [a.code, a])) };
   };
 
+  const dropOtherRegion = (region: Region) => {
+    const staleEntries = entriesRegion !== null && entriesRegion !== region;
+    const staleRequest = requested !== null && requested.region !== region;
+    if (!staleEntries && !staleRequest) return;
+    token += 1; // an answer still in flight for the old region must not repopulate the list
+    requested = null;
+    if (staleEntries) {
+      entriesRegion = null;
+      succeeded = null;
+      store.setState({ entries: [], loading: false, error: null });
+    } else store.setState({ loading: false });
+  };
+
   return {
+    setRegion: dropOtherRegion,
     async update(position, region) {
+      dropOtherRegion(region);
       if (requested && requested.region === region && distanceNm(position, requested.position) < REQUERY_DISTANCE_NM) {
+        // Too close to requery the airports, but the NOTAM feed has its own clock: it still refreshes (and re-flags the list).
+        if (region === 'israel') refreshNotamsIfNeeded();
         return;
       }
       const mine = ++token;
@@ -172,6 +195,7 @@ export function useNearestAirports() {
   useEffect(() => {
     const refresher = refresherFor(store, queries);
     refresher.setQueries(queries);
+    refresher.setRegion(region);
     if (ownship && hasAirportData(region)) void refresher.update(ownship, region);
   }, [store, queries, ownship, region]);
   return {

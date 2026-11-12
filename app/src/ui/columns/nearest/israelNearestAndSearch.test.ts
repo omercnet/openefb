@@ -260,6 +260,32 @@ describe('Israel NRST and Search Tests', () => {
     expect(store.getState().error).toBeNull(); // not reported as an airport refresh failure
   });
 
+  test('theNotamFeedRefreshesOnItsOwnClockWhileOwnshipStaysWithinHalfANauticalMile', async () => {
+    let clock = 1_000_000;
+    let closed = false;
+    const notams = jest.fn(
+      async (): Promise<NotamClosureLookup> => (code) => (closed && code === 'LLHZ' ? ['C2/26'] : []),
+    );
+    const store = nearest.make({ entries: [], loading: false, error: null, ownship: null, directTo: () => {} });
+    const refresher = createNearestRefresher(store, {
+      ...defaultAirportQueries,
+      aviation: usDb([]),
+      israel: israelDb,
+      fetchNotamClosures: notams,
+      now: () => clock,
+    });
+    await refresher.update(here, 'israel');
+    await flush();
+    expect(notams).toHaveBeenCalledTimes(1);
+    expect(isClosedByNotam(store.getState().entries[0]!)).toBe(false);
+    closed = true;
+    clock += 24 * 3_600_000; // far past the refresh interval
+    await refresher.update({ lat: here.lat + 0.001, lon: here.lon }, 'israel'); // 0.06 NM: no airport requery
+    await flush();
+    expect(notams).toHaveBeenCalledTimes(2);
+    expect(isClosedByNotam(store.getState().entries[0]!)).toBe(true);
+  });
+
   // MARK: - Search
 
   function search(region: () => Region) {
