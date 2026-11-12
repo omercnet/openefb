@@ -1,13 +1,19 @@
 import { CORE_LAYER_SPECS } from '../../domain/map/layers';
 import { groupBySource, resolveLayerProps, styleFor } from './surfaceModel';
 
+const GLYPHS = 'file:///app/glyphs/{fontstack}/{range}.pbf';
 const sectionalOf = (night: boolean, sectional: boolean) => {
-  const l = styleFor(night, sectional).layers.find((x) => x.id === 'base-vfr-sectional');
+  const l = styleFor(night, sectional, GLYPHS).layers.find((x) => x.id === 'base-vfr-sectional');
   if (!l || l.type !== 'raster') throw new Error('sectional layer missing');
   return l;
 };
 
 describe('styleFor', () => {
+  it('points glyphs at the local pack, never the remote endpoint', () => {
+    const g = styleFor(false, true, GLYPHS).glyphs;
+    expect(g).toBe(GLYPHS);
+    expect(g).not.toMatch(/^https?:/);
+  });
   it('shows the sectional at runtime (the style ships it hidden) and hides it when the toggle is off', () => {
     expect(sectionalOf(false, true).layout?.visibility).toBe('visible');
     expect(sectionalOf(false, false).layout?.visibility).toBe('none');
@@ -17,8 +23,8 @@ describe('styleFor', () => {
     expect(sectionalOf(false, true).paint).not.toHaveProperty('raster-brightness-max');
   });
   it('leaves every other layer untouched', () => {
-    const a = styleFor(false, true).layers.filter((l) => l.id !== 'base-vfr-sectional');
-    const b = styleFor(true, false).layers.filter((l) => l.id !== 'base-vfr-sectional');
+    const a = styleFor(false, true, GLYPHS).layers.filter((l) => l.id !== 'base-vfr-sectional');
+    const b = styleFor(true, false, GLYPHS).layers.filter((l) => l.id !== 'base-vfr-sectional');
     expect(a).toEqual(b);
   });
 });

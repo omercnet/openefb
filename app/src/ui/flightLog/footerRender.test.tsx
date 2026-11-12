@@ -2,7 +2,7 @@ import { act, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import type { TestInstance } from 'test-renderer';
 import { press, render } from '../../../tests/support/ui';
-import type { Airport } from '../../domain/core';
+import { makeAirport } from '../../domain/core';
 import type { GpsStatus } from '../../domain/location/gpsStatus';
 import { nearest, type NearestAirportEntry } from '../columns/nearest/store';
 import { appStore } from '../state/appStore';
@@ -12,13 +12,34 @@ import { Day } from '../tokens';
 import { FlightLogFooter } from './FlightLogFooter';
 import { footer, type FooterData } from './footerStore';
 
-const KPAO: NearestAirportEntry = { airport: { icao: 'KPAO' } as Airport, distance: 2.0, bearing: 116 };
+const KPAO: NearestAirportEntry = {
+  airport: makeAirport({
+    icao: 'KPAO',
+    name: 'Palo Alto',
+    latitude: 37.46,
+    longitude: -122.11,
+    elevation: 4,
+    type: 'airport',
+    ownership: 'public',
+  }),
+  distance: 2.0,
+  bearing: 116,
+};
 
 async function renderFooter(
-  opts: { status?: GpsStatus; entries?: NearestAirportEntry[]; footerState?: Partial<FooterData> } = {},
+  opts: {
+    status?: GpsStatus;
+    entries?: NearestAirportEntry[];
+    footerState?: Partial<FooterData>;
+    ownship?: { lat: number; lon: number } | null;
+  } = {},
 ) {
   const gpsStore = gps.make({ status: opts.status ?? { kind: 'ok' }, failure: null });
-  const nearestStore = nearest.make({ ...nearest.store.getState(), entries: opts.entries ?? [KPAO] });
+  const nearestStore = nearest.make({
+    ...nearest.store.getState(),
+    entries: opts.entries ?? [KPAO],
+    ownship: opts.ownship ?? null,
+  });
   const footerStore = footer.make({ ...footer.store.getState(), ...opts.footerState });
   const wrap = (children: ReactNode) => (
     <gps.Provider store={gpsStore}>
@@ -30,9 +51,11 @@ async function renderFooter(
     </gps.Provider>
   );
   const view = await render(wrap(<FlightLogFooter width={400} bottomInset={20} />));
-  return { view, footerStore };
+  return { view, footerStore, nearestStore };
 }
 
+const nrst = (view: Awaited<ReturnType<typeof renderFooter>>['view']) =>
+  view.all((n) => String(n.props.accessibilityLabel ?? '').startsWith('Nearest airport KPAO'))[0];
 const style = (n: TestInstance) => StyleSheet.flatten(n.props.style) ?? {};
 
 describe('FlightLogFooter', () => {
@@ -101,6 +124,23 @@ describe('FlightLogFooter', () => {
     const widths = view.all((n) => typeof style(n).width === 'number').map((n) => style(n).width as number);
     expect(widths.length).toBeGreaterThan(0);
     expect(widths.every((w) => w >= 0)).toBe(true);
+  });
+
+  it('the NRST label speaks the entry extras the store does not carry: PPR and a NOTAM closure', async () => {
+    const israel = { requiresPPR: true, closureNotamIDs: ['A1/26'] } as NearestAirportEntry['israel'];
+    const { view } = await renderFooter({ entries: [{ ...KPAO, israel }] });
+    const label = nrst(view).props.accessibilityLabel as string;
+    expect(label).toContain('prior permission required');
+    expect(label).toContain('NOTAM');
+    const plain = await renderFooter({ entries: [KPAO] });
+    expect(nrst(plain.view).props.accessibilityLabel).not.toContain('permission');
+  });
+
+  it('refreshes the nearest list from ownship while the Nearest column is closed (the cell is always mounted)', async () => {
+    const { view, nearestStore } = await renderFooter({ entries: [], ownship: { lat: 37.4876, lon: -122.2289 } });
+    await act(async () => undefined); // let the refresher's query settle
+    expect(nearestStore.getState().entries.length).toBeGreaterThan(0);
+    expect(view.text()).not.toContain('NONE');
   });
 
   it('LAYERS toggles the strip between the layers column and the log', async () => {

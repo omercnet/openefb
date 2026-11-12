@@ -28,6 +28,9 @@ export const dayFixture: FlightLogData = {
   planDeparture: null,
   planDestination: null,
   gpsAvailable: true,
+  // The fix the readouts below come from, taken at nowMs: fresh, with an altitude (hasAltitude), within the 50 m
+  // horizontal limit (GPS ok), moving. The strip reads the evaluated status from state/gps; only the Log ages the raw fix.
+  ownshipFix: { timestampMs: NOW_MS, horizontalAccuracyM: 5, verticalAccuracyM: 8, isStationary: false },
   hasPosition: true,
   hasAltitude: true,
   groundSpeed: 96, // knots

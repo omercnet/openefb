@@ -284,12 +284,15 @@ export function SearchBar({
   text,
   onChangeText,
   placeholder,
+  accessibilityLabel,
   focusOnAppear = false,
   onSubmit,
 }: {
   text: string;
   onChangeText: (value: string) => void;
   placeholder: string;
+  /** What a screen reader says for the field; the placeholder when omitted. It belongs on the input itself. */
+  accessibilityLabel?: string;
   focusOnAppear?: boolean;
   onSubmit: () => void;
 }) {
@@ -320,8 +323,8 @@ export function SearchBar({
         autoCapitalize="characters"
         returnKeyType="search"
         onSubmitEditing={onSubmit}
-        accessibilityLabel={placeholder}
-        style={[Type.body, { flex: 1, color: t.ink, minHeight: StripMetrics.cell, padding: 0 }]}
+        accessibilityLabel={accessibilityLabel ?? placeholder}
+        style={[Type.body, { flex: 1, color: t.ink, minHeight: StripMetrics.cell - 2, padding: 0 }]} // the 1 pt border is inside the 60 pt box
       />
       {text.length > 0 ? (
         <Pressy
@@ -329,7 +332,7 @@ export function SearchBar({
           onPress={() => onChangeText('')}
           style={{
             minWidth: StripMetrics.cell,
-            minHeight: StripMetrics.cell,
+            minHeight: StripMetrics.cell - 2, // inside the border, so the box stays 60 pt with text in it
             alignItems: 'center',
             justifyContent: 'center',
           }}
