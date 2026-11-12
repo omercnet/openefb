@@ -4,7 +4,7 @@
 #   APK=<app-release.apk> OUT=<dir> app/scripts/android-capture.sh
 # Env: APK (required), OUT (default /tmp/app-android), WAIT (seconds for non-map screens, default 10),
 # MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), RESULT_TIMEOUT (seconds, default 120),
-# SCREENS (default "map airport night sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr"), FULL (1 = also run the animation and the self test, default 1; the
+# SCREENS (default "map map-layers airport night layers sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr"), FULL (1 = also run the animation and the self test, default 1; the
 # workflow's second emulator pass with another GPU mode sets FULL=0 SCREENS=map).
 # Writes OUT/screens/<screen>.png, OUT/map-status-<screen>.json and OUT/logcat-<screen>.txt, OUT/spike-result.json
 # and OUT/spike-anim.json (from logcat: a release build is not debuggable, so run-as cannot read the files), and
@@ -17,7 +17,7 @@ WAIT=${WAIT:-10}
 MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}
 # The AI debrief screen (route debrief) is not captured here: the Android app has no AI debrief (owner decision Q8).
-SCREENS=${SCREENS:-map airport night sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr}
+SCREENS=${SCREENS:-map map-layers airport night layers sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr}
 # Screens with no map (a native sheet, the settings forms) wait a fixed time instead of for the map status.
 NO_MAP=" sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr "
 FULL=${FULL:-1}
@@ -35,13 +35,34 @@ collect() {
 }
 trap collect EXIT
 
+# anr_dialogs: the packages with an "isn't responding" dialog up. A starved CI emulator sometimes ANRs its own launcher and
+# the dialog then covers every screenshot (run 43111102990: all four dimmed under "Pixel Launcher isn't responding", SSIM
+# 0.51 to 0.58, logcat "Application Not Responding: com.google.android.apps.nexuslauncher"). The dialog's window title
+# names the process.
+anr_dialogs() {
+  adb shell dumpsys window 2>/dev/null | grep -o 'Application Not Responding: [A-Za-z0-9_.]*' | sed 's/.*: //' | sort -u || true
+}
+# clear_anr_dialogs: killing the process dismisses its dialog (the system server drops a dead process's error dialogs)
+# and the launcher restarts by itself.
+clear_anr_dialogs() {
+  local pkg
+  for pkg in $(anr_dialogs); do
+    echo "android-capture: dismissing the ANR dialog of $pkg" >&2
+    adb shell am force-stop "$pkg" || true
+  done
+}
+
 adb wait-for-device
+# The system server re-reads this setting live: with it set, a process that ANRs is killed quietly instead of getting the
+# dialog. Set it before the install, the first heavy step. A real crash of the app still fails the gate (blank screenshot).
+adb shell settings put global hide_error_dialogs 1 || echo "android-capture: could not hide error dialogs" >&2
 adb install -r "$APK"
 for perm in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION ACCESS_BACKGROUND_LOCATION RECORD_AUDIO POST_NOTIFICATIONS; do
   adb shell pm grant "$PKG" "android.permission.$perm" || echo "android-capture: pm grant $perm failed" >&2
 done
 # shellcheck disable=SC2086 # GEO is two arguments
 adb emu geo fix $GEO
+clear_anr_dialogs   # a dialog that came up before the script started (boot) is not covered by the setting
 
 # portrait: Pixel Tablet is landscape-natural (2560x1600), so portrait is user rotation 1 (90 degrees), not 0.
 portrait() {
@@ -49,14 +70,18 @@ portrait() {
   adb shell cmd window user-rotation lock 1 >/dev/null || adb shell settings put system user_rotation 1 || true
 }
 
-# screenshot <screen>: capture and check it is portrait like the iPad references (warn, do not fail).
+# screenshot <screen>: capture and check it is portrait like the iPad references (warn, do not fail). An ANR dialog that
+# came up while the screen rendered would dim the capture, so dismiss it first and say so in the log if one is still up.
 screenshot() {
-  local png="$OUT/screens/$1.png" size
+  local png="$OUT/screens/$1.png" size dialogs
+  clear_anr_dialogs
   adb exec-out screencap -p > "$png"
   size=$(python3 -c 'import struct,sys; w,h=struct.unpack(">II",open(sys.argv[1],"rb").read()[16:24]); print(w,h)' "$png")
   stamp "$1.png ${size/ /x}"
   read -r w h <<<"$size"
   [ "$h" -gt "$w" ] || echo "android-capture: $1.png is landscape ($w x $h)" >&2
+  dialogs=$(anr_dialogs)
+  [ -z "$dialogs" ] || echo "android-capture: $1.png was taken with an ANR dialog up ($dialogs)" >&2
 }
 
 # open <url>: cold-start the app on a deep link (logcat cleared first, so logged() only sees this launch).

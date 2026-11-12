@@ -12,6 +12,7 @@ import {
   isDataAgeBadgeVisible,
   opacityAccessibilityValue,
   opacityPercentText,
+  stepOpacity,
 } from './logic';
 
 describe('CurrencyBadge', () => {
@@ -69,5 +70,25 @@ describe('OpacitySlider', () => {
     expect(opacityAccessibilityValue(0.5)).toBe('50 percent');
     expect(clampOpacity(1.4)).toBe(1);
     expect(clampOpacity(-0.2)).toBe(0);
+  });
+
+  it('steps ten points at a time without drifting (0.7, 0.8, 0.9 and not 0.8999999999999999)', () => {
+    let value = 0.7;
+    const spoken: string[] = [];
+    for (const action of ['increment', 'increment', 'increment', 'increment']) {
+      value = stepOpacity(value, action) ?? value;
+      spoken.push(opacityAccessibilityValue(value));
+    }
+    expect(spoken).toEqual(['80 percent', '90 percent', '100 percent', '100 percent']);
+    expect(['decrement', 'decrement'].map((a) => (value = stepOpacity(value, a) ?? value))).toEqual([0.9, 0.8]);
+    expect(opacityAccessibilityValue(value)).toBe('80 percent');
+  });
+
+  it('stops at both ends and ignores other accessibility actions', () => {
+    expect(stepOpacity(0.05, 'decrement')).toBe(0);
+    expect(stepOpacity(0, 'decrement')).toBe(0);
+    expect(stepOpacity(0.95, 'increment')).toBe(1);
+    expect(stepOpacity(0.5, 'activate')).toBeNull();
+    expect(stepOpacity(0.5, '')).toBeNull();
   });
 });
