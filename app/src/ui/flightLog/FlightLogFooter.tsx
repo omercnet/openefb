@@ -1,11 +1,12 @@
 // FlightLogFooter (efb-212/Views/Log/FlightLogFooter.swift): one row of 60pt cells under the strip: GPS state,
 // the dark NRST cell, LAYERS, ZOOM + (RECENTER after a pan) and ZOOM -. The paper and the NRST ink run into the
 // bottom safe area.
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Text, View } from 'react-native';
 import type { StripColumnKind } from '../../domain/types';
 import { hasAirportData } from '../../domain/core/region';
 import { gpsStatusAccessibilityDescription } from '../../domain/location/gpsStatus';
+import { entryExtras } from '../columns/nearest/logic';
 import { useNearestEntry } from '../columns/nearest/store';
 import { Layers, Minus, Plus } from '../Icons';
 import { CellButton, ColumnRule, Pressy, useTheme } from '../Primitives';
@@ -132,7 +133,9 @@ export function FlightLogFooter({ width, bottomInset }: { width: number; bottomI
  */
 function NrstCell({ width, bottomInset }: { width: number; bottomInset: number }) {
   const t = useTheme();
-  const entry: NrstEntry | null = useNearestEntry();
+  const raw = useNearestEntry();
+  // The refresher publishes plain entries; the spoken label needs the computed runway, private, military, PPR and NOTAM fields.
+  const entry: NrstEntry | null = useMemo(() => (raw ? { ...raw, ...entryExtras(raw) } : null), [raw]);
   const status = useGpsStatus();
   const hasData = hasAirportData(useRegion());
   // AppState.gpsAvailable turns true with the first location and false on a location error; GpsStatus is lost
