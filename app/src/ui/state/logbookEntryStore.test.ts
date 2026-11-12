@@ -125,6 +125,18 @@ describe('save', () => {
     expect(lockedStore.getState().error).toBe('This entry has been confirmed and is locked.');
   });
 
+  it('an entry deleted while the save was refused as locked is shown as gone, not as a locked summary', async () => {
+    const data = await seeded();
+    const { store, form } = await open(data);
+    await data.logbook.update('e1', { isConfirmed: true });
+    const gone = { ...data, logbook: { ...data.logbook, get: () => Promise.resolve(null) } };
+    const lockedStore = createLogbookEntryStore({ userData: gone });
+    lockedStore.setState({ entry: store.getState().entry, loaded: true });
+    expect(await lockedStore.getState().save(edit(form, { notes: 'late edit' }))).toBe('locked');
+    expect(lockedStore.getState().entry).toBeNull();
+    expect(lockedStore.getState().error).toBe('This logbook entry no longer exists.');
+  });
+
   it('a write that fails is reported and the stored entry is unchanged', async () => {
     const data = await seeded();
     const { form } = await open(data);
