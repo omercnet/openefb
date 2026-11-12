@@ -19,6 +19,8 @@ const LAUNCH_SCREENS = [
   'selftest',
   'sheet',
   'ota',
+  'briefing',
+  'israel-plan',
   'settings',
   'onboarding',
   'disclaimers',
