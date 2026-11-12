@@ -9,8 +9,9 @@
 # screenshots it as <device>-<shot>.png (device ipad|iphone) and fails when the app is not running after the wait or
 # a crash report appears. Image content is not asserted. The iPad also gets the Israel route (il-map-day).
 # Wave 2 shots (iPad only, named after the React Native screens): onboarding, map-layers (every layer on), briefing,
-# and, last because -OpenEFBSeed small leaves its data in the simulator, the seeded pages (-OpenEFBRoute: settings,
-# disclaimers, aircraft, planner, offline-maps, logbook, flight, replay) and currency (the expired medical banner).
+# israel-plan, recording problems (recording, recordingstopped, recordingstop) and, last because -OpenEFBSeed leaves its
+# data in the simulator, settings and the seeded pages (-OpenEFBRoute: disclaimers, aircraft, aircraftedit, pilot,
+# logbookentry, logbooklocked, flightdetail, cvfr, debrief, replay, replayfast); the data is in docs/capture-seed.md.
 # Recording runs without the microphone (-OpenEFBNoAudio), as in tools/ci/fly-scenarios.sh.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -158,11 +159,16 @@ shot "$IPAD" ipad israel-plan il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -
 seen_onboarding=NO
 shot "$IPAD" ipad onboarding us-kpao-ksql 150
 seen_onboarding=YES
-# Seeded: the fictional data set of SeedDataHook (aircraft, pilots with an expired medical, a flight, logbook entries).
-seed=(-OpenEFBSeed small)
-shot "$IPAD" ipad currency us-kpao-ksql 150 "${seed[@]}" -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day
-for route in settings disclaimers aircraft aircraftedit pilot logbookentry logbooklocked flightdetail replay; do
-  shot "$IPAD" ipad "$route" us-kpao-ksql 150 "${seed[@]}" -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute "$route"
+# Recording problems and the stop dialog over the flying map (ScreenCaptureHooks.applyRecording).
+for rec in "notices recording" "stopped recordingstopped" "stop recordingstop"; do
+  # shellcheck disable=SC2086
+  set -- $rec
+  shot "$IPAD" ipad "$2" us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -OpenEFBRecording "$1"
+done
+# Seeded pages (CaptureSeed: the data is listed in docs/capture-seed.md). Seeding replaces the stored rows each launch.
+shot "$IPAD" ipad settings us-kpao-ksql 150 -OpenEFBSeed capture-fresh -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute settings
+for route in disclaimers aircraft aircraftedit pilot logbookentry logbooklocked flightdetail cvfr debrief replay replayfast; do
+  shot "$IPAD" ipad "$route" us-kpao-ksql 150 -OpenEFBSeed capture -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute "$route"
 done
 echo "::endgroup::"
 

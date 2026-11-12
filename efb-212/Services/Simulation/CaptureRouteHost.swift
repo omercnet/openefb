@@ -17,7 +17,17 @@ struct CaptureRouteHost: View {
     @Query private var flights: [SchemaV1.FlightRecord]
     @Query private var aircraft: [SchemaV1.AircraftProfile]
     @Query private var entries: [SchemaV1.LogbookEntry]
+    @Environment(AppState.self) private var appState
     @State private var logbook = LogbookViewModel()
+    @State private var debriefEngine = DebriefEngine()
+    @State private var cvfr: CVFRDebrief?
+
+    private func loadCVFR() async {
+        guard let flight = flights.first, let db = appState.getOrCreateRecordingDatabase() else { return }
+        let id = flight.id
+        let window = RemoteConfigStore.shared.value(for: .cvfrReportWindowSeconds)
+        cvfr = await Task.detached { CVFRDebriefLoader.loadBundled(flightID: id, recordingDB: db, reportWindow: window) }.value
+    }
 
     var body: some View {
         if let route = model.route {
@@ -47,8 +57,20 @@ struct CaptureRouteHost: View {
             }
         case .flightdetail:
             if let flight = flights.first { FlightDetailView(flightRecord: flight) }
-        case .replay:
+        case .replay, .replayfast:
             if let flight = flights.first { ReplayView(flightRecord: flight) }
+        case .cvfr:
+            ScrollView { if let cvfr { CVFRDebriefContent(debrief: cvfr) } }
+                .task(id: flights.first?.id) { await loadCVFR() }
+        case .debrief:
+            if let flight = flights.first, let db = appState.getOrCreateRecordingDatabase() {
+                DebriefView(
+                    debriefEngine: debriefEngine, flightID: flight.id, recordingDB: db,
+                    metadata: FlightMetadata(
+                        aircraftType: nil, pilotName: nil, departureICAO: flight.departureICAO,
+                        arrivalICAO: flight.arrivalICAO, date: flight.startDate, durationSeconds: flight.durationSeconds))
+                    .onAppear { debriefEngine.checkAvailability() }
+            }
         case .israelPlan: IsraelFlightPlanView()
         }
     }

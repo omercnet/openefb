@@ -34,7 +34,7 @@ struct ScreenCaptureHooksTests {
     }
 
     @Test func everyRouteValueParses() {
-        let expected = ["settings", "disclaimers", "aircraft", "aircraftedit", "pilot", "logbookentry", "logbooklocked", "flightdetail", "replay", "israel-plan"]
+        let expected = ["settings", "disclaimers", "aircraft", "aircraftedit", "pilot", "logbookentry", "logbooklocked", "flightdetail", "cvfr", "debrief", "replay", "replayfast", "israel-plan"]
         #expect(Set(ScreenCaptureHooks.Route.allCases.map(\.rawValue)) == Set(expected))
         for value in expected {
             ScreenCaptureHooks.apply(to: AppState(), defaults: defaults(["OpenEFBRoute": value]))
@@ -66,6 +66,17 @@ struct ScreenCaptureHooksTests {
         #expect(!state.isPresentingIsraelBriefing)
         ScreenCaptureHooks.apply(to: state, defaults: defaults(["OpenEFBBriefing": "YES"]))
         #expect(state.isPresentingIsraelBriefing)
+    }
+
+    @Test func aRouteTurnsAutoStartOff() {
+        let state = AppState()
+        #expect(state.isAutoStartEnabled)
+        ScreenCaptureHooks.apply(to: state, defaults: defaults(["OpenEFBRoute": "replay"]))
+        #expect(!state.isAutoStartEnabled)
+    }
+
+    @Test func captureSeedProfilesAreKnown() {
+        #expect(CaptureSeed.profiles == ["capture", "capture-fresh"])
     }
 
     @Test func noArgumentsChangeNothing() {

@@ -34,6 +34,9 @@ struct ReplayView: View {
             if appState.recordingStatus == .idle {
                 viewModel.loadFlight(flightRecord: flightRecord, appState: appState)
             }
+            #if DEBUG
+            ScreenCaptureHooks.applyReplay(to: viewModel)
+            #endif
         }
         .onDisappear {
             viewModel.cleanup()
