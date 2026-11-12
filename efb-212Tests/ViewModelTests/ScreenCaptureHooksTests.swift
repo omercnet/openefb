@@ -104,6 +104,26 @@ struct ScreenCaptureHooksTests {
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.LogbookEntry>()).count == 2)
     }
 
+    @Test func seedFailsLoudlyWhenAudioCannotBeRemoved() throws {
+        let container = try ModelContainer(
+            for: SchemaV1.AircraftProfile.self, SchemaV1.PilotProfile.self, SchemaV1.UserSettings.self,
+            SchemaV1.FlightPlanRecord.self, SchemaV1.FlightRecord.self, SchemaV1.LogbookEntry.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("capture-seed-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let db = try RecordingDatabase(dbPool: try DatabasePool(path: tmp.appendingPathComponent("r.sqlite").path))
+        // A plain file where the audio directory should be: listing it fails, which is not "missing".
+        let notADirectory = tmp.appendingPathComponent("recordings")
+        try Data().write(to: notADirectory)
+        #expect(throws: (any Error).self) {
+            try CaptureSeed.run(profile: "capture-fresh", container: container, recordingDB: db, audioDirectory: notADirectory)
+        }
+        // A missing directory is fine.
+        try CaptureSeed.run(profile: "capture-fresh", container: container, recordingDB: db,
+                            audioDirectory: tmp.appendingPathComponent("absent"))
+    }
+
     @Test func captureFreshLeavesNothingBehind() throws {
         let ctx = try seed("capture-fresh")
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.AircraftProfile>()).isEmpty)

@@ -36,7 +36,7 @@ final class RecordingViewModel {
     /// overlay says audio and transcript are off and how to fix it (Settings).
     var microphoneDenied: Bool = false
     #if DEBUG
-    /// -OpenEFBRecording notices (ScreenCaptureHooks): the sync loop leaves microphoneDenied alone.
+    /// -OpenEFBRecording notices (ScreenCaptureHooks): the sync loop leaves microphoneDenied alone until microphone permission is granted.
     var captureForcesMicrophoneDenied = false
     #endif
 
@@ -207,7 +207,8 @@ final class RecordingViewModel {
                 self.recordingStatus = state.recordingStatus
                 // Covers auto-started recordings and permission changed in Settings mid-flight.
                 #if DEBUG
-                if !self.captureForcesMicrophoneDenied {
+                if !(self.captureForcesMicrophoneDenied
+                    && AVAudioApplication.shared.recordPermission != .granted) {
                     self.microphoneDenied = state.recordingStatus == .recording
                         && AVAudioApplication.shared.recordPermission == .denied
                 }

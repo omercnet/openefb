@@ -58,7 +58,7 @@ enum CaptureSeed {
         try clearRecordings(db: db, audioDirectory: audioDirectory)
         // A NOTAM credential left by -OpenEFBSeed small|full must not show in the fresh install.
         let store = KeychainStore(service: "quartermint.efb-212.faa-notam-api")
-        for account in ["client_id", "client_secret"] { try? store.removeValue(forAccount: account) }
+        for account in ["client_id", "client_secret"] { try store.removeValue(forAccount: account) }
         guard profile == "capture" else { try context.save(); return }
 
         for (i, n) in ["N172KF", "N28PA", "4X-ABC"].enumerated() {
@@ -150,8 +150,10 @@ enum CaptureSeed {
     /// Drops every recorded flight and the audio files, so FlightRecoveryService has no orphan to restore as a flight.
     private static func clearRecordings(db: RecordingDatabase, audioDirectory dir: URL) throws {
         for id in try db.flightIDsWithRecordedData() { try db.deleteFlightData(flightID: id) }
-        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        for file in files where file.pathExtension == "m4a" { try? FileManager.default.removeItem(at: file) }
+        // A missing directory is fine; any other failure stops the seed rather than leaving audio recovery would restore.
+        guard FileManager.default.fileExists(atPath: dir.path) else { return }
+        let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+        for file in files where file.pathExtension == "m4a" { try FileManager.default.removeItem(at: file) }
     }
 
     static let trackPoints = 900
