@@ -137,6 +137,10 @@ export function createSettingsStore(deps: SettingsDeps) {
 
   /** Region writes queued but not finished: a load that reads storage meanwhile must not put the old region back. */
   let pendingRegionWrites = 0;
+  /** Same for the two preferences: a load must not put back a value changed while it was reading. */
+  const pendingPrefWrites = { displayMode: 0, shareUsageData: 0 };
+  /** What went wrong with the last region change, so Retry repeats exactly that (the save, the notification, or both). */
+  let regionFailed = { apply: false, save: false };
   /** Which preference the shown preferenceError belongs to: a later success of another one must not clear it. */
   let errorOwner: 'displayMode' | 'shareUsageData' | null = null;
 
@@ -162,15 +166,22 @@ export function createSettingsStore(deps: SettingsDeps) {
       }
     };
 
-    const saveRegion = async (region: Region, applyFailure: string | null) => {
-      let message: string | null = applyFailure && `Region changed, but the app could not apply it: ${applyFailure}`;
-      try {
-        await deps.userData.settings.update({ regionRaw: region });
-      } catch (error) {
-        message = `Region changed, but it could not be saved: ${describeError(error)}`;
+    /** Saves the region (when `write`) and records what failed. `applyFailure` is what notifying the app threw, if anything. */
+    const saveRegion = async (region: Region, applyFailure: string | null, write: boolean) => {
+      let saveFailure: string | null = null;
+      if (write) {
+        try {
+          await deps.userData.settings.update({ regionRaw: region });
+        } catch (error) {
+          saveFailure = describeError(error);
+        }
       }
+      regionFailed = { apply: applyFailure !== null, save: saveFailure !== null };
       set({
-        regionSaveError: message,
+        regionSaveError:
+          saveFailure !== null
+            ? `Region changed, but it could not be saved: ${saveFailure}`
+            : applyFailure && `Region changed, but the app could not apply it: ${applyFailure}`,
         dataAttribution: await attributionFor(region),
         regionDataError: await unavailableFor(region),
       });
@@ -211,14 +222,18 @@ export function createSettingsStore(deps: SettingsDeps) {
           const pilots = await read(() => deps.userData.pilots.list(), []);
           const cycle = await deps.loadDataCycle().catch(() => null);
           const typing = get().notam;
+          const shownRegion = pendingRegionWrites > 0 ? get().region : region;
           const untouched = typing.clientID === '' && typing.clientSecret === '';
           set({
             loaded: true,
-            region: pendingRegionWrites > 0 ? get().region : region,
-            displayMode: DISPLAY_MODES.find((m) => m === rawMode) ?? 'auto',
-            shareUsageData: share,
-            dataAttribution: await attributionFor(region),
-            regionDataError: await unavailableFor(region),
+            region: shownRegion,
+            displayMode:
+              pendingPrefWrites.displayMode > 0
+                ? get().displayMode
+                : (DISPLAY_MODES.find((m) => m === rawMode) ?? 'auto'),
+            shareUsageData: pendingPrefWrites.shareUsageData > 0 ? get().shareUsageData : share,
+            dataAttribution: await attributionFor(shownRegion),
+            regionDataError: await unavailableFor(shownRegion),
             currencyToRenew: currencyToRenewCount(pilots.find((p) => p.isActive) ?? null, deps.now()),
             dataCycle: cycle,
             loadError: problems.length > 0 ? problems.join('; ') : null,
@@ -234,14 +249,16 @@ export function createSettingsStore(deps: SettingsDeps) {
 
       setRegion: (region) => {
         // Guard newRegion != appState.region; but a region whose save failed may be saved again (the picker offers Retry).
-        const retry = region === get().region && get().regionSaveError !== null;
+        const retry = region === get().region && (regionFailed.apply || regionFailed.save);
         if (region === get().region && !retry) return Promise.resolve();
         set({ region });
-        const applyFailure = retry ? null : notify(() => deps.onRegionChange?.(region));
+        // A retry repeats only what failed: the notification, the save, or both.
+        const applyFailure = !retry || regionFailed.apply ? notify(() => deps.onRegionChange?.(region)) : null;
+        const write = !retry || regionFailed.save;
         pendingRegionWrites += 1;
         return enqueue(async () => {
           try {
-            await saveRegion(region, applyFailure);
+            await saveRegion(region, applyFailure, write);
           } finally {
             pendingRegionWrites -= 1;
           }
@@ -251,16 +268,24 @@ export function createSettingsStore(deps: SettingsDeps) {
       setDisplayMode: (mode) => {
         set({ displayMode: mode });
         const applyFailure = notify(() => deps.onDisplayModeChange?.(mode));
+        pendingPrefWrites.displayMode += 1;
         return enqueue(() =>
-          persist('displayMode', () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode), applyFailure),
+          persist('displayMode', () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode), applyFailure).finally(() => {
+            pendingPrefWrites.displayMode -= 1;
+          }),
         );
       },
 
       setShareUsageData: (enabled) => {
         set({ shareUsageData: enabled });
         const applyFailure = notify(() => deps.setTelemetryEnabled(enabled, get().region));
+        pendingPrefWrites.shareUsageData += 1;
         return enqueue(() =>
-          persist('shareUsageData', () => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled), applyFailure),
+          persist('shareUsageData', () => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled), applyFailure).finally(
+            () => {
+              pendingPrefWrites.shareUsageData -= 1;
+            },
+          ),
         );
       },
 
@@ -275,8 +300,12 @@ export function createSettingsStore(deps: SettingsDeps) {
             await saveNotamCredentials(deps.secrets, credentials);
             const readBack = await loadNotamCredentials(deps.secrets);
             // Both writes succeeded; a read that comes back empty means the store cannot be read, not that no key is saved.
+            // The fields the user kept editing while this waited are left alone; the status still updates.
+            const now = get().notam;
+            const unchanged =
+              now.clientID.trim() === credentials.clientID && now.clientSecret.trim() === credentials.clientSecret;
             setNotam({
-              ...credentials,
+              ...(unchanged ? credentials : {}),
               configured: true,
               message:
                 readBack === null

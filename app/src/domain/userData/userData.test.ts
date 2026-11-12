@@ -160,11 +160,8 @@ describe('createMemoryUserData concurrency and columns (#45 review)', () => {
 
   it('two settings updates started together both land', async () => {
     const data = createMemoryUserData();
-    await Promise.all([
-      data.settings.update({ regionRaw: 'us' }),
-      data.settings.update({ displayModeRaw: 'night' } as never),
-    ]);
-    expect(await data.settings.get()).toMatchObject({ regionRaw: 'us' });
+    await Promise.all([data.settings.update({ regionRaw: 'us' }), data.settings.update({ sectionalOpacity: 0.4 })]);
+    expect(await data.settings.get()).toMatchObject({ regionRaw: 'us', sectionalOpacity: 0.4 });
   });
 
   it('a rollback does not undo another transaction that committed meanwhile', async () => {

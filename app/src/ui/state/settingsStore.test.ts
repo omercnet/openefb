@@ -2,6 +2,7 @@
 // cases follow the Swift source, and the guards for races and failed writes are the JS-only additions listed in U7.md.
 import { newPilotProfile } from '../../data/defaults';
 import { fallbackDataAttribution } from '../../domain/core/region';
+import { DISPLAY_MODE_DEFAULTS_KEY } from '../../domain/displayMode';
 import { FakePreferences, type Preferences } from '../../domain/ports/preferences';
 import {
   FakeSecretStore,
@@ -577,5 +578,43 @@ describe('review fixes on #45', () => {
     await store.getState().saveNotamKey();
     expect(store.getState().notam.configured).toBe(true);
     expect(store.getState().notam.message).toContain('could not be read back');
+  });
+
+  it('a display mode or privacy change made while load is reading is kept on screen', async () => {
+    const { store, prefs } = setup();
+    await store.getState().load();
+    const loading = store.getState().load();
+    const a = store.getState().setDisplayMode('night');
+    const b = store.getState().setShareUsageData(false);
+    await Promise.all([loading, a, b]);
+    expect(store.getState()).toMatchObject({ displayMode: 'night', shareUsageData: false });
+    expect(await prefs.get(DISPLAY_MODE_DEFAULTS_KEY)).toBe('night');
+  });
+
+  it('Retry repeats the notification when that is what failed, and does not write again', async () => {
+    const onRegionChange = jest.fn().mockImplementationOnce(() => {
+      throw new Error('map not ready');
+    });
+    const { store, userData } = setup({ onRegionChange });
+    await store.getState().load();
+    await store.getState().setRegion('us');
+    expect(store.getState().regionSaveError).toContain('could not apply');
+    const update = jest.spyOn(userData.settings, 'update');
+    await store.getState().setRegion('us');
+    expect(onRegionChange).toHaveBeenCalledTimes(2);
+    expect(update).not.toHaveBeenCalled();
+    expect(store.getState().regionSaveError).toBeNull();
+  });
+
+  it('NOTAM text edited while a save is pending is not overwritten by the saved values', async () => {
+    const { store, secrets } = setup();
+    await store.getState().load();
+    store.getState().setNotamClientID('id');
+    store.getState().setNotamClientSecret('secret');
+    const saving = store.getState().saveNotamKey();
+    store.getState().setNotamClientID('id-edited');
+    await saving;
+    expect(store.getState().notam).toMatchObject({ clientID: 'id-edited', clientSecret: 'secret', configured: true });
+    expect(await secrets.get(NOTAM_CLIENT_ID_KEY)).toBe('id');
   });
 });
