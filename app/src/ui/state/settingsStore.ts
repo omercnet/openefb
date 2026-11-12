@@ -140,6 +140,8 @@ export function createSettingsStore(deps: SettingsDeps) {
   /** Same for the two preferences: a load must not put back a value changed while it was reading. */
   const pendingPrefWrites = { displayMode: 0, shareUsageData: 0 };
   /** What went wrong with the last region change, so Retry repeats exactly that (the save, the notification, or both). */
+  /** True once the user has typed in a NOTAM field since the last load, save or removal (empty is a valid edit). */
+  let notamEdited = false;
   let regionFailed: { region: Region | null; apply: boolean; save: boolean } = {
     region: null,
     apply: false,
@@ -180,6 +182,8 @@ export function createSettingsStore(deps: SettingsDeps) {
           saveFailure = describeError(error);
         }
       }
+      // A newer choice owns the shared state; this older save must not overwrite its error, attribution or availability.
+      if (get().region !== region) return;
       regionFailed = { region, apply: applyFailure !== null, save: saveFailure !== null };
       set({
         regionSaveError:
@@ -226,8 +230,9 @@ export function createSettingsStore(deps: SettingsDeps) {
           const pilots = await read(() => deps.userData.pilots.list(), []);
           const cycle = await deps.loadDataCycle().catch(() => null);
           const typing = get().notam;
-          const shownRegion = pendingRegionWrites > 0 ? get().region : region;
-          const untouched = typing.clientID === '' && typing.clientSecret === '';
+          // A region whose save failed is still the one the user chose: a reload must not drop it before Retry.
+          const shownRegion = pendingRegionWrites > 0 || regionFailed.save ? get().region : region;
+          const untouched = !notamEdited;
           set({
             loaded: true,
             region: shownRegion,
@@ -297,8 +302,14 @@ export function createSettingsStore(deps: SettingsDeps) {
         );
       },
 
-      setNotamClientID: (clientID) => setNotam({ clientID }),
-      setNotamClientSecret: (clientSecret) => setNotam({ clientSecret }),
+      setNotamClientID: (clientID) => {
+        notamEdited = true;
+        setNotam({ clientID });
+      },
+      setNotamClientSecret: (clientSecret) => {
+        notamEdited = true;
+        setNotam({ clientSecret });
+      },
 
       saveNotamKey: () => {
         if (!canSaveNotamKey(get().notam)) return Promise.resolve();
@@ -312,6 +323,7 @@ export function createSettingsStore(deps: SettingsDeps) {
             const now = get().notam;
             const unchanged =
               now.clientID.trim() === credentials.clientID && now.clientSecret.trim() === credentials.clientSecret;
+            if (unchanged) notamEdited = false;
             setNotam({
               ...(unchanged ? credentials : {}),
               configured: true,
@@ -330,6 +342,7 @@ export function createSettingsStore(deps: SettingsDeps) {
         enqueue(async () => {
           try {
             await removeNotamCredentials(deps.secrets);
+            notamEdited = false;
             setNotam({ clientID: '', clientSecret: '', configured: false, message: 'Key removed.' });
           } catch (error) {
             // A half-removed pair is not usable, so say what the store now holds instead of keeping "Configured".
