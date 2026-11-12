@@ -1,33 +1,34 @@
-// STUB until the Nearest column is ported (U4a): the entry type and the store the footer already reads.
-import { makeAirport, type Airport } from '../../../domain/core';
+// The nearest-airports slice: the list the Nearest column shows and the footer's NRST cell reads, the ownship it was
+// computed for, and the refresh state. useNearestAirports (refresh.ts) keeps it current; I1 feeds `ownship` from the
+// location service and `directTo` from AppState's Direct-To.
+import type { Airport, Coordinate } from '../../../domain/core';
 import { createStoreContext } from '../../state/storeContext';
+import { FIXTURE_AIRPORTS, FIXTURE_OWNSHIP } from './fixture';
+import { LIST_COUNT, MINIMUM_RUNWAY_LENGTH_FEET, rankLandable, type NearestAirportEntry } from './logic';
 
-/** One nearby airport with its range and bearing from ownship (NearestAirportViewModel.swift NearestAirportEntry). */
-export interface NearestAirportEntry {
-  airport: Airport;
-  /** Nautical miles. */
-  distance: number;
-  /** Degrees true. */
-  bearing: number;
-}
+export type { IsraelAerodromeFlags, NearestAirportEntry } from './logic';
 
 export interface NearestData {
-  /** Nearest first. */
+  /** Nearest first, at most LIST_COUNT. Kept across failed refreshes (stale beats empty). */
   entries: NearestAirportEntry[];
+  /** A refresh is in flight. */
+  loading: boolean;
+  /** Why the last refresh failed; cleared by the next success. The list then still shows the previous entries. */
+  error: string | null;
+  /** Ownship position (degrees); null until the first fix. */
+  ownship: Coordinate | null;
+  /** Start Direct-To to an airport (NearestAirportViewModel.setDirectTo). No-op until I1 wires AppState. */
+  directTo: (airport: Airport) => void;
 }
 
-/** FAKE: the nearest airport in the Swift captures (reference/ipad-*.png footer, NRST 2.0 NM KPAO 116). */
-const KPAO = makeAirport({
-  icao: 'KPAO',
-  name: 'Palo Alto Airport',
-  latitude: 37.4611,
-  longitude: -122.115,
-  elevation: 4,
-  type: 'airport',
-  ownership: 'public',
+/** FAKE: the reference's ownship and its ten airports, ranked the way a refresh would rank them. */
+export const nearest = createStoreContext<NearestData>({
+  entries: rankLandable(FIXTURE_AIRPORTS, FIXTURE_OWNSHIP, MINIMUM_RUNWAY_LENGTH_FEET, LIST_COUNT),
+  loading: false,
+  error: null,
+  ownship: FIXTURE_OWNSHIP,
+  directTo: () => {},
 });
-
-export const nearest = createStoreContext<NearestData>({ entries: [{ airport: KPAO, distance: 2.0, bearing: 116 }] });
 
 /** The closest landable airport, for the footer's NRST cell; null while there is none. */
 export const useNearestEntry = (): NearestAirportEntry | null => nearest.useData((s) => s.entries[0] ?? null);

@@ -4,9 +4,10 @@
 #   APK=<app-release.apk> OUT=<dir> app/scripts/android-capture.sh
 # Env: APK (required), OUT (default /tmp/app-android), WAIT (seconds for non-map screens, default 10),
 # MAP_TIMEOUT (seconds to wait for a fully rendered map, default 45), RESULT_TIMEOUT (seconds, default 120),
-# SCREENS (default "map map-layers airport night layers sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast"), FULL (1 = also run the animation and the self test, default 1; the
+# SCREENS (default "map map-layers airport night layers nearest search log sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast"), FULL (1 = also run the animation and the self test, default 1; the
 # workflow's second emulator pass with another GPU mode sets FULL=0 SCREENS=map).
-# Writes OUT/screens/<screen>.png, OUT/map-status-<screen>.json and OUT/logcat-<screen>.txt, OUT/spike-result.json
+# Writes OUT/screens/<screen>.png, OUT/map-status-<screen>.json (screens with a map) and OUT/logcat-<screen>.txt (every screen),
+# OUT/spike-result.json
 # and OUT/spike-anim.json (from logcat: a release build is not debuggable, so run-as cannot read the files), and
 # OUT/dumpsys-location.txt.
 set -euo pipefail
@@ -16,9 +17,9 @@ OUT=${OUT:-/tmp/app-android}
 WAIT=${WAIT:-10}
 MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}
-SCREENS=${SCREENS:-map map-layers airport night layers sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast}
-# Screens with no map (a native sheet, the settings forms) wait a fixed time instead of for the map status.
-NO_MAP=" sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast "
+SCREENS=${SCREENS:-map map-layers airport night layers nearest search log sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast}
+# Screens with no map (a native sheet, the log, the settings forms) wait a fixed time instead of for the map status.
+NO_MAP=" sheet log settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast "
 FULL=${FULL:-1}
 PKG=io.omer.efb.dev
 GEO="-122.2289 37.4876"   # longitude latitude: ownship over Redwood City (src/fixtures/scenario.ts)
@@ -111,7 +112,13 @@ wait_map() {
 for screen in $SCREENS; do
   stamp "screen $screen"
   open_url "kanaf-dev://$screen"
-  if [[ "$NO_MAP" == *" $screen "* ]]; then sleep "$WAIT"; else wait_map "$screen"; fi
+  if [[ "$NO_MAP" == *" $screen "* ]]; then
+    sleep "$WAIT"
+    # No map status to wait for, and the next open_url clears logcat: keep this screen's log (the only evidence of a crash).
+    adb logcat -d > "$OUT/logcat-$screen.txt" || true
+  else
+    wait_map "$screen"
+  fi
   screenshot "$screen"
 done
 

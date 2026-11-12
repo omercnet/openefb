@@ -1,6 +1,6 @@
 import { act, type ReactElement } from 'react';
 import { callHandler, press, render, type Rendered } from '../../../tests/support/ui';
-import type { Airport } from '../../domain/core';
+import { makeAirport } from '../../domain/core';
 import type { GpsData } from '../state/gps';
 import { gps } from '../state/gps';
 import { panels, type PanelsData } from '../state/panels';
@@ -178,7 +178,19 @@ describe('FlightLogStrip, GPS states', () => {
 
 describe('FlightLogStrip, no navigation', () => {
   it('shows No route, the nearest airport and Plan a flight; no Clear', async () => {
-    const entry = { airport: { icao: 'KPAO' } as Airport, distance: 2.04, bearing: 116 };
+    const entry = {
+      airport: makeAirport({
+        icao: 'KPAO',
+        name: 'Palo Alto',
+        latitude: 37.46,
+        longitude: -122.11,
+        elevation: 4,
+        type: 'airport',
+        ownership: 'public',
+      }),
+      distance: 2.04,
+      bearing: 116,
+    };
     const { view, actions } = await renderStrip({ data: noNavigationFixture, nearestEntry: entry });
     expect(view.byTestId('no-route').props.accessibilityLabel).toBe('No route');
     expect(view.text()).toContain(`NRST KPAO 2.0 NM${DOT}116\u00B0`);
@@ -196,7 +208,19 @@ describe('FlightLogStrip, no navigation', () => {
 });
 
 describe('FlightLogStrip, a stale fix on a route (Q7, owner-approved deviation from Swift)', () => {
-  const entry = { airport: { icao: 'KPAO' } as Airport, distance: 2.04, bearing: 116 };
+  const entry = {
+    airport: makeAirport({
+      icao: 'KPAO',
+      name: 'Palo Alto',
+      latitude: 37.46,
+      longitude: -122.11,
+      elevation: 4,
+      type: 'airport',
+      ownership: 'public',
+    }),
+    distance: 2.04,
+    bearing: 116,
+  };
 
   it('shows leg progress, cautions and the NEXT nearest row as current only with a fix', async () => {
     const { view } = await renderStrip({ data: routeFixture });

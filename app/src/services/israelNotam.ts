@@ -23,49 +23,38 @@ import {
   type JsonObject,
 } from './jsonDecode';
 
-export interface IsraelLatLon {
-  lat: number; // degrees, WGS-84
-  lon: number; // degrees, east positive
-}
+import type {
+  IsraelAltitudeLimit,
+  IsraelAvailableAltitude,
+  IsraelLatLon,
+  IsraelNotam,
+  IsraelNotamGeometry,
+  IsraelNotamQLine,
+  IsraelRouteClosure,
+} from '../domain/israel/notamTypes';
 
-export interface IsraelNotamQLine {
-  fir: string;
-  code: string;
-  traffic: string;
-  purpose: string;
-  scope: string;
-  lower: number; // flight level, 0 = surface
-  upper: number; // flight level, 999 = unlimited
-  centre: IsraelLatLon | null;
-  radiusNM: number | null; // nautical miles
-}
-
-export interface IsraelNotamCircle {
-  centre: IsraelLatLon;
-  radiusNM: number;
-}
-
-export interface IsraelNotamGeometry {
-  /** Ring of positions from E); at least three points, not closed. */
-  polygon: IsraelLatLon[] | null;
-  circle: IsraelNotamCircle | null;
-}
-
-/** One altitude limit, in feet, from a closure clause: "AT 2,500FT AMSL", "BLW 1,500FT", "BTN 1,000 AND 2,000FT". */
-export interface IsraelAltitudeLimit {
-  /** AT, BLW, ABV or BTN (a string so a future op can never fail the whole feed's decoding). */
-  op: string;
-  lowerFt: number | null; // null = unbounded below
-  upperFt: number | null; // null = unbounded above
-  /** AMSL, AGL, or FL when written as a flight level (already converted to feet). */
-  ref: string | null;
-}
-
-/** An altitude at which the chain stays open: the limit plus the direction. */
-export interface IsraelAvailableAltitude extends IsraelAltitudeLimit {
-  /** BIDIRECTIONAL when written, otherwise null. */
-  direction: string | null;
-}
+// The value types, the closure helpers and the severity rule are L3's (domain/israel/notamTypes.ts); this module keeps the
+// relay decoder, the report and its freshness. Swift names are kept as aliases.
+export type {
+  IsraelAltitudeLimit,
+  IsraelAvailableAltitude,
+  IsraelClosureSeverity,
+  IsraelLatLon,
+  IsraelNotam,
+  IsraelNotamCircle,
+  IsraelNotamGeometry,
+  IsraelNotamQLine,
+  IsraelRouteClosure,
+} from '../domain/israel/notamTypes';
+export {
+  closureCovers,
+  closureHasSchedule,
+  closureIsValidAt as closureIsValid,
+  closureKinds,
+  closureLegs,
+  closureSeverity,
+  notamIsSuperseded as isSuperseded,
+} from '../domain/israel/notamTypes';
 
 export const availableAltitudeLimit = (a: IsraelAvailableAltitude): IsraelAltitudeLimit => ({
   op: a.op,
@@ -87,42 +76,6 @@ export function altitudeChartText(limit: IsraelAltitudeLimit): string {
   return op;
 }
 
-/** How a closure is drawn: red = closed, amber = closed only at some altitudes or with exceptions, amber "check NOTAM"
- * = not read in full. */
-export type IsraelClosureSeverity = 'full' | 'partial' | 'check';
-
-/** One ordered chain of published point codes closed by a NOTAM ("CVFR RTE CLSD GALIM-DAROM-HOTRM"). The optional
- * fields come from relay builds that read closure conditions; they are null in older feeds, which then read as full
- * closures (what those feeds meant). */
-export interface IsraelRouteClosure {
-  notamId: string;
-  /** CVFR, HEL, ULTRALIGHT, ATS, ... as written before "RTE CLSD". CVFR when the clause covers CVFR. */
-  routeKind: string;
-  /** ATS route designator ("P68 BTN A-B"), otherwise null. */
-  routeName: string | null;
-  /** Ordered point codes (5-letter reporting points; 4-letter ICAO codes for airfields). */
-  chain: string[];
-  validFrom: number | null;
-  /** null when the NOTAM is permanent or its end couldn't be read. */
-  validTo: number | null;
-  /** D) text: the closure applies only at these times within the validity window. */
-  schedule: string | null;
-  /** Every kind of the clause ("CVFR AND HEL RTE CLSD" -> CVFR, HEL). */
-  routeKinds: string[] | null;
-  /** Altitudes at which the chain is closed; empty = closed at all altitudes. */
-  closedAltitudes: IsraelAltitudeLimit[] | null;
-  /** Altitudes at which the chain stays open. */
-  availableAltitudes: IsraelAvailableAltitude[] | null;
-  /** Raw exception text ("PPR FLT FM IAF"): the closure does not apply to these flights. */
-  exceptions: string[] | null;
-  /** Closed only at some altitudes, or with exceptions. */
-  partial: boolean | null;
-  /** false: looks like a closure but the relay could not read it in full. Show "check NOTAM". */
-  parsed: boolean | null;
-  /** The clause text the relay read this closure from. */
-  raw: string | null;
-}
-
 /** Swift's memberwise initialiser: the optional condition fields default to null. */
 export function makeRouteClosure(
   fields: Pick<
@@ -142,63 +95,6 @@ export function makeRouteClosure(
     ...fields,
   };
 }
-
-/** Inside the validity window (ignores `schedule`; check `closureHasSchedule`). Both ends inclusive. */
-export function closureIsValid(c: IsraelRouteClosure, atMs: number): boolean {
-  if (c.validFrom !== null && atMs < c.validFrom) return false;
-  if (c.validTo !== null && atMs > c.validTo) return false;
-  return true;
-}
-
-export const closureHasSchedule = (c: IsraelRouteClosure): boolean => c.schedule !== null;
-
-/** Consecutive point pairs along the chain. */
-export function closureLegs(c: IsraelRouteClosure): { from: string; to: string }[] {
-  return c.chain.slice(1).map((to, i) => ({ from: c.chain[i], to }));
-}
-
-/** Kinds this closure applies to, upper-cased; falls back to `routeKind` for feeds without `routeKinds`. */
-export function closureKinds(c: IsraelRouteClosure): string[] {
-  const listed = (c.routeKinds ?? []).map((k) => k.toUpperCase());
-  return listed.length === 0 ? [c.routeKind.toUpperCase()] : listed;
-}
-
-export const closureCovers = (c: IsraelRouteClosure, kind: string): boolean =>
-  closureKinds(c).includes(kind.toUpperCase());
-
-export function closureSeverity(c: IsraelRouteClosure): IsraelClosureSeverity {
-  if (c.parsed === false) return 'check';
-  return c.partial === true ? 'partial' : 'full';
-}
-
-export interface IsraelNotam {
-  rowId: string;
-  id: string; // e.g. "C2269/26"
-  type: string | null; // NOTAMN / NOTAMR / NOTAMC
-  references: string | null;
-  location: string; // ICAO location indicator
-  locationDescription: string | null;
-  created: number | null;
-  q: IsraelNotamQLine | null;
-  a: string | null;
-  validFrom: number | null;
-  validTo: number | null;
-  permanent: boolean;
-  estimated: boolean;
-  d: string | null;
-  e: string | null;
-  f: string | null;
-  g: string | null;
-  geometry: IsraelNotamGeometry;
-  closures: IsraelRouteClosure[];
-  /** false: the relay could not read the ICAO fields; show `raw`. */
-  parsed: boolean;
-  cancelledBy: string | null;
-  replacedBy: string | null;
-  raw: string;
-}
-
-export const isSuperseded = (n: IsraelNotam): boolean => n.cancelledBy !== null || n.replacedBy !== null;
 
 export interface IsraelNotamFeed {
   /** When the relay scraped the IAA (epoch ms). */

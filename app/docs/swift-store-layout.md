@@ -7,14 +7,14 @@
 
 Files under Application Support after the seed run:
 
-| path | bytes |
-|---|---|
-| default.store | 102400 |
-| default.store-shm | 32768 |
-| default.store-wal | 78312 |
-| efb-212/recording.sqlite | 610304 |
-| efb-212/recording.sqlite-shm | 32768 |
-| efb-212/recording.sqlite-wal | 0 |
+| path                         | bytes  |
+| ---------------------------- | ------ |
+| default.store                | 102400 |
+| default.store-shm            | 32768  |
+| default.store-wal            | 78312  |
+| efb-212/recording.sqlite     | 610304 |
+| efb-212/recording.sqlite-shm | 32768  |
+| efb-212/recording.sqlite-wal | 0      |
 
 Model counts: {"AircraftProfile": 3, "FlightPlanRecord": 5, "FlightRecord": 10, "LogbookEntry": 20, "PilotProfile": 2, "UserSettings": 1}
 
@@ -30,21 +30,22 @@ Core Data / SwiftData dates are REAL seconds since 2001-01-01T00:00:00Z (add 978
 
 `Z_PRIMARYKEY` (entity number -> table suffix, Z_MAX = last Z_PK handed out):
 
-| Z_ENT | Z_NAME | Z_SUPER | Z_MAX |
-|---|---|---|---|
-| 1 | AircraftProfile | 0 | 3 |
-| 2 | FlightPlanRecord | 0 | 5 |
-| 3 | FlightRecord | 0 | 10 |
-| 4 | LogbookEntry | 0 | 20 |
-| 5 | PilotProfile | 0 | 2 |
-| 6 | UserSettings | 0 | 1 |
-| 16001 | CHANGE | 0 | 41 |
-| 16002 | TRANSACTION | 0 | 1 |
-| 16003 | TRANSACTIONSTRING | 0 | 2 |
+| Z_ENT | Z_NAME            | Z_SUPER | Z_MAX |
+| ----- | ----------------- | ------- | ----- |
+| 1     | AircraftProfile   | 0       | 3     |
+| 2     | FlightPlanRecord  | 0       | 5     |
+| 3     | FlightRecord      | 0       | 10    |
+| 4     | LogbookEntry      | 0       | 20    |
+| 5     | PilotProfile      | 0       | 2     |
+| 6     | UserSettings      | 0       | 1     |
+| 16001 | CHANGE            | 0       | 41    |
+| 16002 | TRANSACTION       | 0       | 1     |
+| 16003 | TRANSACTIONSTRING | 0       | 2     |
 
 `Z_METADATA`: Z_VERSION=1, Z_UUID=EE65F165-E097-4656-9B3B-0DDFE9D37DAF
 
 Z_PLIST keys: `NSPersistenceFrameworkVersion`, `NSPersistenceMaximumFrameworkVersion`, `NSStoreModelVersionChecksumKey`, `NSStoreModelVersionHashes`, `NSStoreModelVersionHashesDigest`, `NSStoreModelVersionHashesVersion`, `NSStoreModelVersionIdentifiers`, `NSStoreType`, `_NSAutoVacuumLevel`
+
 - `NSPersistenceFrameworkVersion`: 1526
 - `NSPersistenceMaximumFrameworkVersion`: 1526
 - `NSStoreModelVersionChecksumKey`: XW3qJLf/ywPFgkEuXE2URQV0FYpyQzQnUGOOhmmU5lI=
@@ -63,16 +64,16 @@ SQLite 3.54.1; page_size 4096; journal_mode wal; user_version 0
 
 #### `ACHANGE` (41 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZCHANGETYPE | INTEGER |  |  |  |
-| ZENTITY | INTEGER |  |  |  |
-| ZENTITYPK | INTEGER |  |  |  |
-| ZTRANSACTIONID | INTEGER |  |  |  |
-| ZCOLUMNS | BLOB |  |  |  |
+| column         | declared type | null | default | key |
+| -------------- | ------------- | ---- | ------- | --- |
+| Z_PK           | INTEGER       |      |         | PK  |
+| Z_ENT          | INTEGER       |      |         |     |
+| Z_OPT          | INTEGER       |      |         |     |
+| ZCHANGETYPE    | INTEGER       |      |         |     |
+| ZENTITY        | INTEGER       |      |         |     |
+| ZENTITYPK      | INTEGER       |      |         |     |
+| ZTRANSACTIONID | INTEGER       |      |         |     |
+| ZCOLUMNS       | BLOB          |      |         |     |
 
 Indexes: `ACHANGE_ZTRANSACTIONID_INDEX`
 
@@ -82,21 +83,21 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: null; ZCHANGETYPE: integer; 
 
 #### `ATRANSACTION` (1 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZAUTHORTS | INTEGER |  |  |  |
-| ZBUNDLEIDTS | INTEGER |  |  |  |
-| ZCONTEXTNAMETS | INTEGER |  |  |  |
-| ZPROCESSIDTS | INTEGER |  |  |  |
-| ZTIMESTAMP | FLOAT |  |  |  |
-| ZAUTHOR | VARCHAR |  |  |  |
-| ZBUNDLEID | VARCHAR |  |  |  |
-| ZCONTEXTNAME | VARCHAR |  |  |  |
-| ZPROCESSID | VARCHAR |  |  |  |
-| ZQUERYGEN | BLOB |  |  |  |
+| column         | declared type | null | default | key |
+| -------------- | ------------- | ---- | ------- | --- |
+| Z_PK           | INTEGER       |      |         | PK  |
+| Z_ENT          | INTEGER       |      |         |     |
+| Z_OPT          | INTEGER       |      |         |     |
+| ZAUTHORTS      | INTEGER       |      |         |     |
+| ZBUNDLEIDTS    | INTEGER       |      |         |     |
+| ZCONTEXTNAMETS | INTEGER       |      |         |     |
+| ZPROCESSIDTS   | INTEGER       |      |         |     |
+| ZTIMESTAMP     | FLOAT         |      |         |     |
+| ZAUTHOR        | VARCHAR       |      |         |     |
+| ZBUNDLEID      | VARCHAR       |      |         |     |
+| ZCONTEXTNAME   | VARCHAR       |      |         |     |
+| ZPROCESSID     | VARCHAR       |      |         |     |
+| ZQUERYGEN      | BLOB          |      |         |     |
 
 Indexes: `Z_TRANSACTION_TransactionTimestampIndex`, `Z_TRANSACTION_TransactionAuthorIndex`, `ATRANSACTION_ZPROCESSIDTS_INDEX`, `ATRANSACTION_ZCONTEXTNAMETS_INDEX`, `ATRANSACTION_ZBUNDLEIDTS_INDEX`, `ATRANSACTION_ZAUTHORTS_INDEX`
 
@@ -107,11 +108,11 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: null; ZAUTHORTS: null; ZBUND
 #### `ATRANSACTIONSTRING` (2 rows)
 
 | column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZNAME | VARCHAR |  |  |  |
+| ------ | ------------- | ---- | ------- | --- |
+| Z_PK   | INTEGER       |      |         | PK  |
+| Z_ENT  | INTEGER       |      |         |     |
+| Z_OPT  | INTEGER       |      |         |     |
+| ZNAME  | VARCHAR       |      |         |     |
 
 Indexes: `Z_TRANSACTIONSTRING_UNIQUE_NAME` (unique)
 
@@ -121,24 +122,24 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: null; ZNAME: text
 
 #### `ZAIRCRAFTPROFILE` (3 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZISACTIVE | INTEGER |  |  |  |
-| ZPERSONSONBOARD | INTEGER |  |  |  |
-| ZANNUALDUE | TIMESTAMP |  |  |  |
-| ZCREATEDAT | TIMESTAMP |  |  |  |
-| ZCRUISESPEEDKTS | FLOAT |  |  |  |
-| ZFUELBURNGPH | FLOAT |  |  |  |
-| ZFUELCAPACITYGALLONS | FLOAT |  |  |  |
-| ZTRANSPONDERDUE | TIMESTAMP |  |  |  |
-| ZAIRCRAFTTYPE | VARCHAR |  |  |  |
-| ZICAOTYPEDESIGNATOR | VARCHAR |  |  |  |
-| ZNNUMBER | VARCHAR |  |  |  |
-| ZID | BLOB |  |  |  |
-| ZVSPEEDSDATA | BLOB |  |  |  |
+| column               | declared type | null | default | key |
+| -------------------- | ------------- | ---- | ------- | --- |
+| Z_PK                 | INTEGER       |      |         | PK  |
+| Z_ENT                | INTEGER       |      |         |     |
+| Z_OPT                | INTEGER       |      |         |     |
+| ZISACTIVE            | INTEGER       |      |         |     |
+| ZPERSONSONBOARD      | INTEGER       |      |         |     |
+| ZANNUALDUE           | TIMESTAMP     |      |         |     |
+| ZCREATEDAT           | TIMESTAMP     |      |         |     |
+| ZCRUISESPEEDKTS      | FLOAT         |      |         |     |
+| ZFUELBURNGPH         | FLOAT         |      |         |     |
+| ZFUELCAPACITYGALLONS | FLOAT         |      |         |     |
+| ZTRANSPONDERDUE      | TIMESTAMP     |      |         |     |
+| ZAIRCRAFTTYPE        | VARCHAR       |      |         |     |
+| ZICAOTYPEDESIGNATOR  | VARCHAR       |      |         |     |
+| ZNNUMBER             | VARCHAR       |      |         |     |
+| ZID                  | BLOB          |      |         |     |
+| ZVSPEEDSDATA         | BLOB          |      |         |     |
 
 First row: Z_PK=1; Z_ENT=1; Z_OPT=1; ZISACTIVE=0; ZPERSONSONBOARD=NULL; ZANNUALDUE=NULL; ZCREATEDAT=757641600; ZCRUISESPEEDKTS=NULL; ZFUELBURNGPH=NULL; ZFUELCAPACITYGALLONS=NULL; ZTRANSPONDERDUE=NULL; ZAIRCRAFTTYPE='SR22'; ZICAOTYPEDESIGNATOR=NULL; ZNNUMBER='N300KF'; ZID=blob(16) 00000001000040008000000000000003; ZVSPEEDSDATA=NULL
 
@@ -146,30 +147,30 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: integer; ZISACTIVE: integer;
 
 #### `ZFLIGHTPLANRECORD` (5 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZCRUISEALTITUDE | INTEGER |  |  |  |
-| ZCREATEDAT | TIMESTAMP |  |  |  |
-| ZCRUISESPEEDKTS | FLOAT |  |  |  |
-| ZDEPARTURELATITUDE | FLOAT |  |  |  |
-| ZDEPARTURELONGITUDE | FLOAT |  |  |  |
-| ZDESTINATIONLATITUDE | FLOAT |  |  |  |
-| ZDESTINATIONLONGITUDE | FLOAT |  |  |  |
-| ZESTIMATEDFUELGALLONS | FLOAT |  |  |  |
-| ZESTIMATEDTIMESECONDS | FLOAT |  |  |  |
-| ZFUELBURNGPH | FLOAT |  |  |  |
-| ZLASTUSEDAT | TIMESTAMP |  |  |  |
-| ZTOTALDISTANCENM | FLOAT |  |  |  |
-| ZDEPARTUREICAO | VARCHAR |  |  |  |
-| ZDEPARTURENAME | VARCHAR |  |  |  |
-| ZDESTINATIONICAO | VARCHAR |  |  |  |
-| ZDESTINATIONNAME | VARCHAR |  |  |  |
-| ZNAME | VARCHAR |  |  |  |
-| ZNOTES | VARCHAR |  |  |  |
-| ZID | BLOB |  |  |  |
+| column                | declared type | null | default | key |
+| --------------------- | ------------- | ---- | ------- | --- |
+| Z_PK                  | INTEGER       |      |         | PK  |
+| Z_ENT                 | INTEGER       |      |         |     |
+| Z_OPT                 | INTEGER       |      |         |     |
+| ZCRUISEALTITUDE       | INTEGER       |      |         |     |
+| ZCREATEDAT            | TIMESTAMP     |      |         |     |
+| ZCRUISESPEEDKTS       | FLOAT         |      |         |     |
+| ZDEPARTURELATITUDE    | FLOAT         |      |         |     |
+| ZDEPARTURELONGITUDE   | FLOAT         |      |         |     |
+| ZDESTINATIONLATITUDE  | FLOAT         |      |         |     |
+| ZDESTINATIONLONGITUDE | FLOAT         |      |         |     |
+| ZESTIMATEDFUELGALLONS | FLOAT         |      |         |     |
+| ZESTIMATEDTIMESECONDS | FLOAT         |      |         |     |
+| ZFUELBURNGPH          | FLOAT         |      |         |     |
+| ZLASTUSEDAT           | TIMESTAMP     |      |         |     |
+| ZTOTALDISTANCENM      | FLOAT         |      |         |     |
+| ZDEPARTUREICAO        | VARCHAR       |      |         |     |
+| ZDEPARTURENAME        | VARCHAR       |      |         |     |
+| ZDESTINATIONICAO      | VARCHAR       |      |         |     |
+| ZDESTINATIONNAME      | VARCHAR       |      |         |     |
+| ZNAME                 | VARCHAR       |      |         |     |
+| ZNOTES                | VARCHAR       |      |         |     |
+| ZID                   | BLOB          |      |         |     |
 
 First row: Z_PK=1; Z_ENT=2; Z_OPT=1; ZCRUISEALTITUDE=4000; ZCREATEDAT=761961600; ZCRUISESPEEDKTS=115.0; ZDEPARTURELATITUDE=31.287; ZDEPARTURELONGITUDE=34.723; ZDESTINATIONLATITUDE=30.6212; ZDESTINATIONLONGITUDE=35.2038; ZESTIMATEDFUELGALLONS=NULL; ZESTIMATEDTIMESECONDS=2760.0; ZFUELBURNGPH=NULL; ZLASTUSEDAT=762825600; ZTOTALDISTANCENM=77.5; ZDEPARTUREICAO='LLBS'; ZDEPARTURENAME='Beer Sheva Teyman'; ZDESTINATIONICAO='LLRS'; ZDESTINATIONNAME='Ein Yahav'; ZNAME=NULL; ZNOTES=NULL; ZID=blob(16) 00000003000040008000000000000004
 
@@ -177,28 +178,28 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: integer; ZCRUISEALTITUDE: in
 
 #### `ZFLIGHTRECORD` (10 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZHASDEBRIEF | INTEGER |  |  |  |
-| ZTRACKPOINTCOUNT | INTEGER |  |  |  |
-| ZTRANSCRIPTSEGMENTCOUNT | INTEGER |  |  |  |
-| ZCREATEDAT | TIMESTAMP |  |  |  |
-| ZDURATIONSECONDS | FLOAT |  |  |  |
-| ZENDDATE | TIMESTAMP |  |  |  |
-| ZSTARTDATE | TIMESTAMP |  |  |  |
-| ZAIRCRAFTPROFILEID | VARCHAR |  |  |  |
-| ZARRIVALICAO | VARCHAR |  |  |  |
-| ZARRIVALNAME | VARCHAR |  |  |  |
-| ZAUDIOFILEURL | VARCHAR |  |  |  |
-| ZAUDIOQUALITY | VARCHAR |  |  |  |
-| ZDEPARTUREICAO | VARCHAR |  |  |  |
-| ZDEPARTURENAME | VARCHAR |  |  |  |
-| ZNOTES | VARCHAR |  |  |  |
-| ZPILOTPROFILEID | VARCHAR |  |  |  |
-| ZID | BLOB |  |  |  |
+| column                  | declared type | null | default | key |
+| ----------------------- | ------------- | ---- | ------- | --- |
+| Z_PK                    | INTEGER       |      |         | PK  |
+| Z_ENT                   | INTEGER       |      |         |     |
+| Z_OPT                   | INTEGER       |      |         |     |
+| ZHASDEBRIEF             | INTEGER       |      |         |     |
+| ZTRACKPOINTCOUNT        | INTEGER       |      |         |     |
+| ZTRANSCRIPTSEGMENTCOUNT | INTEGER       |      |         |     |
+| ZCREATEDAT              | TIMESTAMP     |      |         |     |
+| ZDURATIONSECONDS        | FLOAT         |      |         |     |
+| ZENDDATE                | TIMESTAMP     |      |         |     |
+| ZSTARTDATE              | TIMESTAMP     |      |         |     |
+| ZAIRCRAFTPROFILEID      | VARCHAR       |      |         |     |
+| ZARRIVALICAO            | VARCHAR       |      |         |     |
+| ZARRIVALNAME            | VARCHAR       |      |         |     |
+| ZAUDIOFILEURL           | VARCHAR       |      |         |     |
+| ZAUDIOQUALITY           | VARCHAR       |      |         |     |
+| ZDEPARTUREICAO          | VARCHAR       |      |         |     |
+| ZDEPARTURENAME          | VARCHAR       |      |         |     |
+| ZNOTES                  | VARCHAR       |      |         |     |
+| ZPILOTPROFILEID         | VARCHAR       |      |         |     |
+| ZID                     | BLOB          |      |         |     |
 
 First row: Z_PK=1; Z_ENT=3; Z_OPT=1; ZHASDEBRIEF=0; ZTRACKPOINTCOUNT=0; ZTRANSCRIPTSEGMENTCOUNT=0; ZCREATEDAT=763977600; ZDURATIONSECONDS=3600.0; ZENDDATE=763981200; ZSTARTDATE=763977600; ZAIRCRAFTPROFILEID='00000001-0000-4000-8000-000000000001'; ZARRIVALICAO=NULL; ZARRIVALNAME=NULL; ZAUDIOFILEURL=NULL; ZAUDIOQUALITY='high'; ZDEPARTUREICAO=NULL; ZDEPARTURENAME=NULL; ZNOTES=NULL; ZPILOTPROFILEID='00000002-0000-4000-8000-000000000001'; ZID=blob(16) 00000004000040008000000000000006
 
@@ -206,29 +207,29 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: integer; ZHASDEBRIEF: intege
 
 #### `ZLOGBOOKENTRY` (20 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZDAYLANDINGCOUNT | INTEGER |  |  |  |
-| ZHASDEBRIEF | INTEGER |  |  |  |
-| ZISCONFIRMED | INTEGER |  |  |  |
-| ZNIGHTLANDINGCOUNT | INTEGER |  |  |  |
-| ZCREATEDAT | TIMESTAMP |  |  |  |
-| ZDATE | TIMESTAMP |  |  |  |
-| ZDURATIONSECONDS | FLOAT |  |  |  |
-| ZAIRCRAFTPROFILEID | VARCHAR |  |  |  |
-| ZAIRCRAFTTYPE | VARCHAR |  |  |  |
-| ZARRIVALICAO | VARCHAR |  |  |  |
-| ZARRIVALNAME | VARCHAR |  |  |  |
-| ZDEPARTUREICAO | VARCHAR |  |  |  |
-| ZDEPARTURENAME | VARCHAR |  |  |  |
-| ZNOTES | VARCHAR |  |  |  |
-| ZPILOTPROFILEID | VARCHAR |  |  |  |
-| ZROUTE | VARCHAR |  |  |  |
-| ZFLIGHTID | BLOB |  |  |  |
-| ZID | BLOB |  |  |  |
+| column             | declared type | null | default | key |
+| ------------------ | ------------- | ---- | ------- | --- |
+| Z_PK               | INTEGER       |      |         | PK  |
+| Z_ENT              | INTEGER       |      |         |     |
+| Z_OPT              | INTEGER       |      |         |     |
+| ZDAYLANDINGCOUNT   | INTEGER       |      |         |     |
+| ZHASDEBRIEF        | INTEGER       |      |         |     |
+| ZISCONFIRMED       | INTEGER       |      |         |     |
+| ZNIGHTLANDINGCOUNT | INTEGER       |      |         |     |
+| ZCREATEDAT         | TIMESTAMP     |      |         |     |
+| ZDATE              | TIMESTAMP     |      |         |     |
+| ZDURATIONSECONDS   | FLOAT         |      |         |     |
+| ZAIRCRAFTPROFILEID | VARCHAR       |      |         |     |
+| ZAIRCRAFTTYPE      | VARCHAR       |      |         |     |
+| ZARRIVALICAO       | VARCHAR       |      |         |     |
+| ZARRIVALNAME       | VARCHAR       |      |         |     |
+| ZDEPARTUREICAO     | VARCHAR       |      |         |     |
+| ZDEPARTURENAME     | VARCHAR       |      |         |     |
+| ZNOTES             | VARCHAR       |      |         |     |
+| ZPILOTPROFILEID    | VARCHAR       |      |         |     |
+| ZROUTE             | VARCHAR       |      |         |     |
+| ZFLIGHTID          | BLOB          |      |         |     |
+| ZID                | BLOB          |      |         |     |
 
 First row: Z_PK=1; Z_ENT=4; Z_OPT=1; ZDAYLANDINGCOUNT=1; ZHASDEBRIEF=0; ZISCONFIRMED=0; ZNIGHTLANDINGCOUNT=0; ZCREATEDAT=764208000; ZDATE=764208000; ZDURATIONSECONDS=2340.0; ZAIRCRAFTPROFILEID='00000001-0000-4000-8000-000000000001'; ZAIRCRAFTTYPE='C172S'; ZARRIVALICAO='KSQL'; ZARRIVALNAME='San Carlos'; ZDEPARTUREICAO='KPAO'; ZDEPARTURENAME='Palo Alto'; ZNOTES=NULL; ZPILOTPROFILEID='00000002-0000-4000-8000-000000000002'; ZROUTE=NULL; ZFLIGHTID=blob(16) 00000004000040008000000000000009; ZID=blob(16) 00000005000040008000000000000009
 
@@ -236,24 +237,24 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: integer; ZDAYLANDINGCOUNT: i
 
 #### `ZPILOTPROFILE` (2 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZISACTIVE | INTEGER |  |  |  |
-| ZCREATEDAT | TIMESTAMP |  |  |  |
-| ZFLIGHTREVIEWDATE | TIMESTAMP |  |  |  |
-| ZMEDICALEXPIRY | TIMESTAMP |  |  |  |
-| ZTOTALHOURS | FLOAT |  |  |  |
-| ZCERTIFICATENUMBER | VARCHAR |  |  |  |
-| ZCERTIFICATETYPE | VARCHAR |  |  |  |
-| ZEMAIL | VARCHAR |  |  |  |
-| ZMEDICALCLASS | VARCHAR |  |  |  |
-| ZNAME | VARCHAR |  |  |  |
-| ZPHONE | VARCHAR |  |  |  |
-| ZID | BLOB |  |  |  |
-| ZNIGHTLANDINGENTRIESDATA | BLOB |  |  |  |
+| column                   | declared type | null | default | key |
+| ------------------------ | ------------- | ---- | ------- | --- |
+| Z_PK                     | INTEGER       |      |         | PK  |
+| Z_ENT                    | INTEGER       |      |         |     |
+| Z_OPT                    | INTEGER       |      |         |     |
+| ZISACTIVE                | INTEGER       |      |         |     |
+| ZCREATEDAT               | TIMESTAMP     |      |         |     |
+| ZFLIGHTREVIEWDATE        | TIMESTAMP     |      |         |     |
+| ZMEDICALEXPIRY           | TIMESTAMP     |      |         |     |
+| ZTOTALHOURS              | FLOAT         |      |         |     |
+| ZCERTIFICATENUMBER       | VARCHAR       |      |         |     |
+| ZCERTIFICATETYPE         | VARCHAR       |      |         |     |
+| ZEMAIL                   | VARCHAR       |      |         |     |
+| ZMEDICALCLASS            | VARCHAR       |      |         |     |
+| ZNAME                    | VARCHAR       |      |         |     |
+| ZPHONE                   | VARCHAR       |      |         |     |
+| ZID                      | BLOB          |      |         |     |
+| ZNIGHTLANDINGENTRIESDATA | BLOB          |      |         |     |
 
 First row: Z_PK=1; Z_ENT=5; Z_OPT=1; ZISACTIVE=0; ZCREATEDAT=757468800; ZFLIGHTREVIEWDATE=NULL; ZMEDICALEXPIRY=NULL; ZTOTALHOURS=NULL; ZCERTIFICATENUMBER=NULL; ZCERTIFICATETYPE=NULL; ZEMAIL=NULL; ZMEDICALCLASS=NULL; ZNAME='Test Pilot Two'; ZPHONE=NULL; ZID=blob(16) 00000002000040008000000000000002; ZNIGHTLANDINGENTRIESDATA=NULL
 
@@ -261,19 +262,19 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: integer; ZISACTIVE: integer;
 
 #### `ZUSERSETTINGS` (1 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_PK | INTEGER |  |  | PK |
-| Z_ENT | INTEGER |  |  |  |
-| Z_OPT | INTEGER |  |  |  |
-| ZCREATEDAT | TIMESTAMP |  |  |  |
-| ZSECTIONALOPACITY | FLOAT |  |  |  |
-| ZWEATHERREFRESHINTERVAL | FLOAT |  |  |  |
-| ZACTIVEAIRCRAFTID | VARCHAR |  |  |  |
-| ZACTIVEPILOTID | VARCHAR |  |  |  |
-| ZDEFAULTMAPMODE | VARCHAR |  |  |  |
-| ZLASTFLIGHTPLANID | VARCHAR |  |  |  |
-| ZREGIONRAW | VARCHAR |  |  |  |
+| column                  | declared type | null | default | key |
+| ----------------------- | ------------- | ---- | ------- | --- |
+| Z_PK                    | INTEGER       |      |         | PK  |
+| Z_ENT                   | INTEGER       |      |         |     |
+| Z_OPT                   | INTEGER       |      |         |     |
+| ZCREATEDAT              | TIMESTAMP     |      |         |     |
+| ZSECTIONALOPACITY       | FLOAT         |      |         |     |
+| ZWEATHERREFRESHINTERVAL | FLOAT         |      |         |     |
+| ZACTIVEAIRCRAFTID       | VARCHAR       |      |         |     |
+| ZACTIVEPILOTID          | VARCHAR       |      |         |     |
+| ZDEFAULTMAPMODE         | VARCHAR       |      |         |     |
+| ZLASTFLIGHTPLANID       | VARCHAR       |      |         |     |
+| ZREGIONRAW              | VARCHAR       |      |         |     |
 
 First row: Z_PK=1; Z_ENT=6; Z_OPT=1; ZCREATEDAT=757382400; ZSECTIONALOPACITY=0.55; ZWEATHERREFRESHINTERVAL=600.0; ZACTIVEAIRCRAFTID='00000001-0000-4000-8000-000000000001'; ZACTIVEPILOTID='00000002-0000-4000-8000-000000000001'; ZDEFAULTMAPMODE='trackUp'; ZLASTFLIGHTPLANID='00000003-0000-4000-8000-000000000002'; ZREGIONRAW='us'
 
@@ -281,11 +282,11 @@ Stored types: Z_PK: integer; Z_ENT: integer; Z_OPT: integer; ZCREATEDAT: integer
 
 #### `Z_METADATA` (1 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_VERSION | INTEGER |  |  | PK |
-| Z_UUID | VARCHAR(255) |  |  |  |
-| Z_PLIST | BLOB |  |  |  |
+| column    | declared type | null | default | key |
+| --------- | ------------- | ---- | ------- | --- |
+| Z_VERSION | INTEGER       |      |         | PK  |
+| Z_UUID    | VARCHAR(255)  |      |         |     |
+| Z_PLIST   | BLOB          |      |         |     |
 
 First row: Z_VERSION=1; Z_UUID='EE65F165-E097-4656-9B3B-0DDFE9D37DAF'; Z_PLIST=blob(860) 62706c6973743030d90102030405060708090a0b0d0e0f10 bplist
 
@@ -293,9 +294,9 @@ Stored types: Z_VERSION: integer; Z_UUID: text; Z_PLIST: blob
 
 #### `Z_MODELCACHE` (1 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_CONTENT | BLOB |  |  |  |
+| column    | declared type | null | default | key |
+| --------- | ------------- | ---- | ------- | --- |
+| Z_CONTENT | BLOB          |      |         |     |
 
 First row: Z_CONTENT=blob(7412) 8d9a077c14d5f6c7ef94dd6cef6db2bd235242ef25240102
 
@@ -303,12 +304,12 @@ Stored types: Z_CONTENT: blob
 
 #### `Z_PRIMARYKEY` (9 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| Z_ENT | INTEGER |  |  | PK |
-| Z_NAME | VARCHAR |  |  |  |
-| Z_SUPER | INTEGER |  |  |  |
-| Z_MAX | INTEGER |  |  |  |
+| column  | declared type | null | default | key |
+| ------- | ------------- | ---- | ------- | --- |
+| Z_ENT   | INTEGER       |      |         | PK  |
+| Z_NAME  | VARCHAR       |      |         |     |
+| Z_SUPER | INTEGER       |      |         |     |
+| Z_MAX   | INTEGER       |      |         |     |
 
 First row: Z_ENT=1; Z_NAME='AircraftProfile'; Z_SUPER=0; Z_MAX=3
 
@@ -330,17 +331,17 @@ SQLite 3.54.1; page_size 4096; journal_mode wal; user_version 0
 
 #### `debrief_results` (1 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| id | TEXT |  |  | PK |
-| flightID | TEXT | NOT NULL |  |  |
-| narrativeSummary | TEXT | NOT NULL |  |  |
-| phaseObservationsJSON | TEXT | NOT NULL |  |  |
-| improvementsJSON | TEXT | NOT NULL |  |  |
-| overallRating | INTEGER | NOT NULL |  |  |
-| generatedAt | REAL | NOT NULL |  |  |
-| promptTokensEstimate | INTEGER |  |  |  |
-| responseTokensEstimate | INTEGER |  |  |  |
+| column                 | declared type | null     | default | key |
+| ---------------------- | ------------- | -------- | ------- | --- |
+| id                     | TEXT          |          |         | PK  |
+| flightID               | TEXT          | NOT NULL |         |     |
+| narrativeSummary       | TEXT          | NOT NULL |         |     |
+| phaseObservationsJSON  | TEXT          | NOT NULL |         |     |
+| improvementsJSON       | TEXT          | NOT NULL |         |     |
+| overallRating          | INTEGER       | NOT NULL |         |     |
+| generatedAt            | REAL          | NOT NULL |         |     |
+| promptTokensEstimate   | INTEGER       |          |         |     |
+| responseTokensEstimate | INTEGER       |          |         |     |
 
 Indexes: `idx_debrief_results_flight`, `sqlite_autoindex_debrief_results_1` (unique)
 
@@ -350,12 +351,12 @@ Stored types: id: blob; flightID: blob; narrativeSummary: text; phaseObservation
 
 #### `flight_route_legs` (1 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| flightID | TEXT | NOT NULL |  | PK |
-| seq | INTEGER | NOT NULL |  | PK |
-| fromCode | TEXT | NOT NULL |  |  |
-| toCode | TEXT | NOT NULL |  |  |
+| column   | declared type | null     | default | key |
+| -------- | ------------- | -------- | ------- | --- |
+| flightID | TEXT          | NOT NULL |         | PK  |
+| seq      | INTEGER       | NOT NULL |         | PK  |
+| fromCode | TEXT          | NOT NULL |         |     |
+| toCode   | TEXT          | NOT NULL |         |     |
 
 Indexes: `sqlite_autoindex_flight_route_legs_1` (unique)
 
@@ -365,9 +366,9 @@ Stored types: flightID: blob; seq: integer; fromCode: text; toCode: text
 
 #### `grdb_migrations` (5 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| identifier | TEXT | NOT NULL |  | PK |
+| column     | declared type | null     | default | key |
+| ---------- | ------------- | -------- | ------- | --- |
+| identifier | TEXT          | NOT NULL |         | PK  |
 
 Indexes: `sqlite_autoindex_grdb_migrations_1` (unique)
 
@@ -377,15 +378,15 @@ Stored types: identifier: text
 
 #### `phase_markers` (8 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| id | TEXT |  |  | PK |
-| flightID | TEXT | NOT NULL |  |  |
-| phase | TEXT | NOT NULL |  |  |
-| startTimestamp | REAL | NOT NULL |  |  |
-| endTimestamp | REAL |  |  |  |
-| latitude | REAL | NOT NULL |  |  |
-| longitude | REAL | NOT NULL |  |  |
+| column         | declared type | null     | default | key |
+| -------------- | ------------- | -------- | ------- | --- |
+| id             | TEXT          |          |         | PK  |
+| flightID       | TEXT          | NOT NULL |         |     |
+| phase          | TEXT          | NOT NULL |         |     |
+| startTimestamp | REAL          | NOT NULL |         |     |
+| endTimestamp   | REAL          |          |         |     |
+| latitude       | REAL          | NOT NULL |         |     |
+| longitude      | REAL          | NOT NULL |         |     |
 
 Indexes: `idx_phase_markers_flight`, `sqlite_autoindex_phase_markers_1` (unique)
 
@@ -395,17 +396,17 @@ Stored types: id: blob; flightID: blob; phase: text; startTimestamp: text; endTi
 
 #### `track_points` (3600 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| id | TEXT |  |  | PK |
-| flightID | TEXT | NOT NULL |  |  |
-| timestamp | REAL | NOT NULL |  |  |
-| latitude | REAL | NOT NULL |  |  |
-| longitude | REAL | NOT NULL |  |  |
-| altitudeFeet | REAL | NOT NULL |  |  |
-| groundSpeedKnots | REAL | NOT NULL |  |  |
-| verticalSpeedFPM | REAL | NOT NULL |  |  |
-| courseDegrees | REAL | NOT NULL |  |  |
+| column           | declared type | null     | default | key |
+| ---------------- | ------------- | -------- | ------- | --- |
+| id               | TEXT          |          |         | PK  |
+| flightID         | TEXT          | NOT NULL |         |     |
+| timestamp        | REAL          | NOT NULL |         |     |
+| latitude         | REAL          | NOT NULL |         |     |
+| longitude        | REAL          | NOT NULL |         |     |
+| altitudeFeet     | REAL          | NOT NULL |         |     |
+| groundSpeedKnots | REAL          | NOT NULL |         |     |
+| verticalSpeedFPM | REAL          | NOT NULL |         |     |
+| courseDegrees    | REAL          | NOT NULL |         |     |
 
 Indexes: `idx_track_points_flight`, `sqlite_autoindex_track_points_1` (unique)
 
@@ -415,16 +416,16 @@ Stored types: id: blob; flightID: blob; timestamp: text; latitude: real; longitu
 
 #### `transcript_segments` (12 rows)
 
-| column | declared type | null | default | key |
-|---|---|---|---|---|
-| id | TEXT |  |  | PK |
-| flightID | TEXT | NOT NULL |  |  |
-| timestamp | REAL | NOT NULL |  |  |
-| text | TEXT | NOT NULL |  |  |
-| confidence | REAL |  |  |  |
-| audioStartTime | REAL | NOT NULL |  |  |
-| audioEndTime | REAL | NOT NULL |  |  |
-| flightPhase | TEXT | NOT NULL |  |  |
+| column         | declared type | null     | default | key |
+| -------------- | ------------- | -------- | ------- | --- |
+| id             | TEXT          |          |         | PK  |
+| flightID       | TEXT          | NOT NULL |         |     |
+| timestamp      | REAL          | NOT NULL |         |     |
+| text           | TEXT          | NOT NULL |         |     |
+| confidence     | REAL          |          |         |     |
+| audioStartTime | REAL          | NOT NULL |         |     |
+| audioEndTime   | REAL          | NOT NULL |         |     |
+| flightPhase    | TEXT          | NOT NULL |         |     |
 
 Indexes: `idx_transcript_segments_flight`, `sqlite_autoindex_transcript_segments_1` (unique)
 
@@ -434,51 +435,50 @@ Stored types: id: blob; flightID: blob; timestamp: text; text: text; confidence:
 
 ### UserDefaults: `closed/io.omer.efb.container.plist`
 
-| key | plist type | value |
-|---|---|---|
-| displayMode | str | night |
-| hasSeenOnboarding | bool | True |
-| israel.routeNetwork.00000001-0000-4000-8000-000000000001 | str | cvfr |
-| israel.routeNetwork.00000001-0000-4000-8000-000000000002 | str | lsa |
-| israelChartHintDismissed | bool | True |
-| israelNotamReadKeys | list | ['seed-notam-a', 'seed-notam-b'] |
-| israelOffRouteThresholdNM | float | 2.5 |
-| showAirportDiagrams | bool | False |
-| showsFlightLog | bool | False |
-| showsInstruments | bool | False |
-| showsPredictions | bool | True |
-| telemetryEnabled | bool | False |
+| key                                                      | plist type | value                            |
+| -------------------------------------------------------- | ---------- | -------------------------------- |
+| displayMode                                              | str        | night                            |
+| hasSeenOnboarding                                        | bool       | True                             |
+| israel.routeNetwork.00000001-0000-4000-8000-000000000001 | str        | cvfr                             |
+| israel.routeNetwork.00000001-0000-4000-8000-000000000002 | str        | lsa                              |
+| israelChartHintDismissed                                 | bool       | True                             |
+| israelNotamReadKeys                                      | list       | ['seed-notam-a', 'seed-notam-b'] |
+| israelOffRouteThresholdNM                                | float      | 2.5                              |
+| showAirportDiagrams                                      | bool       | False                            |
+| showsFlightLog                                           | bool       | False                            |
+| showsInstruments                                         | bool       | False                            |
+| showsPredictions                                         | bool       | True                             |
+| telemetryEnabled                                         | bool       | False                            |
 
 ### UserDefaults: `closed/io.omer.efb.defaults-export.plist`
 
 | key | plist type | value |
-|---|---|---|
+| --- | ---------- | ----- |
 
 ### UserDefaults: `live/io.omer.efb.container.plist`
 
-| key | plist type | value |
-|---|---|---|
-| displayMode | str | night |
-| hasSeenOnboarding | bool | True |
-| israel.routeNetwork.00000001-0000-4000-8000-000000000001 | str | cvfr |
-| israel.routeNetwork.00000001-0000-4000-8000-000000000002 | str | lsa |
-| israelChartHintDismissed | bool | True |
-| israelNotamReadKeys | list | ['seed-notam-a', 'seed-notam-b'] |
-| israelOffRouteThresholdNM | float | 2.5 |
-| showAirportDiagrams | bool | False |
-| showsFlightLog | bool | False |
-| showsInstruments | bool | False |
-| showsPredictions | bool | True |
-| telemetryEnabled | bool | False |
+| key                                                      | plist type | value                            |
+| -------------------------------------------------------- | ---------- | -------------------------------- |
+| displayMode                                              | str        | night                            |
+| hasSeenOnboarding                                        | bool       | True                             |
+| israel.routeNetwork.00000001-0000-4000-8000-000000000001 | str        | cvfr                             |
+| israel.routeNetwork.00000001-0000-4000-8000-000000000002 | str        | lsa                              |
+| israelChartHintDismissed                                 | bool       | True                             |
+| israelNotamReadKeys                                      | list       | ['seed-notam-a', 'seed-notam-b'] |
+| israelOffRouteThresholdNM                                | float      | 2.5                              |
+| showAirportDiagrams                                      | bool       | False                            |
+| showsFlightLog                                           | bool       | False                            |
+| showsInstruments                                         | bool       | False                            |
+| showsPredictions                                         | bool       | True                             |
+| telemetryEnabled                                         | bool       | False                            |
 
 ### UserDefaults: `live/io.omer.efb.defaults-export.plist`
 
 | key | plist type | value |
-|---|---|---|
+| --- | ---------- | ----- |
 
 ### Keychain generic-password items (attributes only)
 
 | service | account | accessible | accessGroup / status |
-|---|---|---|---|
-|  |  |  | -34018 |
-
+| ------- | ------- | ---------- | -------------------- |
+|         |         |            | -34018               |
