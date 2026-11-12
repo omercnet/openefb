@@ -1,6 +1,7 @@
 // FlightLogFooter (efb-212/Views/Log/FlightLogFooter.swift): one row of 60pt cells under the strip: GPS state,
 // the dark NRST cell, LAYERS, ZOOM + (RECENTER after a pan) and ZOOM -. The paper and the NRST ink run into the
-// bottom safe area.
+// bottom safe area. `compact` (iPhone, iPad Split View, flight log hidden): the full-width footer of the compact layout,
+// where the GPS cell is at most 76pt and wraps onto two lines.
 import { useEffect, useMemo, useRef } from 'react';
 import { Text, View } from 'react-native';
 import type { StripColumnKind } from '../../domain/types';
@@ -21,6 +22,7 @@ import {
   ZoomStepper,
   gpsText,
   monoFitScale,
+  monoWrapFit,
   runMapAction,
   gpsTint,
   nearestAccessibilityText,
@@ -32,6 +34,7 @@ import {
 import { footer } from './footerStore';
 
 const GPS_MAX_WIDTH = 120; // points
+const GPS_MAX_WIDTH_COMPACT = 76; // points
 const GPS_DOT = 10; // points
 
 /** Open a column, or return to the log when it is already open. */
@@ -40,9 +43,18 @@ const toggle = (column: StripColumnKind) =>
 
 /**
  * GPS and NRST share what the three 60pt cells and four 1pt dividers leave, GPS capped at 120pt (SwiftUI: 108 / 108
- * at 400pt). Computed rather than flex: Yoga on iOS split it 120 / 96 (iOS round 1), which also shrank NRST's text.
+ * at 400pt; compact: 76pt, NRST takes the rest). Computed rather than flex: Yoga on iOS split it 120 / 96 (iOS round 1),
+ * which also shrank NRST's text.
  */
-export function FlightLogFooter({ width, bottomInset }: { width: number; bottomInset: number }) {
+export function FlightLogFooter({
+  width,
+  bottomInset,
+  compact = false,
+}: {
+  width: number;
+  bottomInset: number;
+  compact?: boolean;
+}) {
   const t = useTheme();
   const status = useGpsStatus();
   const layersOpen = useAppStore((s) => s.stripColumn === 'layers');
@@ -62,14 +74,18 @@ export function FlightLogFooter({ width, bottomInset }: { width: number; bottomI
     );
   };
 
-  // Never negative: the 104 pt iPhone rail is the compact footer (U5); until then a narrow strip clips instead of laying out
-  // negative widths.
+  // Never negative: a window narrower than the five cells clips instead of laying out negative widths.
   const shared = Math.max(0, width - 3 * StripMetrics.cell - 4);
-  const gpsWidth = Math.min(GPS_MAX_WIDTH, shared / 2);
+  const gpsWidth = Math.min(compact ? GPS_MAX_WIDTH_COMPACT : GPS_MAX_WIDTH, shared / 2);
   const tint = gpsTint(status, t);
-  // Swift: lineLimit(1) + minimumScaleFactor(0.7). Plex is monospaced, so the fit is computed (no web fallback needed).
+  // Swift: lineLimit(1) (compact: 2) + minimumScaleFactor(0.7). Plex is monospaced, so the fit is computed (no web
+  // fallback needed); the compact lines are broken here so the platform cannot wrap them differently.
   const label = gpsText(status);
-  const gpsSize = 15 * monoFitScale(label.length, 15, gpsWidth - 2 * Space.s - GPS_DOT - Space.xs, 0.7);
+  const gpsRoom = gpsWidth - 2 * Space.s - GPS_DOT - Space.xs; // points
+  const fit = compact
+    ? monoWrapFit(label, 15, gpsRoom, 2, 0.7)
+    : { scale: monoFitScale(label.length, 15, gpsRoom, 0.7), lines: [label] };
+  const gpsSize = 15 * fit.scale;
   const divider = <View style={{ width: 1, height: StripMetrics.cell, backgroundColor: t.rule }} />;
   return (
     <View style={{ backgroundColor: t.paperSecondary }}>
@@ -90,13 +106,14 @@ export function FlightLogFooter({ width, bottomInset }: { width: number; bottomI
         >
           <View style={{ width: GPS_DOT, height: GPS_DOT, borderRadius: GPS_DOT / 2, backgroundColor: tint }} />
           <Text
-            numberOfLines={1}
+            numberOfLines={fit.lines.length}
+            testID="gps-status-text"
             style={[
               Type.dataEmphasis,
               { fontSize: gpsSize, lineHeight: lineHeight(gpsSize, 1.3), color: status.kind === 'ok' ? t.ink : tint },
             ]}
           >
-            {label}
+            {fit.lines.join('\n')}
           </Text>
         </View>
         {divider}

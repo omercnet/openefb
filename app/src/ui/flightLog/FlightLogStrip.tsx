@@ -1,10 +1,12 @@
 // FlightLogStrip (efb-212/Views/Log/FlightLogStrip.swift): the in-flight log beside the chart. Header, warnings and
 // cautions, NEXT, NOW (pinned), FLOWN. The warnings and NEXT take their natural height and scroll only when the column
 // is too short; FLOWN scrolls in whatever space is left. With the instruments hidden NOW is omitted and Clear moves to
-// the header. The iPhone rail (FlightLogRail) is U5. No animation on value changes (pilot SA).
+// the header. iPhone and iPad Split View: the NEXT rows fold into the 104pt rail (FlightLogRail) and the NOW cell moves
+// under the chart at full width (src/ui/CompactMapLayout.tsx). No animation on value changes (pilot SA).
 import { useState, type ReactNode } from 'react';
 import { ScrollView, View, type LayoutChangeEvent } from 'react-native';
 import { ColumnRule, useTheme } from '../Primitives';
+import { StripMetrics } from '../tokens';
 import { FlightLogFlown } from './FlightLogFlown';
 import { FlightLogHeader } from './FlightLogHeader';
 import { FlightLogNext } from './FlightLogNext';
@@ -33,6 +35,20 @@ export function FlightLogStrip() {
         <FlightLogFlown />
       </ScrollView>
     </View>
+  );
+}
+
+/** iPhone and iPad Split View: the NEXT rows in a 104pt rail beside the chart (Swift FlightLogRail). */
+export function FlightLogRail() {
+  const t = useTheme();
+  return (
+    <ScrollView
+      accessibilityLabel="Flight log"
+      testID="flight-log-rail"
+      style={{ width: StripMetrics.railWidth, flexGrow: 0, backgroundColor: t.paper }}
+    >
+      <FlightLogNext compact />
+    </ScrollView>
   );
 }
 

@@ -1,7 +1,7 @@
 import { act, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import type { TestInstance } from 'test-renderer';
-import { press, render } from '../../../tests/support/ui';
+import { press, render, type Rendered } from '../../../tests/support/ui';
 import { makeAirport } from '../../domain/core';
 import type { GpsStatus } from '../../domain/location/gpsStatus';
 import { nearest, type NearestAirportEntry } from '../columns/nearest/store';
@@ -32,6 +32,8 @@ async function renderFooter(
     entries?: NearestAirportEntry[];
     footerState?: Partial<FooterData>;
     ownship?: { lat: number; lon: number } | null;
+    width?: number;
+    compact?: boolean;
   } = {},
 ) {
   const gpsStore = gps.make({ status: opts.status ?? { kind: 'ok' }, failure: null });
@@ -50,7 +52,9 @@ async function renderFooter(
       </nearest.Provider>
     </gps.Provider>
   );
-  const view = await render(wrap(<FlightLogFooter width={400} bottomInset={20} />));
+  const view = await render(
+    wrap(<FlightLogFooter width={opts.width ?? 400} bottomInset={20} compact={opts.compact} />),
+  );
   return { view, footerStore, nearestStore };
 }
 
@@ -119,7 +123,37 @@ describe('FlightLogFooter', () => {
     });
   });
 
-  it('lays out no negative width on the 104 pt iPhone rail (the compact footer is U5)', async () => {
+  describe('compact (the full-width footer of the iPhone layout)', () => {
+    const gpsLabel = (view: Rendered) => view.byTestId('gps-status-text');
+
+    it('caps GPS at 76 pt and gives NRST the rest of a 402 pt window', async () => {
+      const { view } = await renderFooter({ width: 402, compact: true });
+      expect(style(view.byTestId('GPS status')).width).toBe(76);
+      expect(style(view.byTestId('NRST')).width).toBe(402 - 3 * 60 - 4 - 76);
+    });
+
+    it.each([
+      ['ok', { kind: 'ok' }, 'GPS\n3D', 15],
+      ['degraded', { kind: 'degraded', reason: { kind: 'noAltitude' } }, 'GPS\nDEGR', 15],
+      ['lost', { kind: 'lost', ageSeconds: null }, 'GPS\nLOST', 15],
+      // Does not fit two lines even at the 0.7 floor: SwiftUI's tail truncation on the second line.
+      ['lost with an age', { kind: 'lost', ageSeconds: 14 }, 'GPS\nLOST 1\u2026', 10.5],
+    ] as [string, GpsStatus, string, number][])('%s wraps onto two lines', async (_n, status, text, size) => {
+      const { view } = await renderFooter({ width: 402, compact: true, status });
+      const label = gpsLabel(view);
+      expect(label.children.join('')).toBe(text);
+      expect(label.props.numberOfLines).toBe(text.split('\n').length);
+      expect(style(label).fontSize).toBeCloseTo(size, 6);
+    });
+
+    it('keeps the regular footer on one line', async () => {
+      const { view } = await renderFooter({ status: { kind: 'lost', ageSeconds: 14 } });
+      expect(gpsLabel(view).children.join('')).toBe('GPS LOST 14 S');
+      expect(gpsLabel(view).props.numberOfLines).toBe(1);
+    });
+  });
+
+  it('lays out no negative width in a window narrower than the five cells', async () => {
     const view = await render(<FlightLogFooter width={104} bottomInset={0} />);
     const widths = view.all((n) => typeof style(n).width === 'number').map((n) => style(n).width as number);
     expect(widths.length).toBeGreaterThan(0);

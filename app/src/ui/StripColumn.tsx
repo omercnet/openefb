@@ -16,13 +16,14 @@ import { FlightLogFooter } from './flightLog/FlightLogFooter';
 import { FlightLogStrip } from './flightLog/FlightLogStrip';
 import { ThemeContext } from './Primitives';
 import { useAppStore } from './state/appStore';
-import { Day, FontFiles, Night } from './tokens';
+import { Day, FontFiles, Night, type Theme } from './tokens';
 import { useKeyboardVisible } from './useKeyboardVisible';
 
 /** The kanaf-dev://<screen> routes the fidelity gate captures; `night` is the flight log in the night palette. */
 export type StripScreen = 'map' | 'airport' | 'night' | 'layers' | 'nearest' | 'search';
 
-const COLUMNS: Record<StripColumnKind, () => React.JSX.Element> = {
+/** What fills the strip column (and, in the compact layout, the area above the NOW cell) for each open column. */
+export const STRIP_COLUMNS: Record<StripColumnKind, () => React.JSX.Element> = {
   log: FlightLogStrip,
   airport: AirportColumn,
   nearest: NearestColumn,
@@ -34,17 +35,26 @@ const COLUMNS: Record<StripColumnKind, () => React.JSX.Element> = {
 // (react-native-web): status bar 32, home indicator 20.
 const FALLBACK_INSETS = { top: 32, bottom: 20 };
 
-export function StripColumn({ screen, width }: { screen?: StripScreen; width: number }) {
-  const theme = screen === 'night' ? Night : Day;
+/**
+ * What both map layouts share: the palette for the screen, whether the bundled faces are registered (until then the
+ * layouts show bare paper, no text in a fallback face) and the top and bottom safe-area insets (points).
+ */
+export function useStripChrome(screen?: StripScreen): { theme: Theme; ready: boolean; top: number; bottom: number } {
   const [fontsLoaded, fontError] = useFonts(FontFiles);
   const insets = useSafeAreaInsets();
+  return {
+    theme: screen === 'night' ? Night : Day,
+    ready: fontsLoaded || fontError != null,
+    top: insets.top || FALLBACK_INSETS.top,
+    bottom: insets.bottom || FALLBACK_INSETS.bottom,
+  };
+}
+
+export function StripColumn({ screen, width }: { screen?: StripScreen; width: number }) {
+  const { theme, ready, top, bottom } = useStripChrome(screen);
   const column = useAppStore((s) => s.stripColumn);
   const keyboardVisible = useKeyboardVisible();
-  const top = insets.top || FALLBACK_INSETS.top;
-  const bottom = insets.bottom || FALLBACK_INSETS.bottom;
-  // Until the bundled faces are registered, show the bare paper: no text in a fallback face.
-  const ready = fontsLoaded || fontError != null;
-  const Column = COLUMNS[column];
+  const Column = STRIP_COLUMNS[column];
   return (
     <ThemeContext.Provider value={theme}>
       <KeyboardAvoidingView behavior="padding" style={{ width, backgroundColor: theme.paper }}>
