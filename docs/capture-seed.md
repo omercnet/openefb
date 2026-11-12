@@ -77,7 +77,7 @@ All references under `app/reference/` that this table covers come from one CI ru
 The seed day is therefore **2026-11-12 00:00 UTC** and the clock on the screens reads 06:30 to 06:45 UTC on Thu Nov 12 2026 (the
 seeded pages 06:33 to 06:36). The day counts and dates the seeded pages show are offsets from that day: medical expires 2026-12-02 (20
 days), flight review 2026-04-26 (200 days ago), annual due 2027-03-12, night landings 2026-10-13 and 2026-09-28, the flight on 2026-11-11
-at 08:00, the signed entry 2026-11-02. **If a reference is re-captured, update this section in the same commit.**
+at 08:00, the signed entry 2026-11-02. `ipad-recording.png` was re-captured later, by CI run 43232234466 (head 3340395), capture step **2026-11-12T14:48:32Z to 15:03:11Z** (clock 2:53 PM local sim time); it shows no seeded data, so the seed day does not apply to it. It shows both "Microphone is off" and "Audio stopped". **If a reference is re-captured, update this section in the same commit.**
 
 ## Reference file names
 
@@ -87,7 +87,6 @@ at 08:00, the signed entry 2026-11-02. **If a reference is re-captured, update t
 ## Known differences from the React Native fixtures
 
 - `search` shows the on-screen keyboard (the Swift search field is focused on open).
-- `recording` shows only "Audio stopped"; "Microphone is off" did not appear in the capture (the coordinator clears the flag).
 - `map-layers` is the day map with every layer on: the extra layers (weather dots, navaids, advisories) have no data on an offline
   runner, so it differs from `map-day` only by the clock.
 - `debrief` shows the "Generate Debrief" state; no AI debrief is generated in CI. `cvfr` and `flightdetail` show the CVFR report the
