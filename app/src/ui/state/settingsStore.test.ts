@@ -707,4 +707,23 @@ describe('review fixes on #45', () => {
     await loading;
     expect(store.getState().notam).toMatchObject({ clientID: '', clientSecret: '' });
   });
+
+  it('NOTAM edits made while the attribution lookups are pending are kept', async () => {
+    const { secrets } = setup();
+    await secrets.set(NOTAM_CLIENT_ID_KEY, 'saved-id');
+    await secrets.set(NOTAM_CLIENT_SECRET_KEY, 'saved-secret');
+    const gate = Promise.withResolvers<string>();
+    const slow = createSettingsStore({
+      ...setup().deps,
+      secrets,
+      dataAttribution: () => gate.promise,
+    });
+    const loading = slow.getState().load();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    slow.getState().setNotamClientID('');
+    slow.getState().setNotamClientSecret('typed');
+    gate.resolve('attribution');
+    await loading;
+    expect(slow.getState().notam).toMatchObject({ clientID: '', clientSecret: 'typed' });
+  });
 });
