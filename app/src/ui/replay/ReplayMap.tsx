@@ -74,7 +74,7 @@ export function ReplayMap({ store }: { store: ReplayViewStore }) {
         reporter.markRendered({}); // nothing to probe: the track and the marker are plain layers
       }}
       // A pan by the pilot turns auto-follow off (Swift: the camera change reason .gesturePan; here any user gesture).
-      onRegionDidChange={(e) => {
+      onRegionWillChange={(e) => {
         if (e.nativeEvent.userInteraction) store.getState().onUserPan();
       }}
     >

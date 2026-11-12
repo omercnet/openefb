@@ -112,6 +112,7 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
     let starting: Promise<unknown> | null = null;
 
     const startRecording = () => {
+      const alone = get().busy === null;
       const run = exclusive<StartOutcome>('starting', 'busy', async () => {
         set({ lastError: null, showDiscardedNotice: false });
         let denied = false;
@@ -119,7 +120,7 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
           // Ask once (system prompt); afterwards the answer comes from Settings.
           let status = await deps.microphone.status();
           if (status === 'undetermined') status = await deps.microphone.request();
-          denied = status === 'denied';
+          denied = status !== 'granted'; // an unresolved answer is the microphone being off too
         } catch (error) {
           set({ lastError: { kind: 'audioSessionFailed', cause: error } }); // the recording still starts
         }
@@ -138,7 +139,8 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
         }
         return get().microphoneDenied || get().lastError !== null ? 'problem' : 'started';
       });
-      if (get().busy === 'starting') starting = run.catch(() => undefined).finally(() => (starting = null));
+      // Only the call that actually began keeps the slot: a refused second call must not hide the real start.
+      if (alone) starting = run.catch(() => undefined).finally(() => (starting = null));
       return run;
     };
 
@@ -218,7 +220,7 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
         }
         try {
           const status = await deps.microphone.status();
-          if (token === micToken && get().status.kind === 'recording') set({ microphoneDenied: status === 'denied' });
+          if (token === micToken && get().status.kind === 'recording') set({ microphoneDenied: status !== 'granted' });
         } catch {
           // Keeps what was shown; the next check (coming back from Settings) tries again.
         }
@@ -251,6 +253,8 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
       ...(reported === null ? null : { lastError: reported }),
       // The microphone notice and the stop question are for a running recording only.
       ...(status.kind === 'recording' ? null : { microphoneDenied: false, showStopConfirmation: false }),
+      // The coordinator went idle on its own (a stop from elsewhere): that flight is over.
+      ...(status.kind === 'idle' && store.getState().busy !== 'starting' ? { activeFlightId: null } : null),
     });
     if (reported !== null) source.set({ lastError: null });
     // A recording the store did not start (the auto-start countdown ran out): read the permission now.

@@ -577,3 +577,49 @@ describe('a stop confirmed while the recording is starting', () => {
     expect(store.getState()).toMatchObject({ busy: null, activeFlightId: null });
   });
 });
+
+describe('review fixes', () => {
+  const gated = () => {
+    const gate = Promise.withResolvers<void>();
+    const microphone: MicrophonePermission = {
+      status: () => Promise.resolve('undetermined'),
+      request: async () => {
+        await gate.promise;
+        return 'granted';
+      },
+      openSettings: () => Promise.resolve(),
+    };
+    return { gate, microphone };
+  };
+
+  it('a refused second start does not take the place of the real one: a stop confirmed meanwhile still stops it', async () => {
+    const { gate, microphone } = gated();
+    const { store, coordinator } = setup({ microphone });
+    const first = store.getState().startRecording();
+    const second = await store.getState().startRecording();
+    expect(second).toBe('busy');
+    const stopping = store.getState().confirmStop();
+    gate.resolve();
+    await Promise.all([first, stopping]);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+  });
+
+  it('a microphone answer that is neither granted nor denied counts as the microphone being off', async () => {
+    const microphone: MicrophonePermission = {
+      status: () => Promise.resolve('undetermined'),
+      request: () => Promise.resolve('undetermined'),
+      openSettings: () => Promise.resolve(),
+    };
+    const { store } = setup({ microphone });
+    await store.getState().startRecording();
+    expect(store.getState().microphoneDenied).toBe(true);
+  });
+
+  it('forgets the active flight when the coordinator stops on its own', async () => {
+    const { store, coordinator } = setup();
+    await store.getState().startRecording();
+    expect(store.getState().activeFlightId).not.toBeNull();
+    await coordinator.stopRecording();
+    expect(store.getState().activeFlightId).toBeNull();
+  });
+});

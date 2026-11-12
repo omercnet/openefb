@@ -23,7 +23,12 @@ import { MicSlashFill, TrashSlashFill } from './icons';
 function NoticeRow({ tint, testID, children }: { tint: string; testID: string; children: ReactNode }) {
   const t = useTheme();
   return (
-    <View testID={testID} style={{ padding: Space.m, alignSelf: 'stretch', backgroundColor: t.activeCell }}>
+    <View
+      testID={testID}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      style={{ padding: Space.m, alignSelf: 'stretch', backgroundColor: t.activeCell }}
+    >
       <View
         accessibilityElementsHidden
         importantForAccessibility="no"

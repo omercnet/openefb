@@ -131,15 +131,18 @@ export function createReplayStore(deps: ReplayViewDeps): ReplayViewStore {
 
       async loadFlight(flight) {
         const token = ++loadToken;
+        // Replacing a loaded flight stops playback and invalidates an engine read still in progress (its counter only moves here).
+        engine.cleanup();
         set({ isLoading: true, loadError: null });
         // The engine keeps the segments it is given; the panel needs the same list with its text.
         let segments: TranscriptLine[] = [];
+        let audio: ReplayAudioPlayer | null = null;
         try {
           const source = await deps.source();
           if (token !== loadToken) return;
           if (source === null) return fail(token, DATABASE_NOT_OPENED);
 
-          const audio = await openAudio(flight);
+          audio = await openAudio(flight);
           if (token !== loadToken) {
             audio?.stop(); // opened for a flight that is no longer wanted
             return;
@@ -154,6 +157,7 @@ export function createReplayStore(deps: ReplayViewDeps): ReplayViewStore {
           // Superseded while reading: the engine returned without attaching this player, and cleanup only stops an attached one.
           if (token !== loadToken) audio?.stop();
         } catch (error) {
+          audio?.stop(); // opened but never attached: the engine's cleanup cannot release it
           return fail(token, `Track data could not be read: ${describeError(error)}`);
         }
         // Outside the try: only a failed read is a read error, not whatever a listener of the store does with the new state.

@@ -82,11 +82,18 @@ export function TranscriptPanel({
   const viewport = useRef(0);
   const rows = useRef<{ y: number; height: number }[]>([]);
 
-  // Keeps the active segment in the middle of the panel as the position moves.
-  useEffect(() => {
-    const row = activeIndex === null ? undefined : rows.current[activeIndex];
-    if (row)
+  const active = useRef(activeIndex);
+
+  // Keeps the active segment in the middle of the panel. It runs when the active segment changes and again when a measurement
+  // arrives for it (a panel that mounts with an active segment is laid out after its first effect).
+  const centerActive = () => {
+    const row = active.current === null ? undefined : rows.current[active.current];
+    if (row && viewport.current > 0)
       scroll.current?.scrollTo({ y: Math.max(0, row.y + row.height / 2 - viewport.current / 2), animated: true });
+  };
+  useEffect(() => {
+    active.current = activeIndex;
+    centerActive();
   }, [activeIndex]);
 
   return (
@@ -108,7 +115,10 @@ export function TranscriptPanel({
       ) : (
         <ScrollView
           ref={scroll}
-          onLayout={(e) => (viewport.current = e.nativeEvent.layout.height)}
+          onLayout={(e) => {
+            viewport.current = e.nativeEvent.layout.height;
+            centerActive();
+          }}
           contentContainerStyle={{ gap: 2, paddingHorizontal: 12, paddingVertical: 8 }}
         >
           {segments.map((line, index) => (
@@ -116,7 +126,10 @@ export function TranscriptPanel({
               key={index}
               line={line}
               active={index === activeIndex}
-              onLayout={(y, height) => (rows.current[index] = { y, height })}
+              onLayout={(y, height) => {
+                rows.current[index] = { y, height };
+                if (index === active.current) centerActive();
+              }}
             />
           ))}
         </ScrollView>

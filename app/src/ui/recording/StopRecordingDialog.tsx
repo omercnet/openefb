@@ -40,6 +40,7 @@ export function StopRecordingDialog({ store }: { store: RecordingViewStore }) {
       >
         <View
           accessibilityViewIsModal
+          accessibilityLabel={STOP_CONFIRMATION.title}
           testID="stop-recording-dialog"
           style={{ width: '100%', maxWidth: 360, borderRadius: Radius.l, backgroundColor: t.paper, overflow: 'hidden' }}
         >
