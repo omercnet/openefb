@@ -69,3 +69,28 @@ straight Haifa-Megiddo line, not the Haifa pattern flight; recording notices use
 
 The importer fixtures (`-OpenEFBSeed small|full`, `SeedDataHook.swift`) are unchanged; they also set UserDefaults such as night mode
 and hidden panels, so do not combine them with the capture shots.
+
+## Capture instant of the committed references
+
+All references under `app/reference/` that this table covers come from one CI run: workflow run 43165135481 (head d505a51), job
+"Flight scenarios (iPad simulator)", step "Capture the new screens", which ran from **2026-11-12T06:26:46Z to 2026-11-12T06:45:41Z**.
+The seed day is therefore **2026-11-12 00:00 UTC** and the clock on the screens reads 06:30 to 06:45 UTC on Thu Nov 12 2026 (the
+seeded pages 06:33 to 06:36). The day counts and dates the seeded pages show are offsets from that day: medical expires 2026-12-02 (20
+days), flight review 2026-04-26 (200 days ago), annual due 2027-03-12, night landings 2026-10-13 and 2026-09-28, the flight on 2026-11-11
+at 08:00, the signed entry 2026-11-02. **If a reference is re-captured, update this section in the same commit.**
+
+## Reference file names
+
+`ipad-<name>.png` for every name above; the iPhone files are `iphone-map.png` (the `map-day` shot), `iphone-log.png`,
+`iphone-airport.png` (the `airport-KSQL` shot). `ipad-layers.png` is not here: it comes with the U3 PR.
+
+## Known differences from the React Native fixtures
+
+- `search` shows the on-screen keyboard (the Swift search field is focused on open).
+- `recording` shows only "Audio stopped"; "Microphone is off" did not appear in the capture (the coordinator clears the flag).
+- `map-layers` is the day map with every layer on: the extra layers (weather dots, navaids, advisories) have no data on an offline
+  runner, so it differs from `map-day` only by the clock.
+- `debrief` shows the "Generate Debrief" state; no AI debrief is generated in CI. `cvfr` and `flightdetail` show the CVFR report the
+  app computes for the seeded track, which crosses the bundled Haifa to Megiddo route data (it reports two things to look at).
+- `replay` starts at the start of the flight, not at the Afula turn.
+- Weather (METAR/TAF): the airport column (`AirportColumnView`, shot `airport-KSQL`) has the WEATHER section with Raw METAR and TAF.
