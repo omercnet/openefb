@@ -375,6 +375,7 @@ describe('NOTAM API key', () => {
       clientID: 'id1',
       clientSecret: 'secret1',
       configured: true,
+      partiallyStored: false,
       message: 'Saved. NOTAMs appear in the airport sheet.',
     });
   });
@@ -408,6 +409,7 @@ describe('NOTAM API key', () => {
       clientID: '',
       clientSecret: '',
       configured: false,
+      partiallyStored: false,
       message: 'Key removed.',
     });
     expect(await secrets.get(NOTAM_CLIENT_ID_KEY)).toBeNull();
@@ -725,5 +727,72 @@ describe('review fixes on #45', () => {
     gate.resolve('attribution');
     await loading;
     expect(slow.getState().notam).toMatchObject({ clientID: '', clientSecret: 'typed' });
+  });
+
+  it('a failed opt-out can be retried without switching telemetry back on, and without telling the app again', async () => {
+    const prefs = new FakePreferences();
+    const real = prefs.set.bind(prefs);
+    let broken = true;
+    prefs.set = (key, value) => (broken ? Promise.reject(new Error('full')) : real(key, value));
+    const { store, setTelemetryEnabled } = setup({ prefs });
+    await store.getState().load();
+    await store.getState().setShareUsageData(false);
+    expect(store.getState().preferenceErrorFor).toBe('shareUsageData');
+    broken = false;
+    await store.getState().retryPreferenceSave();
+    expect(store.getState().preferenceError).toBeNull();
+    expect(store.getState().shareUsageData).toBe(false);
+    expect(setTelemetryEnabled).toHaveBeenCalledTimes(1);
+    const reload = setup({ prefs }).store;
+    await reload.getState().load();
+    expect(reload.getState().shareUsageData).toBe(false);
+  });
+
+  it('retrying with no failed preference does nothing', async () => {
+    const { store, prefs } = setup();
+    await store.getState().load();
+    const set = jest.spyOn(prefs, 'set');
+    await store.getState().retryPreferenceSave();
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it('credentials typed while Remove Key is waiting are kept, and not wiped by its completion', async () => {
+    const { store, secrets } = setup();
+    await secrets.set(NOTAM_CLIENT_ID_KEY, 'id');
+    await secrets.set(NOTAM_CLIENT_SECRET_KEY, 'secret');
+    await store.getState().load();
+    const removing = store.getState().removeNotamKey();
+    store.getState().setNotamClientID('new-id');
+    store.getState().setNotamClientSecret('new-secret');
+    await removing;
+    expect(store.getState().notam).toMatchObject({ clientID: 'new-id', clientSecret: 'new-secret', configured: false });
+    await store.getState().saveNotamKey();
+    expect(await secrets.get(NOTAM_CLIENT_ID_KEY)).toBe('new-id');
+    expect(store.getState().notam.clientID).toBe('new-id');
+  });
+
+  it('after a removal that failed half way, Remove Key stays available and can finish the job', async () => {
+    const inner = new FakeSecretStore();
+    let failSecret = true;
+    const secrets: SecretStore = {
+      get: (k) => inner.get(k),
+      set: (k, v) => inner.set(k, v),
+      remove: (k) =>
+        k === NOTAM_CLIENT_SECRET_KEY && failSecret ? Promise.reject(new Error('keychain locked')) : inner.remove(k),
+    };
+    const { store } = setup({ secrets });
+    await inner.set(NOTAM_CLIENT_ID_KEY, 'id');
+    await inner.set(NOTAM_CLIENT_SECRET_KEY, 'secret');
+    await store.getState().load();
+    await store.getState().removeNotamKey();
+    expect(store.getState().notam).toMatchObject({ configured: false, partiallyStored: true });
+    failSecret = false;
+    await store.getState().removeNotamKey();
+    expect(store.getState().notam).toMatchObject({
+      configured: false,
+      partiallyStored: false,
+      message: 'Key removed.',
+    });
+    expect(await inner.get(NOTAM_CLIENT_SECRET_KEY)).toBeNull();
   });
 });
