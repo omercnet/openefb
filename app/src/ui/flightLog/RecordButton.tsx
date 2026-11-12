@@ -1,6 +1,7 @@
 // RecordButton + AudioLevelMeter (efb-212/Views/Map/RecordingOverlayView.swift), presentational only: U8 owns the
 // recording overlay, the stop confirmation and the notices. At rest the mic; recording: the accent disc with a stop
-// square and the level meter over the elapsed time "00:12:34"; the auto-start countdown in an amber ring.
+// square and the level meter over the elapsed time "00:12:34"; the auto-start countdown in an amber ring. `compact`
+// (the iPhone header): the glyph only, no level meter or elapsed time (the time is still spoken).
 import { Text, View } from 'react-native';
 import type { RecordingStatus } from '../../domain/recording/recordingCoordinator';
 import { Pressy, useTheme } from '../Primitives';
@@ -34,6 +35,7 @@ export function RecordButton({
   elapsed,
   level,
   microphoneDenied = false,
+  compact = false,
   onPress,
 }: {
   status: RecordingStatus;
@@ -42,6 +44,8 @@ export function RecordButton({
   /** dBFS. */
   level: number;
   microphoneDenied?: boolean;
+  /** iPhone header: glyph only. */
+  compact?: boolean;
   onPress: () => void;
 }) {
   const t = useTheme();
@@ -106,9 +110,9 @@ export function RecordButton({
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xs }}>
         {glyph}
-        {recording && !microphoneDenied ? <AudioLevelMeter dBFS={level} /> : null}
+        {recording && !compact && !microphoneDenied ? <AudioLevelMeter dBFS={level} /> : null}
       </View>
-      {recording ? (
+      {recording && !compact ? (
         <Text numberOfLines={1} style={[Type.data, { color: t.ink, marginTop: 2 }]}>
           {time}
         </Text>
