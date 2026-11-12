@@ -84,4 +84,15 @@ export async function callHandler(node: TestInstance, name: string, ...args: unk
   throw new Error(`no ${name} handler at or above the node`);
 }
 
+/** The value of a prop on the nearest component at or above the host node that sets it (undefined when none does). */
+export function ancestorProp(node: TestInstance, name: string): unknown {
+  let fiber = node.unstable_fiber as unknown as FiberLike | null;
+  while (fiber) {
+    const props = fiber.memoizedProps;
+    if (props && props[name] !== undefined) return props[name];
+    fiber = fiber.return;
+  }
+  return undefined;
+}
+
 export const press = (node: TestInstance) => callHandler(node, 'onPress');

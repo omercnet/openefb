@@ -5,10 +5,15 @@ import type { LayerSpec, StyleValue } from '../../domain/map/layerSpec';
 import { NIGHT_RASTER } from '../../domain/map/layers';
 
 /** base-style.json with the FAA sectional shown, dimmed and desaturated at night (MapService.applyDisplayMode). */
-export function styleFor(night: boolean, sectional: boolean): StyleSpecification {
+/** The remote glyph endpoint authored in base-style.json: the fallback if the local install fails (labels then need a network). */
+export const REMOTE_GLYPHS_URL: string = (baseStyle as unknown as { glyphs: string }).glyphs;
+
+export function styleFor(night: boolean, sectional: boolean, glyphsUrl: string): StyleSpecification {
   const style = baseStyle as unknown as StyleSpecification;
   return {
     ...style,
+    // Offline labels: the bundled glyph ranges, not the remote endpoint (domain/map/glyphs.ts).
+    glyphs: glyphsUrl,
     layers: style.layers.map((l) =>
       l.id === 'base-vfr-sectional' && l.type === 'raster'
         ? {

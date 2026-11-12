@@ -7,7 +7,8 @@
 //   node scripts/compare.mjs --dir <screens dir> [--out dir]   (every <dir>/<name>.png with a reference/ipad-<name>.png
 //                                                              or reference/<name>.png counterpart)
 // Gate: add `--gate <ios|android>` (thresholds from scripts/fidelity-thresholds.json, or `--thresholds <file>`) to exit 1
-// when a screen's strip SSIM is below its floor or a screen listed for the platform was not captured. `--json <file>` writes
+// when a screen's strip SSIM (or its whole-frame SSIM where the entry says "metric": "frame") is below its floor or a screen
+// listed for the platform was not captured. `--json <file>` writes
 // the results (with the gate verdict) to a file in addition to stdout. Android: `--shot-dpr 2 --shot-top 24 --ref-top 32 --rows 900`.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
@@ -105,11 +106,17 @@ if (gate) {
   const verdicts = Object.entries(table).map(([screen, t]) => {
     const floor = t.interim ?? t.min;
     const r = byName.get(screen);
-    const got = r ? r.strip.ssim : null;
-    return { screen, floor, target: t.min, ssim: got, pass: got !== null && got >= floor };
+    // The leading 400 pt strip, or with "metric": "frame" the whole frame (a screen that is not a strip, such as the Log).
+    const metric = t.metric ?? 'strip';
+    if (metric !== 'strip' && metric !== 'frame') { console.error(`compare: ${gate} ${screen}: unknown metric '${metric}' (strip or frame)`); process.exit(2); }
+    const got = r ? r[metric].ssim : null;
+    // "referencePending": the SwiftUI reference is not in the repo yet (Q6 / PR #48): no gate until it lands and the entry is dropped.
+    if (t.referencePending && !r && !referenceFor(`${screen}.png`)) return { screen, metric, floor, target: t.min, ssim: null, pass: true, pending: true };
+    return { screen, metric, floor, target: t.min, ssim: got, pass: got !== null && got >= floor };
   });
   for (const v of verdicts) {
-    console.error(`fidelity ${gate} ${v.screen}: ssim ${v.ssim ?? 'MISSING'} floor ${v.floor} (target ${v.target}) ${v.pass ? 'ok' : 'FAIL'}`);
+    const what = v.metric === 'strip' ? 'ssim' : `${v.metric} ssim`;
+    console.error(v.pending ? `fidelity ${gate} ${v.screen}: reference pending (Q6), not gated` : `fidelity ${gate} ${v.screen}: ${what} ${v.ssim ?? 'MISSING'} floor ${v.floor} (target ${v.target}) ${v.pass ? 'ok' : 'FAIL'}`);
   }
   failed = verdicts.some((v) => !v.pass);
   for (const r of results) r.gate = verdicts.find((v) => v.screen === basename(r.screenshot, '.png')) ?? null;
