@@ -199,7 +199,7 @@ export function statusContent(
 /** Swift trimmingCharacters(in: .whitespaces): spaces and tab, not newlines. */
 const trimWhitespaces = (text: string): string => text.replace(/^[\p{Zs}\t]+|[\p{Zs}\t]+$/gu, '');
 
-/** The Filters row's summary: "Flight · Route 25 NM · LLHZ · Unread". */
+/** The Filters row's summary: "Flight . Route 25 NM . LLHZ . Unread". */
 export function filterSummary(f: Omit<BriefingFilters, 'showStaleList'>): string {
   const parts = [WINDOW_CHOICE_TITLE[f.windowChoice]];
   if (f.distanceChoice !== 'off')

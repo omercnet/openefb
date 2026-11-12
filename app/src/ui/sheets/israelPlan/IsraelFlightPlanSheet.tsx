@@ -347,7 +347,7 @@ function DepartureTime() {
         <Text style={[Type.body, { fontFamily: MONO, color: t.primaryText }]}>{departureTimeText(departureTime)}</Text>
       </View>
       <Button
-        title="−15"
+        title="-15"
         accessibilityLabel="Departure 15 minutes earlier"
         onPress={() => step(-1)}
         style={{ flexGrow: 0 }}
