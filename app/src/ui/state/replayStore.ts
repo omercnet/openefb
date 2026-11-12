@@ -151,6 +151,8 @@ export function createReplayStore(deps: ReplayViewDeps): ReplayViewStore {
             transcriptSegments: async (id) => (segments = await source.transcriptSegments(id)),
           };
           await engine.loadFlight(flight.id, reading, audio);
+          // Superseded while reading: the engine returned without attaching this player, and cleanup only stops an attached one.
+          if (token !== loadToken) audio?.stop();
         } catch (error) {
           return fail(token, `Track data could not be read: ${describeError(error)}`);
         }

@@ -108,8 +108,11 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
       }
     };
 
-    const startRecording = () =>
-      exclusive<StartOutcome>('starting', 'busy', async () => {
+    /** The start that is running, so a stop confirmed meanwhile waits for it instead of being dropped. */
+    let starting: Promise<unknown> | null = null;
+
+    const startRecording = () => {
+      const run = exclusive<StartOutcome>('starting', 'busy', async () => {
         set({ lastError: null, showDiscardedNotice: false });
         let denied = false;
         try {
@@ -135,9 +138,14 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
         }
         return get().microphoneDenied || get().lastError !== null ? 'problem' : 'started';
       });
+      if (get().busy === 'starting') starting = run.catch(() => undefined).finally(() => (starting = null));
+      return run;
+    };
 
     const confirmStop = async (): Promise<void> => {
       set({ showStopConfirmation: false });
+      // A stop confirmed while the recording is still starting waits for the start to finish, then stops it.
+      if (get().busy === 'starting' && starting !== null) await starting.catch(() => undefined);
       await exclusive<void>('stopping', undefined, async () => {
         let summary;
         try {

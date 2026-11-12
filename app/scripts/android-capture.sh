@@ -19,7 +19,7 @@ MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}
 SCREENS=${SCREENS:-map map-layers airport night layers nearest search log sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast}
 # Screens with no map (a native sheet, the log, the settings forms) wait a fixed time instead of for the map status.
-NO_MAP=" sheet log settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast "
+NO_MAP=" sheet log settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop "
 FULL=${FULL:-1}
 PKG=io.omer.efb.dev
 GEO="-122.2289 37.4876"   # longitude latitude: ownship over Redwood City (src/fixtures/scenario.ts)
