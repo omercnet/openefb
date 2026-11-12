@@ -41,10 +41,9 @@ describe('pilotScreenLayout', () => {
     expect(layout).toMatchObject({ showProfileList: true, active: null, showAddToolbar: false });
   });
 
-  // SWIFT BUG, preserved (owner approval needed to fix; see U7.md): a new PilotProfile is inactive and addProfile() does not
-  // activate it, so with exactly one profile nothing is active, the list is hidden (it needs two) and the screen shows only the
-  // "Add Pilot Profile" button and the toolbar plus. The only way to activate the sole pilot is to add a second one.
-  it('one profile that is not active: no list and no info, only Add Pilot Profile (Swift bug preserved)', () => {
+  // The layout is Swift's. Creating a profile now activates the first one (Q5, see profileData.ts), so this state no longer comes
+  // from the app itself; it can still be in the data (a deleted active profile, an older install).
+  it('one profile that is not active: no list and no info, only Add Pilot Profile', () => {
     const only = pilot('a', false);
     expect(pilotScreenLayout([only])).toEqual({
       empty: false,

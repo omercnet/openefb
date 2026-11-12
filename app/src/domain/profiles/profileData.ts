@@ -50,11 +50,18 @@ export async function updateAircraftProfile(
 /** True when a profile was deleted. */
 export const deleteAircraftProfile = (data: UserData, id: string): Promise<boolean> => data.aircraft.remove(id);
 
-/** addProfile(): a blank, inactive pilot profile, inserted at once; the editor then fills it in. */
-export async function createPilotProfile(data: UserData, factory: Factory = {}): Promise<PilotProfile> {
-  const profile = newPilotProfile(factory);
-  await data.pilots.insert(profile);
-  return profile;
+/**
+ * addProfile(): a blank pilot profile, inserted at once; the editor then fills it in. OWNER-APPROVED DEVIATION FROM SWIFT (Q5,
+ * 2026-11-12): Swift never activated a new profile, so a sole pilot stayed inactive and the screen showed nothing for it. A profile
+ * created while none is active becomes the active one; a second one leaves the active profile alone.
+ */
+export function createPilotProfile(data: UserData, factory: Factory = {}): Promise<PilotProfile> {
+  return data.atomically(async (repos) => {
+    const anyActive = (await repos.pilots.list()).some((p) => p.isActive);
+    const profile = { ...newPilotProfile(factory), isActive: !anyActive };
+    await repos.pilots.insert(profile);
+    return profile;
+  });
 }
 
 export async function updatePilotProfile(data: UserData, id: string, fields: PilotFields): Promise<PilotProfile> {

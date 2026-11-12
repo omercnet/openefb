@@ -133,11 +133,11 @@ describe('select', () => {
 });
 
 describe('create (addProfile)', () => {
-  it('inserts a blank, inactive profile at once and returns its id so the editor can open on it', async () => {
+  it('inserts a blank profile at once, active when it is the first (Q5), and returns its id', async () => {
     const { store, userData } = setup();
     const id = await store.getState().create();
     expect(id).toBe('new-1');
-    expect(await userData.pilots.get('new-1')).toMatchObject({ name: '', isActive: false, createdAt: NOW });
+    expect(await userData.pilots.get('new-1')).toMatchObject({ name: '', isActive: true, createdAt: NOW });
     expect(store.getState().profiles.map((p) => p.id)).toEqual(['new-1']);
   });
 
@@ -145,7 +145,10 @@ describe('create (addProfile)', () => {
     const data = createMemoryUserData();
     const broken: UserData = {
       ...data,
-      pilots: { ...data.pilots, insert: () => Promise.reject(new Error('disk full')) },
+      atomically: (fn) =>
+        data.atomically((repos) =>
+          fn({ ...repos, pilots: { ...repos.pilots, insert: () => Promise.reject(new Error('disk full')) } }),
+        ),
     };
     const { store } = setup({}, broken);
     expect(await store.getState().create()).toBeNull();
@@ -157,13 +160,19 @@ describe('create (addProfile)', () => {
     const gate = Promise.withResolvers<void>();
     const slow: UserData = {
       ...data,
-      pilots: {
-        ...data.pilots,
-        insert: async (record) => {
-          await gate.promise;
-          return data.pilots.insert(record);
-        },
-      },
+      atomically: (fn) =>
+        data.atomically((repos) =>
+          fn({
+            ...repos,
+            pilots: {
+              ...repos.pilots,
+              insert: async (record) => {
+                await gate.promise;
+                return repos.pilots.insert(record);
+              },
+            },
+          }),
+        ),
     };
     const { store } = setup({}, slow);
     const first = store.getState().create();

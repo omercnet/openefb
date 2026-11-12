@@ -150,11 +150,76 @@ describe.each(makers)('pilot profiles over %s', (_name, make) => {
     expect((await loadPilotProfiles(data)).map((p) => p.name)).toEqual(['new', 'old']);
   });
 
-  it('addProfile inserts a blank inactive profile at once (the editor then fills it)', async () => {
+  // OWNER-APPROVED DEVIATION FROM SWIFT (Q5, 2026-11-12): Swift never activated a new profile.
+  it('addProfile inserts a blank profile at once; the first one becomes the active pilot', async () => {
     const data = await make();
     const created = await createPilotProfile(data, { newId: () => 'p-new', now: () => 9 });
-    expect(created).toMatchObject({ id: 'p-new', name: '', isActive: false, createdAt: 9, nightLandingEntries: [] });
-    expect((await loadPilotProfiles(data)).map((p) => p.id)).toEqual(['p-new']);
+    expect(created).toMatchObject({ id: 'p-new', name: '', isActive: true, createdAt: 9, nightLandingEntries: [] });
+    expect((await loadPilotProfiles(data)).map((p) => [p.id, p.isActive])).toEqual([['p-new', true]]);
+  });
+
+  it('a second profile does not change the active one', async () => {
+    const data = await make();
+    await createPilotProfile(data, { newId: () => 'first', now: () => 1 });
+    const second = await createPilotProfile(data, { newId: () => 'second', now: () => 2 });
+    expect(second.isActive).toBe(false);
+    expect((await data.pilots.list()).filter((p) => p.isActive).map((p) => p.id)).toEqual(['first']);
+  });
+
+  it('a profile created while another is active (set earlier) stays inactive', async () => {
+    const data = await make();
+    await data.pilots.insert(newPilotProfile({ id: uuid(), createdAt: 1, isActive: true }));
+    expect((await createPilotProfile(data, { now: () => 5 })).isActive).toBe(false);
+  });
+
+  it('deleting the active profile leaves none active; deleting what is not there reports false', async () => {
+    const data = await make();
+    const a = newAircraftProfile('N1', { id: uuid(), createdAt: 1, isActive: true });
+    const b = newAircraftProfile('N2', { id: uuid(), createdAt: 2 });
+    await data.aircraft.insert(a);
+    await data.aircraft.insert(b);
+    expect(await deleteAircraftProfile(data, a.id)).toBe(true);
+    expect((await loadAircraftProfiles(data)).some((x) => x.isActive)).toBe(false);
+    expect(await deleteAircraftProfile(data, a.id)).toBe(false);
+  });
+});
+
+describe.each(makers)('pilot profiles over %s', (_name, make) => {
+  it('loads newest first', async () => {
+    const data = await make();
+    await data.pilots.insert(newPilotProfile({ id: uuid(), name: 'old', createdAt: 1 }));
+    await data.pilots.insert(newPilotProfile({ id: uuid(), name: 'new', createdAt: 2 }));
+    expect((await loadPilotProfiles(data)).map((p) => p.name)).toEqual(['new', 'old']);
+  });
+
+  // OWNER-APPROVED DEVIATION FROM SWIFT (Q5, 2026-11-12): Swift never activated a new profile.
+  it('addProfile inserts a blank profile at once; the first one becomes the active pilot', async () => {
+    const data = await make();
+    const created = await createPilotProfile(data, { newId: () => 'p-new', now: () => 9 });
+    expect(created).toMatchObject({ id: 'p-new', name: '', isActive: true, createdAt: 9, nightLandingEntries: [] });
+    expect((await loadPilotProfiles(data)).map((p) => [p.id, p.isActive])).toEqual([['p-new', true]]);
+  });
+
+  it('a second profile does not change the active one', async () => {
+    const data = await make();
+    await createPilotProfile(data, { newId: () => 'first', now: () => 1 });
+    const second = await createPilotProfile(data, { newId: () => 'second', now: () => 2 });
+    expect(second.isActive).toBe(false);
+    expect((await data.pilots.list()).filter((p) => p.isActive).map((p) => p.id)).toEqual(['first']);
+  });
+
+  it('a profile created while another is active (set earlier) stays inactive', async () => {
+    const data = await make();
+    await data.pilots.insert(newPilotProfile({ id: uuid(), createdAt: 1, isActive: true }));
+    expect((await createPilotProfile(data, { now: () => 5 })).isActive).toBe(false);
+  });
+
+  it('deleting the active profile leaves none active, as in Swift', async () => {
+    const data = await make();
+    const first = await createPilotProfile(data, { now: () => 1 });
+    await createPilotProfile(data, { now: () => 2 });
+    await deletePilotProfile(data, first.id);
+    expect((await data.pilots.list()).some((p) => p.isActive)).toBe(false);
   });
 
   it('updates the form fields', async () => {
