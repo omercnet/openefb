@@ -9,10 +9,10 @@ import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Coordinate, MapLayer, Region } from '../../domain/core';
 import type { CameraCommand } from '../../domain/map/camera';
 import { EMPTY_COLLECTION, type FeatureCollection } from '../../domain/map/geojson';
-import { isLayerVisible, type LayerSpec, type StyleValue } from '../../domain/map/layerSpec';
+import { isLayerVisible, type LayerSpec } from '../../domain/map/layerSpec';
 import { OWNSHIP_LIVE_ICON, OWNSHIP_STALE_ICON, TRACK_RULER_TICK_ICON } from '../../domain/map/layers';
 import { PROBED_LAYERS, useMapStatus } from './mapStatus';
-import { groupBySource, resolveLayerProps, styleFor, type LayerOverrides } from './surfaceModel';
+import { groupBySource, styleFor } from './surfaceModel';
 
 /** What the surface tells its owner about the viewport. `userInteraction` is true for finger gestures. */
 export interface MapViewChange {
@@ -35,8 +35,6 @@ export interface MapSurfaceProps {
   layers: readonly LayerSpec[];
   /** GeoJSON per source id; a missing id draws nothing. */
   sources: Readonly<Record<string, FeatureCollection>>;
-  /** Per-layer overrides that win over the toggle and the spec paint (the official Israel chart base uses them). */
-  overrides?: LayerOverrides;
   initialView: { center: Coordinate; zoom: number };
   /** Applied when `seq` changes; null means no pending move. */
   camera: { seq: number; command: CameraCommand | null };
@@ -46,20 +44,16 @@ export interface MapSurfaceProps {
 
 type AnyLayerProps = Parameters<typeof Layer>[0];
 
-const LayerFromSpec = memo(function LayerFromSpec({
-  spec,
-  visible,
-  night,
-  visibilityOverride,
-  paintOverride,
-}: {
-  spec: LayerSpec;
-  visible: boolean;
-  night: boolean;
-  visibilityOverride: boolean | undefined;
-  paintOverride: Record<string, StyleValue> | undefined;
-}) {
-  const props = { id: spec.id, type: spec.type, ...resolveLayerProps(spec, { visible, night, visibilityOverride, paintOverride }) };
+const LayerFromSpec = memo(function LayerFromSpec({ spec, visible, night }: { spec: LayerSpec; visible: boolean; night: boolean }) {
+  const props = {
+    id: spec.id,
+    type: spec.type,
+    ...(spec.minzoom === undefined ? {} : { minzoom: spec.minzoom }),
+    ...(spec.maxzoom === undefined ? {} : { maxzoom: spec.maxzoom }),
+    ...(spec.filter ? { filter: spec.filter } : {}),
+    paint: night && spec.nightPaint ? { ...spec.paint, ...spec.nightPaint } : spec.paint,
+    layout: { ...spec.layout, visibility: visible ? 'visible' : 'none' },
+  };
   return <Layer {...(props as unknown as AnyLayerProps)} />;
 });
 
@@ -70,7 +64,6 @@ export function MapSurface({
   visibleLayers,
   layers,
   sources,
-  overrides,
   initialView,
   camera,
   onViewChange,
@@ -182,14 +175,7 @@ export function MapSurface({
       {groups.map((g) => (
         <GeoJSONSource key={g.source} id={g.source} data={sources[g.source] ?? EMPTY_COLLECTION}>
           {g.specs.map((spec) => (
-            <LayerFromSpec
-              key={spec.id}
-              spec={spec}
-              night={night}
-              visible={isLayerVisible(spec, visibleLayers, region)}
-              visibilityOverride={overrides?.visibility[spec.id]}
-              paintOverride={overrides?.paint[spec.id]}
-            />
+            <LayerFromSpec key={spec.id} spec={spec} night={night} visible={isLayerVisible(spec, visibleLayers, region)} />
           ))}
         </GeoJSONSource>
       ))}

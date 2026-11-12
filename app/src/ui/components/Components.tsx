@@ -24,19 +24,25 @@ import {
   isDataAgeBadgeVisible,
   opacityAccessibilityValue,
   opacityPercentText,
+  stepOpacity,
   type CurrencyStatus,
   type FlightCategory,
   type FreshnessLevel,
 } from './logic';
 
-/** `color` with its alpha replaced (the Swift `Color.opacity(_)`); handles #RRGGBB (6 digits only; Theme has no short or 8-digit hex) and rgba(r,g,b,a). */
+/**
+ * `color` with its alpha scaled by `alpha` (the Swift `Color.opacity(_)` multiplies: secondaryText at 0.6 with .opacity(0.2)
+ * draws at 0.12); handles #RRGGBB (6 digits only; Theme has no short or 8-digit hex) and rgb(r,g,b) / rgba(r,g,b,a).
+ */
 function withAlpha(color: string, alpha: number): string {
   if (color.startsWith('#')) {
     const n = parseInt(color.slice(1), 16);
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
   }
-  const m = /rgba?\(([^,]+),([^,]+),([^,)]+)/.exec(color);
-  return m ? `rgba(${m[1]},${m[2]},${m[3]},${alpha})` : color;
+  const m = /rgba?\(([^,]+),([^,]+),([^,)]+)(?:,([^)]+))?\)/.exec(color);
+  if (!m) return color;
+  const base = m[4] === undefined ? 1 : Number(m[4]);
+  return `rgba(${m[1]},${m[2]},${m[3]},${Math.round(base * alpha * 1000) / 1000})`;
 }
 
 const subheadline = Type.systemSubheadline;
@@ -166,14 +172,16 @@ export function OpacitySlider({ opacity, onChange }: { opacity: number; onChange
   const [width, setWidth] = useState(0);
   const knobTravel = width - 28; // knob is 28 wide; the knob centre follows the finger
   const set = (x: number) => onChange(clampOpacity(knobTravel > 0 ? (x - 14) / knobTravel : 0));
-  const step = (e: AccessibilityActionEvent) =>
-    onChange(clampOpacity(opacity + (e.nativeEvent.actionName === 'increment' ? 0.1 : -0.1)));
+  const step = (e: AccessibilityActionEvent) => {
+    const next = stepOpacity(opacity, e.nativeEvent.actionName);
+    if (next !== null) onChange(next);
+  };
   const knob = 28;
   const fill = clampOpacity(opacity) * Math.max(0, width - knob);
   return (
     <View style={{ gap: Space.xs }}>
       <View
-        style={{ flexDirection: 'row', justifyContent: 'space-between' }}
+        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
