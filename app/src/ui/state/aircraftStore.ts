@@ -45,8 +45,11 @@ export interface AircraftState {
   save(id: string | null, form: AircraftForm): Promise<AircraftSaveResult>;
   /** True when the profile is gone afterwards (deleted, or already gone); false when the delete failed (see `error`). */
   remove(id: string): Promise<boolean>;
-  /** The route network kept for an aircraft; unreadable reads as none. */
-  routeNetworkFor(id: string): Promise<IsraelRouteNetwork | null>;
+  /**
+   * The route network kept for an aircraft, as `{ network }` (null network: none chosen). Null when it could not be read (see
+   * `error`): the editor must not open on a guess, because saving would then erase the stored choice.
+   */
+  routeNetworkFor(id: string): Promise<{ network: IsraelRouteNetwork | null } | null>;
 }
 
 /** The store a screen renders (`useStore(store)`); the app shell creates it so list and editor share one. */
@@ -55,6 +58,8 @@ export type AircraftStore = StoreApi<AircraftState>;
 export function createAircraftStore(deps: AircraftDeps): AircraftStore {
   // Every change to the data runs here, one at a time in call order.
   const enqueue = createSerialQueue();
+  /** Route network settings of aircraft whose insert failed and whose clean-up failed too: tried again before the next save. */
+  const orphans = new Set<string>();
 
   return createStore<AircraftState>()((set, get) => {
     /** Reads the list again. Returns a problem to show, or null. A failed read keeps what was on screen. */
@@ -76,9 +81,28 @@ export function createAircraftStore(deps: AircraftDeps): AircraftStore {
      * behind and a retry cannot duplicate the aircraft. An update writes the profile, then the network; a retry is safe.
      */
     const write = async (id: string | null, input: AircraftInput): Promise<void> => {
+      for (const orphan of [...orphans]) {
+        await deps.networkPreference.set(orphan, null).then(
+          () => orphans.delete(orphan),
+          () => undefined,
+        );
+      }
       if (id !== null) {
+        const before = await deps.userData.aircraft.get(id);
         await updateAircraftProfile(deps.userData, id, input.fields);
-        await deps.networkPreference.set(id, input.routeNetwork);
+        try {
+          await deps.networkPreference.set(id, input.routeNetwork);
+        } catch (error) {
+          // Not half saved: put the profile back as it was, so the failed save changed nothing.
+          if (before !== null) {
+            await deps.userData.aircraft.update(id, before).catch((restore) => {
+              throw new Error(
+                `${describeError(error)} (and the aircraft could not be restored: ${describeError(restore)})`,
+              );
+            });
+          }
+          throw error;
+        }
         return;
       }
       const newId = deps.newId();
@@ -86,7 +110,16 @@ export function createAircraftStore(deps: AircraftDeps): AircraftStore {
       try {
         await createAircraftProfile(deps.userData, input.fields, { now: deps.now, newId: () => newId });
       } catch (error) {
-        if (input.routeNetwork !== null) await deps.networkPreference.set(newId, null).catch(() => undefined);
+        if (input.routeNetwork !== null) {
+          try {
+            await deps.networkPreference.set(newId, null);
+          } catch (cleanup) {
+            orphans.add(newId); // cleared before the next save
+            throw new Error(
+              `${describeError(error)} (and the route network setting could not be cleared: ${describeError(cleanup)})`,
+            );
+          }
+        }
         throw error;
       }
     };
@@ -146,7 +179,10 @@ export function createAircraftStore(deps: AircraftDeps): AircraftStore {
 
       async routeNetworkFor(id) {
         try {
-          return await deps.networkPreference.get(id);
+          const network = await deps.networkPreference.get(id);
+          // A read that works after a failed one (Try Again) takes that failure off the screen.
+          if (get().error?.startsWith('Could not read the route network')) set({ error: null });
+          return { network };
         } catch (error) {
           set({ error: `Could not read the route network: ${describeError(error)}` });
           return null;
