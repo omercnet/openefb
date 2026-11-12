@@ -32,7 +32,18 @@ const referenceFile = (screen: string) => `reference/${referenceNames[screen] ??
 /** Captured for another reason than the gate (the native sheet probe). */
 // Captured but not compared with a SwiftUI reference: the sheet probe, M1's map-layers (no Swift counterpart), and the app screens
 // of U7/U8, whose floors are set once the Q6 reference captures land (owner decision: no floors until then).
-const NOT_GATED = ['sheet', 'map-layers', 'settings', 'onboarding', 'disclaimers'];
+const NOT_GATED = [
+  'sheet',
+  'map-layers',
+  'settings',
+  'onboarding',
+  'disclaimers',
+  'aircraft',
+  'aircraftedit',
+  'pilot',
+  'logbookentry',
+  'logbooklocked',
+];
 
 describe('fidelity gate registration', () => {
   const screens = Object.keys(thresholds.ios);

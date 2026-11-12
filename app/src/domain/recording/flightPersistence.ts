@@ -8,10 +8,11 @@
 // Differences from Swift (app/docs/port-notes/L4.md): SwiftData ModelContext becomes the data-layer repositories, file
 // deletion and the Application Support root are injected, and the airport lookup is an injected async interface.
 
-import { newFlightRecord, newLogbookEntry } from '../../data/defaults';
+import { newFlightRecord } from '../../data/defaults';
 import { RECOVERED_NOTE, TRACK_UNREADABLE_NOTE } from '../../data/models';
 import type { Db } from '../../data/db';
 import { flightRecordRepository, logbookRepository } from '../../data/repositories';
+import { createFromRecording } from '../logbook/logbook';
 import type { TrackPoint } from './types';
 import type { FlightRecordingSummary } from './recordingCoordinator';
 
@@ -130,22 +131,20 @@ export class FlightPersistenceService {
       notes: note,
     });
 
-    // LogbookViewModel.createFromRecording (ticket U7): aircraftType is filled later in the logbook edit view.
-    // TODO(U7): call the logbook module once it exists.
-    const entry = newLogbookEntry({
-      ...factory,
-      flightID: summary.flightID,
-      date: summary.startDate,
-      departureICAO: departure?.icao ?? null,
-      departureName: departure?.name ?? null,
-      arrivalICAO: arrival?.icao ?? null,
-      arrivalName: arrival?.name ?? null,
-      durationSeconds: (summary.endDate - summary.startDate) / 1000,
-      aircraftProfileID,
-      aircraftType: null,
-      pilotProfileID,
-      isConfirmed: false,
-    });
+    // aircraftType stays empty: the logbook edit view fills it later.
+    const entry = createFromRecording(
+      summary,
+      {
+        departureICAO: departure?.icao ?? null,
+        departureName: departure?.name ?? null,
+        arrivalICAO: arrival?.icao ?? null,
+        arrivalName: arrival?.name ?? null,
+        aircraftProfileID,
+        aircraftType: null,
+        pilotProfileID,
+      },
+      factory,
+    );
 
     // Saved explicitly: a kill right after stop must not lose the History row while track and audio stay. On failure the
     // recording data is untouched, so launch-time recovery rebuilds the record.

@@ -10,9 +10,8 @@ import {
   TextInput,
   View,
   type PressableProps,
-  type StyleProp,
   type TextInputProps,
-  type ViewStyle,
+  type ViewProps,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chevron } from '../Icons';
@@ -58,6 +57,7 @@ export function FormScreen({
         </View>
       </View>
       <ScrollView
+        automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: Space.xxl + insets.bottom }}
       >
@@ -81,6 +81,44 @@ function BackButton({ onPress }: { onPress: () => void }) {
   );
 }
 
+/** A bar button (Cancel, Save): a 44 pt target with accent text. */
+export function BarButton({
+  title,
+  onPress,
+  bold,
+  disabled,
+  tone = 'accent',
+  testID,
+}: {
+  title: string;
+  onPress: () => void;
+  bold?: boolean;
+  disabled?: boolean;
+  tone?: Tone;
+  testID?: string;
+}) {
+  const t = useTheme();
+  return (
+    <Pressy
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: disabled === true }}
+      disabled={disabled}
+      onPress={onPress}
+      testID={testID}
+      style={{ minWidth: 44, minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}
+    >
+      <Text
+        style={[
+          FormType.body,
+          { color: toneColor(t, tone), fontWeight: bold ? '600' : '400', opacity: disabled ? 0.4 : 1 },
+        ]}
+      >
+        {title}
+      </Text>
+    </Pressy>
+  );
+}
+
 /** A hairline between rows, inset like the row text. */
 export function Separator() {
   const t = useTheme();
@@ -94,7 +132,18 @@ export function Separator() {
 }
 
 /** Section("header") { rows } with an optional footer. Falsy children are skipped, so rows can be conditional. */
-export function FormSection({ header, footer, children }: { header?: string; footer?: string; children?: ReactNode }) {
+export function FormSection({
+  header,
+  headerDetail,
+  footer,
+  children,
+}: {
+  header?: string;
+  /** Quiet text at the right end of the header (a count). */
+  headerDetail?: string;
+  footer?: string;
+  children?: ReactNode;
+}) {
   const t = useTheme();
   const rows = Children.toArray(children);
   if (rows.length === 0) return null;
@@ -102,15 +151,21 @@ export function FormSection({ header, footer, children }: { header?: string; foo
   return (
     <View style={{ marginTop: Space.xl }}>
       {header ? (
-        <Text
-          accessibilityRole="header"
-          style={[
-            FormType.headline,
-            { fontWeight: '500', color: t.secondaryText, paddingHorizontal: textInset, paddingBottom: Space.s },
-          ]}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingHorizontal: textInset,
+            paddingBottom: Space.s,
+          }}
         >
-          {header}
-        </Text>
+          <Text accessibilityRole="header" style={[FormType.headline, { fontWeight: '500', color: t.secondaryText }]}>
+            {header}
+          </Text>
+          {headerDetail ? (
+            <Text style={[FormType.headline, { fontWeight: '500', color: t.secondaryText }]}>{headerDetail}</Text>
+          ) : null}
+        </View>
       ) : null}
       <View
         style={{
@@ -139,21 +194,10 @@ export function FormSection({ header, footer, children }: { header?: string; foo
 }
 
 /** The frame every row shares: 52 pt minimum, 20 pt text inset. Exported for rows with their own content (the pack rows). */
-export function RowFrame({
-  children,
-  style,
-  testID,
-  accessible,
-}: {
-  children: ReactNode;
-  style?: StyleProp<ViewStyle>;
-  testID?: string;
-  accessible?: boolean;
-}) {
+export function RowFrame({ children, style, ...rest }: ViewProps & { children: ReactNode }) {
   return (
     <View
-      accessible={accessible}
-      testID={testID}
+      {...rest}
       style={[
         {
           minHeight: FormMetrics.row,
@@ -172,9 +216,13 @@ export function RowFrame({
 }
 
 /** A tappable row: dims while pressed (no scale, unlike a button). */
-function RowButton({ children, ...rest }: Omit<PressableProps, 'style'> & { children: ReactNode }) {
+export function RowButton({
+  children,
+  style,
+  ...rest
+}: Omit<PressableProps, 'style'> & { children: ReactNode; style?: ViewProps['style'] }) {
   return (
-    <Pressable {...rest} style={({ pressed }) => ({ opacity: pressed ? 0.55 : 1 })}>
+    <Pressable {...rest} style={({ pressed }) => [style, { opacity: pressed ? 0.55 : 1 }]}>
       {children}
     </Pressable>
   );
@@ -364,12 +412,15 @@ export function ButtonRow({
   onPress,
   tone = 'accent',
   disabled,
+  icon,
   testID,
 }: {
   title: string;
   onPress: () => void;
   tone?: 'accent' | 'warning';
   disabled?: boolean;
+  /** The Label's symbol, drawn in the same colour (hidden from screen readers; the title says it). */
+  icon?: ReactNode;
   testID?: string;
 }) {
   const t = useTheme();
@@ -382,6 +433,15 @@ export function ButtonRow({
       testID={testID}
     >
       <RowFrame>
+        {icon ? (
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={{ opacity: disabled ? 0.4 : 1 }}
+          >
+            {icon}
+          </View>
+        ) : null}
         <Text style={[FormType.body, { color: toneColor(t, tone), opacity: disabled ? 0.4 : 1 }]}>{title}</Text>
       </RowFrame>
     </RowButton>

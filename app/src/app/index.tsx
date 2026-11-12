@@ -24,6 +24,11 @@ const LAUNCH_SCREENS = [
   'settings',
   'onboarding',
   'disclaimers',
+  'aircraft',
+  'aircraftedit',
+  'pilot',
+  'logbookentry',
+  'logbooklocked',
 ];
 
 /** The screen requested at launch without a deep link (iOS launch argument, web query), if any. */

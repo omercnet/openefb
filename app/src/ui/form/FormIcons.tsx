@@ -1,6 +1,6 @@
 // SF Symbols the forms and onboarding use that Icons.tsx does not have, redrawn as react-native-svg paths in the same style.
 import { View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { Airplane } from '../Icons';
 
 type P = { color: string; size?: number };
@@ -75,4 +75,53 @@ export const AirplaneCircle = ({ color, size = 28 }: P) => (
     </Svg>
     <Airplane color={color} />
   </View>
+);
+
+/** lock.fill (a confirmed logbook entry) */
+export const LockFill = ({ color, size = 16 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 16 16">
+    <Rect x={2.6} y={7} width={10.8} height={7.6} rx={1.8} fill={color} />
+    <Path d="M5 7V5.2C5 3.5 6.3 2.4 8 2.4S11 3.5 11 5.2V7" stroke={color} strokeWidth={1.5} {...line} />
+  </Svg>
+);
+
+/** person.circle (.title3): a head and shoulders inside a ring. */
+export const PersonCircle = ({ color, size = 28 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 28 28">
+    <Circle cx={14} cy={14} r={12.6} stroke={color} strokeWidth={1.5} fill="none" />
+    <Circle cx={14} cy={11} r={3.6} stroke={color} strokeWidth={1.5} fill="none" />
+    <Path d="M6.8 21.6C8.2 18.2 10.8 16.6 14 16.6S19.8 18.2 21.2 21.6" stroke={color} strokeWidth={1.5} {...line} />
+  </Svg>
+);
+
+/** person.badge.plus (.body): a person with a plus. */
+export const PersonPlus = ({ color, size = 24 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Circle cx={9.5} cy={7.5} r={3.6} stroke={color} strokeWidth={1.6} fill="none" />
+    <Path d="M2.8 19.6C3.8 16 6.4 14.4 9.5 14.4S13.2 15.4 14.4 17.4" stroke={color} strokeWidth={1.6} {...line} />
+    <Path d="M18.6 10.4V17.4M15.1 13.9H22.1" stroke={color} strokeWidth={1.7} {...line} />
+  </Svg>
+);
+
+/** pencil (.body) */
+export const Pencil = ({ color, size = 20 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 20 20">
+    <Path
+      d="M3 17L3.9 13.1 13.6 3.4C14.2 2.8 15.2 2.8 15.8 3.4L16.6 4.2C17.2 4.8 17.2 5.8 16.6 6.4L6.9 16.1Z"
+      stroke={color}
+      strokeWidth={1.5}
+      {...line}
+    />
+    <Path d="M12 5L15 8" stroke={color} strokeWidth={1.5} {...line} />
+  </Svg>
+);
+
+/** moon.fill (.body) */
+export const MoonFill = ({ color, size = 20 }: P) => (
+  <Svg width={size} height={size} viewBox="0 0 20 20">
+    <Path
+      d="M16.6 12.6C15.6 13 14.6 13.2 13.5 13.2 9.9 13.2 7 10.3 7 6.7 7 5.6 7.3 4.6 7.7 3.7 4.9 4.6 3 7.2 3 10.2 3 14 6 17 9.8 17 12.8 17 15.4 15.1 16.6 12.6Z"
+      fill={color}
+    />
+  </Svg>
 );

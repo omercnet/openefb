@@ -14,7 +14,7 @@ import { SettingsScreen } from './SettingsScreen';
 const STRIP_WIDTH = 400; // the SwiftUI strip (docs/DESIGN.md); the log stack's NavigationStack presents Settings inside it
 
 /** Settings and its pages sit in the leading strip column beside the map on a wide screen, as on iPad. */
-function StripFrame({ children }: { children: ReactNode }) {
+export function StripFrame({ children }: { children: ReactNode }) {
   const { width } = useWindowDimensions();
   return (
     <SafeAreaProvider>

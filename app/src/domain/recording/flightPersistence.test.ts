@@ -159,6 +159,28 @@ describe('FlightPersistence Tests', () => {
     expect(entry.isConfirmed).toBe(false);
   });
 
+  // Not a Swift case. createFromRecording moved to domain/logbook in U7b; no ported test asserts these fields of the entry.
+  test('theDraftLogbookEntryCarriesTheAircraftPilotAndAirportsOfTheFlight', async () => {
+    const f = await makeFixture();
+    const flightID = uuid();
+    await insertTrack(f, flightID, 5, 24);
+    const aircraft = uuid();
+    const pilot = uuid();
+
+    await f.service([kpao]).persist(summary(flightID, 120, 5), aircraft, pilot);
+
+    const [entry] = await f.logbookRepo.list();
+    expect(entry).toMatchObject({
+      aircraftProfileID: aircraft,
+      pilotProfileID: pilot,
+      departureICAO: 'KPAO',
+      departureName: 'KPAO',
+      arrivalICAO: 'KPAO',
+      arrivalName: 'KPAO',
+      aircraftType: null,
+    });
+  });
+
   test('stopWithNoTrackPointsDiscardsEverything', async () => {
     const f = await makeFixture();
     const result = await f.service([kpao]).persist(summary(uuid(), 5, 0), null, null);
