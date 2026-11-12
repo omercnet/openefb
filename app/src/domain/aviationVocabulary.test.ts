@@ -122,6 +122,20 @@ describe('quirks kept from Swift', () => {
     expect(process(input)).toBe(expected);
   });
 
+  // The altitude pattern has the same ordering problem: the number words list "four", "six", "seven", "eight", "nine" before
+  // "fourteen", "sixteen", ..., "niner", and nothing after the group forces a backtrack, so the short word wins and the rest of
+  // the word stays in the text. "fifteen" works because "five" does not match its start. Swift bug (same pattern), kept.
+  test.each([
+    ['climb fourteen thousand', 'climb 4teen thousand'],
+    ['descend sixteen hundred', 'descend 6teen hundred'],
+    ['at seventeen thousand', 'at 7teen thousand'],
+    ['maintain nineteen thousand five hundred', 'maintain 9teen thousand five hundred'],
+    ['maintain niner thousand', 'maintain 9r thousand'],
+    ['climb fifteen thousand', 'climb 15,000'],
+  ])('altitude words that start with a shorter number word: %s -> %s', (input, expected) => {
+    expect(process(input)).toBe(expected);
+  });
+
   test('"at" matches inside other words, so a number word after one is converted', () => {
     expect(process('that five')).toBe('that 5');
   });

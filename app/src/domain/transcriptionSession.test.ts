@@ -805,6 +805,27 @@ describe('TranscriptionSession', () => {
       expect(await stored(f)).toHaveLength(0);
     });
 
+    test('a failure the new engine reports while its start is still pending is not lost: it restarts again', async () => {
+      const f = await fixture();
+      await f.session.startTranscription(FLIGHT);
+      await endNormally(f);
+      const release = holdStart(f); // holds the restart's start open
+      await f.clock.advance(ENDED_RESTART_DELAY_MS);
+      expect(f.engine.starts).toHaveLength(2);
+
+      f.engine.sink.failure({ kind: 'transient', message: 'native start still pending' }); // the second engine's sink
+      release();
+      await flush();
+      f.engine.startGate = null;
+      await f.clock.advance(60_000);
+
+      expect(f.engine.starts.length).toBeGreaterThanOrEqual(3);
+      expect(f.session.isTranscribing).toBe(true);
+      f.engine.sink.result(final('after the second restart', 0, 1));
+      await flush();
+      expect(await stored(f)).toHaveLength(1);
+    });
+
     test('a new flight started during a restart wait takes over cleanly', async () => {
       const f = await fixture();
       await f.session.startTranscription(FLIGHT);

@@ -212,6 +212,9 @@ export class TranscriptionSession implements TranscriptionServiceLike {
 
   private async startEngine(run: Run): Promise<void> {
     run.generation += 1;
+    // From here the old engine's events are dropped by live(), so "one incident" is over: a failure the new engine reports
+    // while its start is still pending must schedule a restart of its own (it would otherwise be lost and transcription dead).
+    run.restarting = false;
     const generation = run.generation;
     const live = (): boolean => this.run === run && run.generation === generation;
     // Results that arrive while the engine is still starting use the earliest estimate of its time zero.
@@ -287,9 +290,6 @@ export class TranscriptionSession implements TranscriptionServiceLike {
         const kind = error instanceof AppFailure ? error.error.kind : null;
         const fatal = kind === 'microphonePermissionDenied' || kind === 'transcriptionUnavailable';
         return { kind: fatal ? 'fatal' : 'transient', message: error instanceof Error ? error.message : String(error) };
-      } finally {
-        // Cleared as the engine finishes starting, so a failure it reports right after is not taken for the old one.
-        run.restarting = false;
       }
     });
     if (failure !== null && this.run === run) this.handleFailure(run, failure);
