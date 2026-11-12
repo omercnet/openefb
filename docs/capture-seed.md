@@ -32,7 +32,7 @@ moves with the run.
 
 The seed replaces the six SwiftData model types and the recording database on every launch and writes no UserDefaults and no
 Keychain. Dates are offsets from the start of the run day (UTC) because the currency rules use the real clock: the dates and day
-counts below are offsets, the layout does not depend on them. Scenario `us-kpao-ksql 150` runs underneath; the page covers the map,
+counts below are offsets, the layout does not depend on them. Scenario `il-cvfr-llhz-llib-nominal 600` (region Israel) runs underneath; the page covers the map,
 and auto start is off so ReplayView (which only loads while nothing records) works.
 
 `-OpenEFBSeed capture-fresh`, used by **settings** (`-OpenEFBRoute settings`): a fresh install in Israel. Region Israel, no

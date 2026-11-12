@@ -166,9 +166,9 @@ for rec in "notices recording" "stopped recordingstopped" "stop recordingstop"; 
   shot "$IPAD" ipad "$2" us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -OpenEFBRecording "$1"
 done
 # Seeded pages (CaptureSeed: the data is listed in docs/capture-seed.md). Seeding replaces the stored rows each launch.
-shot "$IPAD" ipad settings us-kpao-ksql 150 -OpenEFBSeed capture-fresh -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute settings
+shot "$IPAD" ipad settings il-cvfr-llhz-llib-nominal 600 -OpenEFBSeed capture-fresh -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute settings
 for route in disclaimers aircraft aircraftedit pilot logbookentry logbooklocked flightdetail cvfr debrief replay replayfast; do
-  shot "$IPAD" ipad "$route" us-kpao-ksql 150 -OpenEFBSeed capture -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute "$route"
+  shot "$IPAD" ipad "$route" il-cvfr-llhz-llib-nominal 600 -OpenEFBSeed capture -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute "$route"
 done
 echo "::endgroup::"
 

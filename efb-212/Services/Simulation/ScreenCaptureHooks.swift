@@ -96,7 +96,9 @@ enum ScreenCaptureHooks {
     static func applyReplay(to viewModel: ReplayViewModel) {
         switch CaptureRouteModel.shared.route {
         case .replay: viewModel.isTranscriptPanelExpanded = true
-        case .replayfast: viewModel.selectSpeed(4)
+        case .replayfast:
+            viewModel.selectSpeed(4)
+            viewModel.isTranscriptPanelExpanded = false
         default: break
         }
     }
@@ -109,6 +111,11 @@ enum ScreenCaptureHooks {
         case "notices":
             viewModel.microphoneDenied = true
             viewModel.lastError = .audioSessionFailed(underlying: Cause())
+            // The map checks the microphone permission once it is up and clears the flag; set it again after that.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(3))
+                viewModel.microphoneDenied = true
+            }
         case "stopped":
             viewModel.lastError = .recordingFailed(underlying: Cause())
             viewModel.showDiscardedNotice = true
