@@ -70,8 +70,16 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
       notams = lookup;
       store.setState({ entries: flagged(store.getState().entries) });
     };
-    // A failed fetch leaves the list unflagged, not broken (Swift: `try? await notamFetcher()`).
-    fetchClosures().then(settle, () => settle(null));
+    // A failed fetch leaves the list unflagged, not broken (Swift: `try? await notamFetcher()`), whether it rejects or throws
+    // before returning a promise: either way the in-flight flag is released.
+    let pending: Promise<NotamClosureLookup>;
+    try {
+      pending = fetchClosures();
+    } catch {
+      settle(null);
+      return;
+    }
+    pending.then(settle, () => settle(null));
   };
 
   const queryIsrael = async (position: Coordinate) => {
@@ -109,7 +117,13 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
         if (mine !== token) return;
         // Keep stale data rather than clearing it; the next fix retries from the last good query.
         requested = succeeded;
-        store.setState({ loading: false, error: message(error) });
+        // Entries from another region are not "the last good list" for this one: clear them and forget the success so
+        // the next fix requeries.
+        if (succeeded && succeeded.region !== region) {
+          succeeded = null;
+          requested = null;
+          store.setState({ entries: [], loading: false, error: message(error) });
+        } else store.setState({ loading: false, error: message(error) });
       }
     },
     setQueries(next) {

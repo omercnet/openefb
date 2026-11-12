@@ -55,7 +55,10 @@ describe('fidelity gate registration', () => {
     // A screen whose SwiftUI reference arrives with Q6 (#48) says so in both platforms' floors and is not gated until then.
     const pending = [thresholds.ios[screen], thresholds.android[screen]].map((e) => e?.referencePending === true);
     expect(pending[0]).toBe(pending[1]);
-    expect(existsSync(join(root, referenceFile(screen))) || pending[0]).toBe(true);
+    const hasReference = existsSync(join(root, referenceFile(screen)));
+    expect(hasReference || pending[0]).toBe(true);
+    // The flag is only for a missing reference: once the file lands the entry must drop it, or a missing capture passes.
+    expect(hasReference && pending[0]).toBe(false);
   });
 
   it('gates everything it captures, except the sheet probe', () => {

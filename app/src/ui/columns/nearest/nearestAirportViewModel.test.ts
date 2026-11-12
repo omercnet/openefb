@@ -198,6 +198,22 @@ describe('refresh policy', () => {
     expect(icaos(store.getState())[0]).toBe('KPAO');
   });
 
+  test("a failure after a region change clears the other region's list and the next fix requeries", async () => {
+    const israel = {
+      nearestAerodromes: jest.fn().mockRejectedValue(new Error('israel database missing')),
+      searchAerodromes: jest.fn().mockResolvedValue([]),
+    };
+    const store = nearest.make(EMPTY);
+    const refresher = createNearestRefresher(store, { ...defaultAirportQueries, israel });
+    await refresher.update(FIXTURE_OWNSHIP, 'us');
+    expect(store.getState().entries.length).toBeGreaterThan(0);
+    await refresher.update(FIXTURE_OWNSHIP, 'israel'); // same spot, other region, fails
+    expect(store.getState().entries).toEqual([]); // never US airports listed as the Israeli nearest
+    expect(store.getState().error).toBe('israel database missing');
+    await refresher.update(FIXTURE_OWNSHIP, 'israel'); // same spot again: retried
+    expect(israel.nearestAerodromes).toHaveBeenCalledTimes(2);
+  });
+
   test('a slow earlier query never overwrites a later one', async () => {
     const slow = deferred();
     const query = jest.fn(createFakeAviationDatabase().nearestAirports);

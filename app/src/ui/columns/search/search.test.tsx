@@ -1,6 +1,7 @@
 // SearchViewModel behaviour (debounce, minimum length, region, failures) and the request token, plus render tests for
 // SearchColumn: autofocus, typing to results, selecting, the searching / no-match / failed states.
 import { act } from 'react';
+import { AccessibilityInfo } from 'react-native';
 import { callHandler, press, render } from '../../../../tests/support/ui';
 import type { Airport as AviationAirport } from '../../../data/aviation/types';
 import type { Region } from '../../../domain/core';
@@ -103,6 +104,18 @@ describe('SearchViewModel', () => {
     expect(last().failed).toBe(false);
   });
 
+  test('a new valid query drops the old results at once and shows the pending state', async () => {
+    const { s, last, icaos } = harness(fake.searchAirports);
+    s.setQuery('KPAO');
+    await jest.advanceTimersByTimeAsync(300);
+    expect(icaos()).toEqual(['KPAO']);
+    s.setQuery('KSQL');
+    expect(icaos()).toEqual([]); // during the debounce the KPAO row is not selectable
+    expect(last()).toMatchObject({ isSearching: true, failed: false });
+    await jest.advanceTimersByTimeAsync(300);
+    expect(icaos()).toEqual(['KSQL']);
+  });
+
   test('a late rejection of a superseded search changes nothing', async () => {
     const slow = Promise.withResolvers<AviationAirport[]>();
     const query = jest.fn(fake.searchAirports);
@@ -164,6 +177,28 @@ describe('SearchColumn', () => {
     await callHandler(field(v), 'onChangeText', text);
     await tick(300);
   };
+
+  it("a region change drops the old region's rows and searches the same query in the new region", async () => {
+    const region = regionSlice.make({ region: 'us' });
+    const v = await mount(defaultAirportQueries, undefined, region);
+    await type(v, 'KPAO');
+    expect(v.all((n) => n.props?.testID === 'search-result-KPAO')).toHaveLength(1);
+    await act(async () => region.setState({ region: 'israel' }));
+    await tick(300);
+    // The default Israel queries have no aerodrome database: failed, never the US rows left selectable.
+    expect(v.all((n) => n.props?.testID === 'search-result-KPAO')).toHaveLength(0);
+  });
+
+  it('announces the no-results state (iOS explicitly, Android through a polite live region)', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const v = await mount();
+    await type(v, 'ZZZZ');
+    const note = v.all((n) => n.props?.testID === 'search-no-results')[0]!;
+    expect(note.props.accessibilityLiveRegion).toBe('polite');
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('No airports match ZZZZ');
+    announce.mockRestore();
+  });
 
   it('matches the reference when empty: title, focused field, no rows', async () => {
     const v = await mount();

@@ -86,6 +86,8 @@ export function createAirportSearch(store: StoreApi<SearchState>, sources: Searc
       return;
     }
     const mine = token;
+    // The old results answer another query (or region): never selectable while this one is pending.
+    set({ results: [], failed: false, isSearching: true });
     timer = setTimeout(() => {
       set({ isSearching: true });
       runSearch(query).then(
@@ -124,6 +126,8 @@ interface Controller {
    * they caused is cleared at once. A fresh object around the same databases changes nothing.
    */
   use(sources: Sources): void;
+  /** The region changed: the shown results belong to the old one, so drop them and search the same query in the new one. */
+  regionChanged(): void;
 }
 
 const controllers = new WeakMap<StoreApi<SearchState>, Controller>();
@@ -145,6 +149,7 @@ function controllerFor(store: StoreApi<SearchState>): Controller {
         store.setState({ failed: false });
         controller!.search.search();
       },
+      regionChanged: () => controller!.search.search(),
     };
     controllers.set(store, controller);
   }
@@ -165,8 +170,13 @@ export function useAirportSearch() {
   const store = searchSlice.useStoreApi();
   const queries = useContext(AirportQueriesContext);
   const region = regionSlice.useStoreApi();
-  const { search, use } = controllerFor(store);
+  const { search, use, regionChanged } = controllerFor(store);
   useEffect(() => use({ queries, region }), [use, queries, region]);
+  // The region slice is a separate store: watch it, since the sources above do not change when only the region does.
+  useEffect(
+    () => region.subscribe((next, prev) => (next.region !== prev.region ? regionChanged() : undefined)),
+    [region, regionChanged],
+  );
   const state = searchSlice.useData((s) => s);
   return { ...state, setQuery: search.setQuery, submit: search.search, clear: search.clear };
 }

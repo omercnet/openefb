@@ -1,7 +1,8 @@
 // SearchColumnView (efb-212/Views/Log/SearchColumnView.swift): airport search in the strip column, a search field focused
 // when the column opens and 60pt result rows. Selecting a result hands its identifier to `onSelect` and clears the search;
 // closing the column keeps the query and results (the search lives in `searchSlice`).
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { useEffect } from 'react';
+import { AccessibilityInfo, ActivityIndicator, Platform, ScrollView, Text, View } from 'react-native';
 import type { Airport } from '../../domain/core';
 import { SearchBar } from '../components/Components';
 import { ColumnRule, Pressy, useTheme } from '../Primitives';
@@ -49,11 +50,19 @@ export function SearchColumn({
     );
   } else if (isSearchableQuery(search.query.trim())) {
     body = (
-      <Text testID="search-no-results" style={caption}>
+      // Android announces it through the live region; iOS has none, so an effect announces it (below).
+      <Text testID="search-no-results" accessibilityLiveRegion="polite" style={caption}>
         {`No airports match \u201C${search.query}\u201D`}
       </Text>
     );
   }
+  const noResults =
+    !search.isSearching && !search.failed && search.results.length === 0 && isSearchableQuery(search.query.trim());
+  const noResultsText = `No airports match ${search.query}`;
+  useEffect(() => {
+    // Focus stays in the field, so the empty state is announced when it begins (iOS; Android has the live region).
+    if (noResults && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(noResultsText);
+  }, [noResults, noResultsText]);
   return (
     <View style={{ flex: 1, backgroundColor: t.paper }}>
       <ColumnHeader>

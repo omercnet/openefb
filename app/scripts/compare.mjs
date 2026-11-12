@@ -111,7 +111,7 @@ if (gate) {
     if (metric !== 'strip' && metric !== 'frame') { console.error(`compare: ${gate} ${screen}: unknown metric '${metric}' (strip or frame)`); process.exit(2); }
     const got = r ? r[metric].ssim : null;
     // "referencePending": the SwiftUI reference is not in the repo yet (Q6 / PR #48): no gate until it lands and the entry is dropped.
-    if (t.referencePending && !r) return { screen, metric, floor, target: t.min, ssim: null, pass: true, pending: true };
+    if (t.referencePending && !r && !referenceFor(`${screen}.png`)) return { screen, metric, floor, target: t.min, ssim: null, pass: true, pending: true };
     return { screen, metric, floor, target: t.min, ssim: got, pass: got !== null && got >= floor };
   });
   for (const v of verdicts) {

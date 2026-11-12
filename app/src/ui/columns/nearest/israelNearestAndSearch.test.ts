@@ -248,6 +248,18 @@ describe('Israel NRST and Search Tests', () => {
     expect(store.getState().error).toBeNull();
   });
 
+  test('aNotamFetchThatThrowsBeforeReturningAPromiseLeavesTheListUnflaggedAndNoError', async () => {
+    const notams = jest.fn((): Promise<NotamClosureLookup> => {
+      throw new Error('synchronous failure');
+    });
+    const { store, update } = viewModel({ notams });
+    await update(here);
+    await flush();
+    expect(notams).toHaveBeenCalledTimes(1);
+    expect(store.getState().entries).toHaveLength(3);
+    expect(store.getState().error).toBeNull(); // not reported as an airport refresh failure
+  });
+
   // MARK: - Search
 
   function search(region: () => Region) {

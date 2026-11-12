@@ -119,8 +119,18 @@ describe('NearestColumn', () => {
     expect(appStore.getState()).toMatchObject({ selectedAirportId: 'KOAK', stripColumn: 'airport' });
   });
 
-  it('empty list: says no landable airport is in range, and why', async () => {
+  it('no position yet: waits for the first fix instead of claiming nothing is in range', async () => {
     const v = await mount(base({ entries: [], ownship: null })).view;
+    expect(v.text()).toContain('Waiting for position');
+    expect(v.text()).not.toContain('No landable airport');
+  });
+
+  it('empty list: says no landable airport is in range, and why', async () => {
+    const none: AirportQueries = {
+      ...defaultAirportQueries,
+      aviation: { ...defaultAirportQueries.aviation, nearestAirports: async () => [] },
+    };
+    const v = await mount(base({ entries: [], ownship: { lat: 37.4876, lon: -122.2289 } }), undefined, none).view;
     expect(v.text()).toContain('No landable airport in range');
     expect(v.text()).toContain('runways under 1500 ft are not listed');
     expect(v.all((n) => n.props?.testID?.startsWith?.('Direct '))).toHaveLength(0);

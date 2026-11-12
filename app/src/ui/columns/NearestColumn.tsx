@@ -31,6 +31,7 @@ export function NearestColumn({ onDirectTo, onAirportTap = appStore.getState().s
   const t = useTheme();
   const { entries, loading, error, region } = useNearestAirports();
   const storeDirectTo = nearest.useData((s) => s.directTo);
+  const ownship = nearest.useData((s) => s.ownship);
   const directTo = (airport: Airport) => {
     (onDirectTo ?? storeDirectTo)(airport);
     appStore.getState().setStripColumn('log');
@@ -59,6 +60,9 @@ export function NearestColumn({ onDirectTo, onAirportTap = appStore.getState().s
         <ActivityIndicator color={t.inkSecondary} />
       </View>
     );
+  } else if (entries.length === 0 && ownship === null) {
+    // No position yet, so nothing has been queried: not the same as an empty result.
+    body = <Unavailable title="Waiting for position" detail="The list appears with the first GPS fix." />;
   } else if (entries.length === 0) {
     body = (
       <Unavailable
