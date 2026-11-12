@@ -1,6 +1,5 @@
 // Port of efb-212Tests/ServiceTests/IsraelChartFeaturesTests.swift (all four suites). Same names, inputs and expected
-// values. The closure cases run the chart builder on closure-mapper output; `mapClosuresStandIn` below mirrors
-// IsraelNotamClosureMapper.map (L3) until that port is on main. One case (AppState region switch) is moved; see
+// values. The closure cases run the chart builder on the real L3 closure mapper (`mapClosures`). One case (AppState region switch) is moved; see
 // docs/port-notes/M1-israel.md.
 import {
   AIRSPACE_KINDS,
@@ -24,6 +23,8 @@ import {
   isLayerAvailable,
   regionSupports,
 } from '../../core';
+import type { IsraelRouteClosure } from '../../israel/notamTypes';
+import { mapClosures, type IsraelRouteSegmentLookup } from '../../israel/closureMapper';
 import { airspaceDetails, limitDetail, pointDetail, referenceNote } from './chartDetails';
 import {
   aerodromeLabel,
@@ -43,8 +44,6 @@ import {
   israelClosureSet,
   type IsraelChartClosureMark,
   type IsraelChartClosureSet,
-  type IsraelClosureMatchInput,
-  type IsraelRouteClosureInput,
   type IsraelAltitudeLimitInput,
   type IsraelAvailableAltitudeInput,
 } from './closures';
@@ -254,7 +253,7 @@ describe('Israel CVFR chart features', () => {
   const closure = (
     chain: string[],
     o: { kind?: string; validFrom?: number; validTo?: number; id?: string } = {},
-  ): IsraelRouteClosureInput => ({
+  ): IsraelRouteClosure => ({
     notamId: o.id ?? 'C1/26',
     routeKind: o.kind ?? 'CVFR',
     routeName: null,
@@ -269,35 +268,24 @@ describe('Israel CVFR chart features', () => {
     segments: [segment(10, 'GALIM', 'DAROM'), segment(11, 'DAROM', 'HOTRM')],
   };
 
-  /** Mirror of IsraelNotamClosureMapper.map(_:using:at:) over IsraelChartNetwork (L3 owns the real one). */
-  function mapClosuresStandIn(closures: readonly IsraelRouteClosureInput[], at: number): IsraelClosureMatchInput[] {
+  /** Swift `closures(from: report(closures:scrapedAgo:), network:, now:)`; null closures = absent feed. Uses the real mapper. */
+  async function closures(list: IsraelRouteClosure[] | null, scrapedAgoSeconds = 0): Promise<IsraelChartClosureSet> {
+    if (list === null) return israelClosureSet(null, [], now);
     const codes = new Set(network.points.map((p) => p.code.toUpperCase()));
     const find = (a: string, b: string) =>
       network.segments.find(
         (s) => s.fromCode.toUpperCase() === a.toUpperCase() && s.toCode.toUpperCase() === b.toUpperCase(),
-      );
-    return closures
-      .filter((c) => !(c.validFrom !== null && at < c.validFrom) && !(c.validTo !== null && at > c.validTo))
-      .map((c) => {
-        const segments: IsraelRouteSegment[] = [];
-        for (let i = 0; i + 1 < c.chain.length; i += 1) {
-          const [a, b] = [c.chain[i]!, c.chain[i + 1]!];
-          if (!codes.has(a.toUpperCase()) || !codes.has(b.toUpperCase())) continue;
-          const s = find(a, b) ?? find(b, a);
-          if (s && !segments.includes(s)) segments.push(s);
-        }
-        return { closure: c, segments };
-      });
+      ) ?? null;
+    const lookup: IsraelRouteSegmentLookup<IsraelRouteSegment> = {
+      knowsPoint: (code) => codes.has(code.toUpperCase()),
+      segment: (from, to) => find(from, to) ?? find(to, from),
+    };
+    const mapping = await mapClosures(list, lookup, now, (s) => s.id);
+    return israelClosureSet({ generatedAt: now - scrapedAgoSeconds * 1000 }, mapping.matches, now);
   }
 
-  /** Swift `closures(from: report(closures:scrapedAgo:), network:, now:)`; null closures = absent feed. */
-  function closures(list: IsraelRouteClosureInput[] | null, scrapedAgoSeconds = 0): IsraelChartClosureSet {
-    if (list === null) return israelClosureSet(null, [], now);
-    return israelClosureSet({ generatedAt: now - scrapedAgoSeconds * 1000 }, mapClosuresStandIn(list, now), now);
-  }
-
-  test('freshClosureMarksTheClosedSegmentWithItsValidity', () => {
-    const set = closures([closure(['GALIM', 'DAROM'])], 300);
+  test('freshClosureMarksTheClosedSegmentWithItsValidity', async () => {
+    const set = await closures([closure(['GALIM', 'DAROM'])], 300);
     expect(set.freshness).toBe('fresh');
     expect([...set.marks.keys()].sort((a, b) => a - b)).toEqual([10]);
     const mark = set.marks.get(10);
@@ -305,38 +293,38 @@ describe('Israel CVFR chart features', () => {
     expect(mark?.text).toBe('CLSD to 11:20Z');
   });
 
-  test('closureEndingOnAnotherUTCDayShowsTheDate', () => {
+  test('closureEndingOnAnotherUTCDayShowsTheDate', async () => {
     const tomorrow = now + 86_400_000;
-    const set = closures([closure(['GALIM', 'DAROM'], { validTo: tomorrow })], 60);
+    const set = await closures([closure(['GALIM', 'DAROM'], { validTo: tomorrow })], 60);
     expect(set.marks.get(10)?.text).toBe('CLSD to 2 Nov 09:20Z');
   });
 
-  test('staleFeedDrawsNoClosuresAtAll', () => {
+  test('staleFeedDrawsNoClosuresAtAll', async () => {
     // 7 h since the relay scraped the IAA: past the 6 h NOTAM expiry.
-    const set = closures([closure(['GALIM', 'DAROM'])], 7 * 3600);
+    const set = await closures([closure(['GALIM', 'DAROM'])], 7 * 3600);
     expect(set.marks.size).toBe(0);
     expect(set.freshness).toBe('expired');
     expect(set.generatedAt).not.toBeNull(); // the panel still shows how old it is
   });
 
-  test('oldButNotExpiredFeedDrawsClosuresAndSaysHowOldTheDataIs', () => {
-    const set = closures([closure(['GALIM', 'DAROM'])], 2 * 3600);
+  test('oldButNotExpiredFeedDrawsClosuresAndSaysHowOldTheDataIs', async () => {
+    const set = await closures([closure(['GALIM', 'DAROM'])], 2 * 3600);
     expect(set.freshness).toBe('old');
     const text = set.marks.get(10)?.text;
     expect(text).toBeDefined();
     expect(text!.endsWith('(data 2h00m old)')).toBe(true);
   });
 
-  test('absentFeedDrawsNothing', () => {
-    const set = closures(null);
+  test('absentFeedDrawsNothing', async () => {
+    const set = await closures(null);
     expect(set.marks.size).toBe(0);
     expect(set.generatedAt).toBeNull();
   });
 
-  test('expiredAndOtherNetworkClosuresAreNotDrawn', () => {
+  test('expiredAndOtherNetworkClosuresAreNotDrawn', async () => {
     const ended = closure(['GALIM', 'DAROM'], { validFrom: now - 7200_000, validTo: now - 60_000 });
     const helicopter = closure(['DAROM', 'HOTRM'], { kind: 'HEL' });
-    const set = closures([ended, helicopter], 60);
+    const set = await closures([ended, helicopter], 60);
     expect(set.marks.size).toBe(0);
   });
 
@@ -378,7 +366,7 @@ describe('Israel CVFR chart features', () => {
       raw?: string;
       id?: string;
     } = {},
-  ): IsraelRouteClosureInput => ({
+  ): IsraelRouteClosure => ({
     notamId: o.id ?? 'C1/26',
     routeKind: o.kinds?.[0] ?? 'CVFR',
     routeName: null,
@@ -404,16 +392,16 @@ describe('Israel CVFR chart features', () => {
     direction: 'BIDIRECTIONAL',
   };
 
-  test('partialClosureIsAmberAndLabelledWithItsAltitudes', () => {
+  test('partialClosureIsAmberAndLabelledWithItsAltitudes', async () => {
     const c = conditional({ closed: [closedAt2500], available: [openAt3000], partial: true, parsed: true });
-    const mark = closures([c], 60).marks.get(10);
+    const mark = await (await closures([c], 60)).marks.get(10);
     expect(mark?.severity).toBe('partial');
     expect(mark?.text).toBe('CLSD 2500 \u00B7 AVBL 3000');
   });
 
-  test('exceptionsAloneReadClsdExcAndTheExceptionTextGoesToTheTapSheet', () => {
+  test('exceptionsAloneReadClsdExcAndTheExceptionTextGoesToTheTapSheet', async () => {
     const c = conditional({ exceptions: ['PPR FLT FM IAF'], partial: true, parsed: true });
-    const mark = closures([c], 60).marks.get(10);
+    const mark = await (await closures([c], 60)).marks.get(10);
     expect(mark).toBeDefined();
     expect(mark!.text).toBe('CLSD EXC');
     expect(mark!.notes).toEqual(['EXC PPR FLT FM IAF']);
@@ -423,15 +411,15 @@ describe('Israel CVFR chart features', () => {
     ).toBe(true);
   });
 
-  test('unreadClosureWithAChainIsAmberCheckNotamWithItsClause', () => {
+  test('unreadClosureWithAChainIsAmberCheckNotamWithItsClause', async () => {
     const c = conditional({ parsed: false, raw: 'CVFR RTE CLSD AT 2,500 METRES ALFAB-BRAVO' });
-    const mark = closures([c], 60).marks.get(10);
+    const mark = await (await closures([c], 60)).marks.get(10);
     expect(mark?.severity).toBe('check');
     expect(mark?.text).toBe('CHECK NOTAM');
     expect(mark?.notes[mark.notes.length - 1]).toBe('CVFR RTE CLSD AT 2,500 METRES ALFAB-BRAVO');
   });
 
-  test('aFullClosureOutranksPartialAndUnreadOnTheSameSegment', () => {
+  test('aFullClosureOutranksPartialAndUnreadOnTheSameSegment', async () => {
     const partial = conditional({ closed: [closedAt2500], partial: true, parsed: true, id: 'C1/26' });
     const full = conditional({ id: 'C2/26' });
     const unread = conditional({ parsed: false, id: 'C3/26' });
@@ -440,18 +428,18 @@ describe('Israel CVFR chart features', () => {
       [full, partial, unread],
       [unread, partial, full],
     ]) {
-      const set = closures(order, 60);
+      const set = await closures(order, 60);
       expect(set.marks.get(10)?.severity).toBe('full');
       expect(set.marks.get(10)?.notamID).toBe('C2/26');
     }
     // and an unread closure outranks a partial one
-    expect(closures([partial, unread], 60).marks.get(10)?.severity).toBe('check');
+    expect((await closures([partial, unread], 60)).marks.get(10)?.severity).toBe('check');
   });
 
-  test('onlyClosuresThatCoverCVFRAffectTheChart', () => {
+  test('onlyClosuresThatCoverCVFRAffectTheChart', async () => {
     const both = conditional({ chain: ['GALIM', 'DAROM'], kinds: ['HEL', 'CVFR'] });
     const heliOnly = conditional({ chain: ['DAROM', 'HOTRM'], kinds: ['ULTRALIGHT', 'HEL'] });
-    expect([...closures([both, heliOnly], 60).marks.keys()]).toEqual([10]);
+    expect([...(await closures([both, heliOnly], 60)).marks.keys()]).toEqual([10]);
   });
 
   // MARK: Tap sheets
