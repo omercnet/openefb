@@ -1,15 +1,25 @@
-import { act } from 'react';
-import { render } from '../../../tests/support/ui';
+import { act, useEffect } from 'react';
+import { DeviceEventEmitter, Dimensions, Platform, StyleSheet, View } from 'react-native';
+import { ancestorProp, press, render, type Rendered } from '../../../tests/support/ui';
 import { EMPTY_SEARCH, searchSlice } from '../columns/search/search';
 import { appStore } from '../state/appStore';
+import { panels } from '../state/panels';
 import { MapScreen } from './MapScreen';
 
-// The real provider waits for native insets; the library's mock reports them at once. The map is a native view.
+// The real provider waits for native insets; the library's mock reports them at once. The map is a native view: a
+// stand-in marks where it is mounted (called at render time, after this module has run).
 jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
-jest.mock('../map/MapSurface', () => ({ MapSurface: () => null }));
+jest.mock('../map/MapSurface', () => ({ MapSurface: () => <MockMapSurface /> }));
+let mapMounts = 0;
+const MockMapSurface = () => {
+  useEffect(() => {
+    mapMounts += 1;
+  }, []);
+  return <View testID="map-surface" />;
+};
 // scenarioFeed reads the surface's status holder, which imports the native MapLibre module.
 jest.mock('../../adapters/glyphInstall', () => ({
   useLocalGlyphs: () => ({ status: 'ready', url: 'file:///g/{fontstack}/{range}.pbf' }),
@@ -19,6 +29,23 @@ jest.mock('../map/mapStatus', () => ({ getCurrentMapStatus: () => null }));
 jest.mock('react-native/Libraries/Settings/Settings', () => ({ __esModule: true, default: { get: () => undefined } }));
 // The aviation database is a native asset; the screen only opens it in the background.
 jest.mock('../../adapters/aviationDb', () => ({ openAviationDatabase: () => new Promise(() => undefined) }));
+
+/** Resize the window, as a rotation or a Split View change does (useWindowDimensions follows it). */
+let mockIsPad = false;
+Object.defineProperty(Platform, 'isPad', { configurable: true, get: () => mockIsPad });
+const setWindow = (width: number, height: number, isPad = false) =>
+  act(async () => {
+    mockIsPad = isPad;
+    const size = { width, height, scale: 3, fontScale: 1 };
+    Dimensions.set({ window: size, screen: size });
+  });
+const IPHONE = [402, 874] as const; // iPhone 17 Pro portrait, points
+const IPHONE_LANDSCAPE = [874, 402] as const; // the same phone rotated
+const IPHONE_MAX_LANDSCAPE = [956, 440] as const; // iPhone 17 Pro Max rotated: a regular size class in UIKit
+const IPAD = [1032, 1376] as const; // 13" iPad Pro portrait, the references' device
+
+const has = (view: Rendered, testID: string) => view.all((n) => n.props?.testID === testID).length > 0;
+const width = (view: Rendered, testID: string) => StyleSheet.flatten(view.byTestId(testID).props.style)?.width;
 
 const hasBackButton = (view: Awaited<ReturnType<typeof render>>) =>
   view.all((n) => n.props?.testID === 'column-back-to-log').length > 0;
@@ -67,5 +94,140 @@ describe('MapScreen', () => {
     await render(<MapScreen screen="layers" />);
     unsubscribe();
     expect(seen).toEqual(['layers']);
+  });
+});
+
+describe('MapScreen layouts (U5)', () => {
+  const panelsDefault = panels.store.getState();
+  beforeEach(async () => {
+    appStore.setState({ stripColumn: 'log', selectedAirportId: null });
+    panels.store.setState(panelsDefault, true);
+    await setWindow(...IPAD, true);
+  });
+  afterAll(async () => {
+    panels.store.setState(panelsDefault, true);
+    await setWindow(...IPAD, true);
+  });
+
+  it('a regular window: the 400 pt strip beside the chart, no rail', async () => {
+    const view = await render(<MapScreen />);
+    expect(has(view, 'compact-map-layout')).toBe(false);
+    expect(has(view, 'flight-log-above-now')).toBe(true);
+    expect(has(view, 'map-surface')).toBe(true);
+  });
+
+  it('an iPhone: header, the 104 pt rail beside the chart, NOW and the full-width footer under it', async () => {
+    await setWindow(...IPHONE);
+    const view = await render(<MapScreen />);
+    expect(has(view, 'compact-map-layout')).toBe(true);
+    expect(has(view, 'flight-log-above-now')).toBe(false);
+    expect(width(view, 'flight-log-rail')).toBe(104);
+    expect(has(view, 'map-surface')).toBe(true);
+    expect(has(view, 'flight-log-now')).toBe(true);
+    expect(width(view, 'GPS status')).toBe(76);
+    expect(width(view, 'NRST')).toBe(402 - 3 * 60 - 4 - 76);
+    // Glyph-only record control in the header.
+    expect(view.text()).not.toContain('00:00:06');
+    expect(view.text()).toContain('DIRECT KOAK');
+  });
+
+  it('an iPhone in landscape keeps the compact layout (Swift: compact size class), at the rotated width', async () => {
+    await setWindow(...IPHONE_LANDSCAPE);
+    const view = await render(<MapScreen />);
+    expect(has(view, 'compact-map-layout')).toBe(true);
+    expect(has(view, 'flight-log-above-now')).toBe(false);
+    expect(width(view, 'flight-log-rail')).toBe(104);
+    expect(width(view, 'GPS status')).toBe(76);
+    expect(width(view, 'NRST')).toBe(874 - 3 * 60 - 4 - 76);
+  });
+
+  it('an iPhone Plus or Max in landscape is a regular size class in UIKit: the strip layout', async () => {
+    await setWindow(...IPHONE_MAX_LANDSCAPE);
+    const view = await render(<MapScreen />);
+    expect(has(view, 'compact-map-layout')).toBe(false);
+    expect(has(view, 'flight-log-above-now')).toBe(true);
+  });
+
+  it('rotating a phone does not remount the map', async () => {
+    await setWindow(...IPHONE);
+    mapMounts = 0;
+    const view = await render(<MapScreen />);
+    expect(mapMounts).toBe(1);
+    await setWindow(...IPHONE_LANDSCAPE);
+    expect(has(view, 'compact-map-layout')).toBe(true);
+    await setWindow(...IPHONE);
+    expect(has(view, 'compact-map-layout')).toBe(true);
+    expect(mapMounts).toBe(1);
+  });
+
+  it('an iPad in landscape keeps the strip layout', async () => {
+    await setWindow(1376, 1032, true);
+    const view = await render(<MapScreen />);
+    expect(has(view, 'compact-map-layout')).toBe(false);
+    expect(has(view, 'flight-log-above-now')).toBe(true);
+  });
+
+  it.each(['ios', 'android'] as const)('on %s the compact layout pads for the software keyboard', async (os) => {
+    jest.replaceProperty(Platform, 'OS', os);
+    await setWindow(...IPHONE);
+    const view = await render(<MapScreen />);
+    expect(ancestorProp(view.byTestId('NRST'), 'behavior')).toBe('padding');
+    jest.restoreAllMocks();
+  });
+
+  it('the compact footer drops the home-indicator padding while the keyboard covers it', async () => {
+    await setWindow(...IPHONE);
+    const view = await render(<MapScreen />);
+    const nrst = () => StyleSheet.flatten(view.byTestId('NRST').props.style);
+    const before = nrst().paddingBottom;
+    expect(before).toBeGreaterThan(0);
+    await act(async () => DeviceEventEmitter.emit('keyboardWillShow', {}));
+    expect(nrst().paddingBottom).toBe(0);
+    await act(async () => DeviceEventEmitter.emit('keyboardWillHide', {}));
+    expect(nrst().paddingBottom).toBe(before);
+  });
+
+  it('follows a resize across the threshold', async () => {
+    const view = await render(<MapScreen />);
+    expect(has(view, 'compact-map-layout')).toBe(false);
+    await setWindow(...IPHONE);
+    expect(has(view, 'compact-map-layout')).toBe(true);
+    await setWindow(...IPAD, true);
+    expect(has(view, 'compact-map-layout')).toBe(false);
+  });
+
+  it('an opened column covers the area above NOW; NOW and the footer stay, the covered views leave the a11y tree', async () => {
+    await setWindow(...IPHONE);
+    const view = await render(<MapScreen />);
+    await press(view.byTestId('NRST'));
+    expect(appStore.getState().stripColumn).toBe('nearest');
+    expect(has(view, 'compact-column')).toBe(true);
+    expect(has(view, 'column-back-to-log')).toBe(true);
+    expect(has(view, 'flight-log-now')).toBe(true);
+    expect(has(view, 'NRST')).toBe(true);
+    expect(has(view, 'map-surface')).toBe(true);
+    const covered = view.all((n) => n.props?.importantForAccessibility === 'no-hide-descendants');
+    expect(covered.some((n) => n.queryAll((c) => c.props?.testID === 'flight-log-rail').length > 0)).toBe(true);
+    await press(view.byTestId('column-back-to-log'));
+    expect(has(view, 'compact-column')).toBe(false);
+  });
+
+  it('flight log hidden on a regular window: the compact layout at full width, no rail, the time-to in the header', async () => {
+    panels.store.setState({ showsFlightLog: false });
+    const view = await render(<MapScreen />);
+    expect(has(view, 'compact-map-layout')).toBe(true);
+    expect(has(view, 'flight-log-rail')).toBe(false);
+    expect(view.text()).toContain('DIRECT KOAK \u00B7 9:12');
+    // Not a compact window: the record control keeps its elapsed time.
+    expect(view.text()).toContain('00:00:06');
+    expect(width(view, 'GPS status')).toBe(76);
+  });
+
+  it('instruments hidden: no NOW cell, Clear moves to the header', async () => {
+    await setWindow(...IPHONE);
+    panels.store.setState({ showsInstruments: false });
+    const view = await render(<MapScreen />);
+    expect(has(view, 'flight-log-now')).toBe(false);
+    expect(view.byTestId('clear-direct-to').props.accessibilityLabel).toBe('Clear DIRECT KOAK');
   });
 });

@@ -5,7 +5,9 @@ import { Day } from '../tokens';
 import {
   ZoomStepper,
   monoFitScale,
+  monoWrapFit,
   runMapAction,
+  wrapMono,
   gpsText,
   gpsTint,
   nearestAccessibilityText,
@@ -101,6 +103,39 @@ describe('monoFitScale', () => {
     expect(monoFitScale(12, 15, 78, 0.7)).toBeCloseTo(78 / 108);
     expect(monoFitScale(13, 15, 78, 0.7)).toBe(0.7);
     expect(monoFitScale(0, 15, 78, 0.7)).toBe(1);
+  });
+});
+
+describe('wrapMono', () => {
+  it('wraps at spaces, greedily', () => {
+    expect(wrapMono('GPS LOST 14 S', 7)).toEqual(['GPS', 'LOST 14', 'S']);
+    expect(wrapMono('GPS LOST 14 S', 13)).toEqual(['GPS LOST 14 S']);
+    expect(wrapMono('GPS  3D', 3)).toEqual(['GPS', '3D']);
+  });
+
+  it('breaks a word longer than a line', () => {
+    expect(wrapMono('A ABCDEFG B', 3)).toEqual(['A', 'ABC', 'DEF', 'G B']);
+  });
+});
+
+describe('monoWrapFit (the compact GPS cell: 46 pt of text, lineLimit 2, minimumScaleFactor 0.7)', () => {
+  it('wraps at full size when two lines hold the text', () => {
+    expect(monoWrapFit('GPS 3D', 15, 46, 2, 0.7)).toEqual({ scale: 1, lines: ['GPS', '3D'] });
+    expect(monoWrapFit('GPS DEGR', 15, 46, 2, 0.7)).toEqual({ scale: 1, lines: ['GPS', 'DEGR'] });
+  });
+
+  it('shrinks to the largest scale at which the lines fit', () => {
+    // 5 glyphs fit a line at 15 pt (9 pt each); on one line "GPS 3D" needs 6 (scale 46 / 54), "AB CDEF" 7 (46 / 63).
+    expect(monoWrapFit('GPS 3D', 15, 46, 1, 0.7)).toEqual({ scale: 46 / 54, lines: ['GPS 3D'] });
+    expect(monoWrapFit('AB CDEF', 15, 46, 1, 0.7)).toEqual({ scale: 46 / 63, lines: ['AB CDEF'] });
+  });
+
+  it('cuts the last line with an ellipsis when even the floor is too large', () => {
+    expect(monoWrapFit('GPS LOST 14 S', 15, 46, 2, 0.7)).toEqual({ scale: 0.7, lines: ['GPS', 'LOST 1\u2026'] });
+  });
+
+  it('a room too small for one glyph keeps the text at the floor', () => {
+    expect(monoWrapFit('GPS', 15, 2, 2, 0.7)).toEqual({ scale: 0.7, lines: ['GPS'] });
   });
 });
 
