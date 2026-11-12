@@ -84,6 +84,7 @@ type Respond = (url: string) => ScriptedReply;
 interface Rig {
   fs: MemoryFileSystem;
   urls: string[];
+  maxBytes: (number | undefined)[];
   respond: { current: Respond };
   fetchUrls: string[];
   info: { current: () => StubReply };
@@ -92,6 +93,7 @@ interface Rig {
 
 function rig(initial: Respond, fs = new MemoryFileSystem()): Rig {
   const urls: string[] = [];
+  const maxBytes: (number | undefined)[] = [];
   const respond = { current: initial };
   const info = { current: (): StubReply => ({ body: infoJSON }) };
   const fetchUrls: string[] = [];
@@ -101,11 +103,13 @@ function rig(initial: Respond, fs = new MemoryFileSystem()): Rig {
   });
   const downloader = new ScriptedDownloader(fs, (req) => {
     urls.push(req.url);
+    maxBytes.push(req.maxBytes);
     return respond.current(req.url);
   });
   return {
     fs,
     urls,
+    maxBytes,
     respond,
     fetchUrls,
     info,
@@ -431,4 +435,25 @@ test('the XML reader decodes entities and CDATA, skips comments, and rejects mal
   ]) {
     expect(() => parseXml(bad, noop)).toThrow(XmlError);
   }
+});
+
+// Review follow-ups (PR #51)
+
+test('requests carry a byte limit, an oversized metafile is refused before it is read, and an oversized body is removed', async () => {
+  const r = rig(faaResponder);
+  const size = r.fs.size.bind(r.fs);
+  r.fs.size = (path: string) => (path.includes('.download-') ? 5 * 1024 * 1024 * 1024 : size(path)); // 5 GiB temp file
+  let read = false;
+  const readText = r.fs.readText.bind(r.fs);
+  r.fs.readText = async (path: string) => {
+    if (path.includes('.download-')) read = true;
+    return readText(path);
+  };
+  await expect(r.service().charts(airport('KPAO'))).rejects.toBeInstanceOf(AppFailure);
+  expect(read).toBe(false);
+  expect(r.maxBytes[0]).toBeGreaterThan(0);
+
+  const pdf = rig(() => ({ status: 200, body: pdfBytes }));
+  await pdf.service().pdfPath(makeTerminalChart('APD', 'A', '09216AD.PDF', '2611'));
+  expect(pdf.maxBytes[0]).toBeGreaterThan(0);
 });

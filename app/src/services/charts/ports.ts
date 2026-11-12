@@ -35,6 +35,14 @@ export class CancelledError extends Error {
   }
 }
 
+/** A download body went past `maxBytes`. */
+export class ResponseTooLargeError extends Error {
+  constructor(readonly maxBytes: number) {
+    super(`response larger than ${maxBytes} bytes`);
+    this.name = 'ResponseTooLargeError';
+  }
+}
+
 export interface DownloadRequest {
   url: string;
   /** File to write. */
@@ -43,6 +51,9 @@ export interface DownloadRequest {
    * the range) replaces it from the start. */
   rangeStart: number;
   signal?: AbortSignal;
+  /** The most bytes the destination may hold. A body that would exceed it is cut off, the destination is removed, and the
+   * download rejects with ResponseTooLargeError (not a transport failure: callers do not retry it). */
+  maxBytes?: number;
   /** Total bytes now in `destination`, reported as they arrive. */
   onBytes?: (totalBytes: number) => void;
 }

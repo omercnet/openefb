@@ -1,6 +1,7 @@
 // ChartFileSystem (services/charts/ports) over expo-file-system. Native only; not covered by Jest (no device), so the
 // device checks (I3) own it: hashing speed on a real MBTiles pack, folder moves, and backup exclusion.
 import { Directory, File, FileMode, Paths } from 'expo-file-system';
+import { joinPath } from '../services/charts/pathJoin';
 import type { ChartFileSystem } from '../services/charts/ports';
 import type { Sha256 } from '../services/charts/sha256';
 
@@ -16,7 +17,7 @@ function assertInside(path: string): void {
 const isDirectory = (path: string): boolean => new Directory(path).exists;
 
 export const chartFileSystem: ChartFileSystem = {
-  join: (...parts) => parts.join('/').replace(/([^:])\/{2,}/g, '$1/'),
+  join: joinPath,
   exists(path) {
     assertInside(path);
     return new File(path).exists || isDirectory(path);

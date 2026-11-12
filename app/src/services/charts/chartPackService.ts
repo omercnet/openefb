@@ -24,7 +24,7 @@ import {
   type ChartManifestFile,
   type ChartPackInstalled,
 } from './manifest';
-import { CancelledError, type ChartFileSystem, type FileDownloader } from './ports';
+import { CancelledError, ResponseTooLargeError, type ChartFileSystem, type FileDownloader } from './ports';
 import { Sha256 } from './sha256';
 
 export const ISRAEL_CVFR_PRODUCT = 'israel-cvfr';
@@ -352,8 +352,11 @@ export class ChartPackService implements ChartPackServiceLike {
     }
     checkCancelled();
 
+    // Final commit: remove the old copy, move the verified stage into place, write the record. An abort before the record is
+    // written never installs: the stage is put back (kept for resume) and the call rejects.
     const finalDir = this.editionDir(manifest.edition);
     await fs.remove(finalDir).catch(() => undefined);
+    checkCancelled();
     await fs.move(stage, finalDir);
     await fs.excludeFromBackup?.(finalDir).catch(() => undefined); // re-downloadable
 
@@ -364,6 +367,10 @@ export class ChartPackService implements ChartPackServiceLike {
       files: manifest.files.map((f) => ({ name: f.name, bytes: f.bytes, sha256: f.sha256.toLowerCase() })),
       installedAtMs: this.now(),
     };
+    if (signal.aborted) {
+      await fs.move(finalDir, stage).catch(() => undefined);
+      throw new CancelledError();
+    }
     await fs.writeText(fs.join(this.productDir, 'installed.json'), JSON.stringify(record));
     // One edition on disk: drop every other one now that the new one verified.
     for (const entry of await fs.list(this.productDir)) {
@@ -441,10 +448,15 @@ export class ChartPackService implements ChartPackServiceLike {
         destination,
         rangeStart: existing,
         signal,
+        maxBytes: file.bytes,
         onBytes,
       }));
     } catch (error) {
       if (error instanceof CancelledError || signal.aborted) throw new CancelledError();
+      if (error instanceof ResponseTooLargeError) {
+        await fs.remove(destination).catch(() => undefined); // never keep an oversized body
+        throw new AppFailure({ kind: 'chartDownloadFailed', region });
+      }
       throw new AppFailure({ kind: 'networkUnavailable' });
     }
     if (status !== 200 && status !== 206) throw new AppFailure({ kind: 'chartDownloadFailed', region });

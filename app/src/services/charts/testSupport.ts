@@ -1,6 +1,12 @@
 // In-memory file system and scripted downloader for the chart and terminal-procedure tests. No disk, no network.
 import { createHash } from 'crypto';
-import { CancelledError, type ChartFileSystem, type DownloadRequest, type FileDownloader } from './ports';
+import {
+  CancelledError,
+  ResponseTooLargeError,
+  type ChartFileSystem,
+  type DownloadRequest,
+  type FileDownloader,
+} from './ports';
 import type { Sha256 } from './sha256';
 
 export const bytesOf = (text: string): Uint8Array => new TextEncoder().encode(text);
@@ -103,6 +109,15 @@ export class ScriptedDownloader implements FileDownloader {
     const reply = await this.handler(request, this.requests.length);
     if (request.signal?.aborted) throw new CancelledError();
     const body = reply.body ?? new Uint8Array();
+    if (
+      (reply.status === 200 || reply.status === 206) &&
+      request.maxBytes !== undefined &&
+      body.length + (reply.status === 206 ? (this.fs.files.get(request.destination)?.length ?? 0) : 0) >
+        request.maxBytes
+    ) {
+      this.fs.files.delete(request.destination);
+      throw new ResponseTooLargeError(request.maxBytes);
+    }
     if (reply.status === 200) {
       this.fs.put(request.destination, body);
       request.onBytes?.(body.length);
