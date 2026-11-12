@@ -4,7 +4,7 @@
 // loop, so the React child count is fixed (one source per registry source, one layer per spec) whatever is on screen.
 // The surface is presentational: data comes from MapDataController (hooks in useMapData.ts), camera moves from the
 // camera reducer, and navigation is wired by I1.
-import { Camera, GeoJSONSource, Images, Layer, Map, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
+import { Camera, GeoJSONSource, ImageSource, Images, Layer, Map, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Coordinate, MapLayer, Region } from '../../domain/core';
 import type { CameraCommand } from '../../domain/map/camera';
@@ -12,6 +12,7 @@ import { EMPTY_COLLECTION, type FeatureCollection } from '../../domain/map/geojs
 import { isLayerVisible, type LayerSpec, type StyleValue } from '../../domain/map/layerSpec';
 import { OWNSHIP_LIVE_ICON, OWNSHIP_STALE_ICON, TRACK_RULER_TICK_ICON } from '../../domain/map/layers';
 import { isTileFailureLog } from '../../domain/map/tileLog';
+import { DIAGRAM_IMAGE_SOURCE_IDS, type DiagramImageSource } from '../../domain/diagram/layers';
 import { PROBED_LAYERS, useMapStatus } from './mapStatus';
 import { groupBySource, resolveLayerProps, styleFor, type LayerOverrides } from './surfaceModel';
 
@@ -40,6 +41,8 @@ export interface MapSurfaceProps {
   sources: Readonly<Record<string, FeatureCollection>>;
   /** Per-layer overrides that win over the toggle and the spec paint (the official Israel chart base uses them). */
   overrides?: LayerOverrides;
+  /** Image sources by id (airport diagram slots); a slot id without an entry renders nothing. */
+  imageSources?: Readonly<Record<string, DiagramImageSource>>;
   initialView: { center: Coordinate; zoom: number };
   /** Applied when `seq` changes; null means no pending move. */
   camera: { seq: number; command: CameraCommand | null };
@@ -77,6 +80,7 @@ export function MapSurface({
   layers,
   sources,
   overrides,
+  imageSources,
   initialView,
   camera,
   onViewChange,
@@ -193,20 +197,34 @@ export function MapSurface({
         }}
         onImageMissing={(e) => reporter.addMissingImage(e.nativeEvent.image)}
       />
-      {groups.map((g) => (
-        <GeoJSONSource key={g.source} id={g.source} data={sources[g.source] ?? EMPTY_COLLECTION}>
-          {g.specs.map((spec) => (
-            <LayerFromSpec
-              key={spec.id}
-              spec={spec}
-              night={night}
-              visible={isLayerVisible(spec, visibleLayers, region)}
-              visibilityOverride={overrides?.visibility[spec.id]}
-              paintOverride={overrides?.paint[spec.id]}
-            />
-          ))}
-        </GeoJSONSource>
-      ))}
+      {groups.map((g) => {
+        const layers = g.specs.map((spec) => (
+          <LayerFromSpec
+            key={spec.id}
+            spec={spec}
+            night={night}
+            visible={isLayerVisible(spec, visibleLayers, region)}
+            visibilityOverride={overrides?.visibility[spec.id]}
+            paintOverride={overrides?.paint[spec.id]}
+          />
+        ));
+        if (DIAGRAM_IMAGE_SOURCE_IDS.includes(g.source)) {
+          const img = imageSources?.[g.source];
+          const [tl, tr, br, bl] = img?.coordinates ?? [];
+          if (!img || !tl || !tr || !br || !bl) return null;
+          // Keyed by url: a slot reused for another airport remounts, as the native source id and image are fixed at mount.
+          return (
+            <ImageSource key={`${g.source}:${img.url}`} id={g.source} url={img.url} coordinates={[tl, tr, br, bl]}>
+              {layers}
+            </ImageSource>
+          );
+        }
+        return (
+          <GeoJSONSource key={g.source} id={g.source} data={sources[g.source] ?? EMPTY_COLLECTION}>
+            {layers}
+          </GeoJSONSource>
+        );
+      })}
     </Map>
   );
 }
