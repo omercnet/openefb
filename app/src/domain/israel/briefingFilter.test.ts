@@ -1,6 +1,6 @@
 // Port of efb-212Tests/ServiceTests/IsraelBriefingFilterTests.swift: flight window, distance, aerodrome filters and the
-// closures-first order. Not ported here: the BriefingTimeFormat cases (Views/Briefing, U4) and the
-// IsraelBriefingGeometry case (IsraelBriefingMapHighlight, M1); see docs/port-notes/L3b.md.
+// closures-first order. The BriefingTimeFormat cases (Views/Briefing, U4) and the IsraelBriefingGeometry case
+// (IsraelBriefingMapHighlight) are in ui/sheets/briefing/logic.test.ts.
 import { makeActiveRoute, makeLeg } from '../route/activeRoute';
 import {
   briefingDistanceNM,

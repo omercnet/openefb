@@ -19,6 +19,8 @@ const LAUNCH_SCREENS = [
   'selftest',
   'sheet',
   'ota',
+  'briefing',
+  'israel-plan',
 ];
 
 /** The screen requested at launch without a deep link (iOS launch argument, web query), if any. */
