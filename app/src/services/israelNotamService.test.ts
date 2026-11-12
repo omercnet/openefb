@@ -517,3 +517,22 @@ test('a body read that fails offline is networkUnavailable, not undecodable', as
     error: { kind: 'networkUnavailable' },
   });
 });
+
+test('requests A, B, A: the second A joins the first A, and an older A cannot replace a newer feed', async () => {
+  let url = 'https://a.example/notams.json';
+  const releases: Record<string, (r: StubReply) => void> = {};
+  const fetch = fakeFetch((u): Promise<StubReply> => new Promise((resolve) => (releases[u] = resolve)));
+  const service = new IsraelNotamService({ fetch, feedUrl: () => url });
+  const a1 = service.fetchFeed();
+  url = 'https://b.example/notams.json';
+  const b = service.fetchFeed();
+  url = 'https://a.example/notams.json';
+  const a2 = service.fetchFeed(); // joins a1 instead of starting a second A download
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(fetch.calls.map((c) => c.url)).toEqual(['https://a.example/notams.json', 'https://b.example/notams.json']);
+  releases['https://b.example/notams.json']({ body: feedJSON('2026-11-01T11:00:00.000Z') });
+  releases['https://a.example/notams.json']({ body: feedJSON('2026-11-01T12:00:00.000Z') });
+  const [ra1, , ra2] = await Promise.all([a1, b, a2]);
+  expect(ra2).toBe(ra1);
+});

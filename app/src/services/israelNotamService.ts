@@ -64,8 +64,8 @@ export class IsraelNotamService implements IsraelNotamServiceLike {
   /** The feed URL the in-memory copy came from: a copy is only reused for its own source. */
   private cachedUrl: string | null = null;
   private latestUrl: string | null = null;
-  private inFlightUrl: string | null = null;
-  private inFlight: Promise<IsraelNotamReport> | null = null;
+  /** One download per feed URL: a call for a URL joins that URL's download, whatever was requested in between. */
+  private readonly inFlight = new Map<string, Promise<IsraelNotamReport>>();
   private writeChain: Promise<void> = Promise.resolve();
   private readonly now: Clock;
 
@@ -87,15 +87,12 @@ export class IsraelNotamService implements IsraelNotamServiceLike {
       return cached;
     }
     // JS-only: callers that arrive while a download runs join it instead of starting another.
-    if (this.inFlight && this.inFlightUrl === url) return this.inFlight;
+    const running = this.inFlight.get(url);
+    if (running) return running;
     const run: Promise<IsraelNotamReport> = this.refresh(url).finally(() => {
-      if (this.inFlight === run) {
-        this.inFlight = null;
-        this.inFlightUrl = null;
-      }
+      if (this.inFlight.get(url) === run) this.inFlight.delete(url);
     });
-    this.inFlight = run;
-    this.inFlightUrl = url;
+    this.inFlight.set(url, run);
     return run;
   }
 
