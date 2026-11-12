@@ -29,4 +29,4 @@
   while geometry still draws (Swift rendered labels to local sprites). The fix is a bundled glyph pack (Noto Sans PBF ranges
   referenced from `glyphs` in base-style.json, also used by the street layer and offline packs), which is an asset and
   base-style change shared with the whole map, not an Israel-only edit. Tracked for the offline follow-up (M3 downloads the
-  street pack with glyphs, so labels work offline once a street pack is downloaded).
+  street pack with its glyph ranges, which may cover these labels offline; UNVERIFIED on a device).
