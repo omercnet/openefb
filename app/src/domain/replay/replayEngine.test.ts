@@ -307,6 +307,88 @@ describe('ReplayEngine loadFlight atomicity', () => {
     expect(engine.trackPointCount).toBe(0);
   });
 
+  describe('the audio player of the previous flight', () => {
+    const player = () => {
+      const stops = { n: 0 };
+      return {
+        stops,
+        player: {
+          currentTime: 0,
+          rate: 1,
+          volume: 1,
+          isPlaying: true,
+          play() {},
+          pause() {},
+          stop() {
+            stops.n += 1;
+          },
+        } as unknown as ReplayAudioPlayer,
+      };
+    };
+
+    test('is stopped when a new flight brings its own', async () => {
+      const engine = new ReplayEngine(noTimer);
+      const first = player();
+      const second = player();
+      await engine.loadFlight('a', makeTestStore(), first.player);
+      await engine.loadFlight('b', makeTestStore(), second.player);
+      expect(first.stops.n).toBe(1);
+      expect(second.stops.n).toBe(0);
+    });
+
+    test('is stopped and detached when the new flight has no audio, so it cannot be played against the new track', async () => {
+      const engine = new ReplayEngine(noTimer);
+      const first = player();
+      await engine.loadFlight('a', makeTestStore(), first.player);
+      await engine.loadFlight('b', makeTestStore(), null);
+      expect(first.stops.n).toBe(1);
+      engine.seekTo(2);
+      engine.play();
+      expect(first.player.currentTime).toBe(0); // no longer driven
+    });
+
+    test('is left alone when the same player is loaded again', async () => {
+      const engine = new ReplayEngine(noTimer);
+      const first = player();
+      await engine.loadFlight('a', makeTestStore(), first.player);
+      await engine.loadFlight('a', makeTestStore(), first.player);
+      expect(first.stops.n).toBe(0);
+    });
+
+    test('is kept when the load fails, is superseded, or its audio cannot prepare', async () => {
+      const engine = new ReplayEngine(noTimer);
+      const first = player();
+      await engine.loadFlight('a', makeTestStore(), first.player);
+      const failing: ReplayStore = { ...emptyStore, trackPoints: () => Promise.reject(new Error('boom')) };
+      await expect(engine.loadFlight('b', failing, player().player)).rejects.toThrow('boom');
+      const bad = {
+        prepare() {
+          throw new Error('prep');
+        },
+      } as unknown as ReplayAudioPlayer;
+      await expect(engine.loadFlight('c', emptyStore, bad)).rejects.toThrow('prep');
+      expect(first.stops.n).toBe(0);
+    });
+
+    test('a player that throws on stop does not fail the load', async () => {
+      const engine = new ReplayEngine(noTimer);
+      const throwing = {
+        currentTime: 0,
+        rate: 1,
+        volume: 1,
+        isPlaying: false,
+        play() {},
+        pause() {},
+        stop() {
+          throw new Error('native');
+        },
+      } as unknown as ReplayAudioPlayer;
+      await engine.loadFlight('a', makeTestStore(), throwing);
+      await expect(engine.loadFlight('b', makeTestStore(), null)).resolves.toBeUndefined();
+      expect(engine.trackPointCount).toBe(10);
+    });
+  });
+
   test('a throwing audio prepare leaves the previous flight intact', async () => {
     const engine = new ReplayEngine(noTimer);
     await engine.loadFlight('a', makeTestStore(), null);
