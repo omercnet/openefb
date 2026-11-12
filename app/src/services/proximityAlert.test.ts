@@ -243,3 +243,22 @@ test('circle airspaces, short centres and unlimited ceilings', () => {
     nearestDistance: Number.MAX_VALUE,
   });
 });
+
+// Review follow-up (PR #54)
+test('TFR alerts computed while an airspace lookup is running are kept when the lookup answers', async () => {
+  let release: (a: Airspace[]) => void = () => undefined;
+  const slow: AirspaceSource = { airspaces: () => new Promise<Airspace[]>((resolve) => (release = resolve)) };
+  const service = new ProximityAlertService({ source: slow });
+  const pending = service.checkProximity({ lat: 47.875, lon: -97.42 }, 8000, t0);
+  service.checkTFRProximity({ lat: 47.875, lon: -97.42 }, joinedFixtureTFRs(), utc('2026-10-30T12:00:00Z'));
+  expect(service.activeAlerts.filter((a) => a.type === 'tfr')).toHaveLength(2);
+  release([]); // the airspace answer arrives after the TFR check
+  await pending;
+  expect(service.activeAlerts.filter((a) => a.type === 'tfr')).toHaveLength(2);
+  // Swift parity afterwards: the next airspace check replaces the list until the next TFR check.
+  release = () => undefined;
+  const next = service.checkProximity({ lat: 47.875, lon: -97.42 }, 8000, t0 + 11_000);
+  release([]);
+  await next;
+  expect(service.activeAlerts.filter((a) => a.type === 'tfr')).toHaveLength(0);
+});

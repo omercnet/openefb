@@ -251,3 +251,22 @@ export function pirepBoundingBox(around: { lat: number; lon: number }, radiusNM:
   const maxLon = Math.min(around.lon + dLon, 180);
   return [minLat, minLon, maxLat, maxLon].map((v) => v.toFixed(3)).join(',');
 }
+
+/** Bounding boxes `minLat,minLon,maxLat,maxLon` enclosing a `radiusNM` circle, split at the antimeridian: one box normally, two when
+ * the circle crosses +-180 (a single clamped box would silently drop in-radius reports on the far side). A circle that reaches a
+ * pole or spans more than the globe's width is one whole-longitude box. */
+export function pirepBoundingBoxes(around: { lat: number; lon: number }, radiusNM: number): string[] {
+  const dLat = radiusNM / 60;
+  const cosLat = Math.max(Math.cos((around.lat * Math.PI) / 180), 0.01);
+  const dLon = radiusNM / (60 * cosLat);
+  const minLat = Math.max(around.lat - dLat, -90);
+  const maxLat = Math.min(around.lat + dLat, 90);
+  const fmt = (a: number, b: number, c: number, d: number) => [a, b, c, d].map((v) => v.toFixed(3)).join(',');
+  if (dLon >= 180) return [fmt(minLat, -180, maxLat, 180)];
+  const lon = ((((around.lon + 180) % 360) + 360) % 360) - 180; // 190 is -170
+  const west = lon - dLon;
+  const east = lon + dLon;
+  if (west < -180) return [fmt(minLat, -180, maxLat, east), fmt(minLat, west + 360, maxLat, 180)];
+  if (east > 180) return [fmt(minLat, west, maxLat, 180), fmt(minLat, -180, maxLat, east - 360)];
+  return [fmt(minLat, west, maxLat, east)];
+}

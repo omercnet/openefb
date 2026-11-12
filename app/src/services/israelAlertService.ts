@@ -160,6 +160,10 @@ export class IsraelAlertService {
 
     await this.loadDatabaseIfNeeded();
     this.refreshClosuresIfNeeded(nowMs);
+    // Swift rebuilds the marks synchronously at every evaluation: wait for them, so an expired or aged-out closure is never
+    // raised from the previous evaluation's marks.
+    await this.rebuildMarks(nowMs);
+    if (epoch !== this.epoch) return;
 
     const database = this.database;
     let current: IsraelAlert[] = this.guarded('closure alerts', () => closureAlerts(fix.route, this.closureMarks));
@@ -303,7 +307,7 @@ export class IsraelAlertService {
   }
 
   /** Fetch the NOTAM feed in the background; the marks are rebuilt at every evaluation so a feed that ages past the NOTAM
-   * limit stops raising closures. Marks computed here show at the next evaluation. */
+   * limit stops raising closures. This only starts the fetch; `update` then awaits `rebuildMarks`. */
   private refreshClosuresIfNeeded(nowMs: number): void {
     const fetcher = this.options.notamFetcher;
     if (
@@ -324,7 +328,6 @@ export class IsraelAlertService {
         }
       })();
     }
-    void this.rebuildMarks(nowMs);
   }
 
   private async rebuildMarks(nowMs: number): Promise<void> {

@@ -125,7 +125,10 @@ export class TfrService implements TfrServiceLike {
     this.details = next;
 
     const missing = stale.length - fetched.size;
-    if (missing > 0) this.options.log?.(`${missing} TFR NOTAM details unavailable; altitudes/times shown as See NOTAM`);
+    if (missing > 0)
+      this.options.log?.(
+        `${missing} TFR NOTAM details unavailable (new ones show See NOTAM; a changed one keeps its previous detail, as Swift does)`,
+      );
 
     const tfrs = joinTfrs(features, new Map([...next].map(([id, c]) => [id, c.detail])));
     return { tfrs, fetchedAt: this.now() };

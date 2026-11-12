@@ -55,3 +55,14 @@ kept, plus 3 JS-only tests. Differences:
 - Mutation check: removing the epoch check after the database answer, the throttle reopen, the load-slot identity clear, the airspace
   try/catch or the onRaised try/catch each fails a test. The earlier epoch check after the database open was redundant (the later one
   already drops the result) and was removed.
+
+## Review follow-ups (PR #54)
+
+- Closure marks are rebuilt and awaited at the start of every evaluation (Swift rebuilds them synchronously there), so an expired or
+  aged-out closure is never raised from the previous evaluation's marks, including the first fix after a reset or suspend.
+- TFR alerts computed while an airspace lookup is running are merged into that lookup's result (JS-only: the async lookup can
+  finish after `checkTFRProximity`). Afterwards the Swift behaviour applies: the next airspace check replaces the list until the
+  next TFR check.
+- Declined, Swift parity: a fix rejected by the 5 s throttle does not invalidate an in-flight evaluation. Swift evaluates
+  synchronously, so no evaluation is ever "in flight"; invalidating on every fix would starve publication whenever the database
+  takes longer than the fix interval. The staleness is bounded by one lookup (milliseconds).

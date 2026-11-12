@@ -445,3 +445,30 @@ test('a throwing rule is logged and the other alerts still show', async () => {
   expect(logs.some((l) => l.includes('border alerts failed'))).toBe(true);
   expect(s.alerts.some((a) => a.id === 'squawk')).toBe(true);
 });
+
+// Review follow-ups (PR #54)
+
+test('closure alerts come from the marks of this evaluation: an expired closure is not raised from the previous marks', async () => {
+  const state = { closed: true };
+  const closureMarks: ClosureMarkBuilder = async () =>
+    new Map(
+      state.closed ? [[5, { notamID: 'X', text: 'CLSD', schedule: null, severity: 'full' as const, notes: [] }]] : [],
+    );
+  const s = service({}, { closureMarks });
+  const route = makeActiveRoute([
+    makeLeg({
+      segmentID: 5,
+      fromCode: 'A',
+      toCode: 'B',
+      toLatitude: 32.3,
+      toLongitude: 34.9,
+      altitudeText: '',
+      distanceNM: 1,
+    }),
+  ]);
+  await fix(s, outside, t0, { route });
+  expect(s.alerts.some((a) => a.kind === 'closure')).toBe(true);
+  state.closed = false; // the closure ended (or the feed aged out)
+  await fix(s, outside, t0 + 30_000, { route }); // past the hold time: nothing should keep it up
+  expect(s.alerts.some((a) => a.kind === 'closure')).toBe(false);
+});

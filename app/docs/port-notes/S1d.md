@@ -52,3 +52,13 @@ Tests (names kept; Swift fixtures are read in place with `swiftFixtures.ts`, no 
 - Batch METAR fetch loses only the failed batch; results order is fresh-cached, then fetched, then stale fallbacks.
 - A WFS feature with a non-polygon geometry, fewer than 3 vertices or no NOTAM key is skipped, not an error.
 - A winds-aloft bulletin is not served from cache once its FOR USE window has ended, even inside 30 minutes of the fetch.
+
+## Review follow-ups (PR #54)
+
+- PIREP queries split at the antimeridian (`pirepBoundingBoxes`: two requests, results merged and de-duplicated). Swift clamps the
+  longitudes and so drops in-radius reports across +-180 (a Swift bug fixed here as a safety guard; `pirepBoundingBox` keeps the
+  Swift clamp for parity tests).
+- Declined, Swift parity: when a NOTAM's `LAST_MODIFICATION_DATETIME` changes and its detail refetch fails, the previous detail is
+  kept (Swift `details[id]` survives a failed refetch), so superseded altitude/time limits can show until the next successful
+  refresh. Only the log wording was corrected. If the owner wants "See NOTAM" instead (drop the cached detail when its stamp no
+  longer matches), it is a one-line change in `TfrService.refresh`; flagged as an owner decision.

@@ -7,6 +7,7 @@ import {
   parsePireps,
   pirepAltitudeText,
   pirepBoundingBox,
+  pirepBoundingBoxes,
   pirepIcingSummary,
   pirepId,
   pirepIsUrgent,
@@ -268,4 +269,36 @@ test('a report with a non-object clouds entry or a boolean number is parsed with
   expect(p.clouds).toEqual([]);
   expect(p.temperature).toBeNull();
   expect(p.altitude).toBe(8500);
+});
+
+// Review follow-ups (PR #54): the antimeridian
+test('a circle that crosses the antimeridian is queried as two boxes and one box otherwise', () => {
+  const east = pirepBoundingBoxes({ lat: -17.7, lon: 179.9 }, 60); // Fiji
+  expect(east).toHaveLength(2);
+  const [a, b] = east.map((s) => s.split(',').map(Number));
+  expect(a[3]).toBe(180);
+  expect(b[1]).toBe(-180);
+  expect(b[3]).toBeLessThan(-178);
+  const west = pirepBoundingBoxes({ lat: 52, lon: -179.9 }, 60);
+  expect(west).toHaveLength(2);
+  expect(west[0].split(',').map(Number)[1]).toBe(-180);
+  expect(west[1].split(',').map(Number)[3]).toBe(180);
+  expect(pirepBoundingBoxes(kden, 60)).toHaveLength(1);
+  expect(pirepBoundingBoxes({ lat: 89.9, lon: 0 }, 600)).toEqual(['79.900,-180.000,90.000,180.000']);
+});
+
+test('a report on the far side of the antimeridian is found, and one returned by both boxes appears once', async () => {
+  const t = 1_800_000_000;
+  const entry = (lon: number, raw: string) =>
+    `{"obsTime":${t - 300},"acType":"C172","lat":-17.7,"lon":${lon},"fltLvl":85,"fltLvlType":"OTHER","pirepType":"PIREP","rawOb":"${raw}"}`;
+  const fetch = fakeFetch(() => ({ body: `[${entry(-179.95, 'FAR SIDE')},${entry(179.95, 'NEAR SIDE')}]` }));
+  const near = { lat: -17.7, lon: 179.9 };
+  const pireps = await new PirepService({ fetch, now: () => t * 1000 }).fetchPireps(near, 60, 7200);
+  expect(fetch.calls).toHaveLength(2);
+  expect(pireps.map((p) => p.rawText).sort()).toEqual(['FAR SIDE', 'NEAR SIDE']); // both boxes returned both: deduped
+});
+
+test('a longitude outside -180..180 is wrapped before the boxes are built', () => {
+  expect(pirepBoundingBoxes({ lat: 0, lon: 190 }, 60)).toEqual(pirepBoundingBoxes({ lat: 0, lon: -170 }, 60));
+  expect(pirepBoundingBoxes({ lat: 0, lon: -540.5 }, 60)).toEqual(pirepBoundingBoxes({ lat: 0, lon: 179.5 }, 60));
 });

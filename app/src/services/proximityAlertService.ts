@@ -30,6 +30,10 @@ export class ProximityAlertService {
 
   private lastCheckMs: number | null = null;
   private checkSeq = 0;
+  /** A lookup is running (the latest one). */
+  private lookupPending = false;
+  /** TFR alerts computed while that lookup was running: merged into its result so a late airspace answer cannot drop them. */
+  private tfrDuringLookup: ProximityAlert[] | null = null;
   private readonly now: Clock;
   private readonly listeners = new Set<() => void>();
   private version = 0;
@@ -66,11 +70,13 @@ export class ProximityAlertService {
     if (this.lastCheckMs !== null && (nowMs - this.lastCheckMs) / 1000 < PROXIMITY_CHECK_INTERVAL_SECONDS) return;
     this.lastCheckMs = nowMs;
     const seq = ++this.checkSeq;
+    this.lookupPending = true;
+    this.tfrDuringLookup = null;
     try {
       const nearby = await this.options.source.airspaces(position, PROXIMITY_LOOKUP_RADIUS_NM);
       if (seq !== this.checkSeq) return;
       const result = airspaceAlerts(position, altitude, nearby);
-      this.activeAlerts = result.alerts;
+      this.activeAlerts = [...result.alerts, ...(this.tfrDuringLookup ?? [])];
       this.isInAirspace = result.alerts.some((a) => a.distance <= 0 && (a.type === 'tfr' || a.vertical === 'within'));
       this.nearestAirspaceDistance = result.nearestDistance;
       this.checkUnavailable = false;
@@ -78,18 +84,25 @@ export class ProximityAlertService {
       if (seq !== this.checkSeq) return;
       this.options.log?.(`Airspace proximity check failed: ${error instanceof Error ? error.message : String(error)}`);
       // Old alerts describe an earlier position, so they are cleared; the failure is shown, never silent.
-      this.activeAlerts = [];
+      this.activeAlerts = [...(this.tfrDuringLookup ?? [])];
       this.isInAirspace = false;
       this.nearestAirspaceDistance = null;
       this.checkUnavailable = true;
+    } finally {
+      if (seq === this.checkSeq) {
+        this.lookupPending = false;
+        this.tfrDuringLookup = null;
+      }
     }
     this.changed();
   }
 
   /** Check TFR proximity separately (called when TFR data is available); merged with the airspace alerts. */
   checkTFRProximity(position: { lat: number; lon: number }, tfrs: readonly Tfr[], nowMs: number = this.now()): void {
+    const tfr = tfrAlerts(position, tfrs, nowMs);
+    if (this.lookupPending) this.tfrDuringLookup = tfr;
     const airspace = this.activeAlerts.filter((a) => a.type === 'airspace');
-    this.activeAlerts = [...airspace, ...tfrAlerts(position, tfrs, nowMs)];
+    this.activeAlerts = [...airspace, ...tfr];
     this.changed();
   }
 }
