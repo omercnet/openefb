@@ -11,6 +11,7 @@
 import Testing
 import Foundation
 import GRDB
+import SwiftData
 @testable import efb_212
 
 @Suite("Screen capture hooks", .serialized)
@@ -76,8 +77,39 @@ struct ScreenCaptureHooksTests {
         #expect(!state.isAutoStartEnabled)
     }
 
-    @Test func captureSeedProfilesAreKnown() {
-        #expect(CaptureSeed.profiles == ["capture", "capture-fresh"])
+    private func seed(_ profile: String) throws -> ModelContext {
+        let container = try ModelContainer(
+            for: SchemaV1.AircraftProfile.self, SchemaV1.PilotProfile.self, SchemaV1.UserSettings.self,
+            SchemaV1.FlightPlanRecord.self, SchemaV1.FlightRecord.self, SchemaV1.LogbookEntry.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("capture-seed-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        let audio = tmp.appendingPathComponent("recordings")
+        try FileManager.default.createDirectory(at: audio, withIntermediateDirectories: true)
+        try Data().write(to: audio.appendingPathComponent("stale.m4a"))
+        let db = try RecordingDatabase(dbPool: try DatabasePool(path: tmp.appendingPathComponent("r.sqlite").path))
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try CaptureSeed.run(profile: profile, container: container, recordingDB: db, audioDirectory: audio)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: audio.path).isEmpty)
+        let flights = try db.flightIDsWithRecordedData().count
+        #expect(flights == (profile == "capture" ? 1 : 0))
+        return container.mainContext
+    }
+
+    @Test func captureSeedFillsTheDocumentedData() throws {
+        let ctx = try seed("capture")
+        #expect(try ctx.fetch(FetchDescriptor<SchemaV1.AircraftProfile>()).map(\.nNumber).sorted() == ["4X-ABC", "N172KF", "N28PA"])
+        #expect(try ctx.fetch(FetchDescriptor<SchemaV1.PilotProfile>()).count == 1)
+        #expect(try ctx.fetch(FetchDescriptor<SchemaV1.FlightRecord>()).count == 1)
+        #expect(try ctx.fetch(FetchDescriptor<SchemaV1.LogbookEntry>()).count == 2)
+    }
+
+    @Test func captureFreshLeavesNothingBehind() throws {
+        let ctx = try seed("capture-fresh")
+        #expect(try ctx.fetch(FetchDescriptor<SchemaV1.AircraftProfile>()).isEmpty)
+        #expect(try ctx.fetch(FetchDescriptor<SchemaV1.PilotProfile>()).isEmpty)
+        #expect(try ctx.fetch(FetchDescriptor<SchemaV1.FlightRecord>()).isEmpty)
+        #expect(try ctx.fetch(FetchDescriptor<SchemaV1.LogbookEntry>()).isEmpty)
     }
 
     @Test func microphoneNoticeIsForcedAgainstTheSyncLoop() async throws {

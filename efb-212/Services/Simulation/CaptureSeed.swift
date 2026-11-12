@@ -32,7 +32,10 @@ enum CaptureSeed {
     }
 
     @MainActor
-    static func run(profile: String, container: ModelContainer, now: Date = Date()) throws {
+    static func run(
+        profile: String, container: ModelContainer, now: Date = Date(),
+        recordingDB: RecordingDatabase? = nil, audioDirectory: URL = FlightRecoveryService.defaultAudioDirectory
+    ) throws {
         let context = container.mainContext
         try context.delete(model: SchemaV1.UserSettings.self)
         try context.delete(model: SchemaV1.AircraftProfile.self)
@@ -51,7 +54,11 @@ enum CaptureSeed {
             settings.activePilotID = uuid(2, 1).uuidString
         }
         context.insert(settings)
-        try clearRecordings()
+        let db = try recordingDB ?? RecordingDatabase()
+        try clearRecordings(db: db, audioDirectory: audioDirectory)
+        // A NOTAM credential left by -OpenEFBSeed small|full must not show in the fresh install.
+        let store = KeychainStore(service: "quartermint.efb-212.faa-notam-api")
+        for account in ["client_id", "client_secret"] { try? store.removeValue(forAccount: account) }
         guard profile == "capture" else { try context.save(); return }
 
         for (i, n) in ["N172KF", "N28PA", "4X-ABC"].enumerated() {
@@ -137,14 +144,12 @@ enum CaptureSeed {
         context.insert(draft)
         try context.save()
 
-        try seedRecording(flightID: flightID, start: flight.startDate)
+        try seedRecording(db: db, flightID: flightID, start: flight.startDate)
     }
 
     /// Drops every recorded flight and the audio files, so FlightRecoveryService has no orphan to restore as a flight.
-    private static func clearRecordings() throws {
-        let db = try RecordingDatabase()
+    private static func clearRecordings(db: RecordingDatabase, audioDirectory dir: URL) throws {
         for id in try db.flightIDsWithRecordedData() { try db.deleteFlightData(flightID: id) }
-        let dir = FlightRecoveryService.defaultAudioDirectory
         let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         for file in files where file.pathExtension == "m4a" { try? FileManager.default.removeItem(at: file) }
     }
@@ -152,8 +157,7 @@ enum CaptureSeed {
     static let trackPoints = 900
 
     /// LLHA -> LLMG in a straight line at 1 Hz: climb, cruise, descent; six transcript lines; no AI debrief.
-    private static func seedRecording(flightID: UUID, start: Date) throws {
-        let db = try RecordingDatabase()
+    private static func seedRecording(db: RecordingDatabase, flightID: UUID, start: Date) throws {
         try db.dbPool.write { dbc in
             for i in 0..<trackPoints {
                 let f = Double(i) / Double(trackPoints - 1)

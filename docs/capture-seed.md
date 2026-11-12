@@ -35,7 +35,7 @@ Keychain. Dates are offsets from the start of the run day (UTC) because the curr
 counts below are offsets, the layout does not depend on them. Scenario `il-cvfr-llhz-llib-nominal 600` (region Israel) runs underneath; the page covers the map,
 and auto start is off so ReplayView (which only loads while nothing records) works.
 
-`-OpenEFBSeed capture-fresh`, used by **settings** (`-OpenEFBRoute settings`): a fresh install in Israel. Region Israel, no
+`-OpenEFBSeed capture-fresh` (also removes a NOTAM credential left in the Keychain by `small|full`), used by **settings** (`-OpenEFBRoute settings`): a fresh install in Israel. Region Israel, no
 aircraft, no pilot, no flights, no logbook. Nothing downloaded, no NOTAM key, defaults for everything else.
 
 `-OpenEFBSeed capture` plus `-OpenEFBRoute <name>`:

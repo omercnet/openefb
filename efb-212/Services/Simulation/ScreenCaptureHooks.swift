@@ -9,7 +9,7 @@
 //    -OpenEFBDirectTo <ICAO>             direct to this airport, as the Nearest list's Direct does
 //    -OpenEFBRoute settings|disclaimers|aircraft|aircraftedit|pilot|logbookentry|logbooklocked|flightdetail|cvfr|debrief|replay|replayfast|israel-plan
 //                                        a full-screen page over the app (CaptureRouteHost), named like the React Native
-//                                        screens; the record pages show the first stored record, so also pass -OpenEFBSeed small
+//                                        screens; the record pages show the first stored record, so also pass -OpenEFBSeed capture
 //    -OpenEFBRecording notices|stopped|stop
 //                                        recording problems over the map (applyRecording, called when the map builds its
 //                                        recording view model): notices = microphone off and audio failing, stopped =

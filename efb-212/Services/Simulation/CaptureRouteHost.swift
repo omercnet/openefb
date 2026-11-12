@@ -4,7 +4,7 @@
 //
 //  DEBUG only. Shows the page named by -OpenEFBRoute (ScreenCaptureHooks) over the app, in its own navigation
 //  stack, so tools/ci/capture-screens.sh can screenshot pages that are normally pushed from the log stack.
-//  Pages that show a stored record take the first one; seed it with -OpenEFBSeed small.
+//  Pages that show a stored record take the first one; seed it with -OpenEFBSeed capture.
 //
 
 #if DEBUG
