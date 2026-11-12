@@ -159,11 +159,10 @@ export class IsraelAlertService {
     const epoch = ++this.epoch;
 
     await this.loadDatabaseIfNeeded();
-    if (epoch !== this.epoch) return;
     this.refreshClosuresIfNeeded(nowMs);
 
     const database = this.database;
-    let current: IsraelAlert[] = closureAlerts(fix.route, this.closureMarks);
+    let current: IsraelAlert[] = this.guarded('closure alerts', () => closureAlerts(fix.route, this.closureMarks));
     if (database) {
       try {
         const nearby = await database.airspacesNear(fix.position, ISRAEL_ALERT_LOOKUP_RADIUS_NM);
@@ -184,17 +183,29 @@ export class IsraelAlertService {
     }
     if (epoch !== this.epoch) return; // a newer fix, a suspend or a region change took over while the database answered
     current = current.concat(
-      borderAlerts({
-        position: fix.position,
-        trackTrue: fix.trackTrue,
-        groundSpeedKnots: fix.groundSpeedKnots,
-        buffers: this.options.borderBuffers ?? null,
-        gazaRings: this.gazaRings ?? [],
-      }),
+      this.guarded('border alerts', () =>
+        borderAlerts({
+          position: fix.position,
+          trackTrue: fix.trackTrue,
+          groundSpeedKnots: fix.groundSpeedKnots,
+          buffers: this.options.borderBuffers ?? null,
+          gazaRings: this.gazaRings ?? [],
+        }),
+      ),
     );
-    const reminder = squawkReminderAlert(this.squawk, nowMs);
-    if (reminder) current.push(reminder);
+    const reminder = this.guarded('squawk reminder', () => squawkReminderAlert(this.squawk, nowMs));
+    if (reminder && !Array.isArray(reminder)) current.push(reminder);
     this.publish(current, nowMs);
+  }
+
+  /** One failing rule must not take the other alerts down with it: log and contribute nothing. */
+  private guarded<T extends IsraelAlert[] | IsraelAlert | null>(what: string, rule: () => T): T | IsraelAlert[] {
+    try {
+      return rule();
+    } catch (error) {
+      this.options.log?.(`Israel ${what} failed: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
   }
 
   /** Merge the fresh alerts with the held ones: an alert absent for less than the hold time stays up. */
@@ -222,20 +233,21 @@ export class IsraelAlertService {
    * again at the next fix. The squawk reminder keeps its state: it watches speed, not position. */
   suspend(): void {
     this.epoch += 1;
+    // An evaluation that was in flight is dropped above; the next fix must not wait out its throttle either.
+    this.lastEvaluation = null;
     if (this.alerts.length === 0 && this.held.size === 0) return;
     this.alerts = [];
     this.held = new Map();
-    this.lastEvaluation = null;
     this.changed();
   }
 
   private reset(): void {
     this.epoch += 1;
-    if (this.alerts.length === 0 && this.held.size === 0 && this.lastEvaluation === null) return;
-    this.alerts = [];
-    this.held = new Map();
     this.lastEvaluation = null;
     this.squawk = initialSquawkReminder();
+    if (this.alerts.length === 0 && this.held.size === 0) return;
+    this.alerts = [];
+    this.held = new Map();
     this.changed();
   }
 
@@ -243,7 +255,8 @@ export class IsraelAlertService {
 
   private loadDatabaseIfNeeded(): Promise<void> {
     if (this.database) return Promise.resolve();
-    this.databaseLoad ??= (async () => {
+    if (this.databaseLoad) return this.databaseLoad;
+    const load: Promise<void> = (async () => {
       try {
         const db = await this.options.databaseProvider();
         const gaza = await db
@@ -260,10 +273,13 @@ export class IsraelAlertService {
         this.options.log?.(
           `Israel aviation database unavailable: ${error instanceof Error ? error.message : String(error)}`,
         );
-      } finally {
-        this.databaseLoad = null; // a failed open is retried at the next evaluation
       }
-    })();
+    })().finally(() => {
+      // Cleared only after `this.databaseLoad = load` below has run (a provider that throws synchronously settles the
+      // promise before the assignment), and only by its own load: a failed open is retried at the next evaluation.
+      if (this.databaseLoad === load) this.databaseLoad = null;
+    });
+    this.databaseLoad = load;
     return this.databaseLoad;
   }
 

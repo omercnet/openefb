@@ -341,3 +341,107 @@ test('the notam fetcher runs in the background, a failing fetch keeps the previo
   expect(fetches).toBe(2);
   expect(s.alerts.some((a) => a.kind === 'closure')).toBe(true);
 });
+
+test('a provider that throws synchronously is retried at the next evaluation (the failed load is not cached)', async () => {
+  let opens = 0;
+  const s = new IsraelAlertService({
+    databaseProvider: (() => {
+      opens += 1;
+      if (opens === 1) throw new Error('sync boom');
+      return Promise.resolve(database({ areas: [prohibited()] }));
+    }) as () => Promise<IsraelAviationDatabase>,
+    notamFetcher: null,
+    borderBuffers: null,
+  });
+  await fix(s, center, t0);
+  expect(s.alerts).toEqual([]);
+  await fix(s, center, t0 + 6000);
+  expect(opens).toBe(2);
+  expect(s.alerts).toHaveLength(1);
+});
+
+test('an evaluation dropped by a suspend does not leave the next fix waiting out the throttle', async () => {
+  let release: (a: IsraelAirspace[]) => void = () => undefined;
+  let first = true;
+  const s = new IsraelAlertService({
+    databaseProvider: async () =>
+      ({
+        ...database(),
+        airspacesNear: () =>
+          first ? new Promise<IsraelAirspace[]>((r) => (release = r)) : Promise.resolve([prohibited()]),
+      }) as unknown as IsraelAviationDatabase,
+    notamFetcher: null,
+    borderBuffers: null,
+  });
+  const pending = fix(s, center, t0);
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+  s.suspend(); // nothing shown yet: the early return must still reopen the throttle
+  first = false;
+  release([]);
+  await pending;
+  await fix(s, center, t0 + 1000); // inside 5 s of the dropped evaluation
+  expect(s.alerts).toHaveLength(1);
+});
+
+test('a region change while an evaluation is in flight drops it and clears the squawk state', async () => {
+  let release: (a: IsraelAirspace[]) => void = () => undefined;
+  const s = new IsraelAlertService({
+    databaseProvider: async () =>
+      ({
+        ...database(),
+        airspacesNear: () => new Promise<IsraelAirspace[]>((r) => (release = r)),
+      }) as unknown as IsraelAviationDatabase,
+    notamFetcher: null,
+    borderBuffers: null,
+  });
+  const pending = fix(s, center, t0);
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+  await fix(s, center, t0 + 1000, { region: 'us' });
+  release([prohibited()]);
+  await pending;
+  expect(s.alerts).toEqual([]);
+});
+
+test('a throwing onRaised, a throwing fetcher and a throwing mark builder do not break evaluation', async () => {
+  const logs: string[] = [];
+  const s = service(
+    { areas: [prohibited()] },
+    {
+      notamFetcher: () => {
+        throw new Error('sync fetch failure');
+      },
+      closureMarks: () => {
+        throw new Error('marks failure');
+      },
+      log: (m) => logs.push(m),
+    },
+  );
+  s.onRaised = () => {
+    throw new Error('haptic failure');
+  };
+  await fix(s, center, t0);
+  for (let i = 0; i < 20; i++) await Promise.resolve();
+  await fix(s, center, t0 + 6000);
+  expect(s.alerts).toHaveLength(1);
+  expect(logs.some((l) => l.includes('onRaised'))).toBe(true);
+  expect(logs.some((l) => l.includes('marks failure'))).toBe(true);
+});
+
+test('a throwing rule is logged and the other alerts still show', async () => {
+  const logs: string[] = [];
+  const s = service(
+    {},
+    {
+      borderBuffers: {
+        get borders(): never {
+          throw new Error('bad buffers');
+        },
+      } as never,
+      log: (m) => logs.push(m),
+    },
+  );
+  await fix(s, outside, t0, { speed: 0 });
+  await fix(s, outside, t0 + 6000, { speed: 60 });
+  expect(logs.some((l) => l.includes('border alerts failed'))).toBe(true);
+  expect(s.alerts.some((a) => a.id === 'squawk')).toBe(true);
+});

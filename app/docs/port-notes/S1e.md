@@ -44,3 +44,14 @@ kept, plus 3 JS-only tests. Differences:
 - A non-finite altitude reads as unknown (never INSIDE).
 - `ReachabilityService.start()` is idempotent, a status delivered after `stop()` is ignored, and a throwing observer cannot stop
   the others.
+
+## Self-review follow-ups (IsraelAlertService)
+
+- A provider that throws synchronously used to leave a settled promise cached forever (the failed open was never retried); the load
+  slot is now cleared by identity after assignment. Test: sync-throwing provider.
+- `suspend()` and a region change now always reopen the 5 s throttle (Swift only did so when something was shown): an evaluation
+  dropped in flight must not make the next fix wait. Tests: suspend during an evaluation with nothing shown; region change in flight.
+- Each rule (closure, border, squawk) is guarded separately so one throwing rule cannot take the others down.
+- Mutation check: removing the epoch check after the database answer, the throttle reopen, the load-slot identity clear, the airspace
+  try/catch or the onRaised try/catch each fails a test. The earlier epoch check after the database open was redundant (the later one
+  already drops the result) and was removed.
