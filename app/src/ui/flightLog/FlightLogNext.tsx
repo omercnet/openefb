@@ -221,10 +221,13 @@ export function FlightLogNext() {
   let nearestText: string;
   if (!hasAirportData(data.region)) nearestText = 'No airport data yet';
   else if (!nearestEntry) nearestText = data.gpsAvailable ? 'No landable airport in range' : 'Waiting for GPS';
+  else if (stale)
+    nearestText = 'NRST --- --- NM \u00B7 ---\u00B0'; // Q7: the entry is relative to a fix we no longer have
   else {
     const { airport, distance, bearing } = nearestEntry;
     nearestText = `NRST ${airport.icao} ${printfFixed(distance, 1)} NM \u00B7 ${threeDigits(bearing)}\u00B0`;
   }
+  const nearestSpoken = stale && nearestEntry ? 'Nearest airport unavailable, stale' : nearestText;
   const destination = route ? destinationCode(route) : null;
 
   return (
@@ -252,7 +255,7 @@ export function FlightLogNext() {
       {ident == null ? (
         <>
           {rows.top ? <ColumnRule /> : null}
-          <Text accessibilityLabel={nearestText} style={[Type.data, { color: t.inkSecondary, padding: Space.m }]}>
+          <Text accessibilityLabel={nearestSpoken} style={[Type.data, { color: t.inkSecondary, padding: Space.m }]}>
             {nearestText}
           </Text>
           <Pressy

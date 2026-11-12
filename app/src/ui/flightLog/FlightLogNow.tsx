@@ -64,8 +64,11 @@ export function FlightLogNowCell() {
     />
   );
   const following = route?.following;
-  const offRoute = following?.isOffRoute ? offRouteText(following) : null;
-  const altitudeCaution = following?.isAltitudeCaution && leg ? altitudeText(following, leg.altitudeText) : null;
+  // Q7 (owner-approved deviation from Swift): on a stale fix the route cautions and the leg progress are not shown as
+  // current; one stale marker stands in for the cautions and they return with the fix.
+  const offRoute = !stale && following?.isOffRoute ? offRouteText(following) : null;
+  const altitudeCaution =
+    !stale && following?.isAltitudeCaution && leg ? altitudeText(following, leg.altitudeText) : null;
 
   return (
     <View accessibilityLabel="Now" style={{ padding: Space.m, gap: Space.s, backgroundColor: t.activeCell }}>
@@ -82,7 +85,7 @@ export function FlightLogNowCell() {
             </Text>
           </View>
           {data.distanceToNext != null && leg.distanceNM > 0 ? (
-            <LegProgress toGo={data.distanceToNext} length={leg.distanceNM} />
+            <LegProgress toGo={stale ? null : data.distanceToNext} length={leg.distanceNM} />
           ) : null}
         </View>
       ) : ident != null ? (
@@ -129,6 +132,15 @@ export function FlightLogNowCell() {
       />
       {offRoute ? <Caution text={offRoute} testID="israel-route-off-route" /> : null}
       {altitudeCaution ? <Caution text={altitudeCaution} testID="israel-route-altitude-caution" /> : null}
+      {route && stale ? (
+        <Text
+          testID="israel-route-stale"
+          accessibilityLabel="Route cautions unavailable, stale"
+          style={[Type.data, { color: t.inkSecondary, paddingHorizontal: Space.m }]}
+        >
+          {'Route cautions --- (stale)'}
+        </Text>
+      ) : null}
       {route ? (
         <View style={{ flexDirection: 'row', gap: Space.s }}>
           <ControlButton
@@ -182,22 +194,29 @@ function LegText({ from, to, testID }: { from: string; to: string; testID?: stri
 }
 
 /** LegProgressBar: distance flown along the active leg in route magenta, with "4.5 / 12.0 NM". */
-function LegProgress({ toGo, length }: { toGo: number; length: number }) {
+function LegProgress({ toGo, length }: { toGo: number | null; length: number }) {
   const t = useTheme();
-  const flown = Math.min(Math.max(length - toGo, 0), length); // nautical miles
-  const fraction = Math.min(Math.max(flown / length, 0), 1);
+  // toGo null: a stale fix. Dashed value, empty bar, ", stale" spoken (Q7).
+  const flown = toGo == null ? null : Math.min(Math.max(length - toGo, 0), length); // nautical miles
+  const fraction = flown == null ? 0 : Math.min(Math.max(flown / length, 0), 1);
+  const flownText = flown == null ? '---' : printfFixed(flown, 1);
   return (
     <View
       accessible
       accessibilityLabel="Leg progress"
-      accessibilityValue={{ text: `${printfFixed(flown, 1)} of ${printfFixed(length, 1)} nautical miles flown` }}
+      accessibilityValue={{
+        text:
+          flown == null
+            ? `${printfFixed(length, 1)} nautical mile leg, progress unavailable, stale`
+            : `${flownText} of ${printfFixed(length, 1)} nautical miles flown`,
+      }}
       style={{ flexDirection: 'row', alignItems: 'center', gap: Space.s }}
     >
       <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: t.paperSecondary, overflow: 'hidden' }}>
         <View style={{ width: `${fraction * 100}%`, height: 6, borderRadius: 3, backgroundColor: t.route }} />
       </View>
       <Text numberOfLines={1} style={[Type.data, { color: t.inkSecondary }]}>
-        {`${printfFixed(flown, 1)} / ${printfFixed(length, 1)} NM`}
+        {`${flownText} / ${printfFixed(length, 1)} NM`}
       </Text>
     </View>
   );

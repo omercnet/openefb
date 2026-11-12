@@ -39,10 +39,11 @@ interface Setup {
 async function renderStrip(setup: Setup = {}) {
   const actions = actionSpies();
   const store = flightLog.make({ ...dayFixture, ...setup.data, actions });
+  const gpsStore = gps.make(setup.gps ?? { status: { kind: 'ok' }, failure: null });
   const view = await render(
     <ThemeContext.Provider value={setup.theme ?? Day}>
       <flightLog.Provider store={store}>
-        <gps.Provider store={gps.make(setup.gps ?? { status: { kind: 'ok' }, failure: null })}>
+        <gps.Provider store={gpsStore}>
           <panels.Provider store={panels.make({ ...defaultPanels, ...setup.panels })}>
             <nearest.Provider
               store={nearest.make({
@@ -57,7 +58,7 @@ async function renderStrip(setup: Setup = {}) {
       </flightLog.Provider>
     </ThemeContext.Provider>,
   );
-  return { view, store, actions };
+  return { view, store, actions, gpsStore };
 }
 
 const label = (view: Rendered, testID: string) => view.byTestId(testID).props.accessibilityLabel;
@@ -191,6 +192,52 @@ describe('FlightLogStrip, no navigation', () => {
     expect((await renderStrip({ data: noNavigationFixture })).view.text()).toContain('No landable airport in range');
     const noGps = await renderStrip({ data: { ...noNavigationFixture, gpsAvailable: false } });
     expect(noGps.view.text()).toContain('Waiting for GPS');
+  });
+});
+
+describe('FlightLogStrip, a stale fix on a route (Q7, owner-approved deviation from Swift)', () => {
+  const entry = { airport: { icao: 'KPAO' } as Airport, distance: 2.04, bearing: 116 };
+
+  it('shows leg progress, cautions and the NEXT nearest row as current only with a fix', async () => {
+    const { view } = await renderStrip({ data: routeFixture });
+    expect(view.text()).toContain('7.5 / 12.0 NM');
+    expect(view.text()).toContain('1.2 NM RIGHT OF ROUTE');
+    expect(view.all((n) => n.props.testID === 'israel-route-stale')).toHaveLength(0);
+  });
+
+  it('a lost fix dashes the progress, hides the cautions behind one stale marker and speaks stale', async () => {
+    const { view } = await renderStrip({ data: routeFixture, gps: lost });
+    expect(view.text()).toContain('--- / 12.0 NM');
+    expect(view.text()).not.toContain('7.5 / 12.0');
+    expect(valueOf(view, 'Leg progress')).toBe('12.0 nautical mile leg, progress unavailable, stale');
+    expect(view.text()).not.toContain('RIGHT OF ROUTE');
+    expect(view.text()).not.toContain('FLY 2500');
+    expect(label(view, 'israel-route-stale')).toBe('Route cautions unavailable, stale');
+  });
+
+  it('a lost fix dashes the NEXT nearest row and speaks stale; a degraded fix is still a fix', async () => {
+    const { view } = await renderStrip({ data: noNavigationFixture, nearestEntry: entry, gps: lost });
+    expect(view.text()).toContain(`NRST --- --- NM${DOT}---\u00B0`);
+    expect(view.text()).not.toContain('KPAO');
+    expect(view.byLabel('Nearest airport unavailable, stale')).toHaveLength(1);
+    const degraded: GpsData = {
+      status: { kind: 'degraded', reason: { kind: 'poorHorizontalAccuracy', meters: 80 } },
+      failure: null,
+    };
+    const d = await renderStrip({ data: noNavigationFixture, nearestEntry: entry, gps: degraded });
+    expect(d.view.text()).toContain(`NRST KPAO 2.0 NM${DOT}116\u00B0`);
+  });
+
+  it('everything returns when the fix recovers', async () => {
+    const route = await renderStrip({ data: routeFixture, gps: lost });
+    await act(async () => route.gpsStore.setState({ status: { kind: 'ok' } }));
+    expect(route.view.text()).toContain('7.5 / 12.0 NM');
+    expect(route.view.text()).toContain('1.2 NM RIGHT OF ROUTE');
+    expect(valueOf(route.view, 'Leg progress')).toBe('7.5 of 12.0 nautical miles flown');
+    expect(route.view.all((n) => n.props.testID === 'israel-route-stale')).toHaveLength(0);
+    const near = await renderStrip({ data: noNavigationFixture, nearestEntry: entry, gps: lost });
+    await act(async () => near.gpsStore.setState({ status: { kind: 'ok' } }));
+    expect(near.view.text()).toContain(`NRST KPAO 2.0 NM${DOT}116\u00B0`);
   });
 });
 
