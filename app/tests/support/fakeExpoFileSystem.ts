@@ -52,6 +52,8 @@ export class File {
 
   constructor(...parts: Part[]) {
     this.uri = join(...parts);
+    // expo-file-system SDK 58 (FileSystemFile.swift init): a File cannot be made for a path that is a directory.
+    if (entries.get(this.uri)?.kind === 'directory') throw new Error(`${this.uri} is a directory, not a file`);
   }
 
   get name(): string {

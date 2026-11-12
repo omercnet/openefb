@@ -101,7 +101,12 @@ export function createRecordingFiles(options: RecordingFilesOptions = {}): Recor
     },
 
     async removeFile(path) {
-      const file = new File(path);
+      let file: File;
+      try {
+        file = new File(path);
+      } catch {
+        return; // the SDK constructor throws for a directory: nothing here is a file, so nothing is deleted
+      }
       if (file.exists) file.delete();
     },
   };
