@@ -139,8 +139,11 @@ export class Telemetry {
       } catch {
         // An unreadable backlog is no backlog.
       }
-      // A pilot who chose while this was reading did not choose with that backlog in sight: it stays unsent.
-      if (this.on && !this.chosen) this.buffer.restore(parseRows(text));
+      // Turning it on while this was reading changes nothing when it was on already: that backlog was counted with consent and
+      // is kept. It stays unsent only when the stored choice was off (an opt-out whose removal may not have finished) or could
+      // not be read, because then it may be older than the pilot's last opt-out. (An opt-out made meanwhile queued its removal
+      // ahead of this read, and `this.on` is false for it.)
+      if (this.on && (stored === true || stored === null)) this.buffer.restore(parseRows(text));
     }
     this.loaded = true;
     this.persist();

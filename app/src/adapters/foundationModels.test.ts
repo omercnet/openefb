@@ -13,6 +13,7 @@ import {
 } from './foundationModels';
 
 interface PendingNative {
+  sessionId: number;
   requestId: number;
   prompt: string;
   resolve(json: string): void;
@@ -26,6 +27,11 @@ class FakeKanafDebrief implements KanafDebriefModule {
   opened: string[] = [];
   openError: unknown = null;
   closeCount = 0;
+  /** Ids passed to closeSession, in order. */
+  readonly closedIds: number[] = [];
+  /** The native side keeps one session: the id of the current one, or null once it was closed. */
+  currentSession: number | null = null;
+  private lastSessionId = 0;
   /** When set, generate() throws it synchronously instead of returning a promise. */
   generateThrows: unknown = null;
   readonly generations: PendingNative[] = [];
@@ -49,20 +55,27 @@ class FakeKanafDebrief implements KanafDebriefModule {
     return this.availabilityResult;
   }
 
-  openSession(instructions: string): void {
+  openSession(instructions: string): number {
     if (this.openError !== null) throw this.openError;
     this.opened.push(instructions);
+    this.lastSessionId += 1;
+    this.currentSession = this.lastSessionId;
+    return this.lastSessionId;
   }
 
-  generate(requestId: number, prompt: string): Promise<string> {
+  generate(sessionId: number, requestId: number, prompt: string): Promise<string> {
     if (this.generateThrows !== null) throw this.generateThrows;
+    // As the module does: a session that is not the open one has nothing to generate with.
+    if (sessionId !== this.currentSession) return Promise.reject(new Error('ERR_DEBRIEF_NO_SESSION'));
     const { promise, resolve, reject } = Promise.withResolvers<string>();
-    this.generations.push({ requestId, prompt, resolve, reject });
+    this.generations.push({ sessionId, requestId, prompt, resolve, reject });
     return promise;
   }
 
-  closeSession(): void {
+  closeSession(sessionId: number): void {
     this.closeCount += 1;
+    this.closedIds.push(sessionId);
+    if (sessionId === this.currentSession) this.currentSession = null; // a close of an older session changes nothing
   }
 
   get latest(): PendingNative {
@@ -273,6 +286,40 @@ describe('close', () => {
     s.close();
     s.close();
     expect(native.closeCount).toBe(1);
+  });
+
+  test('closes its own session by id: an older session closed after a newer one was opened leaves the newer one working', async () => {
+    const native = new FakeKanafDebrief();
+    const model = createFoundationModelsDebriefModel(native);
+    const a = model.openSession('a');
+    const b = model.openSession('b');
+    a.close();
+
+    expect(native.closedIds).toEqual([1]);
+    expect(native.currentSession).toBe(2);
+    const generating = b.generate('p', () => undefined);
+    expect(native.latest.sessionId).toBe(2);
+    native.latest.resolve(JSON.stringify(DEBRIEF));
+    await expect(generating).resolves.toEqual(DEBRIEF);
+  });
+
+  test('a generation names the session it was opened with', async () => {
+    const native = new FakeKanafDebrief();
+    const model = createFoundationModelsDebriefModel(native);
+    model.openSession('a');
+    const b = model.openSession('b');
+    void b.generate('p', () => undefined);
+    expect(native.latest.sessionId).toBe(2);
+    b.close();
+    expect(native.closedIds).toEqual([2]);
+  });
+
+  test('an older session whose native session was replaced cannot generate (the module refuses it)', async () => {
+    const native = new FakeKanafDebrief();
+    const model = createFoundationModelsDebriefModel(native);
+    const a = model.openSession('a');
+    model.openSession('b');
+    await expect(a.generate('p', () => undefined)).rejects.toThrow('ERR_DEBRIEF_NO_SESSION');
   });
 
   test('a closed session refuses to generate and never reaches the module', async () => {

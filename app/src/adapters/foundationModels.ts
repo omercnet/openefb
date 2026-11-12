@@ -30,12 +30,15 @@ export interface NativePartialEvent {
 export interface KanafDebriefModule {
   addListener(event: 'onPartial', listener: (event: NativePartialEvent) => void): EventSubscription;
   availability(): NativeAvailability;
-  /** Replaces any open session. Throws when iOS is older than 26. */
-  openSession(instructions: string): void;
-  /** Streams snapshots as `onPartial` events tagged with `requestId`; resolves with the final debrief as JSON text. */
-  generate(requestId: number, prompt: string): Promise<string>;
-  /** Cancels a generation in progress (its promise rejects) and releases the session. */
-  closeSession(): void;
+  /** Replaces any open session and returns the new session's id. Throws when iOS is older than 26. */
+  openSession(instructions: string): number;
+  /**
+   * Streams snapshots as `onPartial` events tagged with `requestId`; resolves with the final debrief as JSON text. Rejects with
+   * ERR_DEBRIEF_NO_SESSION when `sessionId` is not the open session.
+   */
+  generate(sessionId: number, requestId: number, prompt: string): Promise<string>;
+  /** Cancels a generation in progress (its promise rejects) and releases the session; a no-op unless `sessionId` is the open one. */
+  closeSession(sessionId: number): void;
 }
 
 /** The native module, or null where it is not linked (Android, web, a binary built without it). */
@@ -49,7 +52,10 @@ class FoundationModelsSession implements DebriefSession {
   private closed = false;
   private readonly listening = new Set<EventSubscription>();
 
-  constructor(private readonly native: KanafDebriefModule) {}
+  constructor(
+    private readonly native: KanafDebriefModule,
+    private readonly sessionId: number,
+  ) {}
 
   async generate(prompt: string, onPartial: (partial: PartialFlightDebrief) => void): Promise<FlightDebrief> {
     if (this.closed) throw new DebriefError('sessionUnavailable');
@@ -65,7 +71,7 @@ class FoundationModelsSession implements DebriefSession {
 
     let json: unknown;
     try {
-      json = await this.native.generate(requestId, prompt);
+      json = await this.native.generate(this.sessionId, requestId, prompt);
     } catch (error) {
       throw error instanceof Error ? error : new Error(String(error));
     } finally {
@@ -81,7 +87,7 @@ class FoundationModelsSession implements DebriefSession {
     this.closed = true;
     this.listening.forEach((subscription) => subscription.remove());
     this.listening.clear();
-    this.native.closeSession();
+    this.native.closeSession(this.sessionId);
   }
 }
 
@@ -100,8 +106,7 @@ export function createFoundationModelsDebriefModel(
 
     openSession(instructions: string): DebriefSession {
       if (!native) throw new DebriefError('sessionUnavailable');
-      native.openSession(instructions);
-      return new FoundationModelsSession(native);
+      return new FoundationModelsSession(native, native.openSession(instructions));
     },
   };
 }

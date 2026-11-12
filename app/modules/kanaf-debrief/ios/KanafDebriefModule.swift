@@ -33,11 +33,15 @@ enum DebriefModuleError: LocalizedError {
 }
 
 public final class KanafDebriefModule: Module {
-    // openSession and closeSession run on the JavaScript thread, generate on the module's background queue, so both fields
-    // are only touched inside `locked`.
+    // openSession and closeSession run on the JavaScript thread, generate on the module's background queue, so these fields
+    // are only touched inside `locked`. Every change that depends on which session is current (open, close, starting a
+    // generation and publishing its task) is ONE locked transaction, so a close can never miss a generation that is being
+    // started, and a close of an old session can never clear a newer one.
     private let lock = NSLock()
-    /// The open LanguageModelSession (an iOS 26 type, so held as AnyObject) and the generation running on it.
+    /// The open LanguageModelSession (an iOS 26 type, so held as AnyObject), its id, and the generation running on it.
     private var session: AnyObject?
+    /// Id of the current session; handed to JavaScript by openSession and required by generate and closeSession.
+    private var sessionId = 0
     private var generation: Task<Void, Never>?
 
     public func definition() -> ModuleDefinition {
@@ -52,31 +56,46 @@ public final class KanafDebriefModule: Module {
             return Self.currentAvailability()
         }
 
-        Function("openSession") { (instructions: String) throws in
+        /// Replaces any open session (cancelling its generation) and returns the new session's id.
+        Function("openSession") { (instructions: String) throws -> Int in
             guard #available(iOS 26.0, *) else {
                 throw DebriefModuleError.unsupported
             }
             let opened = LanguageModelSession(instructions: instructions)
-            self.endGeneration()
-            self.locked { self.session = opened }
+            return self.locked {
+                self.generation?.cancel()
+                self.generation = nil
+                self.sessionId += 1
+                self.session = opened
+                return self.sessionId
+            }
         }
 
-        AsyncFunction("generate") { (requestId: Int, prompt: String, promise: Promise) in
+        AsyncFunction("generate") { (sessionId: Int, requestId: Int, prompt: String, promise: Promise) in
             guard #available(iOS 26.0, *) else {
                 promise.reject("ERR_DEBRIEF_UNSUPPORTED", DebriefModuleError.unsupported.localizedDescription)
                 return
             }
-            self.startGeneration(requestId: requestId, prompt: prompt, promise: promise)
+            self.startGeneration(sessionId: sessionId, requestId: requestId, prompt: prompt, promise: promise)
         }
 
-        Function("closeSession") {
-            self.endGeneration()
-            self.locked { self.session = nil }
+        /// Cancels the generation and releases the session, but only if `sessionId` is still the current one: closing an
+        /// older session after a newer one was opened must leave the newer one alone.
+        Function("closeSession") { (sessionId: Int) in
+            self.locked {
+                guard self.sessionId == sessionId else { return }
+                self.generation?.cancel()
+                self.generation = nil
+                self.session = nil
+            }
         }
 
         OnDestroy {
-            self.endGeneration()
-            self.locked { self.session = nil }
+            self.locked {
+                self.generation?.cancel()
+                self.generation = nil
+                self.session = nil
+            }
         }
     }
 
@@ -98,46 +117,42 @@ public final class KanafDebriefModule: Module {
     /// as JSON text after it decodes as a FlightDebrief (what the Swift engine did with `FlightDebrief(finalContent)`),
     /// or rejects. A stream that produced nothing resolves with an empty string, which JavaScript reads as an empty answer.
     @available(iOS 26.0, *)
-    private func startGeneration(requestId: Int, prompt: String, promise: Promise) {
-        guard let session = locked({ self.session }) as? LanguageModelSession else {
-            promise.reject("ERR_DEBRIEF_NO_SESSION", DebriefModuleError.noSession.localizedDescription)
-            return
-        }
-        endGeneration() // one generation at a time; JavaScript never overlaps them, so this only cancels a stale one
-        let task = Task { [weak self] in
-            do {
-                let stream = session.streamResponse(to: prompt, generating: FlightDebrief.self)
-                var finalContent: GeneratedContent?
-                for try await snapshot in stream {
+    private func startGeneration(sessionId: Int, requestId: Int, prompt: String, promise: Promise) {
+        // Check the session, cancel a stale generation, create the task and publish it: one transaction under the lock. The
+        // task body never takes the lock, so creating it here cannot deadlock; a closeSession either ran before (the check
+        // below fails) or runs after (and cancels this task).
+        let started: Bool = locked {
+            guard self.sessionId == sessionId, let session = self.session as? LanguageModelSession else { return false }
+            generation?.cancel() // one generation at a time; JavaScript never overlaps them, so this only cancels a stale one
+            generation = Task { [weak self] in
+                do {
+                    let stream = session.streamResponse(to: prompt, generating: FlightDebrief.self)
+                    var finalContent: GeneratedContent?
+                    for try await snapshot in stream {
+                        try Task.checkCancellation()
+                        finalContent = snapshot.rawContent
+                        self?.sendEvent("onPartial", ["requestId": requestId, "json": snapshot.rawContent.jsonString])
+                    }
                     try Task.checkCancellation()
-                    finalContent = snapshot.rawContent
-                    self?.sendEvent("onPartial", ["requestId": requestId, "json": snapshot.rawContent.jsonString])
-                }
-                try Task.checkCancellation()
-                guard let finalContent else {
-                    promise.resolve("")
-                    return
-                }
-                _ = try FlightDebrief(finalContent)
-                promise.resolve(finalContent.jsonString)
-            } catch {
-                if Task.isCancelled || error is CancellationError {
-                    promise.reject("ERR_DEBRIEF_CANCELLED", "The debrief was cancelled")
-                } else {
-                    promise.reject("ERR_DEBRIEF_GENERATION", error.localizedDescription)
+                    guard let finalContent else {
+                        promise.resolve("")
+                        return
+                    }
+                    _ = try FlightDebrief(finalContent)
+                    promise.resolve(finalContent.jsonString)
+                } catch {
+                    if Task.isCancelled || error is CancellationError {
+                        promise.reject("ERR_DEBRIEF_CANCELLED", "The debrief was cancelled")
+                    } else {
+                        promise.reject("ERR_DEBRIEF_GENERATION", error.localizedDescription)
+                    }
                 }
             }
+            return true
         }
-        locked { generation = task }
-    }
-
-    private func endGeneration() {
-        let running = locked { () -> Task<Void, Never>? in
-            let current = generation
-            generation = nil
-            return current
+        if !started {
+            promise.reject("ERR_DEBRIEF_NO_SESSION", DebriefModuleError.noSession.localizedDescription)
         }
-        running?.cancel()
     }
 
     private func locked<T>(_ body: () -> T) -> T {

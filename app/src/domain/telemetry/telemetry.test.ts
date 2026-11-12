@@ -524,6 +524,43 @@ describe('"Share anonymous usage data"', () => {
     expect(transport.batches).toEqual([]);
   });
 
+  test.each([
+    ['stored on', true],
+    ['never chosen', null],
+  ])(
+    'turning it on while start() is still reading keeps the stored backlog when the choice was %s, and sends it',
+    async (_name, stored) => {
+      const { telemetry, transport, storage } = setup();
+      storage.hold('readEnabled');
+      storage.enabled = stored;
+      storage.backlog = serializeRows([row('Recording.started', 4)]);
+      const starting = telemetry.start();
+      const choosing = telemetry.setEnabled(true);
+      storage.release('readEnabled');
+      await Promise.all([starting, choosing]);
+      await drain();
+
+      expect(parseRows(storage.backlog)).toEqual([row('Recording.started', 4)]);
+      await telemetry.flush();
+      expect(transport.batches).toEqual([[row('Recording.started', 4)]]);
+    },
+  );
+
+  test('turning it off and on again while start() is still reading sends no old backlog: the opt-out removed it first', async () => {
+    const { telemetry, transport, storage } = setup();
+    storage.hold('readEnabled');
+    storage.enabled = true;
+    storage.backlog = serializeRows([row('Recording.started', 4)]);
+    const starting = telemetry.start();
+    const off = telemetry.setEnabled(false);
+    const on = telemetry.setEnabled(true);
+    storage.release('readEnabled');
+    await Promise.all([starting, off, on]);
+    await telemetry.flush();
+    expect(transport.batches).toEqual([]);
+    expect(storage.backlog).toBeNull();
+  });
+
   test('turning it on while start() is still reading beats a stored off, and does not send the old backlog', async () => {
     const { telemetry, transport, storage } = setup();
     storage.hold('readEnabled');

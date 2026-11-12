@@ -116,7 +116,8 @@ describe('createHttpTransport', () => {
       expect(init.headers).toEqual({ 'content-type': 'application/json' });
       expect(init.credentials).toBe('omit');
       expect(JSON.parse(init.body as string)).toEqual({ v: 1, counters: ROWS });
-      expect(Object.keys(init).sort()).toEqual(['body', 'credentials', 'headers', 'method', 'signal']);
+      expect(init.redirect).toBe('error'); // a redirect fails the request (retry) instead of sending the batch elsewhere
+      expect(Object.keys(init).sort()).toEqual(['body', 'credentials', 'headers', 'method', 'redirect', 'signal']);
     });
 
     test('goes to the global fetch unless one is given', async () => {
@@ -140,7 +141,6 @@ describe('createHttpTransport', () => {
     test.each([
       ['400', 400],
       ['404', 404],
-      ['405', 405],
       ['413', 413],
       ['422', 422],
       ['401', 401],
@@ -150,6 +150,7 @@ describe('createHttpTransport', () => {
     });
 
     test.each([
+      ['405 (a redirect in between made it a GET)', 405],
       ['408 request timeout', 408],
       ['425 too early', 425],
       ['429 too many requests', 429],
@@ -182,6 +183,11 @@ describe('createHttpTransport', () => {
       ['null', null],
     ])('a 202 with %s is not the Worker: retry', async (_name, body) => {
       const { fetchFn } = recordingFetch(reply(202, body));
+      await expect(createHttpTransport(ENDPOINT, { fetch: fetchFn }).send(ROWS)).resolves.toBe('retry');
+    });
+
+    test('a fetch that refuses a redirect (it rejects) keeps the batch for the next flush', async () => {
+      const { fetchFn } = recordingFetch(() => Promise.reject(new TypeError('redirect mode is set to error')));
       await expect(createHttpTransport(ENDPOINT, { fetch: fetchFn }).send(ROWS)).resolves.toBe('retry');
     });
 

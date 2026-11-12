@@ -50,7 +50,9 @@ async function outcomeOf(response: Response): Promise<SendOutcome> {
     const body: unknown = await response.json(); // not JSON: rejects, which the caller turns into a retry
     return isRecord(body) && typeof body.accepted === 'number' ? 'sent' : 'retry';
   }
-  if (status === 408 || status === 425 || status === 429) return 'retry';
+  // 405 is not the Worker refusing the batch: it only answers 405 to a method other than POST, and this transport only posts. It
+  // is what a 301 or 302 in between gives, because fetch repeats the request as a GET without the body.
+  if (status === 405 || status === 408 || status === 425 || status === 429) return 'retry';
   return status >= 400 && status < 500 ? 'drop' : 'retry';
 }
 
@@ -66,6 +68,8 @@ export function createHttpTransport(endpoint: string, options: HttpTransportOpti
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ v: TELEMETRY_SCHEMA.version, counters: rows }),
           credentials: 'omit',
+          // A redirect is never followed: the batch is not sent anywhere but the configured endpoint, and the request fails (retry).
+          redirect: 'error',
           signal: controller.signal,
         });
         return await outcomeOf(response);
