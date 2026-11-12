@@ -50,7 +50,7 @@ describe('MapScreen', () => {
     expect(view.byLabel('Flight log').length).toBeGreaterThan(0);
   });
 
-  it('seeds before the first paint: no commit shows another column first', async () => {
+  it('seeds the store once with the route column (store initialisation; the first-paint ordering is the layout effect, not observable here)', async () => {
     const seen: string[] = [];
     const unsubscribe = appStore.subscribe((s) => seen.push(s.stripColumn));
     appStore.setState({ stripColumn: 'log' });

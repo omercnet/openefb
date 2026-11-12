@@ -111,6 +111,8 @@ describe('LayersColumn', () => {
         .find((n) => n.queryAll((c) => c.type === 'Text' && c.children.join('') === title).length > 0)!;
     expect(segment('Day').props.accessibilityState).toEqual({ selected: true });
     expect(segment('Night').props.accessibilityState).toEqual({ selected: false });
+    expect(segment('Day').props['aria-pressed']).toBe(true);
+    expect(segment('Night').props['aria-pressed']).toBe(false);
     expect(segment('North up').props.accessibilityState).toEqual({ selected: true });
     await press(segment('Night'));
     expect(store.getState().displayMode).toBe('night');
@@ -195,10 +197,29 @@ describe('LayersColumn', () => {
     const old = await renderLayers(
       {
         visibleLayers: ['cvfrClosures'],
-        closureStatus: { kind: 'loaded', generatedAt: now - 10 * 60_000, level: 'expired', closed: 3 },
+        closureStatus: { kind: 'loaded', generatedAt: now - 7 * 3600_000, level: 'expired', closed: 3 },
       },
       'israel',
     );
     expect(old.view.text()).toContain('Too old: closures hidden');
+    // The visibility follows `now` (the badge's clock), not the level stored at load time: a stale stored level on a feed
+    // that is fresh now still draws, and a stored 'fresh' on a feed older than the 6 h limit does not.
+    const staleLevel = await renderLayers(
+      {
+        visibleLayers: ['cvfrClosures'],
+        closureStatus: { kind: 'loaded', generatedAt: now - 10 * 60_000, level: 'expired', closed: 2 },
+      },
+      'israel',
+    );
+    expect(staleLevel.view.text()).toContain('2 segments closed');
+    const agedOut = await renderLayers(
+      {
+        visibleLayers: ['cvfrClosures'],
+        closureStatus: { kind: 'loaded', generatedAt: now - 7 * 3600_000, level: 'fresh', closed: 2 },
+      },
+      'israel',
+    );
+    expect(agedOut.view.text()).toContain('Too old: closures hidden');
+    expect(agedOut.view.text()).not.toContain('segments closed');
   });
 });

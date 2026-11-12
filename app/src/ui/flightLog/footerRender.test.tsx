@@ -96,6 +96,13 @@ describe('FlightLogFooter', () => {
     });
   });
 
+  it('lays out no negative width on the 104 pt iPhone rail (the compact footer is U5)', async () => {
+    const view = await render(<FlightLogFooter width={104} bottomInset={0} />);
+    const widths = view.all((n) => typeof style(n).width === 'number').map((n) => style(n).width as number);
+    expect(widths.length).toBeGreaterThan(0);
+    expect(widths.every((w) => w >= 0)).toBe(true);
+  });
+
   it('LAYERS toggles the strip between the layers column and the log', async () => {
     const { view } = await renderFooter();
     const layersCell = () => view.byLabel('Map layers')[0];
