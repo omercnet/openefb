@@ -37,6 +37,8 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
   /** The last query that succeeded, and the last one sent (in flight or done): both gate the move threshold. */
   let succeeded: { position: Coordinate; region: Region } | null = null;
   let requested: { position: Coordinate; region: Region } | null = null;
+  /** The region the published entries belong to; null for entries nobody queried (the store's seed). */
+  let entriesRegion: Region | null = null;
   let token = 0;
   // Israel (IL-4): the curated aerodromes behind the current entries, for re-flagging when a NOTAM feed arrives.
   let israelAerodromes = new Map<string, IsraelAerodrome>();
@@ -112,16 +114,18 @@ export function createNearestRefresher(store: StoreApi<NearestData>, initial: Ai
           store.setState({ entries, loading: false, error: null });
         }
         succeeded = { position, region };
+        entriesRegion = region;
         if (region === 'israel') refreshNotamsIfNeeded();
       } catch (error) {
         if (mine !== token) return;
         // Keep stale data rather than clearing it; the next fix retries from the last good query.
         requested = succeeded;
-        // Entries from another region are not "the last good list" for this one: clear them and forget the success so
-        // the next fix requeries.
-        if (succeeded && succeeded.region !== region) {
+        // Entries that did not come from this region (another region's list, or the store's seed) are not "the last good
+        // list" for it: clear them and forget the success so the next fix requeries.
+        if (entriesRegion !== region) {
           succeeded = null;
           requested = null;
+          entriesRegion = null;
           store.setState({ entries: [], loading: false, error: message(error) });
         } else store.setState({ loading: false, error: message(error) });
       }

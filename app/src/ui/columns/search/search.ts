@@ -137,6 +137,8 @@ function controllerFor(store: StoreApi<SearchState>): Controller {
   let controller = controllers.get(store);
   if (!controller) {
     let current: Sources = { queries: defaultAirportQueries, region: regionSlice.store };
+    /** The region the shown results were searched in, so a change while the column was closed is caught on reopening. */
+    let seenRegion: Region = current.region.getState().region;
     controller = {
       search: createAirportSearch(store, {
         queries: () => current.queries,
@@ -145,11 +147,19 @@ function controllerFor(store: StoreApi<SearchState>): Controller {
       use: (sources) => {
         const swapped = !sameQueries(sources.queries, current.queries);
         current = sources;
-        if (!swapped) return;
+        if (!swapped) {
+          // The region can change while the column is closed (nothing is subscribed then): catch it here on reopening.
+          if (sources.region.getState().region !== seenRegion) controller!.regionChanged();
+          return;
+        }
+        seenRegion = sources.region.getState().region;
         store.setState({ failed: false });
         controller!.search.search();
       },
-      regionChanged: () => controller!.search.search(),
+      regionChanged: () => {
+        seenRegion = current.region.getState().region;
+        controller!.search.search();
+      },
     };
     controllers.set(store, controller);
   }

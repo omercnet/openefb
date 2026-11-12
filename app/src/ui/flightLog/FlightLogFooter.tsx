@@ -7,6 +7,7 @@ import type { StripColumnKind } from '../../domain/types';
 import { hasAirportData } from '../../domain/core/region';
 import { gpsStatusAccessibilityDescription } from '../../domain/location/gpsStatus';
 import { entryExtras } from '../columns/nearest/logic';
+import { useNearestAirports } from '../columns/nearest/refresh';
 import { useNearestEntry } from '../columns/nearest/store';
 import { Layers, Minus, Plus } from '../Icons';
 import { CellButton, ColumnRule, Pressy, useTheme } from '../Primitives';
@@ -133,6 +134,9 @@ export function FlightLogFooter({ width, bottomInset }: { width: number; bottomI
  */
 function NrstCell({ width, bottomInset }: { width: number; bottomInset: number }) {
   const t = useTheme();
+  // MapContainerView refreshes the nearest list on every ownship or region change, whichever column is open: this cell is
+  // always mounted, so it drives the refresh (the Nearest column shares the same refresher).
+  useNearestAirports();
   const raw = useNearestEntry();
   // The refresher publishes plain entries; the spoken label needs the computed runway, private, military, PPR and NOTAM fields.
   const entry: NrstEntry | null = useMemo(() => (raw ? { ...raw, ...entryExtras(raw) } : null), [raw]);

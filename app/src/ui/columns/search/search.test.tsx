@@ -200,6 +200,19 @@ describe('SearchColumn', () => {
     announce.mockRestore();
   });
 
+  it('a region change while the column is closed is caught when it reopens', async () => {
+    const region = regionSlice.make({ region: 'us' });
+    const search = searchSlice.make();
+    const first = await mount(defaultAirportQueries, undefined, region, search);
+    await type(first, 'KPAO');
+    expect(first.all((n) => n.props?.testID === 'search-result-KPAO')).toHaveLength(1);
+    await first.unmount();
+    region.setState({ region: 'israel' }); // nothing is subscribed now
+    const second = await mount(defaultAirportQueries, undefined, region, search);
+    await tick(300);
+    expect(second.all((n) => n.props?.testID === 'search-result-KPAO')).toHaveLength(0);
+  });
+
   it('matches the reference when empty: title, focused field, no rows', async () => {
     const v = await mount();
     expect(v.byRole('header').map((n) => n.props.children)).toContain('Search');

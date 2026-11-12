@@ -214,6 +214,14 @@ describe('refresh policy', () => {
     expect(israel.nearestAerodromes).toHaveBeenCalledTimes(2);
   });
 
+  test("a first query that fails clears the store's seed instead of showing it as this region's list", async () => {
+    const store = nearest.make({ ...EMPTY, entries: [{ airport: kpao, distance: 2, bearing: 116 }] }); // the seeded default
+    const query = jest.fn().mockRejectedValue(new Error('database is locked'));
+    await createNearestRefresher(store, queriesWith(query)).update(FIXTURE_OWNSHIP, 'us');
+    expect(store.getState().entries).toEqual([]);
+    expect(store.getState().error).toBe('database is locked');
+  });
+
   test('a slow earlier query never overwrites a later one', async () => {
     const slow = deferred();
     const query = jest.fn(createFakeAviationDatabase().nearestAirports);

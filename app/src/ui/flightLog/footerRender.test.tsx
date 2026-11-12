@@ -27,10 +27,19 @@ const KPAO: NearestAirportEntry = {
 };
 
 async function renderFooter(
-  opts: { status?: GpsStatus; entries?: NearestAirportEntry[]; footerState?: Partial<FooterData> } = {},
+  opts: {
+    status?: GpsStatus;
+    entries?: NearestAirportEntry[];
+    footerState?: Partial<FooterData>;
+    ownship?: { lat: number; lon: number } | null;
+  } = {},
 ) {
   const gpsStore = gps.make({ status: opts.status ?? { kind: 'ok' }, failure: null });
-  const nearestStore = nearest.make({ ...nearest.store.getState(), entries: opts.entries ?? [KPAO] });
+  const nearestStore = nearest.make({
+    ...nearest.store.getState(),
+    entries: opts.entries ?? [KPAO],
+    ownship: opts.ownship ?? null,
+  });
   const footerStore = footer.make({ ...footer.store.getState(), ...opts.footerState });
   const wrap = (children: ReactNode) => (
     <gps.Provider store={gpsStore}>
@@ -42,7 +51,7 @@ async function renderFooter(
     </gps.Provider>
   );
   const view = await render(wrap(<FlightLogFooter width={400} bottomInset={20} />));
-  return { view, footerStore };
+  return { view, footerStore, nearestStore };
 }
 
 const nrst = (view: Awaited<ReturnType<typeof renderFooter>>['view']) =>
@@ -125,6 +134,13 @@ describe('FlightLogFooter', () => {
     expect(label).toContain('NOTAM');
     const plain = await renderFooter({ entries: [KPAO] });
     expect(nrst(plain.view).props.accessibilityLabel).not.toContain('permission');
+  });
+
+  it('refreshes the nearest list from ownship while the Nearest column is closed (the cell is always mounted)', async () => {
+    const { view, nearestStore } = await renderFooter({ entries: [], ownship: { lat: 37.4876, lon: -122.2289 } });
+    await act(async () => undefined); // let the refresher's query settle
+    expect(nearestStore.getState().entries.length).toBeGreaterThan(0);
+    expect(view.text()).not.toContain('NONE');
   });
 
   it('LAYERS toggles the strip between the layers column and the log', async () => {
