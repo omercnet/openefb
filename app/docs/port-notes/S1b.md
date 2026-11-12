@@ -62,3 +62,9 @@ No test uses the network.
 - `NotamCredentials.registrationURL` is exported as `FAA_REGISTRATION_URL` (a constant); the Settings UI is a U-ticket.
 - `Services/TFRService`, `PirepService`, `WindsAloftService`, `WeatherService`, `ProximityAlertService`, `IsraelAlertService`,
   `ReachabilityService` are S1 rows that are not in this PR (see the PR body for what is left).
+
+## After L3 (#42)
+
+`services/israelNotam.ts` now re-exports L3's Israel NOTAM value types and closure helpers (`domain/israel/notamTypes.ts`;
+`closureIsValid` and `isSuperseded` are aliases of `closureIsValidAt` and `notamIsSuperseded`). It keeps the relay decoder, the report,
+the freshness badge, `altitudeChartText` and `makeRouteClosure`.

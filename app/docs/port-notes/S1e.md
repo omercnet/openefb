@@ -1,4 +1,4 @@
-# S1e port notes: proximity alerts, reachability (IsraelAlertService pending)
+# S1e port notes: proximity alerts, reachability, Israel alerts
 
 Sources -> targets (under `src/services/`):
 
@@ -10,15 +10,21 @@ Tests: `ProximityAlertAltitudeTests` 10 of 10; the 3 proximity cases of `TFRServ
 `proximityAlertIgnoresInactiveTFRs`, `proximityAlertsSortedNearestFirst`) 3 of 3, with the TFR fixtures read in place.
 `ReachabilityService` has no Swift test (it wraps `NWPathMonitor`); 3 new tests cover the port.
 
-## IsraelAlertService: NOT in this change yet
+## IsraelAlertService (`israelAlertService.ts`)
 
-`IsraelAlertService` (221 lines) and its 9 cases in `IsraelAlertTests` (suite `IsraelAlertServiceTests`: outsideIsraelNothingIsEvaluated,
-raisesOnceAndCallsTheHapticOnlyForNewAlerts, evaluationIsThrottledToOncePerFiveSeconds, anAlertStaysUpForTenSecondsAfterItStopsApplying,
-theHeldAlertClearsAfterTheHoldTime, leavingIsraelClearsEverything, suspendingForALostFixDropsTheAlertsAndTheNextFixEvaluatesAtOnce,
-aClosureNewlyCoveringALegAheadRaisesOnceAndIsRedWhenFull, and the evaluator-area helper) depend on L3's `IsraelAlertEvaluator`
-(`domain/israel/alertEvaluator.ts`, `closureMarks.ts`, `notamTypes.ts`), which is in PR #42 and not on main. It is ported
-after #42 merges. L3 also asks S1 to import its Israel NOTAM value types instead of redefining them: at that point
-`services/israelNotam.ts` (S1b) drops its duplicate model types and re-exports L3's, keeping only the decoder.
+Ported after L3 (#42) merged. Tests: the 9 cases of `IsraelAlertServiceTests` (suite inside `IsraelAlertTests.swift`) 9 of 9, names
+kept, plus 3 JS-only tests. Differences:
+
+- `update` and `setReport` are async: the aviation database (D5) is async. A fix evaluated while a newer fix, `suspend()` or a
+  region change took over is dropped (epoch token), so an old position never publishes.
+- Closure marks: Swift rebuilds `IsraelChartFeatureBuilder.closures(...).marks` (M1, not ported) synchronously at each
+  evaluation. Here a `ClosureMarkBuilder` is injected; the default is a STAND-IN (CVFR closures valid now mapped through L3's
+  `mapClosures`, text "CLSD"/"CHECK NOTAM", a stale feed gives none). Marks rebuilt during an evaluation are used from the next
+  one (5 s later at most). M1 supplies the real chart wording through `closureMarks`.
+- CTR contacts are looked up before evaluation (the evaluator's callback is sync, `aerodrome()` is async).
+- The DEBUG-only `IsraelChartDebugNotamsPath` feed override is not ported (launch-argument plumbing, Apple/DEBUG only).
+- A database that fails to open is retried at the next evaluation; a failing airspace lookup still yields the border, closure and
+  squawk alerts. `onRaised` exceptions are logged, not propagated.
 
 ## Shape
 
