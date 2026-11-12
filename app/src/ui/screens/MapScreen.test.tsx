@@ -1,5 +1,6 @@
 import { act } from 'react';
 import { render } from '../../../tests/support/ui';
+import { EMPTY_SEARCH, searchSlice } from '../columns/search/search';
 import { appStore } from '../state/appStore';
 import { MapScreen } from './MapScreen';
 
@@ -24,10 +25,15 @@ const hasBackButton = (view: Awaited<ReturnType<typeof render>>) =>
 
 describe('MapScreen', () => {
   // Reset before each test, not after: the helper unmounts the trees after each test, and an update to a mounted tree needs act.
-  beforeEach(() => appStore.setState({ stripColumn: 'log', selectedAirportId: null }));
+  beforeEach(() => {
+    appStore.setState({ stripColumn: 'log', selectedAirportId: null });
+    searchSlice.store.setState(EMPTY_SEARCH, true); // the Search column's state outlives the column
+  });
 
   it.each([
     ['layers', 'layers', null],
+    ['nearest', 'nearest', null],
+    ['search', 'search', null],
     ['airport', 'airport', 'KSQL'],
     ['map', 'log', null],
     ['night', 'log', null],

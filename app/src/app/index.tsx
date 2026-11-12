@@ -8,7 +8,18 @@ import { MapScreen } from '../ui/screens/MapScreen';
 // (NSUserDefaults), because `simctl openurl` with a custom scheme stops at a system confirmation that cannot be
 // accepted headlessly; on web `?screen=airport`. Android uses the kanaf-dev://<screen> deep link, which the router
 // resolves straight to its route, so this screen only sees launches without a URL.
-const LAUNCH_SCREENS = ['airport', 'night', 'layers', 'map-layers', 'selftest', 'sheet', 'ota'];
+const LAUNCH_SCREENS = [
+  'airport',
+  'night',
+  'layers',
+  'map-layers',
+  'nearest',
+  'search',
+  'log',
+  'selftest',
+  'sheet',
+  'ota',
+];
 
 /** The screen requested at launch without a deep link (iOS launch argument, web query), if any. */
 function launchScreen(): string | null {
