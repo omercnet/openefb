@@ -617,4 +617,38 @@ describe('review fixes on #45', () => {
     expect(store.getState().notam).toMatchObject({ clientID: 'id-edited', clientSecret: 'secret', configured: true });
     expect(await secrets.get(NOTAM_CLIENT_ID_KEY)).toBe('id');
   });
+
+  it("a retry queued behind a different region change does not use the earlier region's failure state", async () => {
+    const inner = createMemoryUserData();
+    let failSave = false;
+    const gate = Promise.withResolvers<void>();
+    const userData = withSettings(inner, {
+      update: async (patch) => {
+        if (patch.regionRaw === 'israel') {
+          await gate.promise;
+          if (failSave) throw new Error('disk full');
+        }
+        return inner.settings.update(patch);
+      },
+    });
+    const onRegionChange = jest.fn().mockImplementationOnce(() => {
+      throw new Error('map not ready');
+    });
+    const { store } = setup({ onRegionChange }, userData);
+    await store.getState().load();
+    gate.resolve();
+    await store.getState().setRegion('us'); // saved, notification failed
+    const gate2 = Promise.withResolvers<void>();
+    failSave = true;
+    userData.settings.update = async (patch) => {
+      await gate2.promise;
+      throw new Error('disk full');
+    };
+    const change = store.getState().setRegion('israel'); // its save waits
+    const retry = store.getState().setRegion('israel'); // retried during that wait
+    gate2.resolve();
+    await Promise.all([change, retry]);
+    expect(store.getState().regionSaveError).toContain('could not be saved');
+    expect((await inner.settings.get())?.regionRaw).toBe('us');
+  });
 });
