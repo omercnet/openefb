@@ -80,7 +80,7 @@ export class MapStatusReporter {
 }
 
 /** One reporter per mounted surface, plus the native-log capture and the 40 s "never fully rendered" snapshot. */
-export function useMapStatus(night: boolean): MapStatusReporter {
+export function useMapStatus(night: boolean, onNativeLog?: (level: string, message: string) => void): MapStatusReporter {
   const [reporter] = useState(() => new MapStatusReporter(night));
 
   useEffect(() => {
@@ -91,6 +91,7 @@ export function useMapStatus(night: boolean): MapStatusReporter {
   useEffect(() => {
     LogManager.onLog(({ level, tag, message }) => {
       reporter.addNative(`${level} ${tag} ${message}`);
+      onNativeLog?.(level, message);
       return false; // keep MapLibre's own console output
     });
     LogManager.start();
@@ -99,7 +100,7 @@ export function useMapStatus(night: boolean): MapStatusReporter {
       clearTimeout(snapshot);
       LogManager.stop();
     };
-  }, [reporter]);
+  }, [reporter, onNativeLog]);
 
   return reporter;
 }

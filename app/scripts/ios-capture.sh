@@ -71,9 +71,9 @@ wait_map() {
   sleep 2   # symbol fade-in
 }
 
-# Screens with no map (a native sheet, the settings forms) wait a fixed time instead of for the map status.
-NO_MAP=" sheet settings onboarding disclaimers "
-for screen in map map-layers airport night layers sheet settings onboarding disclaimers; do
+# Screens with no map (a native sheet, the log, the settings forms) wait a fixed time instead of for the map status.
+NO_MAP=" sheet log settings onboarding disclaimers "
+for screen in map map-layers airport night layers nearest search log sheet settings onboarding disclaimers; do
   stamp "screen $screen"
   rm -f "$DOCS/map-status.json"
   launch -KanafScreen "$screen"

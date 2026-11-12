@@ -2,6 +2,7 @@
 // SwiftUI views in Views/Log/FlightLogStrip.swift and FlightLogRows.swift read). GPS quality comes from state/gps.ts,
 // the panel toggles from state/panels.ts and the nearest airport from columns/nearest/store.ts. I1 feeds the services in.
 import type { Region } from '../../domain/core';
+import type { GpsFix } from '../../domain/location/gpsStatus';
 import type { PredictedEvent } from '../../domain/prediction';
 import type { RecordingStatus } from '../../domain/recording/recordingCoordinator';
 import { createStoreContext } from '../state/storeContext';
@@ -38,6 +39,11 @@ export interface FlightLogData extends NavState {
   region: Region;
   /** The location stream works (AppState.gpsAvailable). */
   gpsAvailable: boolean;
+  /**
+   * The last fix (AppState.ownshipPosition with MapViewModel's gpsStationary), null before the first. The strip reads the
+   * evaluated status from `state/gps`; the Log (LogStackView) ages this fix itself, once a second, to hide a stale ETE.
+   */
+  ownshipFix: GpsFix | null;
   /** AppState.ownshipPosition is set. */
   hasPosition: boolean;
   /** The fix carries an altitude (vertical accuracy >= 0; Wi-Fi-only fixes have none). */
