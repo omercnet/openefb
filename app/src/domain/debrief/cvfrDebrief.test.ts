@@ -2,8 +2,8 @@
 // and unplanned), time-weighted altitude adherence with aerodrome exclusion zones and two-number altitudes,
 // reporting-point passage, Hebrew/English position-report matching, and the unrolled profile (distance axis,
 // excluded zones, verdict).
-// Two cases wait on ports that are not on main yet and are test.todo: the RecordingDatabase route-leg round trip (data
-// track) and the bundled LLHZ -> LLIB route (needs the L3 IsraelRoutePlanner and the bundled Israel database).
+// One case waits on a port that is not on main yet and is test.todo: the RecordingDatabase route-leg round trip (data
+// track). The bundled LLHZ -> LLIB route runs in tests/domain/israel/routePlannerDb.test.ts (L3).
 import { polylineLengthNm } from './cvfrDebrief';
 import {
   adherence,
@@ -44,6 +44,25 @@ const t0 = 1_700_000_000_000;
 const flightID = 'cvfr-test-flight';
 const at = (second: number): number => t0 + second * 1000;
 
+/** Segment fields the debrief ignores (the data layer's IsraelRouteSegment carries them; Swift's init defaults them). */
+const SEGMENT_DEFAULTS = {
+  fromPointID: 0,
+  toPointID: 0,
+  nameEnglish: null,
+  nameHebrew: null,
+  lengthNM: null,
+  isCivil: true,
+  isMilitary: false,
+  isByRequest: false,
+  bearingTrue: 90,
+  lowerAltitudeFeet: null,
+  mapSheet: null,
+  network: 'cvfr',
+  activity: 'unspecified',
+  activitySource: null,
+  smallOnly: false,
+} as const;
+
 /** One segment along lat 32.0 (west -> east between the given longitudes). */
 function segment(
   id: number,
@@ -69,6 +88,7 @@ function segment(
       { lat, lon: lon0 },
       { lat, lon: lon1 },
     ],
+    ...SEGMENT_DEFAULTS,
   };
 }
 
@@ -106,7 +126,16 @@ function eastbound(
 const transcript = (text: string, second: number): CVFRTranscriptSegment => ({ timestamp: at(second), text });
 
 function reportingPoint(code: string, en: string | null, he: string | null, lon: number): IsraelReportingPoint {
-  return { id: 1, code, nameEnglish: en, nameHebrew: he, kind: 'compulsory', latitude: 32.0, longitude: lon };
+  return {
+    id: 1,
+    code,
+    nameEnglish: en,
+    nameHebrew: he,
+    kind: 'compulsory',
+    latitude: 32.0,
+    longitude: lon,
+    network: 'cvfr',
+  };
 }
 
 const byCode = (...points: IsraelReportingPoint[]) => new Map(points.map((p) => [p.code, p]));
@@ -354,6 +383,7 @@ test('vocabulary lists hebrew and english names once and skips aerodromes', () =
       kind: 'arp',
       latitude: 32.18,
       longitude: 34.83,
+      network: 'cvfr',
     },
   ];
   expect(vocabulary(points)).toEqual(['Afek', 'אפק']);
@@ -565,6 +595,7 @@ function outAndBackDebrief(home: IsraelReportingPoint): CVFRDebrief {
     kind: 'compulsory',
     latitude: 32.015,
     longitude: 35.0,
+    network: 'cvfr',
   };
   return buildCVFRDebrief({
     trackPoints: [...out, ...back],
@@ -584,6 +615,7 @@ test('an out and back route gives one passage per visit of the home point', () =
     kind: 'arp',
     latitude: 32.0,
     longitude: 34.8,
+    network: 'cvfr',
   };
   const debrief = outAndBackDebrief(home);
   expect(debrief.legs).toHaveLength(2);
@@ -646,8 +678,5 @@ test('a track gap closes an excursion', () => {
 
 // MARK: Bundled network
 
-// Swift plannedLLHZToLLIBFlownHighIsMeasuredAgainstTheBundledAltitudes: plans LLHZ -> LLIB with IsraelRoutePlanner
-// over the bundled Israel database, flies it 150 ft high and expects every measured leg 100% within ±200 ft, the
-// points LLHZ ... LLIB within 0.5 NM, and an unplanned match of the same track. Needs the L3 planner and a Node-side
-// opener for the bundled database.
-test.todo('planned LLHZ to LLIB flown high is measured against the bundled altitudes');
+// Swift plannedLLHZToLLIBFlownHighIsMeasuredAgainstTheBundledAltitudes needs the bundled Israel database from Node, so
+// it runs in tests/domain/israel/routePlannerDb.test.ts (L3 route planner over the bundled database).
