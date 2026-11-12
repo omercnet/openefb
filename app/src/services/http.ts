@@ -26,8 +26,9 @@ export async function fetchWithTimeout(
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      controller.abort();
+      // Reject the deadline first: an abort listener that rejects the body must not win the race with AbortError.
       reject(new RequestTimeoutError(url, timeoutMs));
+      controller.abort();
     }, timeoutMs);
     (timer as { unref?: () => void }).unref?.();
   });
