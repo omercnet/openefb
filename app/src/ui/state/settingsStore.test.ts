@@ -651,4 +651,60 @@ describe('review fixes on #45', () => {
     expect(store.getState().regionSaveError).toContain('could not be saved');
     expect((await inner.settings.get())?.regionRaw).toBe('us');
   });
+
+  it('a reload after a failed region save keeps the chosen region, so Retry still has something to retry', async () => {
+    const inner = createMemoryUserData();
+    let broken = true;
+    const userData = withSettings(inner, {
+      update: (patch) => (broken ? Promise.reject(new Error('disk full')) : inner.settings.update(patch)),
+    });
+    const { store } = setup({}, userData);
+    await store.getState().load();
+    await store.getState().setRegion('us');
+    await store.getState().load();
+    expect(store.getState().region).toBe('us');
+    broken = false;
+    await store.getState().setRegion('us');
+    expect((await inner.settings.get())?.regionRaw).toBe('us');
+    expect(store.getState().regionSaveError).toBeNull();
+  });
+
+  it('a late failure of an older region save does not overwrite the current region state', async () => {
+    const inner = createMemoryUserData();
+    const gate = Promise.withResolvers<void>();
+    const hold = Promise.withResolvers<void>();
+    const userData = withSettings(inner, {
+      update: async (patch) => {
+        if (patch.regionRaw === 'us') {
+          await gate.promise;
+          throw new Error('disk full');
+        }
+        await hold.promise; // the newer save is still running when the older one fails
+        return inner.settings.update(patch);
+      },
+    });
+    const { store } = setup({}, userData);
+    await store.getState().load();
+    const first = store.getState().setRegion('us');
+    const second = store.getState().setRegion('israel');
+    gate.resolve();
+    await first;
+    expect(store.getState().region).toBe('israel');
+    expect(store.getState().regionSaveError).toBeNull();
+    hold.resolve();
+    await second;
+    expect(store.getState().regionSaveError).toBeNull();
+  });
+
+  it('NOTAM fields the user cleared while load is reading stay cleared', async () => {
+    const { store, secrets } = setup();
+    await secrets.set(NOTAM_CLIENT_ID_KEY, 'saved-id');
+    await secrets.set(NOTAM_CLIENT_SECRET_KEY, 'saved-secret');
+    await store.getState().load();
+    const loading = store.getState().load();
+    store.getState().setNotamClientID('');
+    store.getState().setNotamClientSecret('');
+    await loading;
+    expect(store.getState().notam).toMatchObject({ clientID: '', clientSecret: '' });
+  });
 });
