@@ -151,16 +151,46 @@ describe('loadFlight', () => {
   });
 
   it('closes the panel again when a reload finds no transcript', async () => {
-    const s = setup();
+    let reads = 0;
+    const s = setup({
+      openSource: async () => makeSource({ transcriptSegments: async () => (++reads === 1 ? lines : []) }),
+    });
     await s.store.getState().loadFlight(flight);
     expect(s.store.getState().isTranscriptPanelExpanded).toBe(true);
-    const empty = createReplayStore({
-      engine: s.engine,
-      source: async () => makeSource({ transcriptSegments: async () => [] }),
-      openAudio: async () => null,
+    await s.store.getState().loadFlight(flight);
+    expect(s.store.getState().isTranscriptPanelExpanded).toBe(false);
+  });
+
+  it('replacing a flight that is playing stops playback (the control says Play, the map and the audio stand still)', async () => {
+    const audio = new FakeAudio();
+    const s = setup({ openAudio: async () => audio });
+    await s.store.getState().loadFlight({ id: 'flight-1', audioFileURL: 'a.m4a' });
+    s.store.getState().togglePlayPause();
+    expect(s.scheduler.active).toBe(1);
+    await s.store.getState().loadFlight(flight);
+    expect(s.store.getState().isPlaying).toBe(false);
+    expect(s.scheduler.active).toBe(0);
+    expect(audio.isPlaying).toBe(false);
+  });
+
+  it('a read of the old flight that finishes while the new load is still opening does not commit its data', async () => {
+    const slow = Promise.withResolvers<ReplayTrackPoint[]>();
+    const open = Promise.withResolvers<ReplaySource>();
+    let opened = 0;
+    const s = setup({
+      openSource: () =>
+        ++opened === 1 ? Promise.resolve(makeSource({ trackPoints: () => slow.promise })) : open.promise,
     });
-    await empty.getState().loadFlight(flight);
-    expect(empty.getState().isTranscriptPanelExpanded).toBe(false);
+    const first = s.store.getState().loadFlight(flight);
+    await flush();
+    const second = s.store.getState().loadFlight(flight); // waiting for the database
+    slow.resolve(points);
+    await first;
+    expect(s.engine.trackPointCount).toBe(0);
+    expect(s.store.getState().trackPoints).toHaveLength(0);
+    open.resolve(makeSource());
+    await second;
+    expect(s.store.getState().trackPoints).toHaveLength(10);
   });
 
   describe('audio', () => {
@@ -291,6 +321,17 @@ describe('loadFlight', () => {
       expect(store.getState().trackPoints).toHaveLength(4);
       expect(engine.trackPointCount).toBe(4);
       expect(store.getState().isLoading).toBe(false);
+    });
+
+    it('a failed read releases the player it had opened (the engine never attached it)', async () => {
+      const audio = new FakeAudio();
+      const { store } = setup({
+        source: makeSource({ trackPoints: () => Promise.reject(new Error('disk')) }),
+        openAudio: async () => audio,
+      });
+      await store.getState().loadFlight({ id: 'flight-1', audioFileURL: 'a.m4a' });
+      expect(store.getState().loadError).toMatch(/disk/);
+      expect(audio.stopped).toBeGreaterThanOrEqual(1);
     });
 
     it('a load superseded while reading releases the player it had opened (the engine never attached it)', async () => {
