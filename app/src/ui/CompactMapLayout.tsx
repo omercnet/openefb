@@ -4,7 +4,7 @@
 // (airport, nearest, layers, search) covers only the area above the NOW cell: the chart stays mounted under it, NOW and
 // the footer stay visible.
 import type { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, StyleSheet, View } from 'react-native';
 import { FlightLogFooter } from './flightLog/FlightLogFooter';
 import { FlightLogHeader } from './flightLog/FlightLogHeader';
 import { FlightLogNotices } from './flightLog/FlightLogNotices';
@@ -15,6 +15,7 @@ import { ColumnRule, ThemeContext } from './Primitives';
 import { useAppStore } from './state/appStore';
 import { panels } from './state/panels';
 import { STRIP_COLUMNS, useStripChrome, type StripScreen } from './StripColumn';
+import { useKeyboardVisible } from './useKeyboardVisible';
 
 /** Hidden from VoiceOver and TalkBack while an opened column covers it. */
 const covered = { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' } as const;
@@ -36,11 +37,17 @@ export function CompactMapLayout({
   const column = useAppStore((s) => s.stripColumn);
   const showsFlightLog = panels.useData((s) => s.showsFlightLog);
   const { data, showsInstruments } = useFlightLog();
+  const keyboardVisible = useKeyboardVisible();
   const Column = STRIP_COLUMNS[column];
   const columnOpen = ready && column !== 'log';
   return (
     <ThemeContext.Provider value={theme}>
-      <View style={{ flex: 1, backgroundColor: theme.paper }} testID="compact-map-layout">
+      {/* Like SwiftUI, the layout shrinks above the software keyboard (Search types into it), so the footer stays visible. */}
+      <KeyboardAvoidingView
+        behavior="padding"
+        style={{ flex: 1, backgroundColor: theme.paper }}
+        testID="compact-map-layout"
+      >
         {/* The header band runs up under the status bar. */}
         <View style={{ height: top, backgroundColor: theme.paperSecondary }} />
         <View style={{ flex: 1 }}>
@@ -80,11 +87,11 @@ export function CompactMapLayout({
           </View>
         ) : null}
         {ready ? (
-          <FlightLogFooter compact width={width} bottomInset={bottom} />
+          <FlightLogFooter compact width={width} bottomInset={keyboardVisible ? 0 : bottom} />
         ) : (
-          <View style={{ height: bottom }} />
+          <View style={{ height: keyboardVisible ? 0 : bottom }} />
         )}
-      </View>
+      </KeyboardAvoidingView>
     </ThemeContext.Provider>
   );
 }

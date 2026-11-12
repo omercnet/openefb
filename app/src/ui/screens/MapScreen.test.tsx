@@ -1,6 +1,6 @@
 import { act, useEffect } from 'react';
-import { Dimensions, Platform, StyleSheet, View } from 'react-native';
-import { press, render, type Rendered } from '../../../tests/support/ui';
+import { DeviceEventEmitter, Dimensions, Platform, StyleSheet, View } from 'react-native';
+import { ancestorProp, press, render, type Rendered } from '../../../tests/support/ui';
 import { EMPTY_SEARCH, searchSlice } from '../columns/search/search';
 import { appStore } from '../state/appStore';
 import { panels } from '../state/panels';
@@ -165,6 +165,26 @@ describe('MapScreen layouts (U5)', () => {
     const view = await render(<MapScreen />);
     expect(has(view, 'compact-map-layout')).toBe(false);
     expect(has(view, 'flight-log-above-now')).toBe(true);
+  });
+
+  it.each(['ios', 'android'] as const)('on %s the compact layout pads for the software keyboard', async (os) => {
+    jest.replaceProperty(Platform, 'OS', os);
+    await setWindow(...IPHONE);
+    const view = await render(<MapScreen />);
+    expect(ancestorProp(view.byTestId('NRST'), 'behavior')).toBe('padding');
+    jest.restoreAllMocks();
+  });
+
+  it('the compact footer drops the home-indicator padding while the keyboard covers it', async () => {
+    await setWindow(...IPHONE);
+    const view = await render(<MapScreen />);
+    const nrst = () => StyleSheet.flatten(view.byTestId('NRST').props.style);
+    const before = nrst().paddingBottom;
+    expect(before).toBeGreaterThan(0);
+    await act(async () => DeviceEventEmitter.emit('keyboardWillShow', {}));
+    expect(nrst().paddingBottom).toBe(0);
+    await act(async () => DeviceEventEmitter.emit('keyboardWillHide', {}));
+    expect(nrst().paddingBottom).toBe(before);
   });
 
   it('follows a resize across the threshold', async () => {
