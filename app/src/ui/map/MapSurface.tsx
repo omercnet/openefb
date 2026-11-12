@@ -81,6 +81,13 @@ export function MapSurface({
   const mapStyle = useMemo(() => styleFor(night, sectional), [night, sectional]);
   const groups = useMemo(() => groupBySource(layers), [layers]);
   const reporter = useMapStatus(night);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   // Imperative camera moves from the reducer. Each `seq` is applied once.
   // A command is only dropped once it was handed to the Camera: one that arrives before the ref exists (or before the
@@ -125,6 +132,7 @@ export function MapSurface({
         // Give symbol placement a moment, count what each layer placed, then tell CI the map is ready.
         // Data layers fill in as the aviation database opens, so the probe repeats until airports were placed (or 15 tries).
         const probe = async (attempt: number) => {
+          if (!mounted.current) return;
           const rendered: Record<string, number | string> = {};
           for (const id of PROBED_LAYERS) {
             rendered[id] =
@@ -134,6 +142,7 @@ export function MapSurface({
               )) ?? 'no map';
           }
           const dataReady = typeof rendered['airport-circles'] === 'number' && rendered['airport-circles'] > 0;
+          if (!mounted.current) return; // unmounted while querying: never write a stale status
           if (dataReady || attempt >= 15) reporter.markRendered(rendered);
           else setTimeout(() => void probe(attempt + 1), 1000);
         };
