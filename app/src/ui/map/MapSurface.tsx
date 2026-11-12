@@ -1,149 +1,138 @@
-// Native chart: MapLibre React Native v11 with the SwiftUI app's base-style.json (street vector map plus the
-// FAA VFR sectional raster from zoom 8), airport dots from aviation.sqlite (R-tree bbox on the visible region),
-// the track ruler and the ownship chevron. Layer order and paints follow efb-212/Services/MapService.swift.
-// kanaf-dev://map?animate=1 (Android) or `-KanafAnimate 1` (iOS launch argument) moves the ownship along its track at
-// 10 Hz for 60 s and records JS frame pacing. Map lifecycle events and MapLibre native warnings are logged as
-// "SPIKE_MAP {...}" and written to map-status.json so CI can wait for a fully rendered map before a screenshot.
-import { Camera, GeoJSONSource, Images, Layer, LogManager, Map, type MapRef, type StyleSpecification } from '@maplibre/maplibre-react-native';
-import * as Linking from 'expo-linking';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Settings } from 'react-native';
-import baseStyle from '../../../assets/base-style.json';
-import { scenario } from '../../fixtures/scenario';
-import { ANIMATION_FILE, MAP_STATUS_FILE, writeResult } from '../../adapters/resultFile';
-import { airportsInBox, openAviationDb } from '../../adapters/aviationDb';
-import { destination, pacing, trackRuler } from './geo';
+// Production native map surface: MapLibre React Native v11 with the SwiftUI app's base-style.json (street vector map plus
+// the FAA VFR sectional, shown at runtime), and every flight-data layer rendered from the layer registry
+// (src/domain/map/layers.ts and the Israel registry). Risk R6: layers are DATA. The surface maps the registry with one
+// loop, so the React child count is fixed (one source per registry source, one layer per spec) whatever is on screen.
+// The surface is presentational: data comes from MapDataController (hooks in useMapData.ts), camera moves from the
+// camera reducer, and navigation is wired by I1.
+import { Camera, GeoJSONSource, ImageSource, Images, Layer, Map, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import type { Coordinate, MapLayer, Region } from '../../domain/core';
+import type { CameraCommand } from '../../domain/map/camera';
+import { EMPTY_COLLECTION, type FeatureCollection } from '../../domain/map/geojson';
+import { isLayerVisible, type LayerSpec, type StyleValue } from '../../domain/map/layerSpec';
+import { OWNSHIP_LIVE_ICON, OWNSHIP_STALE_ICON, TRACK_RULER_TICK_ICON } from '../../domain/map/layers';
+import { isTileFailureLog } from '../../domain/map/tileLog';
+import { DIAGRAM_IMAGE_SOURCE_IDS, type DiagramImageSource } from '../../domain/diagram/layers';
+import { PROBED_LAYERS, useMapStatus } from './mapStatus';
+import { groupBySource, resolveLayerProps, styleFor, type LayerOverrides } from './surfaceModel';
 
-const { ownship } = scenario;
-const ORIGIN: [number, number] = [ownship.lon, ownship.lat];
-const UPDATE_MS = 100; // 10 Hz, the SwiftUI app's location update rate
-const ANIMATION_MS = 60_000;
-
-// MapService / DesignTokens colors: ruler ink and halo per display mode, night raster dimming (NightPalette).
-const INK = { day: '#14191F', night: '#B6B0A3' };
-const HALO = { day: '#FFFFFF', night: '#0D1013' };
-const NIGHT_RASTER = { 'raster-brightness-max': 0.55, 'raster-saturation': -0.35 };
-
-/**
- * base-style.json with the FAA sectional shown, dimmed and desaturated at night (MapService.applyDisplayMode).
- * The style ships the sectional with `visibility: none`; the SwiftUI app turns it on at runtime in
- * MapService.setMapStyle(_:sectional:) (`isVisible = sectional`), so a plain copy of the style shows no chart.
- */
-function styleFor(night: boolean): StyleSpecification {
-  const style = baseStyle as unknown as StyleSpecification;
-  return {
-    ...style,
-    layers: style.layers.map((l) => (l.id === 'base-vfr-sectional' && l.type === 'raster'
-      ? { ...l, layout: { ...l.layout, visibility: 'visible' }, paint: night ? { ...l.paint, ...NIGHT_RASTER } : l.paint }
-      : l)),
-  };
+/** What the surface tells its owner about the viewport. `userInteraction` is true for finger gestures. */
+export interface MapViewChange {
+  center: Coordinate;
+  zoom: number;
+  bearing: number;
+  northEast: Coordinate;
+  southWest: Coordinate;
+  userInteraction: boolean;
+  animated: boolean;
 }
 
-type MapStatus = {
-  platform: string; night: boolean; events: Record<string, number>; fullyRendered: boolean; failed: boolean; native: string[];
-  /** queryRenderedFeatures count per layer: a symbol layer at 0 was not placed (image / glyph problem); a count > 0
-   *  with nothing on screen means placed but not drawn (renderer / GPU problem). */
-  rendered?: Record<string, number | string>;
-  missingImages: string[];
-};
-
-const PROBED_LAYERS = ['ownship-symbol', 'track-ruler-ticks', 'track-ruler-line', 'airport-circles', 'street-place-label'];
-
-/** Records the first occurrence of a lifecycle event (ms since mount), then logs and persists the cumulative status. */
-function report(status: MapStatus, t0: number, event: string) {
-  if (event in status.events) return; // render events repeat on every change; the first one is what CI waits for
-  status.events[event] = Math.round(performance.now() - t0);
-  if (event === 'didFailLoadingMap') status.failed = true;
-  console.log('SPIKE_MAP ' + JSON.stringify(status));
-  writeResult(MAP_STATUS_FILE, status).catch((e) => console.warn('map status write failed', e));
+export interface MapSurfaceProps {
+  night: boolean;
+  /** Runtime visibility of the FAA sectional (MapService.setMapStyle sectional flag). */
+  sectional: boolean;
+  region: Region;
+  /** Local glyph URL template (see adapters/glyphInstall.ts); labels render with no network. */
+  glyphsUrl: string;
+  visibleLayers: ReadonlySet<MapLayer>;
+  /** Layer registry in draw order (core + Israel). Sources used by the specs are rendered, in first-use order. */
+  layers: readonly LayerSpec[];
+  /** GeoJSON per source id; a missing id draws nothing. */
+  sources: Readonly<Record<string, FeatureCollection>>;
+  /** Per-layer overrides that win over the toggle and the spec paint (the official Israel chart base uses them). */
+  overrides?: LayerOverrides;
+  /** Image sources by id (airport diagram slots); a slot id without an entry renders nothing. */
+  imageSources?: Readonly<Record<string, DiagramImageSource>>;
+  initialView: { center: Coordinate; zoom: number };
+  /** Applied when `seq` changes; null means no pending move. */
+  camera: { seq: number; command: CameraCommand | null };
+  onViewChange?: (change: MapViewChange) => void;
+  onStyleLoaded?: () => void;
+  /** Basemap tile health: 'error' for a native log line that looks like a failed request, 'ok' once the map is fully rendered. */
+  onTileHealth?: (event: 'error' | 'ok') => void;
 }
 
-/** The MapLibre chart with ownship, track ruler and airport dots; reports render status for CI. */
-export function MapSurface({ night }: { night: boolean }) {
+type AnyLayerProps = Parameters<typeof Layer>[0];
+
+const LayerFromSpec = memo(function LayerFromSpec({
+  spec,
+  visible,
+  night,
+  visibilityOverride,
+  paintOverride,
+}: {
+  spec: LayerSpec;
+  visible: boolean;
+  night: boolean;
+  visibilityOverride: boolean | undefined;
+  paintOverride: Record<string, StyleValue> | undefined;
+}) {
+  const props = { id: spec.id, type: spec.type, ...resolveLayerProps(spec, { visible, night, visibilityOverride, paintOverride }) };
+  return <Layer {...(props as unknown as AnyLayerProps)} />;
+});
+
+export function MapSurface({
+  night,
+  sectional,
+  region,
+  glyphsUrl,
+  visibleLayers,
+  layers,
+  sources,
+  overrides,
+  imageSources,
+  initialView,
+  camera,
+  onViewChange,
+  onStyleLoaded,
+  onTileHealth,
+}: MapSurfaceProps) {
   const mapRef = useRef<MapRef>(null);
-  const mapStyle = useMemo(() => styleFor(night), [night]);
-  const t0 = useRef(performance.now()).current;
-  const status = useRef<MapStatus>({ platform: Platform.OS, night, events: {}, fullyRendered: false, failed: false, native: [], missingImages: [] }).current;
-  const [position, setPosition] = useState(ORIGIN);
-  const [airports, setAirports] = useState<GeoJSON.FeatureCollection>({ type: 'FeatureCollection', features: [] });
-  const url = Linking.useURL();
-  const animate = Platform.OS === 'ios' ? String(Settings.get('KanafAnimate') ?? '') === '1' : /[?&]animate=1\b/.test(url ?? '');
-
-  // MapLibre native warnings and errors (tile, glyph, sprite and style failures) into the status file.
-  useEffect(() => {
-    LogManager.onLog(({ level, tag, message }) => {
-      // Capped so the SPIKE_MAP logcat line stays under Android's ~4 KB limit.
-      if (status.native.length < 12) status.native.push(`${level} ${tag} ${message}`.slice(0, 200));
-      return false; // keep MapLibre's own console output
-    });
-    LogManager.start();
-    // Persist late native messages too, and mark a map that never reached "fully rendered" within 40 s.
-    const snapshot = setTimeout(() => report(status, t0, 'snapshot40s'), 40_000);
-    return () => {
-      clearTimeout(snapshot);
-      LogManager.stop();
-    };
-  }, [status, t0]);
-
-  const loadAirports = async (bounds: [number, number, number, number]) => {
-    try {
-      const rows = await airportsInBox(await openAviationDb(), bounds);
-      setAirports({
-        type: 'FeatureCollection',
-        features: rows.map((a) => ({ type: 'Feature', id: a.icao, geometry: { type: 'Point', coordinates: [a.longitude, a.latitude] }, properties: { icao: a.icao } })),
-      });
-    } catch (e) {
-      console.warn('airport query failed', e);
-    }
-  };
-
-  useEffect(() => {
-    if (!animate) return;
-    const start = performance.now();
-    const frames: number[] = []; // requestAnimationFrame deltas, ms
-    const updates: number[] = []; // 10 Hz timer deltas, ms
-    let lastFrame = start;
-    let lastUpdate = start;
-    let raf = 0;
-    const onFrame = () => {
-      const now = performance.now();
-      frames.push(now - lastFrame);
-      lastFrame = now;
-      raf = requestAnimationFrame(onFrame);
-    };
-    raf = requestAnimationFrame(onFrame);
-    const timer = setInterval(() => {
-      const now = performance.now();
-      updates.push(now - lastUpdate);
-      lastUpdate = now;
-      // NM flown = knots * hours
-      setPosition(destination(ORIGIN, (ownship.gsKt * (now - start)) / 3_600_000, ownship.trkDeg));
-      if (now - start < ANIMATION_MS) return;
-      clearInterval(timer);
-      cancelAnimationFrame(raf);
-      const result = {
-        platform: Platform.OS,
-        durationMs: Math.round(now - start),
-        targetUpdateMs: UPDATE_MS,
-        rafDeltaMs: pacing(frames),
-        updateDeltaMs: pacing(updates),
-        map: status,
-      };
-      console.log('SPIKE_ANIM ' + JSON.stringify(result));
-      writeResult(ANIMATION_FILE, result).catch((e) => console.warn('animation result write failed', e));
-    }, UPDATE_MS);
-    return () => {
-      clearInterval(timer);
-      cancelAnimationFrame(raf);
-    };
-  }, [animate, status]);
-
-  const ruler = useMemo(() => trackRuler(position, ownship.trkDeg, ownship.gsKt, scenario.trackRulerMinutes), [position]);
-  const ownshipShape = useMemo<GeoJSON.FeatureCollection>(
-    () => ({ type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'Point', coordinates: position }, properties: { heading: ownship.trkDeg } }] }),
-    [position],
+  const cameraRef = useRef<CameraRef>(null);
+  const mapStyle = useMemo(() => styleFor(night, sectional, glyphsUrl), [night, sectional, glyphsUrl]);
+  const groups = useMemo(() => groupBySource(layers), [layers]);
+  const onNativeLog = useCallback(
+    (level: string, message: string) => {
+      if (isTileFailureLog(level, message)) onTileHealth?.('error');
+    },
+    [onTileHealth],
   );
-  const ink = night ? INK.night : INK.day;
+  const reporter = useMapStatus(night, onNativeLog);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  // Imperative camera moves from the reducer. Each `seq` is applied once.
+  // A command is only dropped once it was handed to the Camera: one that arrives before the ref exists (or before the
+  // map loaded) stays pending and is flushed on the next effect run or when the map finishes loading.
+  const pending = useRef<{ seq: number; command: CameraCommand } | null>(null);
+  const appliedSeq = useRef(-1);
+  const flushCamera = useCallback(() => {
+    const p = pending.current;
+    const cam = cameraRef.current;
+    if (!p || !cam) return;
+    pending.current = null;
+    const c = p.command;
+    cam
+      .setStop({
+        ...(c.center ? { center: [c.center.lon, c.center.lat] as [number, number] } : {}),
+        ...(c.zoom === null ? {} : { zoom: c.zoom }),
+        bearing: c.direction,
+        duration: c.animated ? 400 : 0,
+      })
+      .catch((e: unknown) => console.warn('camera move failed', e));
+  }, []);
+  useEffect(() => {
+    if (camera.seq !== appliedSeq.current) {
+      appliedSeq.current = camera.seq;
+      if (camera.command) pending.current = { seq: camera.seq, command: camera.command };
+    }
+    flushCamera();
+  }, [camera, flushCamera]);
 
   return (
     <Map
@@ -151,74 +140,91 @@ export function MapSurface({ night }: { night: boolean }) {
       style={{ flex: 1 }}
       mapStyle={mapStyle}
       compass={false}
-      onWillStartLoadingMap={() => report(status, t0, 'willStartLoadingMap')}
-      onDidFinishLoadingStyle={() => report(status, t0, 'didFinishLoadingStyle')}
-      onDidFailLoadingMap={() => report(status, t0, 'didFailLoadingMap')}
+      onWillStartLoadingMap={() => reporter.report('willStartLoadingMap')}
+      onDidFinishLoadingStyle={() => reporter.report('didFinishLoadingStyle')}
+      onDidFailLoadingMap={() => reporter.report('didFailLoadingMap')}
       onDidFinishRenderingMapFully={() => {
-        if ('didFinishRenderingMapFully' in status.events) return;
-        report(status, t0, 'didFinishRenderingMapFully');
+        onTileHealth?.('ok'); // fully rendered: every tile for this view arrived (cache or network)
+        if (reporter.has('didFinishRenderingMapFully')) return;
+        reporter.report('didFinishRenderingMapFully');
         // Give symbol placement a moment, count what each layer placed, then tell CI the map is ready.
-        setTimeout(async () => {
+        // Data layers fill in as the aviation database opens, so the probe repeats until airports were placed (or 15 tries).
+        const probe = async (attempt: number) => {
+          if (!mounted.current) return;
           const rendered: Record<string, number | string> = {};
           for (const id of PROBED_LAYERS) {
-            rendered[id] = await mapRef.current?.queryRenderedFeatures({ layers: [id] }).then((f) => f.length, (e) => String(e)) ?? 'no map';
+            rendered[id] =
+              (await mapRef.current?.queryRenderedFeatures({ layers: [id] }).then(
+                (f) => f.length,
+                (e) => String(e),
+              )) ?? 'no map';
           }
-          status.rendered = rendered;
-          status.fullyRendered = true;
-          report(status, t0, 'symbolsProbed');
-        }, 1000);
+          const dataReady = typeof rendered['airport-circles'] === 'number' && rendered['airport-circles'] > 0;
+          if (!mounted.current) return; // unmounted while querying: never write a stale status
+          if (dataReady || attempt >= 15) reporter.markRendered(rendered);
+          else setTimeout(() => void probe(attempt + 1), 1000);
+        };
+        setTimeout(() => void probe(1), 1000);
       }}
       onDidFinishLoadingMap={() => {
-        report(status, t0, 'didFinishLoadingMap');
-        mapRef.current?.getBounds().then(loadAirports);
+        reporter.report('didFinishLoadingMap');
+        flushCamera();
+        onStyleLoaded?.();
       }}
-      onRegionDidChange={(e) => loadAirports(e.nativeEvent.bounds)}
+      onRegionDidChange={(e) => {
+        const ev = e.nativeEvent;
+        const [west, south, east, north] = ev.bounds;
+        onViewChange?.({
+          center: { lat: ev.center[1], lon: ev.center[0] },
+          zoom: ev.zoom,
+          bearing: ev.bearing,
+          northEast: { lat: north, lon: east },
+          southWest: { lat: south, lon: west },
+          userInteraction: ev.userInteraction,
+          animated: ev.animated,
+        });
+      }}
     >
-      <Camera initialViewState={{ center: scenario.map.center, zoom: scenario.map.zoom }} />
-      <Images
-        images={{ 'ownship-chevron': require('./icons/ownship.png'), 'track-ruler-tick': { source: require('./icons/tick.png'), sdf: true } }}
-        onImageMissing={(e) => status.missingImages.push(e.nativeEvent.image)}
+      <Camera
+        ref={cameraRef}
+        initialViewState={{ center: [initialView.center.lon, initialView.center.lat], zoom: initialView.zoom }}
       />
-      <GeoJSONSource id="airports" data={airports}>
-        {/* Green flight-category dot with a white ring, as drawn over the sectional in the reference screenshots */}
-        <Layer type="circle" id="airport-circles" paint={{ 'circle-radius': 8, 'circle-color': '#34C759', 'circle-stroke-width': 1, 'circle-stroke-color': '#FFFFFF' }} />
-      </GeoJSONSource>
-      <GeoJSONSource id="track-ruler-line" data={ruler.line}>
-        <Layer type="line" id="track-ruler-line" paint={{ 'line-color': ink, 'line-width': 2 }} />
-      </GeoJSONSource>
-      <GeoJSONSource id="track-ruler-ticks" data={ruler.ticks}>
-        <Layer
-          type="symbol"
-          id="track-ruler-ticks"
-          layout={{
-            'icon-image': 'track-ruler-tick',
-            'icon-rotate': ['get', 'track'],
-            'icon-rotation-alignment': 'map',
-            'icon-allow-overlap': true,
-            'icon-ignore-placement': true,
-            'text-field': ['get', 'label'],
-            'text-font': ['Noto Sans Regular'],
-            'text-size': 12,
-            'text-anchor': ['get', 'anchor'],
-            'text-offset': [0.7, 0.7],
-            'text-allow-overlap': true,
-          }}
-          paint={{ 'icon-color': ink, 'text-color': ink, 'text-halo-color': night ? HALO.night : HALO.day, 'text-halo-width': 1.5 }}
-        />
-      </GeoJSONSource>
-      <GeoJSONSource id="ownship" data={ownshipShape}>
-        <Layer
-          type="symbol"
-          id="ownship-symbol"
-          layout={{
-            'icon-image': 'ownship-chevron',
-            'icon-rotate': ['get', 'heading'],
-            'icon-rotation-alignment': 'map',
-            'icon-allow-overlap': true,
-            'icon-ignore-placement': true,
-          }}
-        />
-      </GeoJSONSource>
+      <Images
+        images={{
+          [OWNSHIP_LIVE_ICON]: require('./icons/ownship.png'),
+          [OWNSHIP_STALE_ICON]: require('./icons/ownship-stale.png'),
+          [TRACK_RULER_TICK_ICON]: { source: require('./icons/tick.png'), sdf: true },
+        }}
+        onImageMissing={(e) => reporter.addMissingImage(e.nativeEvent.image)}
+      />
+      {groups.map((g) => {
+        const layers = g.specs.map((spec) => (
+          <LayerFromSpec
+            key={spec.id}
+            spec={spec}
+            night={night}
+            visible={isLayerVisible(spec, visibleLayers, region)}
+            visibilityOverride={overrides?.visibility[spec.id]}
+            paintOverride={overrides?.paint[spec.id]}
+          />
+        ));
+        if (DIAGRAM_IMAGE_SOURCE_IDS.includes(g.source)) {
+          const img = imageSources?.[g.source];
+          const [tl, tr, br, bl] = img?.coordinates ?? [];
+          if (!img || !tl || !tr || !br || !bl) return null;
+          // Keyed by url: a slot reused for another airport remounts, as the native source id and image are fixed at mount.
+          return (
+            <ImageSource key={`${g.source}:${img.url}`} id={g.source} url={img.url} coordinates={[tl, tr, br, bl]}>
+              {layers}
+            </ImageSource>
+          );
+        }
+        return (
+          <GeoJSONSource key={g.source} id={g.source} data={sources[g.source] ?? EMPTY_COLLECTION}>
+            {layers}
+          </GeoJSONSource>
+        );
+      })}
     </Map>
   );
 }

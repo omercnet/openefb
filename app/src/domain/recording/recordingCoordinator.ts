@@ -7,6 +7,7 @@
 // @MainActor State object is a plain object with subscribe().
 
 import { AppFailure, type AppError } from '../errors';
+import { durationBucket, type SignalArgs } from '../telemetry/schema';
 import { AutoStartGate } from './autoStartGate';
 import {
   systemClock,
@@ -93,6 +94,11 @@ export class RecordingState {
   }
 }
 
+/** The usage counts of a recording (Swift `Telemetry.signal`, added by A5); `Telemetry` in domain/telemetry fits. */
+export interface RecordingTelemetry {
+  signal<E extends 'Recording.started' | 'Recording.stopped'>(event: E, ...params: SignalArgs<E>): void;
+}
+
 export interface RecordingCoordinatorDeps {
   recordingStore: RecordingStore;
   audioRecorder: AudioRecorderLike;
@@ -103,6 +109,8 @@ export interface RecordingCoordinatorDeps {
   audioFileURL(flightID: string): string;
   clock?: Clock;
   newId?: () => string;
+  /** Counts "Recording.started" and "Recording.stopped". Best effort: a failure in it never fails a recording. */
+  telemetry?: RecordingTelemetry;
 }
 
 interface Cancellable {
@@ -119,6 +127,7 @@ export class RecordingCoordinator {
   private readonly audioFileURL: (flightID: string) => string;
   private readonly clock: Clock;
   private readonly newId: () => string;
+  private readonly telemetry: RecordingTelemetry | undefined;
 
   private trackRecorder: TrackRecorderLike | null = null;
   private timerTask: Cancellable | null = null;
@@ -140,6 +149,7 @@ export class RecordingCoordinator {
     this.audioFileURL = deps.audioFileURL;
     this.clock = deps.clock ?? systemClock;
     this.newId = deps.newId ?? randomUUID;
+    this.telemetry = deps.telemetry;
   }
 
   // MARK: Core lifecycle
@@ -260,6 +270,11 @@ export class RecordingCoordinator {
     }
 
     this.startTimer();
+    try {
+      this.telemetry?.signal('Recording.started');
+    } catch {
+      // Counting is never worth a failed recording.
+    }
     return flightID;
   }
 
@@ -314,6 +329,11 @@ export class RecordingCoordinator {
     this.currentFlightID = null;
     this.recordingStartDate = null;
     this.state.set({ recordingStatus: idleStatus, elapsedTime: 0 });
+    try {
+      this.telemetry?.signal('Recording.stopped', { durationMinutes: durationBucket((endDate - startDate) / 1000) });
+    } catch {
+      // Counting is never worth a lost summary.
+    }
     return summary;
   }
 

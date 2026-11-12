@@ -1,0 +1,19 @@
+{
+  "name": "telemetry",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Worker: anonymous usage counters for the Kanaf RN app, written to Workers Analytics Engine. Not deployed.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "wrangler dev --port 8788 --local",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0",
+    "wrangler": "^4.0.0"
+  }
+}
