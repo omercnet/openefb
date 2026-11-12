@@ -139,7 +139,10 @@ export function SettingsScreen({
           testID="display-mode-picker"
         />
         {s.preferenceError && s.preferenceErrorFor === 'displayMode' ? (
-          <NoteRow tone="caution" text={s.preferenceError} />
+          <>
+            <NoteRow tone="caution" text={s.preferenceError} />
+            <ButtonRow title="Try Saving Again" onPress={() => void s.retryPreferenceSave()} testID="display-retry" />
+          </>
         ) : null}
       </FormSection>
 
@@ -184,7 +187,7 @@ export function SettingsScreen({
             secureTextEntry
           />
           <ButtonRow title="Save Key" disabled={!canSaveNotamKey(s.notam)} onPress={() => void s.saveNotamKey()} />
-          {s.notam.configured ? (
+          {s.notam.configured || s.notam.partiallyStored ? (
             <ButtonRow title="Remove Key" tone="warning" onPress={() => void s.removeNotamKey()} />
           ) : null}
           {s.notam.message ? <NoteRow text={s.notam.message} /> : null}
@@ -201,7 +204,10 @@ export function SettingsScreen({
           testID="share-usage-data-toggle"
         />
         {s.preferenceError && s.preferenceErrorFor === 'shareUsageData' ? (
-          <NoteRow tone="caution" text={s.preferenceError} />
+          <>
+            <NoteRow tone="caution" text={s.preferenceError} />
+            <ButtonRow title="Try Saving Again" onPress={() => void s.retryPreferenceSave()} testID="privacy-retry" />
+          </>
         ) : null}
       </FormSection>
 
