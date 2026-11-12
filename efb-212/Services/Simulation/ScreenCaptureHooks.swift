@@ -111,13 +111,7 @@ enum ScreenCaptureHooks {
         case "notices":
             viewModel.microphoneDenied = true
             viewModel.lastError = .audioSessionFailed(underlying: Cause())
-            // The map checks the microphone permission once it is up and clears the flag; set it again after that.
-            Task { @MainActor in
-                for _ in 0..<40 {
-                    try? await Task.sleep(for: .milliseconds(500))
-                    viewModel.microphoneDenied = true
-                }
-            }
+            viewModel.captureForcesMicrophoneDenied = true
         case "stopped":
             viewModel.lastError = .recordingFailed(underlying: Cause())
             viewModel.showDiscardedNotice = true

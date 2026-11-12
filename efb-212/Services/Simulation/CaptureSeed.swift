@@ -51,6 +51,7 @@ enum CaptureSeed {
             settings.activePilotID = uuid(2, 1).uuidString
         }
         context.insert(settings)
+        try clearRecordings()
         guard profile == "capture" else { try context.save(); return }
 
         for (i, n) in ["N172KF", "N28PA", "4X-ABC"].enumerated() {
@@ -139,12 +140,20 @@ enum CaptureSeed {
         try seedRecording(flightID: flightID, start: flight.startDate)
     }
 
+    /// Drops every recorded flight and the audio files, so FlightRecoveryService has no orphan to restore as a flight.
+    private static func clearRecordings() throws {
+        let db = try RecordingDatabase()
+        for id in try db.flightIDsWithRecordedData() { try db.deleteFlightData(flightID: id) }
+        let dir = FlightRecoveryService.defaultAudioDirectory
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
+        for file in files where file.pathExtension == "m4a" { try? FileManager.default.removeItem(at: file) }
+    }
+
     static let trackPoints = 900
 
     /// LLHA -> LLMG in a straight line at 1 Hz: climb, cruise, descent; six transcript lines; no AI debrief.
     private static func seedRecording(flightID: UUID, start: Date) throws {
         let db = try RecordingDatabase()
-        for id in try db.flightIDsWithRecordedData() { try db.deleteFlightData(flightID: id) }
         try db.dbPool.write { dbc in
             for i in 0..<trackPoints {
                 let f = Double(i) / Double(trackPoints - 1)

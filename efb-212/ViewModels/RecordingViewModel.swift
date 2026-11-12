@@ -35,6 +35,10 @@ final class RecordingViewModel {
     /// True while microphone access is denied. Recording still captures the GPS track; the
     /// overlay says audio and transcript are off and how to fix it (Settings).
     var microphoneDenied: Bool = false
+    #if DEBUG
+    /// -OpenEFBRecording notices (ScreenCaptureHooks): the sync loop leaves microphoneDenied alone.
+    var captureForcesMicrophoneDenied = false
+    #endif
 
     // MARK: - Dependencies
 
@@ -188,6 +192,10 @@ final class RecordingViewModel {
 
     // MARK: - State Sync
 
+    #if DEBUG
+    func startSyncLoopForTesting() { startSyncLoop() }
+    #endif
+
     /// Periodically sync from RecordingCoordinator.State to update UI.
     private func startSyncLoop() {
         syncTask = Task { [weak self] in
@@ -198,8 +206,15 @@ final class RecordingViewModel {
                 let state = self.coordinator.state
                 self.recordingStatus = state.recordingStatus
                 // Covers auto-started recordings and permission changed in Settings mid-flight.
+                #if DEBUG
+                if !self.captureForcesMicrophoneDenied {
+                    self.microphoneDenied = state.recordingStatus == .recording
+                        && AVAudioApplication.shared.recordPermission == .denied
+                }
+                #else
                 self.microphoneDenied = state.recordingStatus == .recording
                     && AVAudioApplication.shared.recordPermission == .denied
+                #endif
                 self.elapsedTime = state.elapsedTime
                 self.currentPhase = state.currentPhase
                 self.recentTranscripts = state.recentTranscripts

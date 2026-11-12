@@ -79,6 +79,23 @@ struct ScreenCaptureHooksTests {
         #expect(CaptureSeed.profiles == ["capture", "capture-fresh"])
     }
 
+    @Test func microphoneNoticeIsForcedAgainstTheSyncLoop() async throws {
+        let (db, dbURL) = try TempRecordingDB.make()
+        defer { TempRecordingDB.remove(dbURL) }
+        let state = AppState()
+        let coordinator = RecordingCoordinator(
+            recordingDB: db, audioRecorder: MockAudioRecorder(), transcriptionService: MockTranscriptionService())
+        let vm = RecordingViewModel(coordinator: coordinator, appState: state)
+        ScreenCaptureHooks.applyRecording(to: vm, defaults: defaults(["OpenEFBRecording": "notices"]))
+        #expect(vm.microphoneDenied && vm.captureForcesMicrophoneDenied)
+        // The sync loop runs every 500 ms while recording; the forced flag must survive it.
+        _ = try await coordinator.startRecording()
+        vm.startSyncLoopForTesting()
+        try await Task.sleep(for: .milliseconds(1_200))
+        #expect(vm.microphoneDenied)
+        _ = await coordinator.stopRecording()
+    }
+
     @Test func noArgumentsChangeNothing() {
         let state = AppState()
         ScreenCaptureHooks.apply(to: state, defaults: defaults([:]))
