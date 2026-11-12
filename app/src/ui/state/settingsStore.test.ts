@@ -863,4 +863,38 @@ describe('review fixes on #45', () => {
     store.getState().setNotamClientID('other');
     expect(store.getState().notam.message).toBeNull();
   });
+
+  it("a Retry queued behind a different change does not use the earlier change's failure state", async () => {
+    const prefs = new FakePreferences();
+    const real = prefs.set.bind(prefs);
+    const gate = Promise.withResolvers<void>();
+    let phase: 'open' | 'held' = 'open';
+    prefs.set = async (key, value) => {
+      if (phase === 'held') {
+        await gate.promise;
+        throw new Error('full');
+      }
+      return real(key, value);
+    };
+    let failing = true;
+    const setTelemetryEnabled = jest.fn(() => {
+      if (failing) throw new Error('crash reporter busy');
+    });
+    const { store } = setup({ prefs, setTelemetryEnabled });
+    await store.getState().load();
+    await store.getState().setShareUsageData(true); // callback fails, save succeeds: { apply: true, save: false }
+    failing = false;
+    phase = 'held';
+    const change = store.getState().setShareUsageData(false); // applies, its save waits
+    const retry = store.getState().retryPreferenceSave(); // retried during that wait
+    gate.resolve();
+    await Promise.all([change, retry]);
+    expect(store.getState().preferenceError).toContain('could not be saved'); // the failed opt-out is not hidden
+    phase = 'open';
+    await store.getState().retryPreferenceSave();
+    expect(store.getState().preferenceError).toBeNull();
+    const reload = setup({ prefs }).store;
+    await reload.getState().load();
+    expect(reload.getState().shareUsageData).toBe(false);
+  });
 });
