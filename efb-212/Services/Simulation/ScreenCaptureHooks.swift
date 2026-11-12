@@ -7,9 +7,9 @@
 //    -OpenEFBStripColumn log|nearest|layers|search|airport:<ICAO>
 //    -OpenEFBDisplayMode day|night
 //    -OpenEFBDirectTo <ICAO>             direct to this airport, as the Nearest list's Direct does
-//    -OpenEFBRoute settings|disclaimers|aircraft|planner|offline-maps|logbook|flight|replay
-//                                        a full-screen page over the app (CaptureRouteHost); logbook, flight and replay
-//                                        show the first stored entry, so launch with -OpenEFBSeed small as well
+//    -OpenEFBRoute settings|disclaimers|aircraft|aircraftedit|pilot|logbookentry|logbooklocked|flightdetail|replay|israel-plan
+//                                        a full-screen page over the app (CaptureRouteHost), named like the React Native
+//                                        screens; the record pages show the first stored record, so also pass -OpenEFBSeed small
 //    -OpenEFBBriefing YES                the Israel NOTAM briefing sheet over the map
 //    -OpenEFBLayers all                  every map layer on (the all-layers map)
 //  Unknown values are ignored; without the arguments nothing changes.
@@ -39,8 +39,8 @@ enum ScreenCaptureHooks {
 
     /// The pages -OpenEFBRoute opens; the raw value is the launch argument value.
     enum Route: String, CaseIterable {
-        case settings, disclaimers, aircraft, planner, logbook, flight, replay
-        case offlineMaps = "offline-maps"
+        case settings, disclaimers, aircraft, aircraftedit, pilot, logbookentry, logbooklocked, flightdetail, replay
+        case israelPlan = "israel-plan"
     }
 
     @MainActor

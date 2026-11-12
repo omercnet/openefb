@@ -15,6 +15,7 @@ import SwiftData
 struct CaptureRouteHost: View {
     private let model = CaptureRouteModel.shared
     @Query private var flights: [SchemaV1.FlightRecord]
+    @Query private var aircraft: [SchemaV1.AircraftProfile]
     @Query private var entries: [SchemaV1.LogbookEntry]
     @State private var logbook = LogbookViewModel()
 
@@ -31,16 +32,24 @@ struct CaptureRouteHost: View {
         case .settings: SettingsView()
         case .disclaimers: CaptureDisclaimersView()
         case .aircraft: AircraftListView()
-        case .planner: FlightPlanView()
-        case .offlineMaps: OfflineMapsView()
-        case .logbook:
-            if let entry = entries.first {
-                LogbookEntryEditView(entry: entry, viewModel: logbook, isReadOnly: entry.isConfirmed)
+        case .aircraftedit:
+            if let aircraft = aircraft.first {
+                AircraftEditView(profile: aircraft, onSave: {}, onAddNew: { _ in aircraft })
             }
-        case .flight:
+        case .pilot: PilotProfileView()
+        case .logbookentry:
+            if let entry = entries.first(where: { !$0.isConfirmed }) ?? entries.first {
+                LogbookEntryEditView(entry: entry, viewModel: logbook, isReadOnly: false)
+            }
+        case .logbooklocked:
+            if let entry = entries.first(where: \.isConfirmed) ?? entries.first {
+                LogbookEntryEditView(entry: entry, viewModel: logbook, isReadOnly: true)
+            }
+        case .flightdetail:
             if let flight = flights.first { FlightDetailView(flightRecord: flight) }
         case .replay:
             if let flight = flights.first { ReplayView(flightRecord: flight) }
+        case .israelPlan: IsraelFlightPlanView()
         }
     }
 }

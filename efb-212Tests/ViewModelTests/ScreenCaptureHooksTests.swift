@@ -34,7 +34,7 @@ struct ScreenCaptureHooksTests {
     }
 
     @Test func everyRouteValueParses() {
-        let expected = ["settings", "disclaimers", "aircraft", "planner", "offline-maps", "logbook", "flight", "replay"]
+        let expected = ["settings", "disclaimers", "aircraft", "aircraftedit", "pilot", "logbookentry", "logbooklocked", "flightdetail", "replay", "israel-plan"]
         #expect(Set(ScreenCaptureHooks.Route.allCases.map(\.rawValue)) == Set(expected))
         for value in expected {
             ScreenCaptureHooks.apply(to: AppState(), defaults: defaults(["OpenEFBRoute": value]))

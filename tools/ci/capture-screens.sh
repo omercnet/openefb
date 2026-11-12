@@ -154,13 +154,14 @@ shot "$IPAD" ipad il-map-predictions il-cvfr-llhz-llib-nominal 600 -OpenEFBScree
 # Wave 2 screens. The map-layers and briefing shots need no stored data; onboarding is the first-run screen.
 shot "$IPAD" ipad map-layers us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -OpenEFBLayers all
 shot "$IPAD" ipad briefing il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBBriefing YES
+shot "$IPAD" ipad israel-plan il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBRoute israel-plan -OpenEFBDisplayMode day
 seen_onboarding=NO
 shot "$IPAD" ipad onboarding us-kpao-ksql 150
 seen_onboarding=YES
 # Seeded: the fictional data set of SeedDataHook (aircraft, pilots with an expired medical, a flight, logbook entries).
 seed=(-OpenEFBSeed small)
 shot "$IPAD" ipad currency us-kpao-ksql 150 "${seed[@]}" -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day
-for route in settings disclaimers aircraft planner offline-maps logbook flight replay; do
+for route in settings disclaimers aircraft aircraftedit pilot logbookentry logbooklocked flightdetail replay; do
   shot "$IPAD" ipad "$route" us-kpao-ksql 150 "${seed[@]}" -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute "$route"
 done
 echo "::endgroup::"
