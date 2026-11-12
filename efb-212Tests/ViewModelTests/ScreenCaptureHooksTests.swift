@@ -10,6 +10,7 @@
 
 import Testing
 import Foundation
+import GRDB
 @testable import efb_212
 
 @Suite("Screen capture hooks", .serialized)
@@ -80,8 +81,9 @@ struct ScreenCaptureHooksTests {
     }
 
     @Test func microphoneNoticeIsForcedAgainstTheSyncLoop() async throws {
-        let (db, dbURL) = try TempRecordingDB.make()
-        defer { TempRecordingDB.remove(dbURL) }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("capture-hooks-\(UUID().uuidString).sqlite")
+        let db = try RecordingDatabase(dbPool: try DatabasePool(path: url.path))
+        defer { for suffix in ["", "-wal", "-shm"] { try? FileManager.default.removeItem(atPath: url.path + suffix) } }
         let state = AppState()
         let coordinator = RecordingCoordinator(
             recordingDB: db, audioRecorder: MockAudioRecorder(), transcriptionService: MockTranscriptionService())
