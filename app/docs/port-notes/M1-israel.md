@@ -25,8 +25,6 @@
   Swift (on top), but they are drawn with the rest of the Israel set here; ownship and route stay above all of them, which
   is the safety-relevant part. Splitting LSA/briefing back above the core layers is a one-line registry change if a capture
   shows it matters.
-- KNOWN REGRESSION, deferred: labels are `text-field` layers using the base style's glyph endpoint, so offline they vanish
-  while geometry still draws (Swift rendered labels to local sprites). The fix is a bundled glyph pack (Noto Sans PBF ranges
-  referenced from `glyphs` in base-style.json, also used by the street layer and offline packs), which is an asset and
-  base-style change shared with the whole map, not an Israel-only edit. Tracked for the offline follow-up (M3 downloads the
-  street pack with its glyph ranges, which may cover these labels offline; UNVERIFIED on a device).
+- Remote glyphs: Israel labels were `text-field` layers on the base style's remote glyph endpoint, so they vanished offline
+  (Swift drew local sprites). FIXED BY M3 (`rewrite/m3-offline`, `port-notes/M3.md` Offline labels): the Noto Sans Regular glyph
+  ranges are bundled and the style's `glyphs` points at the installed local copy.

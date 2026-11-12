@@ -7,7 +7,9 @@ import { layerSpecsFor } from '../../domain/map/registry';
 import type { MapDataSource } from '../../domain/map/mapDataController';
 import { fixtureAdvisory, fixtureTfr } from '../../fixtures/mapLayers';
 import { scenario } from '../../fixtures/scenario';
+import { useLocalGlyphs } from '../../adapters/glyphInstall';
 import { MapSurface } from '../map/MapSurface';
+import { REMOTE_GLYPHS_URL } from '../map/surfaceModel';
 import { scenarioWeather, useAnimateFlag, useScenarioOwnship } from '../map/scenarioFeed';
 import { useMapController, useMapModel } from '../map/useMapData';
 import type { StripColumnKind } from '../../domain/types';
@@ -70,6 +72,8 @@ export function MapScreen({ screen, allLayers = false }: { screen?: StripScreen;
   const { width } = useWindowDimensions();
   const stripWidth = width < 600 ? 104 : STRIP_WIDTH_PT; // iPhone rail is 104pt; the spike targets iPad
   const night = screen === 'night';
+  const glyphs = useLocalGlyphs();
+  if (glyphs.status === 'failed') console.warn('local glyph install failed; labels need a network', glyphs.error);
   const animate = useAnimateFlag();
 
   const appState = useMemo(
@@ -107,19 +111,22 @@ export function MapScreen({ screen, allLayers = false }: { screen?: StripScreen;
       <View style={styles.row}>
         <StripColumn screen={screen} width={stripWidth} />
         <View style={styles.map}>
-          <MapSurface
-            night={night}
-            sectional
-            region={model.snapshot.region}
-            visibleLayers={model.snapshot.visibleLayers}
-            layers={layerSpecsFor(model.snapshot.region)}
-            sources={model.sources}
-            initialView={INITIAL_VIEW}
-            camera={model.camera}
-            onViewChange={model.onViewChange}
-            onStyleLoaded={model.onStyleLoaded}
-            onTileHealth={model.onTileHealth}
-          />
+          {glyphs.status === 'loading' ? null : (
+            <MapSurface
+              night={night}
+              glyphsUrl={glyphs.status === 'ready' ? glyphs.url : REMOTE_GLYPHS_URL}
+              sectional
+              region={model.snapshot.region}
+              visibleLayers={model.snapshot.visibleLayers}
+              layers={layerSpecsFor(model.snapshot.region)}
+              sources={model.sources}
+              initialView={INITIAL_VIEW}
+              camera={model.camera}
+              onViewChange={model.onViewChange}
+              onStyleLoaded={model.onStyleLoaded}
+              onTileHealth={model.onTileHealth}
+            />
+          )}
         </View>
       </View>
     </SafeAreaProvider>
