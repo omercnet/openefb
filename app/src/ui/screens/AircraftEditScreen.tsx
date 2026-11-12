@@ -10,7 +10,16 @@ import {
   type AircraftForm,
 } from '../../domain/profiles/aircraft';
 import { DateRow, DeleteRow, FieldRow } from '../form/Controls';
-import { BarButton, FormScreen, FormSection, NoteRow, PickerRow, SwitchRow, TextFieldRow } from '../form/Form';
+import {
+  BarButton,
+  ButtonRow,
+  FormScreen,
+  FormSection,
+  NoteRow,
+  PickerRow,
+  SwitchRow,
+  TextFieldRow,
+} from '../form/Form';
 import type { AircraftStore } from '../state/aircraftStore';
 
 const ISRAEL_FOOTER = 'Preselects the CVFR or sport-aviation (LSA) route network when you plan a flight in Israel.';
@@ -32,6 +41,8 @@ export function AircraftEditScreen({
   const profile = profileId === null ? null : (profiles.find((p) => p.id === profileId) ?? null);
   const [form, setForm] = useState<AircraftForm | null>(() => (profileId === null ? emptyAircraftForm(now()) : null));
   const [showValidation, setShowValidation] = useState(false);
+  /** Bumped by Try Again: reads the route network once more after a failed read. */
+  const [attempt, setAttempt] = useState(0);
 
   // The editor can be the first screen opened (a deep link), so it loads the list itself when nobody has.
   useEffect(() => {
@@ -45,13 +56,14 @@ export function AircraftEditScreen({
     void store
       .getState()
       .routeNetworkFor(profileId)
-      .then((network) => {
-        if (!cancelled) setForm(aircraftFormFromProfile(profile, network, now()));
+      .then((read) => {
+        // Unreadable: no form (saving would erase the stored choice); the error and Try Again are shown instead.
+        if (!cancelled && read !== null) setForm(aircraftFormFromProfile(profile, read.network, now()));
       });
     return () => {
       cancelled = true;
     };
-  }, [store, profileId, profile, form, now]);
+  }, [store, profileId, profile, form, now, attempt]);
 
   const update = (patch: Partial<AircraftForm>) => setForm((f) => (f === null ? f : { ...f, ...patch }));
   const save = async () => {
@@ -73,6 +85,9 @@ export function AircraftEditScreen({
         ) : error ? (
           <FormSection>
             <NoteRow tone="caution" text={error} testID="aircraft-error" />
+            {profile !== null ? (
+              <ButtonRow title="Try Again" onPress={() => setAttempt((n) => n + 1)} testID="aircraft-retry" />
+            ) : null}
           </FormSection>
         ) : null}
       </FormScreen>
