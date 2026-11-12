@@ -15,7 +15,7 @@ Tests: `IsraelChartServiceTests` 18 of 18, `IsraelAirportDiagramTests` 10 of 12,
 Not ported from `IsraelAirportDiagramTests`: `regionGating` (Region.isAvailable is L1's, already covered there) and
 `nearestGeoreferencedAerodromes` (it tests `AirportDiagramOverlay.georeferencedAerodromes`, a map overlay: M4).
 `MockTerminalProcedureService` is dropped (double). `AirportChartsSection.grouped` is ported as `groupCharts` because the
-Swift terminal test calls it; the view stays M4. The stores have no Swift tests; their tests are new. 80 tests in total (43 ported, 37 new).
+Swift terminal test calls it; the view stays M4. The stores have no Swift tests; their tests are new. 119 new tests.
 `IsraelDiagramSettingsSummaryTests` (ViewModelTests) is a U7 case and is not here.
 
 ## The interface the map track (M4) consumes (owner decision Q6, STABLE)
