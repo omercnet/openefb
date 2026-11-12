@@ -6,6 +6,7 @@
 | `notam-relay/` | Israel NOTAM relay: scrapes IAA every 15 min, serves `notams.json` | **Cloudflare Worker** (Cron Trigger + KV) | Hobby crons run once a day at most |
 | `ota/` | Expo Updates (OTA) server for the React Native spike: read-only Worker over R2 plus an offline-signing publisher CLI | **Cloudflare Worker + R2** (spike, deployed, no updates published) | signing key never leaves the publisher; R2 egress is free |
 | `charts/` | Chart pack hosting (official CAAI CVFR MBTiles, Israel data packs) + publish script | **Cloudflare R2** | R2 egress is free; Blob's 10 GB/month transfer is ~50 pack downloads |
+| `telemetry/` | Anonymous usage counters for the React Native app (event name, parameter value, app version, platform, update id, region, count; no identifiers): `POST /v1/counters` into Workers Analytics Engine. **Not deployed yet** | **Cloudflare Worker** (Analytics Engine) | one data point per counter row, no KV or R2; the free plan covers 100,000 data points written a day |
 
 Each folder has its own `package.json` and lockfile (no workspace tooling) and its own README with details.
 
@@ -20,6 +21,7 @@ Vercel (Hobby, personal non-commercial use only) and Cloudflare (free; R2 needs 
 | `charts/` | R2 bucket `openefb-charts`, public dev URL `https://pub-cdfb51548498487fa9fdb9794192c8ef.r2.dev` | Live, with CORS from `cors.json`. Published: `israel-cvfr` (latest edition 2025-02) and `il-diagrams` (latest 2026-08b). The app's built-in base URL is this one (`IsraelChartConfig.defaultBaseURL`); the `israelChartBaseURL` default overrides it. The dev URL is rate-limited: attach a custom domain before pilots depend on it. |
 | `ota/` | `https://openefb-ota.omerc.workers.dev` (`/manifest`, `/assets/<sha256>`, `/health`) | Live since 2026-11-09, version `134938c5`, bucket `openefb-ota` (empty: nothing published to any channel). Smoke-tested live on a throwaway `smoke` channel (signed publish, wrong-key update failing verify, rollback directive), then the test objects were deleted. Production signing key: owner machine `~/.config/kanaf/ota/`, never on Cloudflare. No app build points at it yet. |
 | `interviews/` | Vercel project `openefb-interviews`, `https://openefb-interviews.vercel.app` | Live. Git-connected to `omercnet/openefb` (production branch `main`) with Root Directory `web/interviews`, so a push to `main` deploys it. |
+| `telemetry/` | `https://openefb-telemetry.omerc.workers.dev` (planned: `POST /v1/counters`, `/health`) | **Not deployed.** Code and tests only (owner decision Q7). The owner deploys it by hand (`web/telemetry/README.md`) and then builds the app with `EXPO_PUBLIC_TELEMETRY_URL`; until then the app sends nothing. |
 
 The IAA answered the Worker's Cloudflare addresses on 2026-11-02, with one earlier HTTP 403 that the relay's backoff recovered from (`docs/RELIABILITY.md`). If the IAA starts blocking it, see the fallback in `notam-relay/README.md`.
 

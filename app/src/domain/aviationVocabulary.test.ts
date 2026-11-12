@@ -108,33 +108,8 @@ describe('quirks kept from Swift', () => {
     expect(process('november one two three four five six seven')).toBe('N123456seven');
   });
 
-  // The digit alternation lists "nine" before "niner", and a regex alternation takes the first alternative that lets the
-  // whole pattern match. Wherever the pattern can end right after "nine", "niner" becomes 9 plus a stray "r". Only the
-  // frequency pattern, which needs whitespace after each whole digit, falls back to "niner" ('one two niner point five'
-  // above). AviationVocabularyTests.ninerToNine passes because it only checks that "1209" appears. Swift bug, kept.
-  test.each([
-    ['squawk one two zero niner', 'Squawk 1209r'],
-    ['runway niner', 'Runway 9r'],
-    ['heading zero niner zero', 'heading 09r zero'],
-    ['flight level two niner zero', 'FL29r zero'],
-    ['november seven three two niner', 'N7329r'],
-  ])('"niner" leaves a stray r: %s -> %s', (input, expected) => {
-    expect(process(input)).toBe(expected);
-  });
-
-  // The altitude pattern has the same ordering problem: the number words list "four", "six", "seven", "eight", "nine" before
-  // "fourteen", "sixteen", ..., "niner", and nothing after the group forces a backtrack, so the short word wins and the rest of
-  // the word stays in the text. "fifteen" works because "five" does not match its start. Swift bug (same pattern), kept.
-  test.each([
-    ['climb fourteen thousand', 'climb 4teen thousand'],
-    ['descend sixteen hundred', 'descend 6teen hundred'],
-    ['at seventeen thousand', 'at 7teen thousand'],
-    ['maintain nineteen thousand five hundred', 'maintain 9teen thousand five hundred'],
-    ['maintain niner thousand', 'maintain 9r thousand'],
-    ['climb fifteen thousand', 'climb 15,000'],
-  ])('altitude words that start with a shorter number word: %s -> %s', (input, expected) => {
-    expect(process(input)).toBe(expected);
-  });
+  // (The Swift ordering bugs that used to be pinned here, "niner" as 9 plus a stray "r" and "fourteen" as "4teen", are fixed:
+  // owner-approved deviation Q8, 2026-11-12. See "number words that start with a shorter number word" below.)
 
   test('"at" matches inside other words, so a number word after one is converted', () => {
     expect(process('that five')).toBe('that 5');
@@ -154,6 +129,76 @@ describe('quirks kept from Swift', () => {
 
   test('words glued together without a space still match, but their digits are lost', () => {
     expect(process('flight level onetwo')).toBe('FL');
+  });
+});
+
+describe('number words that start with a shorter number word (Q8: fixed, Swift gives "4teen" and "9r")', () => {
+  test.each([
+    ['ten', '10'],
+    ['eleven', '11'],
+    ['twelve', '12'],
+    ['thirteen', '13'],
+    ['fourteen', '14'],
+    ['fifteen', '15'],
+    ['sixteen', '16'],
+    ['seventeen', '17'],
+    ['eighteen', '18'],
+    ['nineteen', '19'],
+  ])('altitude: climb %s thousand reads as %s thousand in digits', (word, digits) => {
+    expect(process(`climb ${word} thousand`)).toBe(`climb ${digits},000`);
+  });
+
+  test.each([
+    ['descend sixteen hundred', 'descend 1,600'],
+    ['at seventeen thousand', 'at 17,000'],
+    ['maintain nineteen thousand five hundred', 'maintain 19,500'],
+    ['maintain eighteen thousand', 'maintain 18,000'],
+    ['maintain niner thousand', 'maintain 9,000'],
+    ['maintain niner thousand five hundred', 'maintain 9,500'],
+    ['climb four thousand', 'climb 4,000'],
+    ['climb nine thousand', 'climb 9,000'],
+  ])('altitude: %s -> %s', (input, expected) => {
+    expect(process(input)).toBe(expected);
+  });
+
+  test.each([
+    ['squawk one two zero niner', 'Squawk 1209'],
+    ['squawk niner niner niner niner', 'Squawk 9999'],
+    ['squawk niner one two seven', 'Squawk 9127'],
+    ['squawk seven seven zero zero', 'Squawk 7700'],
+  ])('squawk: %s -> %s', (input, expected) => {
+    expect(process(input)).toBe(expected);
+  });
+
+  test.each([
+    ['one two niner point five', '129.5'],
+    ['one one eight point niner', '118.9'],
+    ['one two one point niner five', '121.95'],
+    ['one two three point four', '123.4'],
+  ])('frequency: %s -> %s', (input, expected) => {
+    expect(process(input)).toBe(expected);
+  });
+
+  test.each([
+    ['runway niner', 'Runway 9'],
+    ['runway one niner left', 'Runway 19L'],
+    ['heading zero niner zero', 'heading 090'],
+    ['flight level two niner zero', 'FL290'],
+    ['november seven three two niner', 'N7329'],
+    ['november niner two papa', 'N92P'],
+  ])('runway, heading, flight level, N-number: %s -> %s', (input, expected) => {
+    expect(process(input)).toBe(expected);
+  });
+
+  test('"nine" still reads as 9, and a word that merely starts with a number word is not touched', () => {
+    expect(process('squawk one two zero nine')).toBe('Squawk 1209');
+    expect(process('runway nine')).toBe('Runway 9');
+    expect(process('tower')).toBe('tower');
+  });
+
+  test('keeps lower-casing and spacing as Swift does', () => {
+    expect(process('SQUAWK One Two Zero NINER')).toBe('Squawk 1209');
+    expect(process('Cleared TO land')).toBe('cleared to land');
   });
 });
 

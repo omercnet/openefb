@@ -85,8 +85,14 @@ const NUMBERS = new Map([
   ['fifty', 50],
 ]);
 
-const DIGIT_WORDS = 'zero|one|two|three|four|five|six|seven|eight|nine|niner';
-const NUMBER_WORDS = [...NUMBERS.keys(), 'hundred', 'thousand'].join('|');
+// Longest word first: a regex alternation takes the first alternative that matches, so "nine" ahead of "niner" left a stray "r"
+// ("squawk one two zero niner" gave "Squawk 1209r") and "four" ahead of "fourteen" gave "4teen". Swift has both bugs (same
+// order); fixing them is an owner-approved deviation (Q8, 2026-11-12, docs/port-notes/A3.md).
+const DIGIT_WORDS = 'zero|one|two|three|four|five|six|seven|eight|nine|niner'
+  .split('|')
+  .sort((a, b) => b.length - a.length)
+  .join('|');
+const NUMBER_WORDS = [...NUMBERS.keys(), 'hundred', 'thousand'].sort((a, b) => b.length - a.length).join('|');
 const LETTER_WORDS = [...LETTERS.keys()].filter((w) => w !== 'november').join('|');
 
 const N_NUMBER = new RegExp(String.raw`november\s+((?:(?:${DIGIT_WORDS}|${LETTER_WORDS})\s*){1,6})`, 'gi');

@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "maxRows": 40,
+  "maxCount": 100000,
+  "platforms": ["ios", "android"],
+  "regions": ["us", "israel"],
+  "patterns": {
+    "app": "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$",
+    "update": "^(?:embedded|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$"
+  },
+  "events": {
+    "App.launched": {},
+    "Navigation.screen": { "screen": { "values": ["map", "log"] } },
+    "Recording.started": {},
+    "Recording.stopped": { "durationMinutes": { "values": ["0-15", "15-60", "60+"] } },
+    "FlightPlan.activated": {},
+    "Debrief.generated": {},
+    "ChartPack.installed": {
+      "product": { "pattern": "^[a-z0-9][a-z0-9._-]{0,31}$" },
+      "edition": { "pattern": "^[a-z0-9][a-z0-9._-]{0,31}$" }
+    },
+    "Israel.briefingOpened": {},
+    "Israel.fplShared": { "method": { "values": ["share", "email"] } }
+  }
+}
