@@ -795,4 +795,68 @@ describe('review fixes on #45', () => {
     });
     expect(await inner.get(NOTAM_CLIENT_SECRET_KEY)).toBeNull();
   });
+
+  it('a failed opt-out stays selected across a later load, and Retry saves the opt-out, not the stored value', async () => {
+    const prefs = new FakePreferences();
+    const real = prefs.set.bind(prefs);
+    let broken = true;
+    prefs.set = (key, value) => (broken ? Promise.reject(new Error('full')) : real(key, value));
+    const { store } = setup({ prefs });
+    await store.getState().load();
+    await store.getState().setShareUsageData(false);
+    await store.getState().load();
+    expect(store.getState().shareUsageData).toBe(false);
+    broken = false;
+    await store.getState().retryPreferenceSave();
+    const reload = setup({ prefs }).store;
+    await reload.getState().load();
+    expect(reload.getState().shareUsageData).toBe(false);
+  });
+
+  it('Retry repeats a telemetry callback that threw, and keeps the warning until it works', async () => {
+    let failing = true;
+    const setTelemetryEnabled = jest.fn(() => {
+      if (failing) throw new Error('crash reporter busy');
+    });
+    const { store } = setup({ setTelemetryEnabled });
+    await store.getState().load();
+    await store.getState().setShareUsageData(false);
+    expect(store.getState().preferenceError).toContain('could not apply');
+    await store.getState().retryPreferenceSave();
+    expect(setTelemetryEnabled).toHaveBeenCalledTimes(2);
+    expect(store.getState().preferenceError).toContain('could not apply'); // still failing
+    failing = false;
+    await store.getState().retryPreferenceSave();
+    expect(setTelemetryEnabled).toHaveBeenCalledTimes(3);
+    expect(setTelemetryEnabled).toHaveBeenLastCalledWith(false, expect.anything());
+    expect(store.getState().preferenceError).toBeNull();
+  });
+
+  it('Retry repeats a display mode callback that threw', async () => {
+    let failing = true;
+    const onDisplayModeChange = jest.fn(() => {
+      if (failing) throw new Error('map not ready');
+    });
+    const { store } = setup({ onDisplayModeChange });
+    await store.getState().load();
+    await store.getState().setDisplayMode('night');
+    failing = false;
+    await store.getState().retryPreferenceSave();
+    expect(onDisplayModeChange).toHaveBeenCalledTimes(2);
+    expect(store.getState().preferenceError).toBeNull();
+  });
+
+  it('editing a NOTAM field clears the old result, and does not change whether a key is configured', async () => {
+    const { store } = setup();
+    await store.getState().load();
+    store.getState().setNotamClientID('id');
+    store.getState().setNotamClientSecret('secret');
+    await store.getState().saveNotamKey();
+    expect(store.getState().notam.message).toContain('Saved');
+    store.getState().setNotamClientSecret('secret2');
+    expect(store.getState().notam).toMatchObject({ message: null, configured: true });
+    await store.getState().saveNotamKey();
+    store.getState().setNotamClientID('other');
+    expect(store.getState().notam.message).toBeNull();
+  });
 });
