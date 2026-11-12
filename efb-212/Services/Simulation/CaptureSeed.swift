@@ -16,6 +16,7 @@
 
 import Foundation
 import SwiftData
+import GRDB
 
 enum CaptureSeed {
     static let profiles: Set<String> = ["capture", "capture-fresh"]
