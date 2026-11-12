@@ -160,6 +160,19 @@ export function createSettingsStore(deps: SettingsDeps) {
     shareUsageData: { apply: false, save: false },
   };
 
+  /** Whether any part of a NOTAM key is still stored (an unreadable value counts: it may be there). */
+  const anyPartStored = async (): Promise<boolean> => {
+    const stored = await Promise.all(
+      [NOTAM_CLIENT_ID_KEY, NOTAM_CLIENT_SECRET_KEY].map((key) =>
+        deps.secrets.get(key).then(
+          (v) => v !== null,
+          () => true,
+        ),
+      ),
+    );
+    return stored.some(Boolean);
+  };
+
   return createStore<SettingsState>()((set, get) => {
     const setNotam = (patch: Partial<NotamState>) => set((s) => ({ notam: { ...s.notam, ...patch } }));
 
@@ -254,6 +267,8 @@ export function createSettingsStore(deps: SettingsDeps) {
           // Unreadable reads as off: a privacy choice must not come back on because storage failed.
           const share = await read(() => readBool(deps.prefs, TELEMETRY_ENABLED_KEY, true), false);
           const credentials = await read(() => loadNotamCredentials(deps.secrets), null);
+          // An incomplete pair is not a usable key, but what is left must stay removable after a restart too.
+          const partiallyStored = credentials === null && (await anyPartStored());
           const pilots = await read(() => deps.userData.pilots.list(), []);
           const cycle = await deps.loadDataCycle().catch(() => null);
           // Everything that awaits comes first; what the user did meanwhile is read at the moment of the final set(), not before.
@@ -289,7 +304,7 @@ export function createSettingsStore(deps: SettingsDeps) {
               clientID: notamEdited ? typing.clientID : (credentials?.clientID ?? ''),
               clientSecret: notamEdited ? typing.clientSecret : (credentials?.clientSecret ?? ''),
               configured: credentials !== null,
-              partiallyStored: false,
+              partiallyStored,
             },
           });
         }),
@@ -412,15 +427,7 @@ export function createSettingsStore(deps: SettingsDeps) {
               (c) => c !== null,
               () => get().notam.configured,
             );
-            const stored = await Promise.all(
-              [NOTAM_CLIENT_ID_KEY, NOTAM_CLIENT_SECRET_KEY].map((key) =>
-                deps.secrets.get(key).then(
-                  (v) => v !== null,
-                  () => true,
-                ),
-              ),
-            );
-            setNotam({ configured, partiallyStored: stored.some(Boolean), message: describeError(error) });
+            setNotam({ configured, partiallyStored: await anyPartStored(), message: describeError(error) });
           }
         });
       },

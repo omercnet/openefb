@@ -786,6 +786,10 @@ describe('review fixes on #45', () => {
     await store.getState().load();
     await store.getState().removeNotamKey();
     expect(store.getState().notam).toMatchObject({ configured: false, partiallyStored: true });
+    // Reopening Settings (a new store over the same storage) still offers to finish the removal.
+    const reopened = setup({ secrets }).store;
+    await reopened.getState().load();
+    expect(reopened.getState().notam).toMatchObject({ configured: false, partiallyStored: true });
     failSecret = false;
     await store.getState().removeNotamKey();
     expect(store.getState().notam).toMatchObject({
