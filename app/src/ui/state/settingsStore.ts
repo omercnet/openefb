@@ -154,6 +154,11 @@ export function createSettingsStore(deps: SettingsDeps) {
   };
   /** Which preference the shown preferenceError belongs to: a later success of another one must not clear it. */
   let errorOwner: 'displayMode' | 'shareUsageData' | null = null;
+  /** What failed for each preference's last change, so Retry repeats exactly that (the app callback, the save, or both). */
+  const prefFailed = {
+    displayMode: { apply: false, save: false },
+    shareUsageData: { apply: false, save: false },
+  };
 
   return createStore<SettingsState>()((set, get) => {
     const setNotam = (patch: Partial<NotamState>) => set((s) => ({ notam: { ...s.notam, ...patch } }));
@@ -161,7 +166,7 @@ export function createSettingsStore(deps: SettingsDeps) {
     /** Saves a preference and records the failure next to the setting that changed. */
     const persist = async (
       owner: 'displayMode' | 'shareUsageData',
-      write: () => Promise<void>,
+      write: (() => Promise<void>) | null,
       applyFailure: string | null,
     ) => {
       const show = (message: string | null) => {
@@ -170,11 +175,28 @@ export function createSettingsStore(deps: SettingsDeps) {
         set({ preferenceError: message, preferenceErrorFor: message === null ? null : owner });
       };
       try {
-        await write();
+        await write?.();
+        prefFailed[owner] = { apply: applyFailure !== null, save: false };
         show(applyFailure && `Changed, but the app could not apply it: ${applyFailure}`);
       } catch (error) {
+        prefFailed[owner] = { apply: applyFailure !== null, save: true };
         show(`Changed, but it could not be saved: ${describeError(error)}`);
       }
+    };
+
+    /** The two preferences share one path: apply it to the app now, save it in order, and record what failed. */
+    const changePreference = (
+      owner: 'displayMode' | 'shareUsageData',
+      apply: (() => void) | null,
+      write: (() => Promise<void>) | null,
+    ) => {
+      const applyFailure = apply === null ? null : notify(apply);
+      pendingPrefWrites[owner] += 1;
+      return enqueue(() =>
+        persist(owner, write, applyFailure).finally(() => {
+          pendingPrefWrites[owner] -= 1;
+        }),
+      );
     };
 
     /** Saves the region (when `write`) and records what failed. `applyFailure` is what notifying the app threw, if anything. */
@@ -251,10 +273,11 @@ export function createSettingsStore(deps: SettingsDeps) {
             loaded: true,
             region: attributedFor,
             displayMode:
-              pendingPrefWrites.displayMode > 0
+              pendingPrefWrites.displayMode > 0 || prefFailed.displayMode.save
                 ? get().displayMode
                 : (DISPLAY_MODES.find((m) => m === rawMode) ?? 'auto'),
-            shareUsageData: pendingPrefWrites.shareUsageData > 0 ? get().shareUsageData : share,
+            shareUsageData:
+              pendingPrefWrites.shareUsageData > 0 || prefFailed.shareUsageData.save ? get().shareUsageData : share,
             dataAttribution: attribution,
             regionDataError: unavailable,
             currencyToRenew: currencyToRenewCount(pilots.find((p) => p.isActive) ?? null, deps.now()),
@@ -295,57 +318,50 @@ export function createSettingsStore(deps: SettingsDeps) {
 
       setDisplayMode: (mode) => {
         set({ displayMode: mode });
-        const applyFailure = notify(() => deps.onDisplayModeChange?.(mode));
-        pendingPrefWrites.displayMode += 1;
-        return enqueue(() =>
-          persist('displayMode', () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode), applyFailure).finally(() => {
-            pendingPrefWrites.displayMode -= 1;
-          }),
+        return changePreference(
+          'displayMode',
+          () => deps.onDisplayModeChange?.(mode),
+          () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode),
         );
       },
 
       retryPreferenceSave: () => {
         const owner = get().preferenceErrorFor;
         if (owner === null) return Promise.resolve();
-        // The value on screen is what the user chose; saving it again changes nothing the app has applied.
+        // Repeat the step that failed, with the value the user chose: the app callback, the save, or both.
+        const failed = prefFailed[owner];
         if (owner === 'displayMode') {
           const mode = get().displayMode;
-          pendingPrefWrites.displayMode += 1;
-          return enqueue(() =>
-            persist('displayMode', () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode), null).finally(() => {
-              pendingPrefWrites.displayMode -= 1;
-            }),
+          return changePreference(
+            owner,
+            failed.apply ? () => deps.onDisplayModeChange?.(mode) : null,
+            failed.save ? () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode) : null,
           );
         }
         const enabled = get().shareUsageData;
-        pendingPrefWrites.shareUsageData += 1;
-        return enqueue(() =>
-          persist('shareUsageData', () => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled), null).finally(() => {
-            pendingPrefWrites.shareUsageData -= 1;
-          }),
+        return changePreference(
+          owner,
+          failed.apply ? () => deps.setTelemetryEnabled(enabled, get().region) : null,
+          failed.save ? () => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled) : null,
         );
       },
 
       setShareUsageData: (enabled) => {
         set({ shareUsageData: enabled });
-        const applyFailure = notify(() => deps.setTelemetryEnabled(enabled, get().region));
-        pendingPrefWrites.shareUsageData += 1;
-        return enqueue(() =>
-          persist('shareUsageData', () => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled), applyFailure).finally(
-            () => {
-              pendingPrefWrites.shareUsageData -= 1;
-            },
-          ),
+        return changePreference(
+          'shareUsageData',
+          () => deps.setTelemetryEnabled(enabled, get().region),
+          () => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled),
         );
       },
 
       setNotamClientID: (clientID) => {
         notamEdited = true;
-        setNotam({ clientID });
+        setNotam({ clientID, message: null });
       },
       setNotamClientSecret: (clientSecret) => {
         notamEdited = true;
-        setNotam({ clientSecret });
+        setNotam({ clientSecret, message: null });
       },
 
       saveNotamKey: () => {
