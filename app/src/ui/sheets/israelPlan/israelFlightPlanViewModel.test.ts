@@ -348,6 +348,8 @@ describe('Israel flight plan view model: review fixes (PR #58)', () => {
     expect(s.mailURL()).toBeNull();
     expect(h.map.clearRoute).toHaveBeenCalled();
     expect(h.map.setPlanUsesLSA).toHaveBeenLastCalledWith(false);
+    h.store.getState().clear(); // Clear empties the form and the failure banner with it
+    expect(h.store.getState().lastNetworkFailure).toBeNull();
   });
 
   test('editingTheProfilesAfterRoutingBlocksActivation', async () => {

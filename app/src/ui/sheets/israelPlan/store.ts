@@ -506,6 +506,7 @@ export function createIsraelPlanStore(deps: IsraelPlanDeps): StoreApi<IsraelPlan
           viaError: null,
           departureResults: [],
           destinationResults: [],
+          lastNetworkFailure: null,
           plan: null,
           routeError: null,
           issues: [],
