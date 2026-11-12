@@ -1,7 +1,8 @@
 // FlightLogHeader (efb-212/Views/Log/FlightLogRows.swift): LOG, route title, SEARCH, BRIEF (Israel), CLEAR (instruments
 // hidden), REC. 60pt high; the controls keep their full cell width, the title takes what is left on one line. With the
-// flight log hidden (`showsNextTime`, the full-width header of the U5 layout) the title carries the next time-to, or the
-// soonest predicted entry in amber (red for a warning).
+// flight log hidden (`showsNextTime`, the full-width header of the compact layout) the title carries the next time-to, or
+// the soonest predicted entry in amber (red for a warning). `compact` (iPhone, iPad Split View): the record control shows
+// its glyph only.
 import { Text, View } from 'react-native';
 import { ListBullet, Magnifier, Xmark } from '../Icons';
 import { useTheme } from '../Primitives';
@@ -22,9 +23,12 @@ import { DocMagnifier, FlightLogCellButton } from './parts';
 import { RecordButton } from './RecordButton';
 
 export function FlightLogHeader({
+  compact = false,
   showsNextTime = false,
   onClear,
 }: {
+  /** iPhone and iPad Split View: the record control shows its glyph only. */
+  compact?: boolean;
   /** The flight log is hidden (no NEXT on screen): the title carries the next waypoint's time-to. */
   showsNextTime?: boolean;
   /** The instruments are hidden (no NOW cell): the header carries Clear while navigation is active. */
@@ -130,6 +134,7 @@ export function FlightLogHeader({
           elapsed={data.recording.elapsedSeconds}
           level={data.recording.levelDBFS}
           microphoneDenied={data.recording.microphoneDenied}
+          compact={compact}
           onPress={data.actions.record}
         />
       ) : null}
