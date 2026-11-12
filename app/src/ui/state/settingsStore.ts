@@ -140,7 +140,11 @@ export function createSettingsStore(deps: SettingsDeps) {
   /** Same for the two preferences: a load must not put back a value changed while it was reading. */
   const pendingPrefWrites = { displayMode: 0, shareUsageData: 0 };
   /** What went wrong with the last region change, so Retry repeats exactly that (the save, the notification, or both). */
-  let regionFailed = { apply: false, save: false };
+  let regionFailed: { region: Region | null; apply: boolean; save: boolean } = {
+    region: null,
+    apply: false,
+    save: false,
+  };
   /** Which preference the shown preferenceError belongs to: a later success of another one must not clear it. */
   let errorOwner: 'displayMode' | 'shareUsageData' | null = null;
 
@@ -176,7 +180,7 @@ export function createSettingsStore(deps: SettingsDeps) {
           saveFailure = describeError(error);
         }
       }
-      regionFailed = { apply: applyFailure !== null, save: saveFailure !== null };
+      regionFailed = { region, apply: applyFailure !== null, save: saveFailure !== null };
       set({
         regionSaveError:
           saveFailure !== null
@@ -249,12 +253,16 @@ export function createSettingsStore(deps: SettingsDeps) {
 
       setRegion: (region) => {
         // Guard newRegion != appState.region; but a region whose save failed may be saved again (the picker offers Retry).
-        const retry = region === get().region && (regionFailed.apply || regionFailed.save);
+        // The failure flags belong to the operation that set them: they are taken, and cleared, when a change or retry is queued,
+        // so a later operation never reads (or leaves) another region's state.
+        const failed = regionFailed.region === region ? regionFailed : { region, apply: false, save: false };
+        regionFailed = { region, apply: false, save: false };
+        const retry = region === get().region && (failed.apply || failed.save);
         if (region === get().region && !retry) return Promise.resolve();
         set({ region });
         // A retry repeats only what failed: the notification, the save, or both.
-        const applyFailure = !retry || regionFailed.apply ? notify(() => deps.onRegionChange?.(region)) : null;
-        const write = !retry || regionFailed.save;
+        const applyFailure = !retry || failed.apply ? notify(() => deps.onRegionChange?.(region)) : null;
+        const write = !retry || failed.save;
         pendingRegionWrites += 1;
         return enqueue(async () => {
           try {
