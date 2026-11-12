@@ -293,6 +293,23 @@ describe('loadFlight', () => {
       expect(store.getState().isLoading).toBe(false);
     });
 
+    it('a load superseded while reading releases the player it had opened (the engine never attached it)', async () => {
+      const slow = Promise.withResolvers<ReplayTrackPoint[]>();
+      let reads = 0;
+      const first = new FakeAudio();
+      const { store } = setup({
+        openSource: async () => (++reads === 1 ? makeSource({ trackPoints: () => slow.promise }) : shortFlight),
+        openAudio: async () => (reads === 1 ? first : new FakeAudio()),
+      });
+      const withAudio = { id: 'flight-1', audioFileURL: 'recordings/flight-1.m4a' };
+      const loading = store.getState().loadFlight(withAudio);
+      await flush(); // opened its audio, now reading the track
+      await store.getState().loadFlight(withAudio);
+      slow.resolve(points);
+      await loading;
+      expect(first.stopped).toBeGreaterThanOrEqual(1);
+    });
+
     it('a load that lost to a newer one does not open its flight audio', async () => {
       const gate = Promise.withResolvers<ReplaySource>();
       let opens = 0;

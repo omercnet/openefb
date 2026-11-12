@@ -1,17 +1,10 @@
 // ReplayMapView (efb-212/Views/Flights/ReplayMapView.swift): a separate map for the replay, with the recorded track as an orange
 // line and the replay position as an orange marker; it fits the whole track once the style has loaded and follows the marker
 // until the pilot pans. MapLibre React Native has no imperative layers, so the track and the marker are two GeoJSON sources.
-import {
-  Camera,
-  GeoJSONSource,
-  Layer,
-  Map,
-  type CameraRef,
-  type StyleSpecification,
-} from '@maplibre/maplibre-react-native';
+import { Camera, GeoJSONSource, Layer, Map, type CameraRef } from '@maplibre/maplibre-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from 'zustand';
-import baseStyle from '../../../assets/base-style.json';
+import { useLocalGlyphs } from '../../adapters/glyphInstall';
 import {
   FIT_PADDING,
   REPLAY_COLOR,
@@ -19,24 +12,13 @@ import {
   replayTrackData,
   trackBounds,
 } from '../../domain/replay/replayMap';
+import { REMOTE_GLYPHS_URL, styleFor } from '../map/surfaceModel';
+import { useMapStatus } from '../map/mapStatus';
 import { useTheme } from '../Primitives';
 import type { ReplayViewStore } from '../state/replayStore';
 
 /** The camera before the track is fitted: the centre of the contiguous US, as in Swift. */
 const INITIAL_VIEW = { center: [-98, 39] as [number, number], zoom: 5 };
-
-/** base-style.json with the FAA sectional shown (the style ships it hidden; the SwiftUI app turns it on at runtime). */
-const MAP_STYLE: StyleSpecification = (() => {
-  const style = baseStyle as unknown as StyleSpecification;
-  return {
-    ...style,
-    layers: style.layers.map((layer) =>
-      layer.id === 'base-vfr-sectional' && layer.type === 'raster'
-        ? { ...layer, layout: { ...layer.layout, visibility: 'visible' } }
-        : layer,
-    ),
-  };
-})();
 
 export function ReplayMap({ store }: { store: ReplayViewStore }) {
   const t = useTheme();
@@ -46,6 +28,12 @@ export function ReplayMap({ store }: { store: ReplayViewStore }) {
   const autoFollow = useStore(store, (s) => s.autoFollow);
   const camera = useRef<CameraRef>(null);
   const [styleLoaded, setStyleLoaded] = useState(false);
+  // The same style as the main map (the sectional on, the bundled glyphs so labels work offline) and the same readiness report
+  // the capture scripts wait for.
+  const glyphs = useLocalGlyphs();
+  const glyphsUrl = glyphs.status === 'ready' ? glyphs.url : REMOTE_GLYPHS_URL;
+  const mapStyle = useMemo(() => styleFor(t.night, true, glyphsUrl), [t.night, glyphsUrl]);
+  const reporter = useMapStatus(t.night);
   const trackData = useMemo(() => replayTrackData(track), [track]);
   const markerData = useMemo(() => replayMarkerData(coordinate, heading), [coordinate, heading]);
   const orange = t.night ? REPLAY_COLOR.night : REPLAY_COLOR.day;
@@ -68,12 +56,23 @@ export function ReplayMap({ store }: { store: ReplayViewStore }) {
     }
   }, [styleLoaded, autoFollow, coordinate]);
 
+  if (glyphs.status === 'loading') return null;
   return (
     <Map
       style={{ flex: 1 }}
-      mapStyle={MAP_STYLE}
+      mapStyle={mapStyle}
       compass={false}
-      onDidFinishLoadingStyle={() => setStyleLoaded(true)}
+      onWillStartLoadingMap={() => reporter.report('willStartLoadingMap')}
+      onDidFinishLoadingStyle={() => {
+        reporter.report('didFinishLoadingStyle');
+        setStyleLoaded(true);
+      }}
+      onDidFailLoadingMap={() => reporter.report('didFailLoadingMap')}
+      onDidFinishRenderingMapFully={() => {
+        if (reporter.has('didFinishRenderingMapFully')) return;
+        reporter.report('didFinishRenderingMapFully');
+        reporter.markRendered({}); // nothing to probe: the track and the marker are plain layers
+      }}
       // A pan by the pilot turns auto-follow off (Swift: the camera change reason .gesturePan; here any user gesture).
       onRegionDidChange={(e) => {
         if (e.nativeEvent.userInteraction) store.getState().onUserPan();

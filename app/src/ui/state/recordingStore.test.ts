@@ -555,3 +555,25 @@ describe('openMicrophoneSettings', () => {
     expect(store.getState().microphoneDenied).toBe(true);
   });
 });
+
+describe('a stop confirmed while the recording is starting', () => {
+  it('waits for the start to finish and then stops it, instead of being dropped', async () => {
+    const gate = Promise.withResolvers<void>();
+    const microphone: MicrophonePermission = {
+      status: () => Promise.resolve('undetermined'),
+      request: async () => {
+        await gate.promise;
+        return 'granted';
+      },
+      openSettings: () => Promise.resolve(),
+    };
+    const { store, persist, coordinator } = setup({ microphone });
+    const starting = store.getState().startRecording();
+    const stopping = store.getState().confirmStop(); // pressed while the start is still waiting
+    gate.resolve();
+    await Promise.all([starting, stopping]);
+    expect(coordinator.state.recordingStatus).toEqual({ kind: 'idle' });
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(store.getState()).toMatchObject({ busy: null, activeFlightId: null });
+  });
+});
