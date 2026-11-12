@@ -229,28 +229,37 @@ export function createSettingsStore(deps: SettingsDeps) {
           const credentials = await read(() => loadNotamCredentials(deps.secrets), null);
           const pilots = await read(() => deps.userData.pilots.list(), []);
           const cycle = await deps.loadDataCycle().catch(() => null);
+          // Everything that awaits comes first; what the user did meanwhile is read at the moment of the final set(), not before.
+          const regionNow = () =>
+            // A region whose save failed is still the one the user chose: a reload must not drop it before Retry.
+            pendingRegionWrites > 0 || regionFailed.save ? get().region : region;
+          let attributedFor = regionNow();
+          let attribution = await attributionFor(attributedFor);
+          let unavailable = await unavailableFor(attributedFor);
+          while (attributedFor !== regionNow()) {
+            attributedFor = regionNow();
+            attribution = await attributionFor(attributedFor);
+            unavailable = await unavailableFor(attributedFor);
+          }
           const typing = get().notam;
-          // A region whose save failed is still the one the user chose: a reload must not drop it before Retry.
-          const shownRegion = pendingRegionWrites > 0 || regionFailed.save ? get().region : region;
-          const untouched = !notamEdited;
           set({
             loaded: true,
-            region: shownRegion,
+            region: attributedFor,
             displayMode:
               pendingPrefWrites.displayMode > 0
                 ? get().displayMode
                 : (DISPLAY_MODES.find((m) => m === rawMode) ?? 'auto'),
             shareUsageData: pendingPrefWrites.shareUsageData > 0 ? get().shareUsageData : share,
-            dataAttribution: await attributionFor(shownRegion),
-            regionDataError: await unavailableFor(shownRegion),
+            dataAttribution: attribution,
+            regionDataError: unavailable,
             currencyToRenew: currencyToRenewCount(pilots.find((p) => p.isActive) ?? null, deps.now()),
             dataCycle: cycle,
             loadError: problems.length > 0 ? problems.join('; ') : null,
             notam: {
-              ...get().notam,
-              // What the user is typing is not replaced by a slow read.
-              clientID: untouched ? (credentials?.clientID ?? '') : typing.clientID,
-              clientSecret: untouched ? (credentials?.clientSecret ?? '') : typing.clientSecret,
+              ...typing,
+              // What the user typed or cleared is not replaced by a slow read.
+              clientID: notamEdited ? typing.clientID : (credentials?.clientID ?? ''),
+              clientSecret: notamEdited ? typing.clientSecret : (credentials?.clientSecret ?? ''),
               configured: credentials !== null,
             },
           });
