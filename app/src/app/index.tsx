@@ -21,6 +21,9 @@ const LAUNCH_SCREENS = [
   'ota',
   'briefing',
   'israel-plan',
+  'settings',
+  'onboarding',
+  'disclaimers',
 ];
 
 /** The screen requested at launch without a deep link (iOS launch argument, web query), if any. */
