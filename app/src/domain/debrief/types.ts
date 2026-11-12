@@ -1,10 +1,6 @@
 // Port of efb-212/Services/Debrief/DebriefTypes.swift minus the Apple Foundation Models @Generable plumbing
 // (the on-device model call is an adapter concern). Times are epoch ms.
 // TODO(D): record shapes below are structural subsets of the recording records; use the data-layer types once on main.
-// TODO(L3): the Israel network shapes at the end are structural subsets of IsraelAviationModels.swift; use the L3
-// types once on main.
-
-import type { Coordinate } from '../geo';
 
 /** Per-phase observation within a flight debrief. */
 export interface PhaseObservation {
@@ -83,37 +79,10 @@ export interface StoredRouteLeg {
   to: string;
 }
 
-/** Israel reporting point kind; 'arp' is an aerodrome reference point. */
-export type IsraelPointKind = 'compulsory' | 'onRequest' | 'arp' | 'unlisted';
-
-export interface IsraelReportingPoint {
-  id: number;
-  /** Five-letter point code ("TAVOR") or four-letter aerodrome ICAO ("LLHZ"). Not unique. */
-  code: string;
-  nameEnglish: string | null;
-  nameHebrew: string | null;
-  kind: IsraelPointKind;
-  /** Degrees. */
-  latitude: number;
-  longitude: number;
-}
-
-/** The altitude CAAI publishes for one direction of a segment. */
-export interface IsraelRouteAltitude {
-  /** Verbatim: "3500", or "2500/3500" where it changes along the leg. */
-  published: string;
-  /** Feet MSL; null when the published value is two numbers. */
-  feet: number | null;
-}
-
-/** A route segment. Identity is `id` (the database row). The polyline runs fromCode -> toCode. */
-export interface IsraelRouteSegment {
-  id: number;
-  fromCode: string;
-  toCode: string;
-  /** Flying fromCode -> toCode; null when none is published for that direction. */
-  altitudeForward: IsraelRouteAltitude | null;
-  /** Flying toCode -> fromCode; null when none is published for that direction. */
-  altitudeReverse: IsraelRouteAltitude | null;
-  polyline: Coordinate[];
-}
+// Israel network shapes: the data layer's models (L3 replaced the structural subsets that stood here).
+export type {
+  IsraelPointKind,
+  IsraelReportingPoint,
+  IsraelRouteAltitude,
+  IsraelRouteSegment,
+} from '../../data/aviation/israelTypes';

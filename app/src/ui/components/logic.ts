@@ -82,6 +82,15 @@ export const opacityPercentText = (opacity: number): string => `${opacityPercent
 export const opacityAccessibilityValue = (opacity: number): string => `${opacityPercent(opacity)} percent`;
 export const clampOpacity = (value: number): number => Math.min(1, Math.max(0, value));
 
+/**
+ * One screen-reader step of the opacity slider: 10 points up or down, snapped to a whole percent so repeated steps never
+ * drift (0.7 + 0.1 + 0.1 is 0.8999999999999999, which `opacityPercent` truncates to 89). Any other action does nothing.
+ */
+export function stepOpacity(opacity: number, action: string): number | null {
+  if (action !== 'increment' && action !== 'decrement') return null;
+  return clampOpacity(Math.round((opacity + (action === 'increment' ? 0.1 : -0.1)) * 100) / 100);
+}
+
 export const DATABASE_UNAVAILABLE_TITLE = 'Airport database could not be opened';
 export const DATABASE_UNAVAILABLE_DETAIL = 'No airports, airspace or navaids will show. Reinstall Kanaf.';
 /** Deep red so white text clears 4.5:1 (system red under white is ~3.6:1), day and night. */
