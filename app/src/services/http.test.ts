@@ -91,3 +91,19 @@ test('a non-2xx answer releases the timer without a body read', async () => {
   await fetchWithTimeout(async () => response({ status: 503 }), 'https://x.test/a', 5000);
   expect(jest.getTimerCount()).toBe(0);
 });
+
+test('a body that rejects from its abort listener still reports RequestTimeoutError', async () => {
+  jest.useFakeTimers();
+  const abortAware = async (_url: string, init?: { signal?: AbortSignal }) => ({
+    status: 200,
+    text: () =>
+      new Promise<string>((_, reject) =>
+        init?.signal?.addEventListener('abort', () => reject(new Error('AbortError'))),
+      ),
+    arrayBuffer: async () => new ArrayBuffer(0),
+  });
+  const res = await fetchWithTimeout(abortAware, 'https://x.test/a', 5000);
+  const text = expect(res.text()).rejects.toBeInstanceOf(RequestTimeoutError);
+  jest.advanceTimersByTime(5000);
+  await text;
+});
