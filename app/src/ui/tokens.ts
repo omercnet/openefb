@@ -1,6 +1,6 @@
 // Port of efb-212/Core/DesignTokens.swift (Direction 2 strip): spacing, radii, type roles, strip metrics
 // and the day / night palette. Values are exact copies; sizes are points (1 pt = 1 CSS px on web).
-import type { TextStyle } from 'react-native';
+import { Platform, type TextStyle } from 'react-native';
 
 /** 4-point spacing scale (Space). */
 export const Space = { xs: 4, s: 8, m: 12, l: 16, xl: 24, xxl: 32 } as const;
@@ -33,12 +33,30 @@ export const FontFiles = {
 
 type Face = keyof typeof FontFiles;
 /**
- * Line height in points: the natural height (hhea ascent + descent: Archivo 0.878 + 0.210 em, Plex Mono
- * 1.025 + 0.275 em) rounded to the nearest 0.5 pt. Explicit because Chromium rounds ascent and descent separately;
- * rounded because RN iOS ceils every text height to the 0.5 pt pixel grid, and 15 * 1.3 = 19.500000000000004 in
- * floating point became 20 (iOS round 1: every Plex row 0.5 pt tall, 12 pt of drift down the airport column).
+ * Line height in points for a face whose natural height (hhea ascent + descent) is `em` times the size: Archivo 1.088,
+ * Plex Mono 1.3, SF 1.193. SwiftUI sizes a Text to its natural height rounded up to the pixel grid (0.5 pt on the 2x iPad).
+ * Explicit at all because Chromium rounds ascent and descent separately. Per platform, each measured on the CI
+ * simulator or emulator against the Swift reference:
+ * - iOS: RN ceils to that same grid, but when an explicit line height is above the natural one it adds a baseline
+ *   offset and the ceil then costs another half point (the 12.0 pt line of an 11 pt label became 12.5), which drifted
+ *   every text column down. So iOS gets a height just below the natural one, which RN ceils to SwiftUI's grid line
+ *   (iPad strip SSIM: map 0.9428 -> 0.9858, night 0.9483 -> 0.9856, airport 0.8209 -> 0.8853).
+ * - Android: the natural height rounded to the nearest 0.5 pt, as before: main measured SSIM 0.98 on the airport column with
+ *   it. The iOS rule was tried there in run 43102552494 without a clean result (that run also had the 1.5 pt header
+ *   regression described in AirportColumn, and a rewritten strip), so Android stays on the old rounding until an A/B.
+ * - react-native-web has no pixel grid and gets the rounded-up height itself.
  */
-export const lineHeight = (fontSize: number, em: number) => Math.round(fontSize * em * 2) / 2;
+export const lineHeight = (fontSize: number, em: number) => {
+  const natural = fontSize * em;
+  switch (Platform.OS) {
+    case 'ios':
+      return Math.round((natural - 0.01) * 1000) / 1000;
+    case 'web':
+      return Math.ceil((natural - 0.01) * 2) / 2;
+    default:
+      return Math.round(natural * 2) / 2;
+  }
+};
 const face = (fontFamily: Face, fontSize: number, extra?: TextStyle): TextStyle => ({
   fontFamily,
   fontSize,
@@ -86,6 +104,8 @@ export type Theme = {
   route: string;
   airspace: string;
   accent: string;
+  /** Palette.accentText: the AccentColor asset, accent as text and tint (lighter than `accent` at night). */
+  accentText: string;
   onAccent: string;
   ok: string;
   caution: string;
@@ -133,6 +153,7 @@ export const Day: Theme = {
   route: '#C2168D',
   airspace: '#1B58A3',
   accent: '#1556B8',
+  accentText: '#1556B8',
   onAccent: '#FFFFFF',
   ok: '#147832',
   caution: '#A55200',
@@ -166,6 +187,7 @@ export const Night: Theme = {
   route: '#93407A',
   airspace: '#86A3CB',
   accent: '#2E4A6E',
+  accentText: '#8FB4E0',
   onAccent: '#D9D9D9', // UIColor(white: 0.85)
   ok: '#30D158', // systemGreen, dark
   caution: '#FF9F0A', // systemOrange, dark

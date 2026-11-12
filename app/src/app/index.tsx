@@ -11,6 +11,8 @@ import { MapScreen } from '../ui/screens/MapScreen';
 const LAUNCH_SCREENS = [
   'airport',
   'night',
+  'layers',
+  'map-layers',
   'selftest',
   'sheet',
   'ota',
@@ -50,5 +52,5 @@ export default function Index() {
       .catch(() => null);
   }, [router]);
   if (screen) return <Redirect href={`/${screen}`} />;
-  return <MapScreen screen="map" />;
+  return <MapScreen />;
 }
