@@ -4,7 +4,7 @@ import { fallbackDataAttribution, parseRegion, type Region } from '../../domain/
 import { describeError } from '../../domain/describeError';
 import { DISPLAY_MODE_DEFAULTS_KEY, DISPLAY_MODES, type DisplayMode } from '../../domain/displayMode';
 import { readBool, writeBool, type Preferences } from '../../domain/ports/preferences';
-import type { SecretStore } from '../../domain/ports/secretStore';
+import { NOTAM_CLIENT_ID_KEY, NOTAM_CLIENT_SECRET_KEY, type SecretStore } from '../../domain/ports/secretStore';
 import {
   loadNotamCredentials,
   removeNotamCredentials,
@@ -71,7 +71,10 @@ export interface SettingsServices extends SettingsDeps {
 export interface NotamState {
   clientID: string;
   clientSecret: string;
+  /** A complete, usable pair is stored. */
   configured: boolean;
+  /** Part of a key is still stored (a removal failed half way): Remove Key stays available so it can be finished. */
+  partiallyStored: boolean;
   message: string | null;
 }
 
@@ -100,6 +103,8 @@ export interface SettingsState {
   setRegion(region: Region): Promise<void>;
   setDisplayMode(mode: DisplayMode): Promise<void>;
   setShareUsageData(enabled: boolean): Promise<void>;
+  /** Repeats the failed write of the preference named in `preferenceError`, with its current value and without telling the app again. */
+  retryPreferenceSave(): Promise<void>;
   setNotamClientID(text: string): void;
   setNotamClientSecret(text: string): void;
   saveNotamKey(): Promise<void>;
@@ -208,7 +213,7 @@ export function createSettingsStore(deps: SettingsDeps) {
       loadError: null,
       currencyToRenew: 0,
       dataCycle: null,
-      notam: { clientID: '', clientSecret: '', configured: false, message: null },
+      notam: { clientID: '', clientSecret: '', configured: false, partiallyStored: false, message: null },
 
       load: () =>
         enqueue(async () => {
@@ -261,6 +266,7 @@ export function createSettingsStore(deps: SettingsDeps) {
               clientID: notamEdited ? typing.clientID : (credentials?.clientID ?? ''),
               clientSecret: notamEdited ? typing.clientSecret : (credentials?.clientSecret ?? ''),
               configured: credentials !== null,
+              partiallyStored: false,
             },
           });
         }),
@@ -294,6 +300,28 @@ export function createSettingsStore(deps: SettingsDeps) {
         return enqueue(() =>
           persist('displayMode', () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode), applyFailure).finally(() => {
             pendingPrefWrites.displayMode -= 1;
+          }),
+        );
+      },
+
+      retryPreferenceSave: () => {
+        const owner = get().preferenceErrorFor;
+        if (owner === null) return Promise.resolve();
+        // The value on screen is what the user chose; saving it again changes nothing the app has applied.
+        if (owner === 'displayMode') {
+          const mode = get().displayMode;
+          pendingPrefWrites.displayMode += 1;
+          return enqueue(() =>
+            persist('displayMode', () => deps.prefs.set(DISPLAY_MODE_DEFAULTS_KEY, mode), null).finally(() => {
+              pendingPrefWrites.displayMode -= 1;
+            }),
+          );
+        }
+        const enabled = get().shareUsageData;
+        pendingPrefWrites.shareUsageData += 1;
+        return enqueue(() =>
+          persist('shareUsageData', () => writeBool(deps.prefs, TELEMETRY_ENABLED_KEY, enabled), null).finally(() => {
+            pendingPrefWrites.shareUsageData -= 1;
           }),
         );
       },
@@ -347,21 +375,39 @@ export function createSettingsStore(deps: SettingsDeps) {
         });
       },
 
-      removeNotamKey: () =>
-        enqueue(async () => {
+      removeNotamKey: () => {
+        // What was typed after Remove was pressed is not removed with the saved key.
+        const pressed = { ...get().notam };
+        return enqueue(async () => {
           try {
             await removeNotamCredentials(deps.secrets);
-            notamEdited = false;
-            setNotam({ clientID: '', clientSecret: '', configured: false, message: 'Key removed.' });
+            const now = get().notam;
+            const unchanged = now.clientID === pressed.clientID && now.clientSecret === pressed.clientSecret;
+            if (unchanged) notamEdited = false;
+            setNotam({
+              ...(unchanged ? { clientID: '', clientSecret: '' } : {}),
+              configured: false,
+              partiallyStored: false,
+              message: 'Key removed.',
+            });
           } catch (error) {
-            // A half-removed pair is not usable, so say what the store now holds instead of keeping "Configured".
+            // A half-removed pair is not usable, but what is left must stay removable.
             const configured = await loadNotamCredentials(deps.secrets).then(
               (c) => c !== null,
               () => get().notam.configured,
             );
-            setNotam({ configured, message: describeError(error) });
+            const stored = await Promise.all(
+              [NOTAM_CLIENT_ID_KEY, NOTAM_CLIENT_SECRET_KEY].map((key) =>
+                deps.secrets.get(key).then(
+                  (v) => v !== null,
+                  () => true,
+                ),
+              ),
+            );
+            setNotam({ configured, partiallyStored: stored.some(Boolean), message: describeError(error) });
           }
-        }),
+        });
+      },
     };
   });
 }
