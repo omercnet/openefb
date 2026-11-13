@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { AircraftEditScreen } from './AircraftEditScreen';
 import { AircraftListScreen } from './AircraftListScreen';
-import { StripFrame } from './CaptureScreens';
+import { ScreenFrame } from './CaptureScreens';
 import {
   CAPTURE_AIRCRAFT_ID,
   CAPTURE_CONFIRMED_ENTRY_ID,
@@ -26,6 +26,8 @@ function ProfilesFlow({ initial }: { initial: Page }) {
   const [stores] = useState(captureProfileStores);
   const [page, setPage] = useState<Page>(initial);
   const go = (next: Page) => () => setPage(next);
+  // The pilot profile is the root of its stack in the Swift capture (no Back); pushed from the aircraft list it has one.
+  const pilotIsRoot = initial.name === 'pilot' && page.name === 'pilot';
   const { now, aircraft, pilot } = stores;
   switch (page.name) {
     case 'aircraft':
@@ -46,7 +48,7 @@ function ProfilesFlow({ initial }: { initial: Page }) {
         <PilotProfileScreen
           store={pilot}
           navigation={{
-            onBack: go({ name: 'aircraft' }),
+            onBack: pilotIsRoot ? undefined : go({ name: 'aircraft' }),
             onEdit: (id) => setPage({ name: 'pilotEdit', id }),
             onLogNightLandings: go({ name: 'nightLandings' }),
           }}
@@ -62,27 +64,27 @@ function ProfilesFlow({ initial }: { initial: Page }) {
 /** kanaf-dev://aircraft: the aircraft list, with the pilot profile one tap away. */
 export function AircraftCapture() {
   return (
-    <StripFrame>
+    <ScreenFrame>
       <ProfilesFlow initial={{ name: 'aircraft' }} />
-    </StripFrame>
+    </ScreenFrame>
   );
 }
 
 /** kanaf-dev://aircraftedit: the editor of the active aircraft, every section filled. */
 export function AircraftEditCapture() {
   return (
-    <StripFrame>
+    <ScreenFrame>
       <ProfilesFlow initial={{ name: 'aircraftEdit', id: CAPTURE_AIRCRAFT_ID }} />
-    </StripFrame>
+    </ScreenFrame>
   );
 }
 
 /** kanaf-dev://pilot: the pilot profile with its currency status. */
 export function PilotCapture() {
   return (
-    <StripFrame>
+    <ScreenFrame>
       <ProfilesFlow initial={{ name: 'pilot' }} />
-    </StripFrame>
+    </ScreenFrame>
   );
 }
 
@@ -90,12 +92,11 @@ export function PilotCapture() {
 export function LogbookEntryCapture({ locked }: { locked: boolean }) {
   const [stores] = useState(captureProfileStores);
   return (
-    <StripFrame>
+    <ScreenFrame>
       <LogbookEntryScreen
         store={stores.logbookEntry}
         entryId={locked ? CAPTURE_CONFIRMED_ENTRY_ID : CAPTURE_DRAFT_ENTRY_ID}
-        onClose={() => undefined}
       />
-    </StripFrame>
+    </ScreenFrame>
   );
 }

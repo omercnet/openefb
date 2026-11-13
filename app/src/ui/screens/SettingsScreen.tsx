@@ -68,7 +68,7 @@ export function SettingsScreen({
   const ignored = remoteConfig.ignored;
 
   return (
-    <FormScreen title="Settings" onBack={navigation.onBack} testID="settings-screen">
+    <FormScreen largeTitle title="Settings" onBack={navigation.onBack} testID="settings-screen">
       <FormSection header="About">
         <LabeledRow label="Version" value={appInfo.version} />
         <LabeledRow label="Build" value={appInfo.build} />

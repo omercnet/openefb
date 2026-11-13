@@ -11,54 +11,51 @@
     "log": { "min": 0.97, "metric": "frame" },
     "settings": {
       "min": 0.85,
-      "interim": 0.41,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.73,
+      "reason": "whole-frame score; text rows drift a few px against SwiftUI (row and section spacing, config and version strings differ)",
+      "metric": "frame"
     },
     "onboarding": { "min": 0.9 },
     "disclaimers": {
       "min": 0.85,
-      "interim": 0.54,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.7,
+      "reason": "whole-frame score; paragraph line breaks and section spacing differ from the SwiftUI Form",
+      "metric": "frame"
     },
-    "aircraft": {
-      "min": 0.85,
-      "interim": 0.82,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
-    },
+    "aircraft": { "min": 0.85, "metric": "frame" },
     "aircraftedit": {
       "min": 0.85,
-      "interim": 0.54,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.8,
+      "reason": "whole-frame score; form field values and row spacing differ from the SwiftUI editor",
+      "metric": "frame"
     },
-    "pilot": {
-      "min": 0.85,
-      "interim": 0.74,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
-    },
+    "pilot": { "min": 0.85, "metric": "frame" },
     "logbookentry": {
       "min": 0.85,
-      "interim": 0.68,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.8,
+      "reason": "whole-frame score; row spacing and the iOS 26 glass toolbar buttons differ",
+      "metric": "frame"
     },
     "logbooklocked": {
       "min": 0.85,
-      "interim": 0.52,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.82,
+      "reason": "whole-frame score; row spacing and the iOS 26 glass banner differ",
+      "metric": "frame"
     },
     "recording": {
       "min": 0.9,
-      "interim": 0.6,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.67,
+      "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
     "recordingstopped": {
       "min": 0.9,
-      "interim": 0.62,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.71,
+      "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
     "recordingstop": {
       "min": 0.9,
-      "interim": 0.62,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.77,
+      "reason": "End recording dialog is a centred modal, Swift anchors a popover under the record button"
     },
     "briefing": {
       "min": 0.85,
@@ -78,8 +75,8 @@
     "log": { "min": 0.85 },
     "settings": {
       "min": 0.8,
-      "interim": 0.5,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.6,
+      "reason": "text rows drift a few px against SwiftUI (row and section spacing, config and version strings differ)"
     },
     "onboarding": {
       "min": 0.8,
@@ -88,48 +85,44 @@
     },
     "disclaimers": {
       "min": 0.8,
-      "interim": 0.36,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.56,
+      "reason": "paragraph line breaks and section spacing differ from the SwiftUI Form"
     },
-    "aircraft": {
-      "min": 0.8,
-      "interim": 0.74,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
-    },
+    "aircraft": { "min": 0.8 },
     "aircraftedit": {
       "min": 0.8,
-      "interim": 0.58,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.69,
+      "reason": "form field values and row spacing differ from the SwiftUI editor"
     },
     "pilot": {
       "min": 0.8,
-      "interim": 0.61,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.77,
+      "reason": "row text drifts a few px against SwiftUI"
     },
     "logbookentry": {
       "min": 0.8,
-      "interim": 0.55,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.7,
+      "reason": "row spacing and the iOS 26 glass toolbar buttons differ"
     },
     "logbooklocked": {
       "min": 0.8,
-      "interim": 0.47,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.78,
+      "reason": "row spacing and the iOS 26 glass banner differ"
     },
     "recording": {
       "min": 0.85,
-      "interim": 0.48,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.51,
+      "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
     "recordingstopped": {
       "min": 0.85,
-      "interim": 0.52,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.57,
+      "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
     "recordingstop": {
       "min": 0.85,
-      "interim": 0.52,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.7,
+      "reason": "End recording dialog is a centred modal, Swift anchors a popover under the record button"
     },
     "briefing": {
       "min": 0.8,

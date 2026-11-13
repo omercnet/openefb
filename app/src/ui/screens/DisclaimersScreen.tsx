@@ -8,7 +8,7 @@ import { useTheme } from '../Primitives';
 export function DisclaimersScreen({ onBack }: { onBack?: () => void }) {
   const t = useTheme();
   return (
-    <FormScreen title="Disclaimers" onBack={onBack} testID="disclaimers-screen">
+    <FormScreen largeTitle title="Disclaimers" onBack={onBack} testID="disclaimers-screen">
       <FormSection>
         {DISCLAIMERS.map((item) => (
           <RowFrame

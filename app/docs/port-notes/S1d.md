@@ -58,7 +58,7 @@ Tests (names kept; Swift fixtures are read in place with `swiftFixtures.ts`, no 
 - PIREP queries split at the antimeridian (`pirepBoundingBoxes`: two requests, results merged and de-duplicated). Swift clamps the
   longitudes and so drops in-radius reports across +-180 (a Swift bug fixed here as a safety guard; `pirepBoundingBox` keeps the
   Swift clamp for parity tests).
-- Declined, Swift parity: when a NOTAM's `LAST_MODIFICATION_DATETIME` changes and its detail refetch fails, the previous detail is
-  kept (Swift `details[id]` survives a failed refetch), so superseded altitude/time limits can show until the next successful
-  refresh. Only the log wording was corrected. If the owner wants "See NOTAM" instead (drop the cached detail when its stamp no
-  longer matches), it is a one-line change in `TfrService.refresh`; flagged as an owner decision.
+- OWNER-APPROVED DEVIATION FROM SWIFT (Q10, 2026-11-13): when a TFR NOTAM's `LAST_MODIFICATION_DATETIME` changes and its detail
+  refetch fails, the previous (superseded) altitude and time limits are no longer shown: the TFR reads "See NOTAM" until a refresh
+  succeeds. Swift keeps `details[id]` across a failed refetch. A detail is kept only while its NOTAM stamp is unchanged; first
+  fetches and unchanged NOTAMs behave as before. Tests: `tfrService.test.ts` (changed + failed, unchanged + failed, first fetch).

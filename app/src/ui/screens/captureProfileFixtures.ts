@@ -1,6 +1,8 @@
 // Deterministic fakes for the fidelity captures of the profile and logbook screens (kanaf-dev://aircraft, pilot, ...) and the
 // web preview: three aircraft (one active), one active pilot whose three currency statuses show all three colours, and a
-// draft and a confirmed logbook entry. Dates are relative to now so the statuses do not drift. Real wiring is the shell's.
+// draft and a confirmed logbook entry. They mirror the Swift capture seed (CaptureSeed.swift) value for value, and `now` is
+// pinned to the day the SwiftUI references were taken, so dates and currency statuses match them whenever the capture runs.
+// Real wiring is the shell's.
 import { newAircraftProfile, newLogbookEntry, newPilotProfile } from '../../data/defaults';
 import { uuidv4 } from '../../data/ids';
 import { FakePreferences } from '../../domain/ports/preferences';
@@ -13,6 +15,9 @@ import { createPilotStore, type PilotStore } from '../state/pilotStore';
 
 const DAY = 86_400_000;
 
+/** 12 Nov 2026, noon: the day of the SwiftUI references. */
+export const CAPTURE_NOW = new Date(2026, 10, 12, 12, 0, 0).getTime();
+
 export const CAPTURE_AIRCRAFT_ID = 'capture-aircraft-1';
 export const CAPTURE_DRAFT_ENTRY_ID = 'capture-entry-draft';
 export const CAPTURE_CONFIRMED_ENTRY_ID = 'capture-entry-confirmed';
@@ -22,31 +27,29 @@ export function captureUserData(now: number): UserData {
     aircraft: [
       newAircraftProfile('N172KF', {
         id: CAPTURE_AIRCRAFT_ID,
-        aircraftType: 'Cessna 172SP',
+        aircraftType: 'C172S',
         icaoTypeDesignator: 'C172',
         personsOnBoard: 2,
         fuelCapacityGallons: 53,
-        fuelBurnGPH: 8.5,
+        fuelBurnGPH: 9,
         cruiseSpeedKts: 110,
         vSpeeds: { vr: 55, vx: 62, vy: 74, va: 99, vne: 163, vfe: 85, vs0: 40, vs1: 48 },
         annualDue: now + 120 * DAY,
+        transponderDue: now + 200 * DAY,
         isActive: true,
-        createdAt: now - 3 * DAY,
+        createdAt: now - 200 * DAY,
       }),
       newAircraftProfile('N28PA', {
         id: 'capture-aircraft-2',
-        aircraftType: 'Piper PA-28',
-        fuelCapacityGallons: 48,
-        fuelBurnGPH: 9.5,
-        createdAt: now - 2 * DAY,
+        aircraftType: 'PA28',
+        createdAt: now - 199 * DAY,
       }),
-      newAircraftProfile('4X-ABC', { id: 'capture-aircraft-3', createdAt: now - DAY }),
+      newAircraftProfile('4X-ABC', { id: 'capture-aircraft-3', createdAt: now - 198 * DAY }),
     ],
     pilots: [
       newPilotProfile({
         id: 'capture-pilot-1',
         name: 'Test Pilot',
-        certificateNumber: '1234567',
         certificateType: 'private',
         medicalClass: 'third',
         medicalExpiry: now + 20 * DAY, // expiring soon (caution)
@@ -64,32 +67,29 @@ export function captureUserData(now: number): UserData {
       newLogbookEntry({
         id: CAPTURE_DRAFT_ENTRY_ID,
         date: now - DAY,
-        departureICAO: 'LLHZ',
-        departureName: 'Herzliya',
-        arrivalICAO: 'LLIB',
-        arrivalName: 'Rosh Pina',
-        route: 'LLHZ LLIB',
-        durationSeconds: 5400,
-        aircraftType: 'C172',
+        departureICAO: 'LLHA',
+        departureName: 'Haifa',
+        arrivalICAO: 'LLMG',
+        arrivalName: 'Megiddo',
+        durationSeconds: 900,
+        aircraftType: 'C172S',
         dayLandingCount: 1,
         createdAt: now - DAY,
       }),
       newLogbookEntry({
         id: CAPTURE_CONFIRMED_ENTRY_ID,
-        date: now - 8 * DAY,
+        date: now - 10 * DAY,
         departureICAO: 'LLIB',
         departureName: 'Rosh Pina',
         arrivalICAO: 'LLHZ',
         arrivalName: 'Herzliya',
-        route: 'LLIB LLHZ',
         durationSeconds: 5040,
-        aircraftType: 'C172',
+        aircraftType: 'C172S',
         dayLandingCount: 1,
         nightLandingCount: 1,
         isConfirmed: true,
-        hasDebrief: true,
         notes: 'Smooth air, a little haze on the coast.',
-        createdAt: now - 8 * DAY,
+        createdAt: now - 10 * DAY,
       }),
     ],
   });
@@ -103,16 +103,14 @@ export interface CaptureProfileStores {
 }
 
 export function captureProfileStores(): CaptureProfileStores {
-  const now = () => Date.now();
+  const now = () => CAPTURE_NOW;
   const userData = captureUserData(now());
   const base = { userData, now, newId: uuidv4, onActiveChange: () => undefined };
   return {
     now,
     aircraft: createAircraftStore({
       ...base,
-      networkPreference: preferencesNetworkPreference(
-        new FakePreferences({ [`israel.routeNetwork.${CAPTURE_AIRCRAFT_ID}`]: 'cvfr' }),
-      ),
+      networkPreference: preferencesNetworkPreference(new FakePreferences()),
     }),
     pilot: createPilotStore(base),
     logbookEntry: createLogbookEntryStore({ userData }),
