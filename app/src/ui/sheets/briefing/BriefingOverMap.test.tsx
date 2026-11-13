@@ -2,7 +2,7 @@
 // clipped it to "Fee" when it rendered before they loaded).
 import { useFonts } from 'expo-font';
 import { Platform } from 'react-native';
-import { callHandler, press, render } from '../../../../tests/support/ui';
+import { press, render } from '../../../../tests/support/ui';
 import { BriefingOverMap } from './BriefingOverMap';
 
 jest.mock('expo-font', () => ({ ...jest.requireActual('expo-font'), useFonts: jest.fn(() => [true, null]) }));
