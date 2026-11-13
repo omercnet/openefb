@@ -17,6 +17,18 @@
       "interim": 0.9,
       "metric": "frame",
       "reason": "first measurement pending: gated on the whole frame because the strip metric passes a blank Log (0.867); the web render scores 0.993"
+    },
+    "briefing": {
+      "min": 0.85,
+      "interim": 0.5,
+      "metric": "frame",
+      "reason": "first measurement pending (this PR's App run); replaced by a measured floor in the next commit"
+    },
+    "israel-plan": {
+      "min": 0.85,
+      "interim": 0.5,
+      "metric": "frame",
+      "reason": "first measurement pending (this PR's App run); replaced by a measured floor in the next commit"
     }
   },
   "android": {
@@ -26,6 +38,16 @@
     "layers": { "min": 0.8 },
     "nearest": { "min": 0.8 },
     "search": { "min": 0.8 },
-    "log": { "min": 0.8 }
+    "log": { "min": 0.8 },
+    "briefing": {
+      "min": 0.8,
+      "interim": 0.5,
+      "reason": "first measurement pending (this PR's App run); replaced by a measured floor in the next commit"
+    },
+    "israel-plan": {
+      "min": 0.8,
+      "interim": 0.5,
+      "reason": "first measurement pending (this PR's App run); replaced by a measured floor in the next commit"
+    }
   }
 }

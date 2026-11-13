@@ -198,10 +198,12 @@ describe('IsraelFlightPlanSheet', () => {
     expect(routes[0]?.[routes[0].length - 1]).toBe('LLIB');
   });
 
-  test('the israel-plan route shows the fixture plan once it has routed', async () => {
+  test('the israel-plan route is the empty form of the SwiftUI capture: no plan, the briefing button and the filing note', async () => {
     const view = await render(<IsraelPlanRoute />);
     await settle();
-    expect(view.byTestId('il-summary')).toBeTruthy();
-    expect(view.text()).toContain('LEGS 12');
+    expect(view.all((n) => n.props?.testID === 'il-summary')).toHaveLength(0);
+    expect(view.byTestId('il-notam-briefing')).toBeTruthy();
+    expect(view.text()).toContain('Departure');
+    expect(view.text()).toContain('ais@iaa.gov.il');
   });
 });
