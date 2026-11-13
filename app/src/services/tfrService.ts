@@ -120,14 +120,18 @@ export class TfrService implements TfrServiceLike {
     const fetched = await this.fetchDetails(stale);
     // Build the next cache aside, then swap: a failure above leaves the previous cache untouched.
     const next = new Map<string, CachedDetail>();
-    for (const [id, cached] of this.details) if (modified.has(id)) next.set(id, cached); // drop cancelled NOTAMs
+    // Keep a detail only while its NOTAM is unchanged (Q10, owner-approved deviation from Swift): a changed NOTAM whose refetch
+    // failed shows "See NOTAM" until a refresh succeeds, never the superseded limits. Cancelled NOTAMs are dropped too.
+    for (const [id, cached] of this.details) {
+      if (modified.has(id) && cached.lastModifiedRaw === (modified.get(id) ?? null)) next.set(id, cached);
+    }
     for (const [id, detail] of fetched) next.set(id, { lastModifiedRaw: modified.get(id) ?? null, detail });
     this.details = next;
 
     const missing = stale.length - fetched.size;
     if (missing > 0)
       this.options.log?.(
-        `${missing} TFR NOTAM details unavailable (new ones show See NOTAM; a changed one keeps its previous detail, as Swift does)`,
+        `${missing} TFR NOTAM details unavailable; altitudes/times shown as See NOTAM until a refresh succeeds`,
       );
 
     const tfrs = joinTfrs(features, new Map([...next].map(([id, c]) => [id, c.detail])));

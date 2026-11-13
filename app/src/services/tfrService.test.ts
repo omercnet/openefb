@@ -361,3 +361,51 @@ test('malformed features and coordinates are skipped, not fatal', () => {
   expect(parseXnotamCoordinate('')).toBeNull();
   expect(parseXnotamCoordinate('12X')).toBeNull();
 });
+
+// Q10 (owner-approved deviation from Swift, 2026-11-13): a changed NOTAM whose detail refetch fails shows "See NOTAM".
+function wfsWithStamp(stamp: string): string {
+  const doc = JSON.parse(wfsJSON) as { features: { properties: Record<string, unknown> }[] };
+  for (const f of doc.features)
+    if (String(f.properties.NOTAM_KEY).startsWith('6/4348')) f.properties.LAST_MODIFICATION_DATETIME = stamp;
+  return JSON.stringify(doc);
+}
+
+test('a changed NOTAM whose detail refetch fails shows See NOTAM, an unchanged one keeps its detail', async () => {
+  const state = { stamp: '202603051701', detailOk: true };
+  const fetch = fakeFetch((url): StubReply => {
+    if (url.includes('geoserver')) return { body: wfsWithStamp(state.stamp) };
+    if (url.endsWith('detail_6_4348.xml')) return state.detailOk ? { body: detail4348 } : { status: 503 };
+    return { status: 404 };
+  });
+  const clock = new TestClock(T0);
+  const service = new TfrService({ fetch, now: clock.now });
+  const first = await service.currentTFRs();
+  expect(tfrAltitudeDescription(first.tfrs[0])).toBe("2400' MSL-FL180");
+
+  // Unchanged stamp, detail endpoint now failing: nothing is refetched, the detail stays.
+  state.detailOk = false;
+  clock.advance(700);
+  const unchanged = await service.currentTFRs();
+  expect(tfrAltitudeDescription(unchanged.tfrs[0])).toBe("2400' MSL-FL180");
+  expect(unchanged.tfrs[0].effectiveDate).toBe(utc('2026-03-08T07:00:00Z'));
+
+  // The NOTAM changed and its refetch fails: the superseded limits are gone.
+  state.stamp = '202603061200';
+  clock.advance(700);
+  const changed = await service.currentTFRs();
+  expect(tfrAltitudeDescription(changed.tfrs[0])).toBe('See NOTAM');
+  expect([changed.tfrs[0].effectiveDate, changed.tfrs[0].expirationDate]).toEqual([null, null]);
+  expect(tfrAltitudeDescription(changed.tfrs[1])).toBe('See NOTAM');
+
+  // A later refresh that succeeds shows the new details again (the failed one was retried, not cached).
+  state.detailOk = true;
+  clock.advance(700);
+  const recovered = await service.currentTFRs();
+  expect(tfrAltitudeDescription(recovered.tfrs[0])).toBe("2400' MSL-FL180");
+});
+
+test('a first fetch with failing details still shows See NOTAM (unchanged behaviour)', async () => {
+  const fetch = fakeFetch((url): StubReply => (url.includes('geoserver') ? { body: wfsJSON } : { status: 503 }));
+  const snapshot = await new TfrService({ fetch }).currentTFRs();
+  expect(snapshot.tfrs.every((t) => tfrAltitudeDescription(t) === 'See NOTAM')).toBe(true);
+});
