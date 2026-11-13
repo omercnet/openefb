@@ -30,9 +30,11 @@ const referenceNames = Object.fromEntries(
 );
 const referenceFile = (screen: string) => `reference/${referenceNames[screen] ?? `ipad-${screen}.png`}`;
 /** Captured for another reason than the gate (the native sheet probe). */
-// Captured but not gated: the sheet probe, M1's map-layers (no Swift counterpart), and the AI debrief, which is iOS-only (Q8) so
-// the rule that both platforms gate the same screens cannot hold for it.
-const NOT_GATED = ['sheet', 'map-layers', 'debrief'];
+// Captured but not gated: the sheet probe; M1's map-layers (no Swift counterpart); the AI debrief, which is iOS-only (Q8), so the
+// rule that both platforms gate the same screens cannot hold for it; and the flight screens whose Swift reference seeds a different
+// flight than the RN fixture (cvfr and flightdetail show another route, replay and replayfast another track), so the score would
+// measure the data, not the layout. Gate them once the fixtures are aligned.
+const NOT_GATED = ['sheet', 'map-layers', 'debrief', 'flightdetail', 'cvfr', 'replay', 'replayfast'];
 
 describe('fidelity gate registration', () => {
   const screens = Object.keys(thresholds.ios);
