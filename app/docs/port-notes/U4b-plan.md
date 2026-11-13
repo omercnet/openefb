@@ -201,3 +201,17 @@ phone and a tablet (the top inset is 16 dp below the status bar, where the iPad 
 edge-to-edge insets with gesture navigation; that the backdrop keeps MapLibre's native view from taking gestures; no
 enter or exit animation (the native sheet slid up). `expo export --platform web` could not be run here: it stops on the
 missing built asset assets/aviation.sqlite before reaching this code.
+
+## Review decisions (PR #64)
+
+- Departure time in the Israel zone: a time pick on the departure's own Israel day IS the new departure, and a date pick on
+  the same day changes nothing, so an instant inside the repeated hour (the end of Israel DST, 01:00 to 01:59 occurs twice)
+  is kept; a wall time entered afresh that falls in the repeated hour takes the FIRST occurrence (`israelEpoch`); a wall time in
+  the spring gap lands an hour later. Swift's `DatePicker` binds the instant, so the first rule is its behaviour.
+- The Android dialogs no longer edit a mirror of the Israel wall clock as a device-local Date (that skipped or repeated an
+  hour on the DEVICE's own DST change: Israel Mar 14 2027 02:30 showed as 03:30 on a New York device). The date dialog gets
+  local noon of the Israel day and the time dialog a fixed Jan 15 2000 date with the Israel hour and minute; only the
+  matching fields are read back (`israelDayMirror`, `israelTimeMirror`, `withDialogDay`, `withDialogTime`). The tests assert
+  the anchors, which hold in every device zone (checked with TZ set to UTC, New York, Jerusalem and Kiritimati).
+- TalkBack: `accessibilityViewIsModal` is iOS only, so while the Android briefing overlay is presented `BriefingOverMap` hides
+  the map and strip behind it (`importantForAccessibility="no-hide-descendants"`) and restores them on dismiss.

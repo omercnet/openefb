@@ -5,13 +5,18 @@
 // edges on Android. Fakes only: the fixture's feed and an in-memory read store.
 import { useFonts } from 'expo-font';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { MapScreen } from '../../screens/MapScreen';
 import { FontFiles } from '../../tokens';
 import { BriefingPresentation } from './BriefingPresentation';
 import { FIXTURE_NOW, MemoryNotamReadStore, captureBriefingData, fixtureReport } from './fixture';
 import { IsraelBriefingSheet } from './IsraelBriefingSheet';
 import { IsraelBriefingViewModel, briefing, noBriefingActions } from './store';
+
+const HIDDEN_FROM_ASSISTIVE_TECH = {
+  importantForAccessibility: 'no-hide-descendants',
+  accessibilityElementsHidden: true,
+} as const;
 
 const captureModel = () =>
   new IsraelBriefingViewModel(briefing.make(captureBriefingData()), {
@@ -32,7 +37,15 @@ export function BriefingOverMap() {
   const actions = { ...noBriefingActions, dismiss };
   return (
     <View style={{ flex: 1 }}>
-      <MapScreen screen="map" />
+      {/* While the Android overlay is up, TalkBack must not reach the map and strip behind it (accessibilityViewIsModal is
+          iOS only): hide that subtree, and restore it when the sheet is dismissed. */}
+      <View
+        testID="briefing-background"
+        style={{ flex: 1 }}
+        {...(Platform.OS === 'android' && presented ? HIDDEN_FROM_ASSISTIVE_TECH : null)}
+      >
+        <MapScreen screen="map" />
+      </View>
       <BriefingPresentation presented={presented} onDismiss={dismiss}>
         {ready ? <IsraelBriefingSheet model={model} actions={actions} /> : null}
       </BriefingPresentation>

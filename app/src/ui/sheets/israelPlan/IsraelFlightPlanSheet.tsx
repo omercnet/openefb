@@ -32,8 +32,10 @@ import {
   WEEKEND_RULE_FALLBACK,
   departureClockText,
   departureDateText,
-  deviceDateShowingIsraelTime,
-  israelEpochOfDeviceDate,
+  israelDayMirror,
+  israelTimeMirror,
+  withDialogDay,
+  withDialogTime,
   withIsraelDay,
   withIsraelTime,
   legRows,
@@ -482,6 +484,7 @@ function DepartureTime() {
     const next = part === 'date' ? withIsraelDay(current, pickedMs) : withIsraelTime(current, pickedMs);
     store.getState().pickDepartureTime(next);
   };
+  const mirror = editing === 'time' ? israelTimeMirror : israelDayMirror;
   const shared = {
     accentColor: t.accent,
     themeVariant: t.night ? ('dark' as const) : ('light' as const),
@@ -536,11 +539,15 @@ function DepartureTime() {
           presentation="dialog"
           style={{ position: 'absolute', width: 0, height: 0 }}
           mode={editing}
-          value={deviceDateShowingIsraelTime(departureTime)}
-          minimumDate={deviceDateShowingIsraelTime(earliest)}
+          value={mirror(departureTime)}
+          minimumDate={mirror(earliest)}
           onChange={(event: DateTimePickerEvent, date?: Date) => {
             setEditing(null);
-            if (event.type === 'set' && date) pick(editing, israelEpochOfDeviceDate(date));
+            if (event.type !== 'set' || !date) return;
+            const current = store.getState().departureTime;
+            store
+              .getState()
+              .pickDepartureTime(editing === 'date' ? withDialogDay(current, date) : withDialogTime(current, date));
           }}
           onDismiss={() => setEditing(null)}
           {...shared}

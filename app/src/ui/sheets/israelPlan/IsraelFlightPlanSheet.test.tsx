@@ -238,7 +238,7 @@ describe('IsraelFlightPlanSheet', () => {
     beforeEach(() => jest.replaceProperty(Platform, 'OS', 'android'));
     afterEach(() => jest.restoreAllMocks());
 
-    test('the pills read the Israel time and open the date or time dialog on a device-local mirror of it', async () => {
+    test('the pills read the Israel time and open the date or time dialog on a DST-proof device-local mirror of it', async () => {
       const { view, store } = await mount();
       expect(view.text()).toContain('Nov 12, 2026');
       expect(view.text()).toContain('9:00 AM');
@@ -247,7 +247,7 @@ describe('IsraelFlightPlanSheet', () => {
       await press(view.byTestId('il-departure-date'));
       expect(pickerProp(view, 'il-departure-dialog', 'mode')).toBe('date');
       const mirror = pickerProp(view, 'il-departure-dialog', 'value') as Date;
-      expect([mirror.getDate(), mirror.getHours(), mirror.getMinutes()]).toEqual([12, 9, 0]);
+      expect([mirror.getDate(), mirror.getHours(), mirror.getMinutes()]).toEqual([12, 12, 0]); // local noon of the Israel day
       await callHandler(view.byTestId('il-departure-dialog'), 'onChange', set, new Date(2026, 10, 13, 9, 0));
       expect(departure(store)).toBe(Date.UTC(2026, 10, 13, 7));
       expect(view.all((n) => n.props?.testID === 'il-departure-dialog')).toHaveLength(0);
@@ -255,6 +255,8 @@ describe('IsraelFlightPlanSheet', () => {
 
       await press(view.byTestId('il-departure-clock'));
       expect(pickerProp(view, 'il-departure-dialog', 'mode')).toBe('time');
+      const timeMirror = pickerProp(view, 'il-departure-dialog', 'value') as Date;
+      expect([timeMirror.getHours(), timeMirror.getMinutes()]).toEqual([9, 0]); // the Israel time of day
       await callHandler(view.byTestId('il-departure-dialog'), 'onChange', set, new Date(2026, 10, 13, 11, 30));
       expect(departure(store)).toBe(Date.UTC(2026, 10, 13, 9, 30));
       expect(view.text()).toContain('11:30 AM');
