@@ -15,6 +15,7 @@ import { ColumnRule, ThemeContext } from './Primitives';
 import { useAppStore } from './state/appStore';
 import { panels } from './state/panels';
 import { STRIP_COLUMNS, useStripChrome, type StripScreen } from './StripColumn';
+import { ThemedStatusBar } from './SystemBars';
 import { useKeyboardVisible } from './useKeyboardVisible';
 
 /** Hidden from VoiceOver and TalkBack while an opened column covers it. */
@@ -42,6 +43,7 @@ export function CompactMapLayout({
   const columnOpen = ready && column !== 'log';
   return (
     <ThemeContext.Provider value={theme}>
+      <ThemedStatusBar theme={theme} />
       {/* Like SwiftUI, the layout shrinks above the software keyboard (Search types into it), so the footer stays visible. */}
       <KeyboardAvoidingView
         behavior="padding"
