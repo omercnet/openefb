@@ -6,29 +6,20 @@
     "night": { "min": 0.9 },
     "airport": { "min": 0.85 },
     "layers": { "min": 0.85 },
-    "nearest": { "min": 0.85 },
-    "search": {
-      "min": 0.85,
-      "interim": 0.75,
-      "reason": "not yet measured on iOS: the reference has the software keyboard with the footer on it (StripColumn is keyboard-aware now) and nobody has seen whether the CI simulator shows it for this app"
-    },
-    "log": {
-      "min": 0.93,
-      "interim": 0.9,
-      "metric": "frame",
-      "reason": "first measurement pending: gated on the whole frame because the strip metric passes a blank Log (0.867); the web render scores 0.993"
-    },
+    "nearest": { "min": 0.93 },
+    "search": { "min": 0.95 },
+    "log": { "min": 0.97, "metric": "frame" },
     "briefing": {
       "min": 0.85,
-      "interim": 0.5,
+      "interim": 0.75,
       "metric": "frame",
-      "reason": "first measurement pending (this PR's App run); replaced by a measured floor in the next commit"
+      "reason": "measured PR #64 App run 43356486570: whole-frame 0.7836, gap to the target not diagnosed yet; floor 0.03 under it, ratchet up"
     },
     "israel-plan": {
       "min": 0.85,
-      "interim": 0.5,
+      "interim": 0.8,
       "metric": "frame",
-      "reason": "first measurement pending (this PR's App run); replaced by a measured floor in the next commit"
+      "reason": "measured PR #64 App run 43356486570: whole-frame 0.8278, gap to the target not diagnosed yet; floor 0.03 under it, ratchet up"
     }
   },
   "android": {
@@ -36,18 +27,18 @@
     "night": { "min": 0.85 },
     "airport": { "min": 0.8 },
     "layers": { "min": 0.8 },
-    "nearest": { "min": 0.8 },
-    "search": { "min": 0.8 },
-    "log": { "min": 0.8 },
+    "nearest": { "min": 0.92 },
+    "search": { "min": 0.9 },
+    "log": { "min": 0.85 },
     "briefing": {
       "min": 0.8,
       "interim": 0.5,
-      "reason": "first measurement pending (this PR's App run); replaced by a measured floor in the next commit"
+      "reason": "measured PR #64 App run 43356486570: strip 0.5279, gap to the target not diagnosed yet; floor 0.03 under it, ratchet up"
     },
     "israel-plan": {
       "min": 0.8,
-      "interim": 0.5,
-      "reason": "first measurement pending (this PR's App run); replaced by a measured floor in the next commit"
+      "interim": 0.69,
+      "reason": "measured PR #64 App run 43356486570: strip 0.7218, gap to the target not diagnosed yet; floor 0.03 under it, ratchet up"
     }
   }
 }
