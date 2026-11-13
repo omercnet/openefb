@@ -77,6 +77,7 @@ function MicrophoneNotice({ store }: { store: RecordingViewStore }) {
         <View style={{ alignSelf: 'flex-start' }}>
           <BorderedButton
             minSize={StripMetrics.cell}
+            framedLabel
             title={MICROPHONE_NOTICE.action}
             onPress={() => void store.getState().openMicrophoneSettings()}
             testID="mic-open-settings"
@@ -102,6 +103,7 @@ function ProblemNotice({ store, error }: { store: RecordingViewStore; error: App
         </View>
         <BorderedButton
           minSize={StripMetrics.cell}
+          framedLabel
           title="Dismiss"
           label="Dismiss recording problem"
           onPress={() => store.getState().dismissError()}
@@ -124,6 +126,7 @@ function DiscardedNotice({ store }: { store: RecordingViewStore }) {
         </View>
         <BorderedButton
           minSize={StripMetrics.cell}
+          framedLabel
           title="Dismiss"
           label="Dismiss recording not saved notice"
           onPress={() => store.getState().dismissDiscardedNotice()}

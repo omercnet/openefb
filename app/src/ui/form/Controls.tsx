@@ -123,9 +123,7 @@ export function DateRow({
         <RowFrame>
           <Text style={[FormType.body, { flex: 1, color: t.primaryText }]}>{label}</Text>
           <View style={{ backgroundColor: t.fill, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 }}>
-            <Text style={[FormType.body, { color: disabled ? t.secondaryText : open ? accentText(t) : t.primaryText }]}>
-              {day}
-            </Text>
+            <Text style={[FormType.body, { color: open ? accentText(t) : t.primaryText }]}>{day}</Text>
           </View>
         </RowFrame>
       </RowButton>
@@ -170,7 +168,7 @@ export function StepperRow({
         height: 36,
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: disabled || atLimit ? 0.4 : 1,
+        opacity: atLimit ? 0.4 : 1, // a locked entry's steppers look as enabled ones in the Swift capture
       }}
     >
       <Text style={[FormType.title2, { color: accentText(t) }]}>{title}</Text>
@@ -242,7 +240,7 @@ export function FieldRow({
             minHeight: 32,
             paddingVertical: 0,
             textAlign: 'right',
-            color: readOnly ? t.secondaryText : t.primaryText,
+            color: t.primaryText,
           },
           fieldWidth ? { width: fieldWidth } : { flex: 1 },
           style,
@@ -272,11 +270,7 @@ export function TextAreaRow({ readOnly, style, ...input }: TextInputProps & { re
         placeholderTextColor={t.secondaryText}
         editable={readOnly !== true}
         {...input}
-        style={[
-          FormType.body,
-          { flex: 1, minHeight: 80, paddingVertical: 4, color: readOnly ? t.secondaryText : t.primaryText },
-          style,
-        ]}
+        style={[FormType.body, { flex: 1, minHeight: 80, paddingVertical: 4, color: t.primaryText }, style]}
       />
     </RowFrame>
   );

@@ -87,6 +87,7 @@ export function AircraftListScreen({
   }, [store]);
   return (
     <FormScreen
+      largeTitle
       title="Aircraft & Pilot"
       onBack={navigation.onBack}
       testID="aircraft-list-screen"

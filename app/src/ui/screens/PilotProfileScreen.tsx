@@ -73,6 +73,7 @@ export function PilotProfileScreen({ store, navigation }: { store: PilotStore; n
   };
   return (
     <FormScreen
+      largeTitle
       title="Pilot Profile"
       onBack={navigation.onBack}
       testID="pilot-profile-screen"

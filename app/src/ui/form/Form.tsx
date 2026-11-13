@@ -29,6 +29,7 @@ export function NavBar({
   onBack,
   leading,
   trailing,
+  largeTitle = false,
 }: {
   title: string;
   /** Shows a Back button in the bar's leading slot. */
@@ -36,6 +37,8 @@ export function NavBar({
   /** Replaces the Back button (a sheet's Cancel). */
   leading?: ReactNode;
   trailing?: ReactNode;
+  /** The default (large) display mode: the bar holds only its buttons, and the title sits under it (see LargeTitle). */
+  largeTitle?: boolean;
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -45,21 +48,39 @@ export function NavBar({
         <View style={{ flex: 1, alignItems: 'flex-start' }}>
           {leading ?? (onBack ? <BackButton onPress={onBack} /> : null)}
         </View>
-        <Text accessibilityRole="header" numberOfLines={1} style={[FormType.headline, { color: t.primaryText }]}>
-          {title}
-        </Text>
+        {largeTitle ? null : (
+          <Text accessibilityRole="header" numberOfLines={1} style={[FormType.headline, { color: t.primaryText }]}>
+            {title}
+          </Text>
+        )}
         <View style={{ flex: 1, alignItems: 'flex-end' }}>{trailing}</View>
       </View>
     </View>
   );
 }
 
-/** A screen of grouped sections under an inline navigation bar (NavigationStack + Form). */
+/** The large navigation title (.navigationBarTitleDisplayMode(.automatic) at the top of a stack): bold 34 pt under the bar. */
+function LargeTitle({ title }: { title: string }) {
+  const t = useTheme();
+  return (
+    <View style={{ height: 49, paddingTop: 9, paddingHorizontal: FormMetrics.margin }}>
+      <Text accessibilityRole="header" numberOfLines={1} style={[FormType.largeTitle, { color: t.primaryText }]}>
+        {title}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * A screen of grouped sections under a navigation bar (NavigationStack + Form): inline title by default, `largeTitle` for
+ * the screens Swift leaves at the default display mode (Settings, Aircraft & Pilot, Pilot Profile, logbook entry).
+ */
 export function FormScreen({
   title,
   onBack,
   leading,
   trailing,
+  largeTitle = false,
   children,
   testID,
 }: {
@@ -69,6 +90,7 @@ export function FormScreen({
   /** Replaces the Back button (a sheet's Cancel). */
   leading?: ReactNode;
   trailing?: ReactNode;
+  largeTitle?: boolean;
   children: ReactNode;
   testID?: string;
 }) {
@@ -76,12 +98,13 @@ export function FormScreen({
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: t.paper }} testID={testID}>
-      <NavBar title={title} onBack={onBack} leading={leading} trailing={trailing} />
+      <NavBar title={title} onBack={onBack} leading={leading} trailing={trailing} largeTitle={largeTitle} />
       <ScrollView
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: Space.xxl + insets.bottom }}
       >
+        {largeTitle ? <LargeTitle title={title} /> : null}
         {children}
       </ScrollView>
     </View>
@@ -147,7 +170,7 @@ export function Separator() {
     <View
       accessibilityElementsHidden
       importantForAccessibility="no"
-      style={{ height: 1, marginLeft: FormMetrics.pad, backgroundColor: t.rule, opacity: 0.6 }}
+      style={{ height: 1, marginTop: -1, marginLeft: FormMetrics.pad, backgroundColor: t.rule, opacity: 0.6 }}
     />
   );
 }
@@ -170,14 +193,14 @@ export function FormSection({
   if (rows.length === 0) return null;
   const textInset = FormMetrics.margin + FormMetrics.pad;
   return (
-    <View style={{ marginTop: Space.xl }}>
+    <View style={{ marginTop: Space.xl + 2 }}>
       {header ? (
         <View
           style={{
             flexDirection: 'row',
             justifyContent: 'space-between',
             paddingHorizontal: textInset,
-            paddingBottom: Space.s,
+            paddingBottom: Space.s + 2,
           }}
         >
           <Text accessibilityRole="header" style={[FormType.headline, { fontWeight: '500', color: t.secondaryText }]}>
@@ -205,7 +228,11 @@ export function FormSection({
       </View>
       {footer ? (
         <Text
-          style={[FormType.footnote, { color: t.secondaryText, paddingHorizontal: textInset, paddingTop: Space.s }]}
+          style={[
+            FormType.footnote,
+            // The next section's header sits closer under a footer than under a card (measured on the Swift capture).
+            { color: t.secondaryText, paddingHorizontal: textInset, paddingTop: Space.s, marginBottom: -8 },
+          ]}
         >
           {footer}
         </Text>
