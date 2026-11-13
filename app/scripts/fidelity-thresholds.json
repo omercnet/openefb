@@ -2,61 +2,34 @@
   "_doc": "Minimum SSIM of the leading 400 pt strip (compare.mjs result.strip.ssim) per platform and screen. Plan 5.4 and section 10 (Q9): iOS 0.90 map-heavy / 0.85 text-heavy; Android 0.85 map / 0.80 text (owner decision). 'interim' lowers a floor below the target while a known gap is open; the gate uses interim when present. Ratchet up, never down, except by an explicit interim entry with a reason. A screen that is not a strip (the full-width Log) sets \"metric\": \"frame\" on iOS to be gated on the whole frame instead of its leading 400 pt: its lower half is empty paper, which lifts the strip score so much that a blank screen passes (0.867 against the 0.85 floor). Android keeps the strip for it: its screen is 800 dp wide against the 1032 pt reference, so the right-aligned content of a whole-frame crop cannot line up (a blank Log scores 0.7955 on the Android strip, just under the 0.80 floor).",
   "metric": "strip.ssim",
   "ios": {
-    "map": {
-      "min": 0.9
-    },
-    "night": {
-      "min": 0.9
-    },
-    "airport": {
-      "min": 0.85
-    },
-    "layers": {
-      "min": 0.85
-    },
-    "nearest": {
-      "min": 0.85
-    },
-    "search": {
-      "min": 0.85,
-      "interim": 0.75,
-      "reason": "not yet measured on iOS: the reference has the software keyboard with the footer on it (StripColumn is keyboard-aware now) and nobody has seen whether the CI simulator shows it for this app"
-    },
-    "log": {
-      "min": 0.93,
-      "interim": 0.9,
-      "metric": "frame",
-      "reason": "first measurement pending: gated on the whole frame because the strip metric passes a blank Log (0.867); the web render scores 0.993"
-    },
+    "map": { "min": 0.9 },
+    "night": { "min": 0.9 },
+    "airport": { "min": 0.85 },
+    "layers": { "min": 0.85 },
+    "nearest": { "min": 0.93 },
+    "search": { "min": 0.95 },
+    "log": { "min": 0.97, "metric": "frame" },
     "settings": {
       "min": 0.85,
       "interim": 0.73,
       "reason": "whole-frame score; text rows drift a few px against SwiftUI (row and section spacing, config and version strings differ)",
       "metric": "frame"
     },
-    "onboarding": {
-      "min": 0.9
-    },
+    "onboarding": { "min": 0.9 },
     "disclaimers": {
       "min": 0.85,
       "interim": 0.7,
       "reason": "whole-frame score; paragraph line breaks and section spacing differ from the SwiftUI Form",
       "metric": "frame"
     },
-    "aircraft": {
-      "min": 0.85,
-      "metric": "frame"
-    },
+    "aircraft": { "min": 0.85, "metric": "frame" },
     "aircraftedit": {
       "min": 0.85,
       "interim": 0.8,
       "reason": "whole-frame score; form field values and row spacing differ from the SwiftUI editor",
       "metric": "frame"
     },
-    "pilot": {
-      "min": 0.85,
-      "metric": "frame"
-    },
+    "pilot": { "min": 0.85, "metric": "frame" },
     "logbookentry": {
       "min": 0.85,
       "interim": 0.8,
@@ -83,30 +56,23 @@
       "min": 0.9,
       "interim": 0.77,
       "reason": "End recording dialog is a centred modal, Swift anchors a popover under the record button"
-    }
+    },
+    "briefing": {
+      "min": 0.85,
+      "interim": 0.75,
+      "metric": "frame",
+      "reason": "measured run 43419415080: whole-frame 0.7834; the strip and map behind the sheet are the US day scenario where the reference shows the Israel route, and the RN sheet has a grab handle; floor 0.03 under it, ratchet up"
+    },
+    "israel-plan": { "min": 0.85, "metric": "frame" }
   },
   "android": {
-    "map": {
-      "min": 0.85
-    },
-    "night": {
-      "min": 0.85
-    },
-    "airport": {
-      "min": 0.8
-    },
-    "layers": {
-      "min": 0.8
-    },
-    "nearest": {
-      "min": 0.8
-    },
-    "search": {
-      "min": 0.8
-    },
-    "log": {
-      "min": 0.8
-    },
+    "map": { "min": 0.85 },
+    "night": { "min": 0.85 },
+    "airport": { "min": 0.8 },
+    "layers": { "min": 0.8 },
+    "nearest": { "min": 0.92 },
+    "search": { "min": 0.9 },
+    "log": { "min": 0.85 },
     "settings": {
       "min": 0.8,
       "interim": 0.6,
@@ -122,9 +88,7 @@
       "interim": 0.56,
       "reason": "paragraph line breaks and section spacing differ from the SwiftUI Form"
     },
-    "aircraft": {
-      "min": 0.8
-    },
+    "aircraft": { "min": 0.8 },
     "aircraftedit": {
       "min": 0.8,
       "interim": 0.69,
@@ -159,6 +123,12 @@
       "min": 0.85,
       "interim": 0.7,
       "reason": "End recording dialog is a centred modal, Swift anchors a popover under the record button"
-    }
+    },
+    "briefing": {
+      "min": 0.8,
+      "interim": 0.52,
+      "reason": "measured run 43419415080: strip 0.5545; the capture's map and strip behind the sheet are the US day scenario where the reference shows the Israel route, and the sheet runs to the bottom inset where the reference sheet ends above the footer; floor 0.03 under it, ratchet up"
+    },
+    "israel-plan": { "min": 0.8 }
   }
 }

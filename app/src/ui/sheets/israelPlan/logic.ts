@@ -352,19 +352,106 @@ export function closureText(closure: IsraelRouteClosure, nowMs: number, dataAge?
 
 // MARK: - Sheet text
 
-/** The departure picker's value: "Thu 12.11.2026 10:00" in Israel local time (the DatePicker's Asia/Jerusalem zone). */
-export function departureTimeText(epochMs: number): string {
+/** The departure picker's date pill: "Nov 12, 2026" in Israel local time (the DatePicker's Asia/Jerusalem zone, en_US). */
+export function departureDateText(epochMs: number): string {
   const c = israelClock(epochMs);
-  const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][c.weekday] ?? '';
-  return `${weekday} ${two(c.day)}.${two(c.month)}.${c.year} ${two(c.hour)}:${two(c.minute)}`.trim();
+  return `${MONTHS[c.month - 1] ?? ''} ${c.day}, ${c.year}`;
 }
 
-/** Minutes one press of the departure stepper moves the time. */
-export const DEPARTURE_STEP_MINUTES = 15;
+/** The departure picker's time pill: "10:00 AM" in Israel local time (en_US, 12-hour). */
+export function departureClockText(epochMs: number): string {
+  const c = israelClock(epochMs);
+  const hour = c.hour % 12 === 0 ? 12 : c.hour % 12;
+  return `${hour}:${two(c.minute)} ${c.hour < 12 ? 'AM' : 'PM'}`;
+}
 
-/** The departure moved by `steps` stepper presses, never before `nowMs` (the DatePicker's `in: Date()...`). */
-export function steppedDeparture(current: number, steps: number, nowMs: number): number {
-  return Math.max(nowMs, current + steps * DEPARTURE_STEP_MINUTES * 60_000);
+/**
+ * The instant of an Israel wall-clock time (`month` 1-12). The offset is read back from `israelClock`, so DST is honored.
+ * Policy for the repeated hour (the end of DST, 01:00 to 01:59 occurs twice): the FIRST occurrence, the earlier instant.
+ * A wall time inside the spring gap does not exist and lands an hour later.
+ */
+export function israelEpoch(year: number, month: number, day: number, hour: number, minute: number): number {
+  const wall = Date.UTC(year, month - 1, day, hour, minute);
+  let epoch = wall;
+  for (let i = 0; i < 2; i++) {
+    const c = israelClock(epoch);
+    epoch += wall - Date.UTC(c.year, c.month - 1, c.day, c.hour, c.minute);
+  }
+  const earlier = epoch - 3_600_000;
+  const c = israelClock(earlier);
+  return Date.UTC(c.year, c.month - 1, c.day, c.hour, c.minute) === wall ? earlier : epoch;
+}
+
+const sameIsraelDay = (a: number, b: number): boolean => {
+  const x = israelClock(a);
+  const y = israelClock(b);
+  return x.year === y.year && x.month === y.month && x.day === y.day;
+};
+
+/**
+ * The departure moved to the Israel calendar day of `pickedMs`, keeping its Israel time of day (the date pill). The same
+ * day changes nothing, so the instant is kept inside a repeated hour.
+ */
+export function withIsraelDay(departureMs: number, pickedMs: number): number {
+  if (sameIsraelDay(departureMs, pickedMs)) return departureMs;
+  const day = israelClock(pickedMs);
+  const time = israelClock(departureMs);
+  return israelEpoch(day.year, day.month, day.day, time.hour, time.minute);
+}
+
+/**
+ * The departure moved to the Israel time of day of `pickedMs`, keeping its Israel calendar day (the time pill). When the
+ * pick is already on the departure's day it IS the new departure, so a pick inside a repeated hour keeps its instant.
+ */
+export function withIsraelTime(departureMs: number, pickedMs: number): number {
+  if (sameIsraelDay(departureMs, pickedMs)) return pickedMs;
+  const day = israelClock(departureMs);
+  const time = israelClock(pickedMs);
+  return israelEpoch(day.year, day.month, day.day, time.hour, time.minute);
+}
+
+/**
+ * The Android dialogs have no time zone setting and edit device-local fields, and a device-local Date can skip or repeat
+ * wall times of the DEVICE's own DST. So the two dialogs get separate mirrors that cannot hit a device DST change: the
+ * date dialog a local NOON on the Israel calendar day (only the date fields are read back), the time dialog a fixed
+ * mid-January date with the Israel hour and minute (only the time fields are read back).
+ */
+export function israelDayMirror(epochMs: number): Date {
+  const c = israelClock(epochMs);
+  return new Date(c.year, c.month - 1, c.day, 12, 0);
+}
+
+export function israelTimeMirror(epochMs: number): Date {
+  const c = israelClock(epochMs);
+  return new Date(2000, 0, 15, c.hour, c.minute);
+}
+
+/** The departure moved to the calendar day the date dialog returned (its device-local year, month and day). */
+export function withDialogDay(departureMs: number, dialogDate: Date): number {
+  const time = israelClock(departureMs);
+  const day = israelEpoch(
+    dialogDate.getFullYear(),
+    dialogDate.getMonth() + 1,
+    dialogDate.getDate(),
+    time.hour,
+    time.minute,
+  );
+  return sameIsraelDay(departureMs, day) ? departureMs : day;
+}
+
+/** The departure moved to the time the time dialog returned (its device-local hour and minute). */
+export function withDialogTime(departureMs: number, dialogDate: Date): number {
+  const day = israelClock(departureMs);
+  const hour = dialogDate.getHours();
+  const minute = dialogDate.getMinutes();
+  const time = israelClock(departureMs);
+  if (time.hour === hour && time.minute === minute) return departureMs; // unchanged: keeps a repeated hour's instant
+  return israelEpoch(day.year, day.month, day.day, hour, minute);
+}
+
+/** A picked departure, never before `nowMs` (the DatePicker's `in: Date()...`): a past pick becomes now. */
+export function pickedDeparture(pickedMs: number, nowMs: number): number {
+  return Math.max(nowMs, pickedMs);
 }
 
 export interface SummaryCell {

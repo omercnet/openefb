@@ -1,20 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { IsraelFlightPlanSheet } from '../ui/sheets/israelPlan/IsraelFlightPlanSheet';
-import { createFixturePlanStore, seedFixturePlan } from '../ui/sheets/israelPlan/fixture';
+import { useTheme } from '../ui/Primitives';
+import { IsraelFlightPlanSheet, formColors } from '../ui/sheets/israelPlan/IsraelFlightPlanSheet';
+import { ISRAEL_PLAN_CAPTURE_NOW, createFixturePlanStore } from '../ui/sheets/israelPlan/fixture';
 import { IsraelPlanProvider } from '../ui/sheets/israelPlan/store';
 
 /**
- * Route israel-plan: the Israel flight plan sheet over FAKE data (fixture.ts), LLHZ to LLIB routed on CVFR. Not in the
- * fidelity gate yet: the ipad-israel-plan reference comes later (app/docs/port-notes/U4b-plan.md).
+ * Route israel-plan (fidelity gate screen): the Israel flight plan sheet on FAKE data (fixture.ts) in its empty state, as
+ * the SwiftUI capture shows it (`-OpenEFBRoute israel-plan`, no stored data: empty departure and destination, no plan).
+ * The routed LLHZ to LLIB plan of the fixture is seeded by the tests, not by the route.
  */
 export default function IsraelPlanRoute() {
-  const [store] = useState(() => createFixturePlanStore());
-  useEffect(() => {
-    void seedFixturePlan(store);
-  }, [store]);
+  const t = useTheme();
+  const [store] = useState(() => createFixturePlanStore({ now: () => ISRAEL_PLAN_CAPTURE_NOW }));
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: formColors(t).background }}>
       <IsraelPlanProvider store={store}>
         <IsraelFlightPlanSheet />
       </IsraelPlanProvider>

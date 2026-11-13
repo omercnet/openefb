@@ -12,18 +12,26 @@ import {
   computePlan,
   cruiseSpeedKnots,
   defaultDeparture,
-  departureTimeText,
+  departureClockText,
+  departureDateText,
+  israelDayMirror,
+  israelTimeMirror,
   flightPlanMailURL,
+  israelEpoch,
+  withDialogDay,
+  withDialogTime,
   legRows,
   mailtoEncode,
   messageInput,
+  pickedDeparture,
   planActivation,
   plannableAerodromes,
   searchableQuery,
-  steppedDeparture,
   summaryCells,
   viaRefusal,
   windyURL,
+  withIsraelDay,
+  withIsraelTime,
 } from './logic';
 
 const NOW = Date.UTC(2026, 10, 12, 6, 26);
@@ -140,13 +148,83 @@ describe('defaults and pickers', () => {
     expect(viaRefusal('NOPE', 'cvfr')).toBe('NOPE is not a reporting point of the CVFR network.');
   });
 
-  test('steppedDeparture moves 15 minutes and never before now', () => {
-    expect(steppedDeparture(NOW, 1, NOW)).toBe(NOW + 15 * 60_000);
-    expect(steppedDeparture(NOW + 10 * 60_000, -1, NOW)).toBe(NOW);
+  test('pickedDeparture keeps a future pick and refuses a past one: never before now', () => {
+    expect(pickedDeparture(NOW + 15 * 60_000, NOW)).toBe(NOW + 15 * 60_000);
+    expect(pickedDeparture(NOW - 24 * 3_600_000, NOW)).toBe(NOW);
   });
 
-  test('departureTimeText is Israel local time', () => {
-    expect(departureTimeText(Date.UTC(2026, 10, 12, 7))).toBe('Thu 12.11.2026 09:00');
+  test('the date and time pills read Israel local time, en_US', () => {
+    expect(departureDateText(Date.UTC(2026, 10, 12, 8))).toBe('Nov 12, 2026');
+    expect(departureClockText(Date.UTC(2026, 10, 12, 8))).toBe('10:00 AM');
+    expect(departureClockText(Date.UTC(2026, 10, 12, 22, 5))).toBe('12:05 AM');
+    expect(departureDateText(Date.UTC(2026, 10, 12, 22, 5))).toBe('Nov 13, 2026');
+    expect(departureClockText(Date.UTC(2026, 10, 12, 13, 30))).toBe('3:30 PM');
+  });
+
+  test('israelEpoch is the inverse of the Israel wall clock, winter and summer time', () => {
+    expect(israelEpoch(2026, 11, 12, 10, 0)).toBe(Date.UTC(2026, 10, 12, 8));
+    expect(israelEpoch(2026, 7, 1, 10, 0)).toBe(Date.UTC(2026, 6, 1, 7));
+  });
+
+  test('the date pill keeps the time of day, the time pill keeps the day (Israel local)', () => {
+    const departure = Date.UTC(2026, 10, 12, 8); // Nov 12 10:00 Israel
+    expect(withIsraelDay(departure, Date.UTC(2026, 10, 14, 21, 30))).toBe(Date.UTC(2026, 10, 14, 8)); // picked Nov 14 23:30
+    expect(withIsraelTime(departure, Date.UTC(2026, 10, 20, 12, 45))).toBe(Date.UTC(2026, 10, 12, 12, 45)); // 14:45
+  });
+
+  test('the Android dialog mirrors show the Israel date at local noon and the Israel time on a fixed date', () => {
+    const departure = Date.UTC(2026, 10, 12, 8); // Nov 12 10:00 Israel
+    const day = israelDayMirror(departure);
+    expect([day.getFullYear(), day.getMonth(), day.getDate(), day.getHours(), day.getMinutes()]).toEqual([
+      2026, 10, 12, 12, 0,
+    ]);
+    const time = israelTimeMirror(departure);
+    expect([time.getHours(), time.getMinutes()]).toEqual([10, 0]);
+    expect(withDialogDay(departure, new Date(2026, 10, 14, 12, 0))).toBe(Date.UTC(2026, 10, 14, 8));
+    expect(withDialogTime(departure, new Date(2000, 0, 15, 14, 45))).toBe(Date.UTC(2026, 10, 12, 12, 45));
+  });
+
+  test('the dialog mirrors are anchored away from any device DST change, so the device zone cannot alter the Israel fields', () => {
+    // The old mirror (the Israel wall clock as a device-local Date) skipped or repeated an hour on the DEVICE's own DST
+    // change: Israel Mar 14 2027 02:30 became 03:30 on a New York device. The time mirror is fixed on Jan 15 2000 and the
+    // day mirror is local noon, neither of which is a DST change in any zone.
+    const gap = Date.UTC(2027, 2, 14, 0, 30); // Israel Mar 14 2027 02:30, a US device-DST gap
+    const time = israelTimeMirror(gap);
+    expect([time.getFullYear(), time.getMonth(), time.getDate(), time.getHours(), time.getMinutes()]).toEqual([
+      2000, 0, 15, 2, 30,
+    ]);
+    expect(withDialogTime(gap + 3_600_000, time)).toBe(gap);
+    const day = israelDayMirror(gap);
+    expect([day.getFullYear(), day.getMonth(), day.getDate(), day.getHours(), day.getMinutes()]).toEqual([
+      2027, 2, 14, 12, 0,
+    ]);
+    expect(withDialogDay(gap, day)).toBe(gap);
+    // Every quarter hour across the Israel DST changes round-trips through both mirrors.
+    for (const base of [Date.UTC(2027, 2, 25, 0), Date.UTC(2027, 9, 30, 0)]) {
+      for (let q = 0; q < 12 * 4 * 2; q++) {
+        const epoch = base + q * 900_000;
+        const t = israelTimeMirror(epoch);
+        expect(departureClockText(withDialogTime(epoch + 86_400_000 * 3, t))).toBe(departureClockText(epoch));
+        expect(departureDateText(withDialogDay(epoch, israelDayMirror(epoch)))).toBe(departureDateText(epoch));
+      }
+    }
+  });
+
+  test('the repeated Israel hour: the instant is kept when the day or the time is unchanged, a new wall time takes the first occurrence', () => {
+    // Oct 31 2027: Israel repeats 01:00 to 01:59 (summer time ends at 02:00 IDT = 23:00Z Oct 30).
+    const first = Date.UTC(2027, 9, 30, 22, 30); // 01:30 IDT, the first occurrence
+    const second = Date.UTC(2027, 9, 30, 23, 30); // 01:30 IST, the second
+    expect(withIsraelTime(first, first)).toBe(first);
+    expect(withIsraelTime(second, second)).toBe(second);
+    expect(withIsraelDay(first, first)).toBe(first);
+    expect(withIsraelDay(second, Date.UTC(2027, 9, 30, 23, 45))).toBe(second);
+    expect(withDialogTime(second, israelTimeMirror(second))).toBe(second);
+    expect(withDialogDay(second, israelDayMirror(second))).toBe(second);
+    // A wall time entered afresh is ambiguous: the first occurrence.
+    expect(israelEpoch(2027, 10, 31, 1, 30)).toBe(first);
+    expect(withIsraelDay(Date.UTC(2027, 9, 29, 22, 30), Date.UTC(2027, 9, 30, 22, 30))).toBe(first);
+    // Outside the repeat nothing changes.
+    expect(israelEpoch(2026, 11, 12, 10, 0)).toBe(Date.UTC(2026, 10, 12, 8));
   });
 });
 

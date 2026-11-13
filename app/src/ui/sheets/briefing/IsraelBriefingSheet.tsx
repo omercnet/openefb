@@ -671,15 +671,20 @@ function StatusCard({
       {status.kind === 'feed' ? (
         <>
           <Row first>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.s }}>
-              <Text style={[Type.label, { color: t.secondaryText }]}>Feed</Text>
+            {/* HStack { label, badge, Spacer, count }: only the spacer gives way, the labels keep their full width
+                (flexShrink 0, no numberOfLines or width). The clipped "Fee" seen on Android came from rendering before the
+                bundled faces loaded: BriefingOverMap waits for them (see there). */}
+            <View testID="briefing-feed-row" style={{ flexDirection: 'row', alignItems: 'center', gap: Space.s }}>
+              <Text testID="briefing-feed-label" style={[Type.label, { color: t.secondaryText, flexShrink: 0 }]}>
+                Feed
+              </Text>
               <DataAgeBadge
                 level={status.freshness.level}
                 text={status.freshness.text}
                 productName={status.productName}
               />
               <View style={{ flex: 1 }} />
-              <Text style={[Type.caption, { color: t.secondaryText }]}>{`${status.count} NOTAMs`}</Text>
+              <Text style={[Type.caption, { color: t.secondaryText, flexShrink: 0 }]}>{`${status.count} NOTAMs`}</Text>
             </View>
           </Row>
           {status.banners.map((banner) => (

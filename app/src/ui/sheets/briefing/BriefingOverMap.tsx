@@ -1,21 +1,22 @@
 // The briefing sheet over the map, as the capture route (kanaf-dev://briefing, iOS -KanafScreen briefing) and the web
 // preview mount it: the SwiftUI shot opens the sheet over the map with the strip on the Log (-OpenEFBScreen map
-// -OpenEFBStripColumn log -OpenEFBBriefing YES). Like the sheet probe (screens/SheetScreen.tsx), @expo/ui's BottomSheet
-// presents a real SwiftUI sheet on iOS (page-sized on iPad, the .presentationSizing(.page) of IsraelBriefingView) and a
-// Material 3 sheet on Android; the React Native content sits in an RNHostView. Fakes only: the fixture's feed and an
-// in-memory read store.
-import { BottomSheet, RNHostView } from '@expo/ui';
-import type { ModifierConfig } from '@expo/ui/swift-ui/modifiers';
+// -OpenEFBStripColumn log -OpenEFBBriefing YES). BriefingPresentation presents it: a real SwiftUI page sheet on iOS
+// (@expo/ui's BottomSheet, like the sheet probe in screens/SheetScreen.tsx), a React Native form sheet inset from the
+// edges on Android. Fakes only: the fixture's feed and an in-memory read store.
+import { useFonts } from 'expo-font';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
 import { MapScreen } from '../../screens/MapScreen';
+import { FontFiles } from '../../tokens';
+import { BriefingPresentation } from './BriefingPresentation';
 import { FIXTURE_NOW, MemoryNotamReadStore, captureBriefingData, fixtureReport } from './fixture';
 import { IsraelBriefingSheet } from './IsraelBriefingSheet';
 import { IsraelBriefingViewModel, briefing, noBriefingActions } from './store';
 
-// Same object presentationSizing('page') builds; written out because importing '@expo/ui/swift-ui/modifiers' at runtime
-// calls requireNativeModule('ExpoUI'), which the web preview does not have.
-const PAGE_SHEET: ModifierConfig = { $type: 'presentationSizing', sizing: 'page' };
+const HIDDEN_FROM_ASSISTIVE_TECH = {
+  importantForAccessibility: 'no-hide-descendants',
+  accessibilityElementsHidden: true,
+} as const;
 
 const captureModel = () =>
   new IsraelBriefingViewModel(briefing.make(captureBriefingData()), {
@@ -27,24 +28,27 @@ const captureModel = () =>
 export function BriefingOverMap() {
   const [model] = useState(captureModel);
   const [presented, setPresented] = useState(true);
-  const actions = { ...noBriefingActions, dismiss: () => setPresented(false) };
+  const dismiss = () => setPresented(false);
+  // Text sized to its content (the Feed label) is measured once: with the bundled faces not registered yet Android measures a
+  // fallback face and then draws the wider Archivo into that box, clipping the last glyph ("Fee"). Like the strip, show the
+  // sheet content only once the faces are loaded (or failed to load).
+  const [fontsLoaded, fontError] = useFonts(FontFiles);
+  const ready = fontsLoaded || fontError != null;
+  const actions = { ...noBriefingActions, dismiss };
   return (
     <View style={{ flex: 1 }}>
-      <MapScreen screen="map" />
-      <BottomSheet
-        isPresented={presented}
-        onDismiss={() => setPresented(false)}
-        snapPoints={['full']}
-        containerColor="#F2F2F7" // systemGroupedBackground, the inset-grouped List behind the cards
-        // iPad (regular width) ignores detents and shows a small form sheet; ask for the large page sheet instead.
-        modifiers={Platform.OS === 'ios' ? [PAGE_SHEET] : undefined}
+      {/* While the Android overlay is up, TalkBack must not reach the map and strip behind it (accessibilityViewIsModal is
+          iOS only): hide that subtree, and restore it when the sheet is dismissed. */}
+      <View
+        testID="briefing-background"
+        style={{ flex: 1 }}
+        {...(Platform.OS === 'android' && presented ? HIDDEN_FROM_ASSISTIVE_TECH : null)}
       >
-        <RNHostView>
-          <View style={{ flex: 1 }}>
-            <IsraelBriefingSheet model={model} actions={actions} />
-          </View>
-        </RNHostView>
-      </BottomSheet>
+        <MapScreen screen="map" />
+      </View>
+      <BriefingPresentation presented={presented} onDismiss={dismiss}>
+        {ready ? <IsraelBriefingSheet model={model} actions={actions} /> : null}
+      </BriefingPresentation>
     </View>
   );
 }

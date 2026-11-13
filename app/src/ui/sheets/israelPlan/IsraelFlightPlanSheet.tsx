@@ -4,18 +4,40 @@
 // IsraelPlanProvider (store.ts). The preview's E-mail button opens a draft to the IAA filing address, never to the pilot
 // (issue #39, logic.ts `flightPlanMailURL`).
 import { useEffect, useState, type ReactNode } from 'react';
-import { Keyboard, Linking, Modal, ScrollView, Share, Switch, Text, TextInput, View } from 'react-native';
+import { DateTimePicker, type DateTimePickerEvent } from '@expo/ui/community/datetime-picker';
+import {
+  Keyboard,
+  Linking,
+  Modal,
+  Platform,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+  type TextStyle,
+} from 'react-native';
+import { ISRAEL_TIME_ZONE } from '../../../domain/israel/lsaTimeRules';
 import { FLIGHT_PLAN_DISCLAIMER, issueMessage } from '../../../domain/israel/flightPlanMessage';
 import type { IsraelDayOverride } from '../../../domain/israel/lsaTimeRules';
 import type { IsraelRouteError, IsraelRoutePlan } from '../../../domain/israel/routePlanner';
 import type { IsraelAerodrome, IsraelRouteNetwork } from '../../../data/aviation/israelTypes';
-import { Chevron, OctagonWarning, WarningTriangle } from '../../Icons';
+import { Chevron, DocTextMagnifier, OctagonWarning, WarningTriangle } from '../../Icons';
 import { Pressy, useTheme } from '../../Primitives';
 import { Radius, Space, Type, type Theme } from '../../tokens';
 import {
   FILING_NOTE,
   WEEKEND_RULE_FALLBACK,
-  departureTimeText,
+  departureClockText,
+  departureDateText,
+  israelDayMirror,
+  israelTimeMirror,
+  withDialogDay,
+  withDialogTime,
+  withIsraelDay,
+  withIsraelTime,
   legRows,
   summaryCells,
   windyURL,
@@ -23,10 +45,37 @@ import {
 } from './logic';
 import { useIsraelPlan, useIsraelPlanStore } from './store';
 
-const MONO = 'Kanaf-IBMPlexMono-Regular';
 const MONO_BOLD = 'Kanaf-IBMPlexMono-SemiBold';
 /** Minimum touch target, points. */
 const TOUCH = 44;
+
+/** SF .body and .caption (the SwiftUI form's text: field text, labels, buttons; captions and the disclaimer). */
+const SF_BODY: TextStyle = { fontSize: 17, lineHeight: 22 };
+const SF_CAPTION: TextStyle = { fontSize: 12, lineHeight: 16 };
+
+/**
+ * iOS system colors the SwiftUI form sits on: systemBackground (the ScrollView is white, not the app's paper), the
+ * .roundedBorder field's border and placeholderText, secondarySystemFill (.bordered buttons) and tertiarySystemFill
+ * (segmented control and the DatePicker pills).
+ */
+export const formColors = (t: Theme) =>
+  t.night
+    ? {
+        background: '#000000',
+        fieldBorder: 'rgba(84,84,88,0.65)',
+        placeholder: 'rgba(235,235,245,0.3)',
+        buttonFill: 'rgba(120,120,128,0.32)',
+        pillFill: 'rgba(118,118,128,0.24)',
+        thumb: '#636366',
+      }
+    : {
+        background: '#FFFFFF',
+        fieldBorder: '#CCCCCC',
+        placeholder: 'rgba(60,60,67,0.3)',
+        buttonFill: 'rgba(120,120,128,0.16)',
+        pillFill: 'rgba(118,118,128,0.12)',
+        thumb: '#FFFFFF',
+      };
 
 export interface IsraelFlightPlanSheetProps {
   /** Opens the e-mail draft and the route-weather link (default Linking.openURL). */
@@ -48,7 +97,7 @@ export function IsraelFlightPlanSheet({ openURL = defaultOpenURL, share = defaul
   useEffect(() => store.getState().configure(), [store]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.paper }}>
+    <View testID="il-flight-plan" style={{ flex: 1, backgroundColor: formColors(t).background }}>
       <ScrollView keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled">
         <View style={{ padding: Space.l, gap: Space.l }}>
           <NetworkPicker />
@@ -83,9 +132,16 @@ export function IsraelFlightPlanSheet({ openURL = defaultOpenURL, share = defaul
             title="NOTAM briefing"
             testID="il-notam-briefing"
             onPress={() => store.getState().openBriefing()}
+            icon={
+              <View testID="il-notam-briefing-icon">
+                <DocTextMagnifier color={t.accentText} />
+              </View>
+            }
+            // .frame(minHeight: 44) on the Label: the capsule measures 58 pt in the reference, 2 pt more than 44 + 2 x 6.
+            labelMinHeight={TOUCH + 2}
             style={{ alignSelf: 'stretch' }}
           />
-          <Text style={[Type.caption, { color: t.secondaryText }]}>{FLIGHT_PLAN_DISCLAIMER}</Text>
+          <Text style={[SF_CAPTION, { color: t.secondaryText }]}>{FLIGHT_PLAN_DISCLAIMER}</Text>
         </View>
       </ScrollView>
       <PreviewSheet visible={showPreview} onDone={() => setShowPreview(false)} openURL={openURL} share={share} />
@@ -98,6 +154,10 @@ const defaultShare = (message: string) => void Share.share({ message }).catch(()
 
 // MARK: - Shared pieces
 
+/** Vertical padding of a .bordered button around its label: 34 pt tall with a 22 pt body line, 56 pt with minHeight 44. */
+const BUTTON_PAD = 6;
+
+/** A .bordered (or .borderedProminent) button: a capsule in secondarySystemFill, the label in SF body. */
 function Button({
   title,
   onPress,
@@ -106,6 +166,8 @@ function Button({
   prominent = false,
   destructive = false,
   accessibilityLabel,
+  icon,
+  labelMinHeight = SF_BODY.lineHeight ?? 22,
   style,
 }: {
   title: string;
@@ -115,10 +177,17 @@ function Button({
   prominent?: boolean;
   destructive?: boolean;
   accessibilityLabel?: string;
+  /** A leading icon (SwiftUI Label's systemImage). */
+  icon?: ReactNode;
+  /** The label's `.frame(minHeight:)`; the capsule adds BUTTON_PAD above and below. */
+  labelMinHeight?: number;
   style?: object;
 }) {
   const t = useTheme();
   const color = prominent ? t.onAccent : destructive ? t.warning : t.accentText;
+  const height = labelMinHeight + 2 * BUTTON_PAD;
+  // Shorter than the 44 pt touch target: the hit area reaches it.
+  const slop = Math.max(0, (TOUCH - height) / 2);
   return (
     <Pressy
       testID={testID}
@@ -126,50 +195,71 @@ function Button({
       disabled={disabled}
       accessibilityLabel={accessibilityLabel ?? title}
       accessibilityState={{ disabled }}
+      hitSlop={{ top: slop, bottom: slop }}
       style={[
         {
-          minHeight: TOUCH,
+          minHeight: height,
+          paddingVertical: BUTTON_PAD,
           paddingHorizontal: Space.m,
-          borderRadius: Radius.m,
+          borderRadius: height / 2,
+          flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: prominent ? t.accent : t.fill,
+          gap: Space.s,
+          backgroundColor: prominent ? t.accent : formColors(t).buttonFill,
           opacity: disabled ? 0.4 : 1,
           flexGrow: 1,
         },
         style,
       ]}
     >
-      <Text style={[Type.systemHeadline, { color }]}>{title}</Text>
+      {icon}
+      <Text style={[SF_BODY, { color }]}>{title}</Text>
     </Pressy>
   );
 }
 
 function Caption({ children }: { children: ReactNode }) {
   const t = useTheme();
-  return <Text style={[Type.caption, { color: t.secondaryText }]}>{children}</Text>;
+  return <Text style={[SF_CAPTION, { color: t.secondaryText }]}>{children}</Text>;
 }
 
-/** A segmented control (Picker with .segmented style): one button per option, the selected one filled. */
+/** The segmented control's track inset around the selected thumb, points. */
+const SEGMENT_INSET = 4;
+/** Segment titles: SF 13 pt (semibold when selected). */
+const SEGMENT_TEXT: TextStyle = { fontSize: 13, lineHeight: 16 };
+/** The network picker's thumb (.controlSize(.large)): a 49 pt capsule in the reference. */
+const LARGE_THUMB = 41;
+
+/** A segmented control (Picker with .segmented style): a capsule track, the selected option on a white thumb. */
 function Segmented<T extends string>({
   options,
   selected,
   onSelect,
   testID,
   accessibilityLabel,
+  thumbHeight = TOUCH - 2 * SEGMENT_INSET,
 }: {
   options: readonly { value: T; title: string }[];
   selected: T;
   onSelect: (value: T) => void;
   testID: string;
   accessibilityLabel: string;
+  thumbHeight?: number;
 }) {
   const t = useTheme();
+  const colors = formColors(t);
+  const outer = thumbHeight + 2 * SEGMENT_INSET;
   return (
     <View
       testID={testID}
       accessibilityLabel={accessibilityLabel}
-      style={{ flexDirection: 'row', backgroundColor: t.fill, borderRadius: Radius.s, padding: 2 }}
+      style={{
+        flexDirection: 'row',
+        backgroundColor: colors.pillFill,
+        borderRadius: outer / 2,
+        padding: SEGMENT_INSET,
+      }}
     >
       {options.map((option) => {
         const isSelected = option.value === selected;
@@ -180,16 +270,25 @@ function Segmented<T extends string>({
             accessibilityLabel={option.title}
             accessibilityState={{ selected: isSelected }}
             onPress={() => onSelect(option.value)}
-            style={{
-              flex: 1,
-              minHeight: TOUCH,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: Radius.s - 2,
-              backgroundColor: isSelected ? t.paper : 'transparent',
-            }}
+            style={[
+              {
+                flex: 1,
+                minHeight: thumbHeight,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: thumbHeight / 2,
+              },
+              isSelected && {
+                backgroundColor: colors.thumb,
+                shadowColor: '#000000',
+                shadowOpacity: 0.12,
+                shadowRadius: 4,
+                shadowOffset: { width: 0, height: 1 },
+                elevation: 1,
+              },
+            ]}
           >
-            <Text style={[Type.systemSubheadline, { color: t.primaryText, fontWeight: isSelected ? '600' : '400' }]}>
+            <Text style={[SEGMENT_TEXT, { color: t.primaryText, fontWeight: isSelected ? '600' : '400' }]}>
               {option.title}
             </Text>
           </Pressy>
@@ -209,25 +308,39 @@ function Disclosure({ title, testID, children }: { title: string; testID?: strin
         accessibilityLabel={title}
         accessibilityState={{ expanded }}
         onPress={() => setExpanded((e) => !e)}
-        style={{ minHeight: TOUCH, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+        hitSlop={{ top: (TOUCH - DISCLOSURE_ROW) / 2, bottom: (TOUCH - DISCLOSURE_ROW) / 2 }}
+        style={{
+          minHeight: DISCLOSURE_ROW,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
       >
-        <Text style={[Type.body, { color: t.primaryText }]}>{title}</Text>
-        <Chevron color={t.accentText} dir={expanded ? 'down' : 'right'} />
+        <Text style={[SF_BODY, { color: t.accentText }]}>{title}</Text>
+        <Chevron color={t.primaryText} dir={expanded ? 'down' : 'right'} />
       </Pressy>
       {expanded ? <View style={{ gap: Space.s }}>{children}</View> : null}
     </View>
   );
 }
 
-const fieldStyle = (t: Theme) => ({
-  minHeight: TOUCH,
-  paddingHorizontal: Space.m,
-  borderWidth: 1,
-  borderColor: t.rule,
-  borderRadius: Radius.s,
+/** The DisclosureGroup's label row: one SF body line, as the reference draws it (the hit area reaches 44 pt). */
+const DISCLOSURE_ROW = 22;
+
+/** A .roundedBorder TextField: white, a hairline grey border, radius 4, 34 pt tall, SF body. */
+const fieldStyle = (t: Theme): TextStyle => ({
+  height: FIELD_HEIGHT,
+  paddingHorizontal: 7,
+  paddingVertical: 0,
+  borderWidth: StyleSheet.hairlineWidth,
+  borderColor: formColors(t).fieldBorder,
+  borderRadius: Radius.xs,
+  backgroundColor: formColors(t).background,
   color: t.primaryText,
-  ...Type.body,
+  fontSize: SF_BODY.fontSize,
 });
+
+const FIELD_HEIGHT = 34;
 
 // MARK: - Pickers
 
@@ -247,6 +360,7 @@ function NetworkPicker() {
       options={NETWORK_OPTIONS}
       selected={network}
       onSelect={(value) => store.getState().selectNetwork(value)}
+      thumbHeight={LARGE_THUMB}
     />
   );
 }
@@ -280,7 +394,7 @@ function AerodromePicker({ field }: { field: 'departure' | 'destination' }) {
         value={query}
         onChangeText={onChange}
         placeholder="ICAO, English or Hebrew name"
-        placeholderTextColor={t.secondaryText}
+        placeholderTextColor={formColors(t).placeholder}
         autoCorrect={false}
         accessibilityLabel={label}
         style={fieldStyle(t)}
@@ -334,7 +448,7 @@ function ViaSection() {
           onChangeText={(text) => store.getState().setViaQuery(text)}
           onSubmitEditing={add}
           placeholder="Reporting point code (e.g. TAVOR)"
-          placeholderTextColor={t.secondaryText}
+          placeholderTextColor={formColors(t).placeholder}
           autoCapitalize="characters"
           autoCorrect={false}
           accessibilityLabel="Via point"
@@ -347,30 +461,98 @@ function ViaSection() {
   );
 }
 
-/** DatePicker("Departure (local)", in: Date()...) in Asia/Jerusalem, as a 15-minute stepper (no date picker dependency). */
+/** The DatePicker row: 47 pt in the reference, its 36 pt pills centered. */
+const DEPARTURE_ROW = 47;
+const PILL_HEIGHT = 36;
+
+type DeparturePart = 'date' | 'time';
+
+/**
+ * DatePicker("Departure (local)", selection: $vm.departureTime, in: Date()...) in Asia/Jerusalem: a date pill and a time
+ * pill. iOS: two compact SwiftUI DatePickers from @expo/ui (the same grey pills; the zone set through the environment).
+ * Android: Material has no compact picker, so the pills are drawn here and open @expo/ui's date or time dialog, which
+ * edits a device-local mirror of the Israel wall clock. A past pick is refused (the store's pickDepartureTime).
+ */
 function DepartureTime() {
   const t = useTheme();
   const store = useIsraelPlanStore();
   const departureTime = useIsraelPlan((s) => s.departureTime);
-  const step = (steps: number) => store.getState().stepDepartureTime(steps);
+  const [editing, setEditing] = useState<DeparturePart | null>(null);
+  const earliest = store.getState().earliestDeparture();
+  const pick = (part: DeparturePart, pickedMs: number) => {
+    const current = store.getState().departureTime;
+    const next = part === 'date' ? withIsraelDay(current, pickedMs) : withIsraelTime(current, pickedMs);
+    store.getState().pickDepartureTime(next);
+  };
+  const mirror = editing === 'time' ? israelTimeMirror : israelDayMirror;
+  const shared = {
+    accentColor: t.accent,
+    themeVariant: t.night ? ('dark' as const) : ('light' as const),
+  };
+  const parts: { part: DeparturePart; testID: string; text: string }[] = [
+    { part: 'date', testID: 'il-departure-date', text: departureDateText(departureTime) },
+    { part: 'time', testID: 'il-departure-clock', text: departureClockText(departureTime) },
+  ];
   return (
-    <View testID="il-departure-time" style={{ flexDirection: 'row', alignItems: 'center', gap: Space.s }}>
-      <View style={{ flex: 1 }}>
-        <Caption>Departure (local)</Caption>
-        <Text style={[Type.body, { fontFamily: MONO, color: t.primaryText }]}>{departureTimeText(departureTime)}</Text>
+    <View
+      testID="il-departure-time"
+      style={{ flexDirection: 'row', alignItems: 'center', minHeight: DEPARTURE_ROW, gap: Space.s }}
+    >
+      <Text style={[SF_BODY, { color: t.primaryText, flex: 1 }]}>Departure (local)</Text>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {Platform.OS === 'ios'
+          ? parts.map(({ part, testID }) => (
+              <DateTimePicker
+                key={part}
+                testID={testID}
+                mode={part}
+                display="compact"
+                value={new Date(departureTime)}
+                minimumDate={new Date(earliest)}
+                timeZoneName={ISRAEL_TIME_ZONE}
+                onValueChange={(_, date) => pick(part, date.getTime())}
+                {...shared}
+              />
+            ))
+          : parts.map(({ part, testID, text }) => (
+              <Pressy
+                key={part}
+                testID={testID}
+                accessibilityLabel={`Departure ${part}, ${text}`}
+                onPress={() => setEditing(part)}
+                hitSlop={{ top: (TOUCH - PILL_HEIGHT) / 2, bottom: (TOUCH - PILL_HEIGHT) / 2 }}
+                style={{
+                  height: PILL_HEIGHT,
+                  paddingHorizontal: 11,
+                  borderRadius: PILL_HEIGHT / 2,
+                  justifyContent: 'center',
+                  backgroundColor: formColors(t).pillFill,
+                }}
+              >
+                <Text style={[SF_BODY, { color: t.primaryText }]}>{text}</Text>
+              </Pressy>
+            ))}
       </View>
-      <Button
-        title="-15"
-        accessibilityLabel="Departure 15 minutes earlier"
-        onPress={() => step(-1)}
-        style={{ flexGrow: 0 }}
-      />
-      <Button
-        title="+15"
-        accessibilityLabel="Departure 15 minutes later"
-        onPress={() => step(1)}
-        style={{ flexGrow: 0 }}
-      />
+      {Platform.OS !== 'ios' && editing ? (
+        <DateTimePicker
+          testID="il-departure-dialog"
+          presentation="dialog"
+          style={{ position: 'absolute', width: 0, height: 0 }}
+          mode={editing}
+          value={mirror(departureTime)}
+          minimumDate={mirror(earliest)}
+          onChange={(event: DateTimePickerEvent, date?: Date) => {
+            setEditing(null);
+            if (event.type !== 'set' || !date) return;
+            const current = store.getState().departureTime;
+            store
+              .getState()
+              .pickDepartureTime(editing === 'date' ? withDialogDay(current, date) : withDialogTime(current, date));
+          }}
+          onDismiss={() => setEditing(null)}
+          {...shared}
+        />
+      ) : null}
     </View>
   );
 }

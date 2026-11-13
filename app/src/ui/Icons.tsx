@@ -150,3 +150,18 @@ export const OctagonWarning = ({ color, bang, size = 20 }: P & { bang: string })
     <Circle cx={10} cy={14} r={1.1} fill={bang} />
   </Svg>
 );
+
+/** doc.text.magnifyingglass (body, 15 x 19): the NOTAM briefing button's leading icon. */
+export const DocTextMagnifier = ({ color }: P) => (
+  <Svg width={16} height={20} viewBox="0 0 16 20">
+    <Path
+      d="M7 17.6H3.2C1.8 17.6 0.6 16.4 0.6 15V3.2C0.6 1.8 1.8 0.6 3.2 0.6H11C12.4 0.6 13.6 1.8 13.6 3.2V10.9"
+      stroke={color}
+      strokeWidth={1.2}
+      {...line}
+    />
+    <Path d="M3.6 5.1H10.6M3.6 7.9H10.6" stroke={color} strokeWidth={1.2} {...line} />
+    <Circle cx={10.6} cy={14.4} r={3} stroke={color} strokeWidth={1.2} fill="none" />
+    <Path d="M12.8 16.6L15 18.8" stroke={color} strokeWidth={1.4} {...line} />
+  </Svg>
+);
