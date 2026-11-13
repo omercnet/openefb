@@ -30,8 +30,9 @@
     },
     "settings": {
       "min": 0.85,
-      "interim": 0.66,
-      "reason": "text rows drift a few px against SwiftUI (row and section spacing, config and version strings differ)"
+      "interim": 0.73,
+      "reason": "whole-frame score; text rows drift a few px against SwiftUI (row and section spacing, config and version strings differ)",
+      "metric": "frame"
     },
     "onboarding": {
       "min": 0.9
@@ -39,28 +40,34 @@
     "disclaimers": {
       "min": 0.85,
       "interim": 0.7,
-      "reason": "paragraph line breaks and section spacing differ from the SwiftUI Form"
+      "reason": "whole-frame score; paragraph line breaks and section spacing differ from the SwiftUI Form",
+      "metric": "frame"
     },
     "aircraft": {
-      "min": 0.85
+      "min": 0.85,
+      "metric": "frame"
     },
     "aircraftedit": {
       "min": 0.85,
-      "interim": 0.71,
-      "reason": "form field values and row spacing differ from the SwiftUI editor"
+      "interim": 0.8,
+      "reason": "whole-frame score; form field values and row spacing differ from the SwiftUI editor",
+      "metric": "frame"
     },
     "pilot": {
-      "min": 0.85
+      "min": 0.85,
+      "metric": "frame"
     },
     "logbookentry": {
       "min": 0.85,
-      "interim": 0.79,
-      "reason": "row spacing and the iOS 26 glass toolbar buttons differ"
+      "interim": 0.8,
+      "reason": "whole-frame score; row spacing and the iOS 26 glass toolbar buttons differ",
+      "metric": "frame"
     },
     "logbooklocked": {
       "min": 0.85,
-      "interim": 0.77,
-      "reason": "row spacing and the iOS 26 glass banner differ"
+      "interim": 0.82,
+      "reason": "whole-frame score; row spacing and the iOS 26 glass banner differ",
+      "metric": "frame"
     },
     "recording": {
       "min": 0.9,
