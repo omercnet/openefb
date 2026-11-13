@@ -239,14 +239,18 @@ export function DebriefScreen({ store, onBack }: { store: DebriefViewStore; onBa
         {pane === 'streaming' ? (
           <>
             <StreamingContent store={store} />
-            <View style={{ paddingTop: 8, alignItems: 'center', gap: 8 }}>
+            <View accessibilityLiveRegion="polite" style={{ paddingTop: 8, alignItems: 'center', gap: 8 }}>
               <ActivityIndicator color={t.secondaryText} />
               <Text style={[FormType.subheadline, { color: t.secondaryText }]}>Generating debrief...</Text>
             </View>
           </>
         ) : null}
         {pane === 'error' ? (
-          <View style={{ paddingTop: 32, alignItems: 'center', gap: 16 }}>
+          <View
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+            style={{ paddingTop: 32, alignItems: 'center', gap: 16 }}
+          >
             <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               <WarningTriangle color={t.caution} bang={t.paper} />
             </View>

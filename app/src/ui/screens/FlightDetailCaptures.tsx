@@ -148,6 +148,7 @@ export function CvfrCapture() {
 /** kanaf-dev://debrief: the finished AI debrief. Regenerate streams a new one in the web preview. */
 export function DebriefCapture() {
   const [lab] = useState(captureDebriefLab);
+  if (Platform.OS === 'android') return null; // Q8: no AI debrief on Android, even by a deep link
   return (
     <WithFonts>
       <DebriefScreen store={lab.store} onBack={() => undefined} />

@@ -34,6 +34,8 @@ export function createFlightDetailStore(deps: FlightDetailDeps): FlightDetailSto
   /** Bumped by every appear and disappear: a CVFR load that is no longer the latest must not set the state. */
   let loadToken = 0;
   let unsubscribe = () => {};
+  /** Whether the model last reported itself able to run; reset by every appear so a return to the screen prewarms again. */
+  let wasAvailable = false;
 
   const store = createStore<FlightDetailState>()(() => ({
     hasEngine: engine !== null,
@@ -42,6 +44,7 @@ export function createFlightDetailStore(deps: FlightDetailDeps): FlightDetailSto
 
     async appear() {
       appeared = true;
+      wasAvailable = false;
       const token = ++loadToken;
       engine?.checkAvailability();
       // Swift's loadBundled swallows its errors: the flight shows without the CVFR section.
@@ -59,7 +62,6 @@ export function createFlightDetailStore(deps: FlightDetailDeps): FlightDetailSto
   }));
 
   if (engine) {
-    let wasAvailable = engine.state.availability.kind === 'available';
     unsubscribe = engine.subscribe(() => {
       const availability = engine.state.availability;
       store.setState({ availability });

@@ -36,6 +36,14 @@ describe('appear', () => {
     expect(engine!.prewarmCalls).toBe(1);
   });
 
+  it('prewarms again when the screen is shown again after it was left (the model was freed)', async () => {
+    const { store, engine } = setup();
+    await store.getState().appear();
+    store.getState().disappear();
+    await store.getState().appear();
+    expect(engine!.prewarmCalls).toBe(2);
+  });
+
   it('does not prewarm a model that cannot run, and shows why', () => {
     const { store, engine } = setup({
       engine: new FakeDebriefEngine({ kind: 'unavailable', reason: 'Apple Intelligence is not enabled.' }),
