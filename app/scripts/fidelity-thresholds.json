@@ -17,7 +17,22 @@
       "interim": 0.9,
       "metric": "frame",
       "reason": "first measurement pending: gated on the whole frame because the strip metric passes a blank Log (0.867); the web render scores 0.993"
-    }
+    },
+    "settings": { "min": 0.5 },
+    "onboarding": { "min": 0.5 },
+    "disclaimers": { "min": 0.5 },
+    "aircraft": { "min": 0.5 },
+    "aircraftedit": { "min": 0.5 },
+    "pilot": { "min": 0.5 },
+    "logbookentry": { "min": 0.5 },
+    "logbooklocked": { "min": 0.5 },
+    "recording": { "min": 0.5 },
+    "recordingstopped": { "min": 0.5 },
+    "recordingstop": { "min": 0.5 },
+    "replay": { "min": 0.5 },
+    "replayfast": { "min": 0.5 },
+    "flightdetail": { "min": 0.5 },
+    "cvfr": { "min": 0.5 }
   },
   "android": {
     "map": { "min": 0.85 },
@@ -26,6 +41,21 @@
     "layers": { "min": 0.8 },
     "nearest": { "min": 0.8 },
     "search": { "min": 0.8 },
-    "log": { "min": 0.8 }
+    "log": { "min": 0.8 },
+    "settings": { "min": 0.5 },
+    "onboarding": { "min": 0.5 },
+    "disclaimers": { "min": 0.5 },
+    "aircraft": { "min": 0.5 },
+    "aircraftedit": { "min": 0.5 },
+    "pilot": { "min": 0.5 },
+    "logbookentry": { "min": 0.5 },
+    "logbooklocked": { "min": 0.5 },
+    "recording": { "min": 0.5 },
+    "recordingstopped": { "min": 0.5 },
+    "recordingstop": { "min": 0.5 },
+    "replay": { "min": 0.5 },
+    "replayfast": { "min": 0.5 },
+    "flightdetail": { "min": 0.5 },
+    "cvfr": { "min": 0.5 }
   }
 }
