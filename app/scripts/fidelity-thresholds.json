@@ -127,7 +127,7 @@
     "briefing": {
       "min": 0.8,
       "interim": 0.52,
-      "reason": "measured run 43419415080: strip 0.5545; the capture's map and strip behind the sheet are the US day scenario where the reference shows the Israel route (the map is most of the 400 dp strip's pixels), and the sheet runs to the bottom inset where the reference sheet ends above the footer; floor 0.03 under it, ratchet up"
+      "reason": "measured run 43419415080: strip 0.5545; the capture's map and strip behind the sheet are the US day scenario where the reference shows the Israel route, and the sheet runs to the bottom inset where the reference sheet ends above the footer; floor 0.03 under it, ratchet up"
     },
     "israel-plan": { "min": 0.8 }
   }
