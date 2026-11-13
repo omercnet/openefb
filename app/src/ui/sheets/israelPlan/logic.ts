@@ -352,19 +352,61 @@ export function closureText(closure: IsraelRouteClosure, nowMs: number, dataAge?
 
 // MARK: - Sheet text
 
-/** The departure picker's value: "Thu 12.11.2026 10:00" in Israel local time (the DatePicker's Asia/Jerusalem zone). */
-export function departureTimeText(epochMs: number): string {
+/** The departure picker's date pill: "Nov 12, 2026" in Israel local time (the DatePicker's Asia/Jerusalem zone, en_US). */
+export function departureDateText(epochMs: number): string {
   const c = israelClock(epochMs);
-  const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][c.weekday] ?? '';
-  return `${weekday} ${two(c.day)}.${two(c.month)}.${c.year} ${two(c.hour)}:${two(c.minute)}`.trim();
+  return `${MONTHS[c.month - 1] ?? ''} ${c.day}, ${c.year}`;
 }
 
-/** Minutes one press of the departure stepper moves the time. */
-export const DEPARTURE_STEP_MINUTES = 15;
+/** The departure picker's time pill: "10:00 AM" in Israel local time (en_US, 12-hour). */
+export function departureClockText(epochMs: number): string {
+  const c = israelClock(epochMs);
+  const hour = c.hour % 12 === 0 ? 12 : c.hour % 12;
+  return `${hour}:${two(c.minute)} ${c.hour < 12 ? 'AM' : 'PM'}`;
+}
 
-/** The departure moved by `steps` stepper presses, never before `nowMs` (the DatePicker's `in: Date()...`). */
-export function steppedDeparture(current: number, steps: number, nowMs: number): number {
-  return Math.max(nowMs, current + steps * DEPARTURE_STEP_MINUTES * 60_000);
+/** The instant of an Israel wall-clock time (`month` 1-12). The offset is read back from `israelClock`, so DST is honored. */
+export function israelEpoch(year: number, month: number, day: number, hour: number, minute: number): number {
+  const wall = Date.UTC(year, month - 1, day, hour, minute);
+  let epoch = wall;
+  for (let i = 0; i < 2; i++) {
+    const c = israelClock(epoch);
+    epoch += wall - Date.UTC(c.year, c.month - 1, c.day, c.hour, c.minute);
+  }
+  return epoch;
+}
+
+/** The departure moved to the Israel calendar day of `pickedMs`, keeping its Israel time of day (the date pill). */
+export function withIsraelDay(departureMs: number, pickedMs: number): number {
+  const day = israelClock(pickedMs);
+  const time = israelClock(departureMs);
+  return israelEpoch(day.year, day.month, day.day, time.hour, time.minute);
+}
+
+/** The departure moved to the Israel time of day of `pickedMs`, keeping its Israel calendar day (the time pill). */
+export function withIsraelTime(departureMs: number, pickedMs: number): number {
+  const day = israelClock(departureMs);
+  const time = israelClock(pickedMs);
+  return israelEpoch(day.year, day.month, day.day, time.hour, time.minute);
+}
+
+/**
+ * A device-local Date showing the Israel wall clock of `epochMs`. The Android picker dialogs have no time zone setting
+ * and edit device-local fields, so they get this mirror and `israelEpochOfDeviceDate` reads the pick back.
+ */
+export function deviceDateShowingIsraelTime(epochMs: number): Date {
+  const c = israelClock(epochMs);
+  return new Date(c.year, c.month - 1, c.day, c.hour, c.minute);
+}
+
+/** The instant whose Israel wall clock is `date`'s device-local fields (the inverse of `deviceDateShowingIsraelTime`). */
+export function israelEpochOfDeviceDate(date: Date): number {
+  return israelEpoch(date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours(), date.getMinutes());
+}
+
+/** A picked departure, never before `nowMs` (the DatePicker's `in: Date()...`): a past pick becomes now. */
+export function pickedDeparture(pickedMs: number, nowMs: number): number {
+  return Math.max(nowMs, pickedMs);
 }
 
 export interface SummaryCell {

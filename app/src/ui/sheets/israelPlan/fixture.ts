@@ -25,6 +25,12 @@ import { createIsraelPlanStore, type IsraelPlanDatabase, type IsraelPlanDeps, ty
 /** 2026-11-12 06:26Z (08:26 in Israel), the capture seed's clock. */
 export const FIXTURE_NOW = Date.UTC(2026, 10, 12, 6, 26);
 
+/**
+ * The clock of the SwiftUI capture (its status bar reads 6:31 AM UTC): the DatePicker's default departure, the next full
+ * hour at least 30 minutes ahead, is 08:00Z, 10:00 AM in Israel. FIXTURE_NOW (06:26Z) would give 9:00 AM.
+ */
+export const ISRAEL_PLAN_CAPTURE_NOW = Date.UTC(2026, 10, 12, 6, 31);
+
 // MARK: - Builders
 
 export function planPoint(

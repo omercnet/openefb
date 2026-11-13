@@ -45,10 +45,10 @@ import {
   defaultDeparture,
   flightPlanMailURL,
   messageInput,
+  pickedDeparture,
   plannableAerodromes,
   planActivation,
   searchableQuery,
-  steppedDeparture,
   viaRefusal,
   type LoadedNetwork,
   type PlanActivation,
@@ -164,8 +164,10 @@ export interface IsraelPlanState {
   addVia(code: string): Promise<void>;
   removeVia(index: number): void;
   setDepartureTime(epochMs: number): void;
-  /** The departure stepper (the DatePicker's stand-in): DEPARTURE_STEP_MINUTES per step, never before now. */
-  stepDepartureTime(steps: number): void;
+  /** The DatePicker's lower bound (`in: Date()...`): now. */
+  earliestDeparture(): number;
+  /** The departure DatePicker's binding: the picked time, never before now (a past pick is refused: it becomes now). */
+  pickDepartureTime(epochMs: number): void;
   setAllowByRequest(allow: boolean): void;
   setAllowMilitary(allow: boolean): void;
   setDayOverride(override: IsraelDayOverride): void;
@@ -362,8 +364,11 @@ export function createIsraelPlanStore(deps: IsraelPlanDeps): StoreApi<IsraelPlan
         set({ departureTime });
         scheduleReroute();
       },
-      stepDepartureTime(steps) {
-        get().setDepartureTime(steppedDeparture(get().departureTime, steps, deps.now()));
+      earliestDeparture() {
+        return deps.now();
+      },
+      pickDepartureTime(epochMs) {
+        get().setDepartureTime(pickedDeparture(epochMs, deps.now()));
       },
       setAllowByRequest(allowByRequest) {
         set({ allowByRequest });

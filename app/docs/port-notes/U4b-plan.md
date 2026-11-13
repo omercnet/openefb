@@ -83,12 +83,25 @@ apps decode both forms to the same text.
   writes (Swift cancels the previous Task, and checks cancellation only after the feed); `clear()` bumps it too, so a run
   still waiting cannot refill a cleared sheet. Picker searches carry a token per field. `addVia`, `searchDeparture` and
   `searchDestination` return promises.
-- The departure DatePicker (`in: Date()...`, Asia/Jerusalem) is a 15-minute stepper with the time in Israel local time
-  (`departureTimeText`, `steppedDeparture`, store `stepDepartureTime` on the store's clock). The app has no date picker
-  dependency, and adding a native module needs a dev client rebuild; the picker can come with the reference.
+- The departure DatePicker (`in: Date()...`, Asia/Jerusalem) is a real picker from `@expo/ui` (already a dependency,
+  ~58.0.27; no package change): `@expo/ui/community/datetime-picker`, its drop-in for
+  `@react-native-community/datetimepicker`. iOS: two compact SwiftUI DatePickers (`mode` date and time, the zone through
+  `timeZoneName` = the `\.timeZone` environment, `minimumDate` = now), the same two grey pills as the reference. Swift
+  draws one DatePicker with both components; two let the tests address each pill (`il-departure-date`,
+  `il-departure-clock`) and the sheet recombines the picked day or time with the other half in Israel time
+  (`withIsraelDay`, `withIsraelTime`). Android: Material has no compact picker and the Compose dialogs have no time zone,
+  so the pills are drawn in the sheet ("Nov 12, 2026", "10:00 AM", Israel time: `departureDateText`,
+  `departureClockText`) and open `@expo/ui`'s date or time dialog on a device-local mirror of the Israel wall clock
+  (`deviceDateShowingIsraelTime`, read back with `israelEpochOfDeviceDate`). Both go through the store's
+  `pickDepartureTime`, which refuses a past time: the departure becomes now (`pickedDeparture`, the stepper's old rule).
+  `setDepartureTime` stays unclamped like the Swift view model's property (the LSA tests set past days). The 15-minute
+  stepper (`stepDepartureTime`, `steppedDeparture`, `departureTimeText`) is gone. The picker is a native view: the
+  ExpoUI module is in the dev client already (BottomSheet uses it), so no rebuild beyond the current one; Jest mocks
+  the picker module in the sheet test.
 - The preview is a React Native `Modal` (page sheet on iOS), its `onAppear: refreshMessage()` an effect on opening.
 - The issue icons are the existing OctagonWarning and WarningTriangle (SF `xmark.octagon.fill` and
-  `exclamationmark.triangle.fill`). Labels lose their SF Symbols (doc.text, envelope, wind, ...).
+  `exclamationmark.triangle.fill`). The NOTAM briefing button has its `doc.text.magnifyingglass` (Icons.tsx
+  `DocTextMagnifier`); the other labels lose their SF Symbols (doc.text, envelope, wind, ...).
 - `computePlan` rethrows anything that is not an IsraelRouteError; the store reports a database failure in
   `lastNetworkFailure` as Swift does.
 - `canFile` is a stored field the store keeps in step with `plan` and `issues`. Swift computes it on read.
@@ -117,10 +130,31 @@ props (defaults: `Linking.openURL`, React Native `Share`).
 
 ## Fidelity
 
-No reference and no gate registration in this change: the `ipad-israel-plan` reference comes later. The route
-`israel-plan` is not in `LAUNCH_SCREENS` (src/app/index.tsx) nor in scripts/fidelity-thresholds.json; add both with the
-reference, and align the fixture to the capture seed then. Web preview: the route renders the fixture plan (summary,
-12 legs, the amber "closures were not checked" note, actions).
+The route `israel-plan` is a gate screen (Q1: `LAUNCH_SCREENS`, scripts/fidelity-thresholds.json, reference
+`reference/ipad-israel-plan.png`) and renders the empty form, as the SwiftUI capture does. Measured against the
+reference (2x pixels / 2 = points) and fixed in the empty form:
+
+- Background: the SwiftUI ScrollView sits on systemBackground (white; black at night), not the app's grey `paper`.
+  The route's SafeAreaView takes the same colour. The iOS system colours the form uses live in `formColors`
+  (IsraelFlightPlanSheet.tsx).
+- Text: SF body 17 / caption 12 (field text, labels, buttons; the field captions and the disclaimer), not Archivo 15 / 13.
+- Fields (`.roundedBorder`): white, a hairline #CCCCCC border (1 px at 2x), radius 4, 34 pt tall, 7 pt text inset,
+  placeholderText (secondary label at 0.3) placeholders. Before: 44 pt, a 1 pt `rule` border, radius 8, 12 pt inset.
+- Buttons (`.bordered`): capsules in secondarySystemFill, the label in SF body regular. Add is 34 pt (hit area 44 pt);
+  NOTAM briefing is 58 pt with its leading `doc.text.magnifyingglass` (`il-notam-briefing-icon`). Before: radius 10,
+  `fill`, semibold.
+- Network picker (`.segmented`, `.controlSize(.large)`): a 49 pt capsule track in tertiarySystemFill, a 41 pt white
+  thumb inset 4 pt with a soft shadow, SF 13. The LSA day picker keeps its 44 pt height in the same shape.
+- Departure: the "Departure (local)" label in SF body at the left, the date and time pills at the right (36 pt, 10 pt
+  apart) in a 47 pt row; see Swift differences for the picker.
+- Route options (DisclosureGroup): the title in the accent colour, the chevron in the primary colour, a 22 pt row (hit
+  area 44 pt). Before: black title, accent chevron, 44 pt row.
+- Clock: the route's store runs on `ISRAEL_PLAN_CAPTURE_NOW` (06:31Z, the reference's status bar), so the default
+  departure reads 10:00 AM in Israel like the reference pills; FIXTURE_NOW (06:26Z) would give 9:00 AM. The tests keep
+  FIXTURE_NOW.
+
+Not checked on a device in this change (no simulator here): the compact pickers' exact frame inside the 47 pt row, and
+the Android dialogs. The new frame scores need the next capture run before the floors ratchet.
 
 ## Review decisions (PR #58)
 

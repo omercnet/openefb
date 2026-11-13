@@ -12,18 +12,24 @@ import {
   computePlan,
   cruiseSpeedKnots,
   defaultDeparture,
-  departureTimeText,
+  departureClockText,
+  departureDateText,
+  deviceDateShowingIsraelTime,
   flightPlanMailURL,
+  israelEpoch,
+  israelEpochOfDeviceDate,
   legRows,
   mailtoEncode,
   messageInput,
+  pickedDeparture,
   planActivation,
   plannableAerodromes,
   searchableQuery,
-  steppedDeparture,
   summaryCells,
   viaRefusal,
   windyURL,
+  withIsraelDay,
+  withIsraelTime,
 } from './logic';
 
 const NOW = Date.UTC(2026, 10, 12, 6, 26);
@@ -140,13 +146,38 @@ describe('defaults and pickers', () => {
     expect(viaRefusal('NOPE', 'cvfr')).toBe('NOPE is not a reporting point of the CVFR network.');
   });
 
-  test('steppedDeparture moves 15 minutes and never before now', () => {
-    expect(steppedDeparture(NOW, 1, NOW)).toBe(NOW + 15 * 60_000);
-    expect(steppedDeparture(NOW + 10 * 60_000, -1, NOW)).toBe(NOW);
+  test('pickedDeparture keeps a future pick and refuses a past one: never before now', () => {
+    expect(pickedDeparture(NOW + 15 * 60_000, NOW)).toBe(NOW + 15 * 60_000);
+    expect(pickedDeparture(NOW - 24 * 3_600_000, NOW)).toBe(NOW);
   });
 
-  test('departureTimeText is Israel local time', () => {
-    expect(departureTimeText(Date.UTC(2026, 10, 12, 7))).toBe('Thu 12.11.2026 09:00');
+  test('the date and time pills read Israel local time, en_US', () => {
+    expect(departureDateText(Date.UTC(2026, 10, 12, 8))).toBe('Nov 12, 2026');
+    expect(departureClockText(Date.UTC(2026, 10, 12, 8))).toBe('10:00 AM');
+    expect(departureClockText(Date.UTC(2026, 10, 12, 22, 5))).toBe('12:05 AM');
+    expect(departureDateText(Date.UTC(2026, 10, 12, 22, 5))).toBe('Nov 13, 2026');
+    expect(departureClockText(Date.UTC(2026, 10, 12, 13, 30))).toBe('3:30 PM');
+  });
+
+  test('israelEpoch is the inverse of the Israel wall clock, winter and summer time', () => {
+    expect(israelEpoch(2026, 11, 12, 10, 0)).toBe(Date.UTC(2026, 10, 12, 8));
+    expect(israelEpoch(2026, 7, 1, 10, 0)).toBe(Date.UTC(2026, 6, 1, 7));
+  });
+
+  test('the date pill keeps the time of day, the time pill keeps the day (Israel local)', () => {
+    const departure = Date.UTC(2026, 10, 12, 8); // Nov 12 10:00 Israel
+    expect(withIsraelDay(departure, Date.UTC(2026, 10, 14, 21, 30))).toBe(Date.UTC(2026, 10, 14, 8)); // picked Nov 14 23:30
+    expect(withIsraelTime(departure, Date.UTC(2026, 10, 20, 12, 45))).toBe(Date.UTC(2026, 10, 12, 12, 45)); // 14:45
+  });
+
+  test('the Android dialogs edit a device-local mirror of the Israel wall clock', () => {
+    const departure = Date.UTC(2026, 10, 12, 8);
+    const mirror = deviceDateShowingIsraelTime(departure);
+    expect([mirror.getFullYear(), mirror.getMonth(), mirror.getDate(), mirror.getHours(), mirror.getMinutes()]).toEqual(
+      [2026, 10, 12, 10, 0],
+    );
+    expect(israelEpochOfDeviceDate(mirror)).toBe(departure);
+    expect(israelEpochOfDeviceDate(new Date(2026, 10, 13, 7, 15))).toBe(Date.UTC(2026, 10, 13, 5, 15));
   });
 });
 
