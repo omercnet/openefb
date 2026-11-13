@@ -23,8 +23,8 @@ export function LogbookEntryScreen({
 }: {
   store: LogbookEntryStore;
   entryId: string;
-  /** Back, a saved entry, or a confirmed one. */
-  onClose: () => void;
+  /** Back, a saved entry, or a confirmed one; none at the root of a stack. */
+  onClose?: () => void;
 }) {
   const t = useTheme();
   const { loaded, entry, saving, error } = useStore(store);
@@ -33,7 +33,8 @@ export function LogbookEntryScreen({
     void store.getState().load(entryId);
   }, [store, entryId]);
 
-  const back = <BarButton title="Back" onPress={onClose} testID="logbook-back" />;
+  // The Swift capture shows the screen at the root of its stack, with no Back (the shell passes onClose when it pushes it).
+  const back = onClose ? <BarButton title="Back" onPress={onClose} testID="logbook-back" /> : undefined;
   if (entry === null) {
     return (
       <FormScreen largeTitle title="Edit Entry" leading={back} testID="logbook-entry-screen">
@@ -54,7 +55,7 @@ export function LogbookEntryScreen({
   const parsed = logbookEditsFromForm(form);
   const submit = async (confirm: boolean) => {
     const result = await (confirm ? store.getState().confirm(form) : store.getState().save(form));
-    if (result === 'saved') onClose();
+    if (result === 'saved') onClose?.();
   };
   const summary = logbookSummary(entry);
 

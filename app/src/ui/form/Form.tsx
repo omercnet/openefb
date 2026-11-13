@@ -193,14 +193,14 @@ export function FormSection({
   if (rows.length === 0) return null;
   const textInset = FormMetrics.margin + FormMetrics.pad;
   return (
-    <View style={{ marginTop: Space.xl }}>
+    <View style={{ marginTop: Space.xl + 2 }}>
       {header ? (
         <View
           style={{
             flexDirection: 'row',
             justifyContent: 'space-between',
             paddingHorizontal: textInset,
-            paddingBottom: Space.s,
+            paddingBottom: Space.s + 2,
           }}
         >
           <Text accessibilityRole="header" style={[FormType.headline, { fontWeight: '500', color: t.secondaryText }]}>
@@ -228,7 +228,11 @@ export function FormSection({
       </View>
       {footer ? (
         <Text
-          style={[FormType.footnote, { color: t.secondaryText, paddingHorizontal: textInset, paddingTop: Space.s }]}
+          style={[
+            FormType.footnote,
+            // The next section's header sits closer under a footer than under a card (measured on the Swift capture).
+            { color: t.secondaryText, paddingHorizontal: textInset, paddingTop: Space.s, marginBottom: -8 },
+          ]}
         >
           {footer}
         </Text>

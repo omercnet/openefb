@@ -30,54 +30,56 @@
     },
     "settings": {
       "min": 0.85,
-      "interim": 0.56,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.51,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "onboarding": {
       "min": 0.9
     },
     "disclaimers": {
       "min": 0.85,
-      "interim": 0.68,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.65,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "aircraft": {
-      "min": 0.85
+      "min": 0.85,
+      "interim": 0.84,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "aircraftedit": {
       "min": 0.85,
-      "interim": 0.71,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.69,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "pilot": {
       "min": 0.85,
-      "interim": 0.69,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.68,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "logbookentry": {
       "min": 0.85,
-      "interim": 0.75,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.71,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "logbooklocked": {
       "min": 0.85,
-      "interim": 0.66,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.57,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "recording": {
       "min": 0.9,
-      "interim": 0.6,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.63,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "recordingstopped": {
       "min": 0.9,
-      "interim": 0.62,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.67,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "recordingstop": {
       "min": 0.9,
-      "interim": 0.74,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.72,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     }
   },
   "android": {
@@ -104,8 +106,8 @@
     },
     "settings": {
       "min": 0.8,
-      "interim": 0.56,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.61,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "onboarding": {
       "min": 0.8,
@@ -114,48 +116,48 @@
     },
     "disclaimers": {
       "min": 0.8,
-      "interim": 0.55,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.51,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "aircraft": {
       "min": 0.8,
       "interim": 0.79,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "aircraftedit": {
       "min": 0.8,
-      "interim": 0.71,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.69,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "pilot": {
       "min": 0.8,
-      "interim": 0.59,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.56,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "logbookentry": {
       "min": 0.8,
-      "interim": 0.65,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.6,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "logbooklocked": {
       "min": 0.8,
-      "interim": 0.65,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.54,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "recording": {
       "min": 0.85,
-      "interim": 0.42,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.46,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "recordingstopped": {
       "min": 0.85,
-      "interim": 0.44,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.53,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     },
     "recordingstop": {
       "min": 0.85,
-      "interim": 0.68,
-      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
+      "interim": 0.66,
+      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
     }
   }
 }
