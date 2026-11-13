@@ -6,8 +6,10 @@ import type { CVFRDebrief } from '../../domain/debrief/cvfrDebrief';
 import {
   CVFR_LEG_HEADERS,
   CVFR_POINT_HEADERS,
+  cvfrLegLabel,
   cvfrLegRows,
   cvfrNote,
+  cvfrPointLabel,
   cvfrPointRows,
 } from '../../domain/debrief/cvfrView';
 import { FormType } from '../form/formStyle';
@@ -44,7 +46,11 @@ function LegsTable({ debrief }: { debrief: CVFRDebrief }) {
       <HeaderRow titles={CVFR_LEG_HEADERS} />
       {cvfrLegRows(debrief).map((row) => (
         <View key={row.id}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 8 }}>
+          <View
+            accessible
+            accessibilityLabel={cvfrLegLabel(row)}
+            style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 8 }}
+          >
             <View style={[cell, { gap: 2 }]}>
               <Text style={[FormType.body, { fontWeight: '700', color: t.primaryText }]}>{row.route}</Text>
               <Text style={[FormType.caption, { color: t.secondaryText }]}>{row.times}</Text>
@@ -86,7 +92,11 @@ function PointsTable({ debrief }: { debrief: CVFRDebrief }) {
       <HeaderRow titles={CVFR_POINT_HEADERS} />
       {cvfrPointRows(debrief).map((row) => (
         <View key={row.id}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 8 }}>
+          <View
+            accessible
+            accessibilityLabel={cvfrPointLabel(row)}
+            style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, paddingVertical: 8 }}
+          >
             <View style={[cell, { gap: 2 }]}>
               <Text style={[FormType.body, { fontWeight: '700', color: t.primaryText }]}>{row.code}</Text>
               {row.name ? <Text style={[FormType.caption, { color: t.secondaryText }]}>{row.name}</Text> : null}

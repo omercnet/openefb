@@ -70,6 +70,15 @@ export function cvfrLegRows(debrief: Pick<CVFRDebrief, 'legs'>, timeZone?: strin
   }));
 }
 
+/** The leg row read as one phrase, each value after its column's name (a screen reader meets the cells without the header). */
+export function cvfrLegLabel(row: CvfrLegRow): string {
+  const [leg, published, adherence, deviation] = CVFR_LEG_HEADERS;
+  const measured = row.adherence
+    ? `${adherence} ${row.adherence.text}${row.adherence.low ? ', below 80 percent' : ''}. ${deviation} ${row.maxDeviation}`
+    : 'not measured';
+  return `${leg} ${row.route}, ${row.times}. ${published} ${row.published}. ${measured}`;
+}
+
 export interface CvfrPointRow {
   id: string;
   code: string;
@@ -78,6 +87,13 @@ export interface CvfrPointRow {
   time: string;
   closest: string;
   reported: { text: 'Yes' | 'No' | 'Not checked'; spoken?: string };
+}
+
+/** The point row read as one phrase, each value after its column's name. */
+export function cvfrPointLabel(row: CvfrPointRow): string {
+  const [point, time, closest, reported] = CVFR_POINT_HEADERS;
+  const name = row.name ? `, ${row.name}` : '';
+  return `${point} ${row.code}${name}. ${time} ${row.time}. ${closest} ${row.closest}. ${reported} ${row.reported.spoken ?? row.reported.text}`;
 }
 
 export function cvfrPointRows(

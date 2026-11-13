@@ -5,8 +5,10 @@ import {
   CVFR_LEG_HEADERS,
   CVFR_POINT_HEADERS,
   clockText,
+  cvfrLegLabel,
   cvfrLegRows,
   cvfrNote,
+  cvfrPointLabel,
   cvfrPointRows,
   signedWhole,
 } from './cvfrView';
@@ -154,5 +156,27 @@ describe('cvfrPointRows', () => {
     debrief.points = [debrief.points[1]!, { ...debrief.points[1]!, time: debrief.points[1]!.time + 600_000 }];
     const ids = cvfrPointRows(debrief, utc).map((r) => r.id);
     expect(new Set(ids).size).toBe(2);
+  });
+});
+
+describe('row labels (a screen reader meets the cells without the header)', () => {
+  it('names each value of a leg by its column, and says when a leg was not measured', () => {
+    const debrief = sampleCvfrDebrief();
+    const rows = cvfrLegRows(debrief, utc);
+    const first = cvfrLegLabel(rows[0]!);
+    expect(first).toContain(`Leg ${rows[0]!.route}`);
+    expect(first).toContain(`Pub. alt ${rows[0]!.published}`);
+    expect(first).toContain(`Max dev. ${rows[0]!.maxDeviation}`);
+    expect(cvfrLegLabel({ ...rows[0]!, adherence: null, maxDeviation: null })).toMatch(/not measured$/);
+    expect(cvfrLegLabel({ ...rows[0]!, adherence: { text: '70% / 90%', low: true } })).toContain('below 80 percent');
+  });
+
+  it('names each value of a point by its column, with the spoken form of "not checked"', () => {
+    const debrief = sampleCvfrDebrief();
+    const rows = cvfrPointRows(debrief, utc);
+    expect(cvfrPointLabel(rows[2]!)).toBe('Point AFULA. Time 14:23:32. Closest 0.3 NM. Reported No');
+    expect(cvfrPointLabel(rows[0]!)).toContain('Point LLHA, Haifa.');
+    const unchecked = cvfrPointRows({ ...debrief, transcriptAvailable: false }, utc)[0]!;
+    expect(cvfrPointLabel(unchecked)).toMatch(/Reported Not checked: no transcript$/);
   });
 });
