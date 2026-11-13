@@ -20,13 +20,24 @@ import { Space, StripMetrics, Type } from '../tokens';
 import { MicSlashFill, TrashSlashFill } from './icons';
 
 /** noticeRow: the active-cell background with a 4 pt rule in the notice's colour at the leading edge (never a filled amber block). */
-function NoticeRow({ tint, testID, children }: { tint: string; testID: string; children: ReactNode }) {
+function NoticeRow({
+  tint,
+  testID,
+  live = 'polite',
+  children,
+}: {
+  tint: string;
+  testID: string;
+  /** Failures interrupt the screen reader; information (microphone off, flight not saved) waits its turn. */
+  live?: 'polite' | 'assertive';
+  children: ReactNode;
+}) {
   const t = useTheme();
   return (
     <View
       testID={testID}
       accessibilityRole="alert"
-      accessibilityLiveRegion="polite"
+      accessibilityLiveRegion={live}
       style={{ padding: Space.m, alignSelf: 'stretch', backgroundColor: t.activeCell }}
     >
       <View
@@ -83,7 +94,7 @@ function ProblemNotice({ store, error }: { store: RecordingViewStore; error: App
   const tint = severity === 'caution' ? t.caution : t.warning;
   const notice = recordingErrorNotice(error, severity);
   return (
-    <NoticeRow tint={tint} testID={`recording-error-notice-${severity}`}>
+    <NoticeRow tint={tint} testID={`recording-error-notice-${severity}`} live="assertive">
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Space.s }}>
         <View style={{ flex: 1, gap: Space.xs }}>
           <Heading icon={<WarningTriangle color={tint} bang={t.activeCell} />} title={notice.title} tint={tint} />
