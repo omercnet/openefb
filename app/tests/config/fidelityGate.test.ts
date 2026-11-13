@@ -43,6 +43,11 @@ const NOT_GATED = [
   'pilot',
   'logbookentry',
   'logbooklocked',
+  'recording',
+  'recordingstopped',
+  'recordingstop',
+  'replay',
+  'replayfast',
 ];
 
 describe('fidelity gate registration', () => {

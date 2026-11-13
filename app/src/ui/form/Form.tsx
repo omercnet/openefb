@@ -21,9 +21,40 @@ import { Checkmark, UpDownChevrons } from './FormIcons';
 import { accentText, FormMetrics, FormType, toneColor, type Tone } from './formStyle';
 
 /**
- * A screen of grouped sections under an inline navigation bar (NavigationStack + Form). Navigation itself is the shell's.
- * Needs a SafeAreaProvider above it (expo-router's root has one) for the status bar inset.
+ * The inline navigation bar (.navigationBarTitleDisplayMode(.inline)): Back or a custom leading item, the title, a trailing item.
+ * Needs a SafeAreaProvider above it (expo-router's root has one) for the status bar inset. Navigation itself is the shell's.
  */
+export function NavBar({
+  title,
+  onBack,
+  leading,
+  trailing,
+}: {
+  title: string;
+  /** Shows a Back button in the bar's leading slot. */
+  onBack?: () => void;
+  /** Replaces the Back button (a sheet's Cancel). */
+  leading?: ReactNode;
+  trailing?: ReactNode;
+}) {
+  const t = useTheme();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ paddingTop: insets.top }}>
+      <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Space.s }}>
+        <View style={{ flex: 1, alignItems: 'flex-start' }}>
+          {leading ?? (onBack ? <BackButton onPress={onBack} /> : null)}
+        </View>
+        <Text accessibilityRole="header" numberOfLines={1} style={[FormType.headline, { color: t.primaryText }]}>
+          {title}
+        </Text>
+        <View style={{ flex: 1, alignItems: 'flex-end' }}>{trailing}</View>
+      </View>
+    </View>
+  );
+}
+
+/** A screen of grouped sections under an inline navigation bar (NavigationStack + Form). */
 export function FormScreen({
   title,
   onBack,
@@ -45,17 +76,7 @@ export function FormScreen({
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: t.paper }} testID={testID}>
-      <View style={{ paddingTop: insets.top }}>
-        <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Space.s }}>
-          <View style={{ flex: 1, alignItems: 'flex-start' }}>
-            {leading ?? (onBack ? <BackButton onPress={onBack} /> : null)}
-          </View>
-          <Text accessibilityRole="header" numberOfLines={1} style={[FormType.headline, { color: t.primaryText }]}>
-            {title}
-          </Text>
-          <View style={{ flex: 1, alignItems: 'flex-end' }}>{trailing}</View>
-        </View>
-      </View>
+      <NavBar title={title} onBack={onBack} leading={leading} trailing={trailing} />
       <ScrollView
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
