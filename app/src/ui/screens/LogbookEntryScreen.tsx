@@ -36,7 +36,7 @@ export function LogbookEntryScreen({
   const back = <BarButton title="Back" onPress={onClose} testID="logbook-back" />;
   if (entry === null) {
     return (
-      <FormScreen title="Edit Entry" leading={back} testID="logbook-entry-screen">
+      <FormScreen largeTitle title="Edit Entry" leading={back} testID="logbook-entry-screen">
         {loaded || error ? (
           <FormSection>
             <NoteRow tone="caution" text={error ?? 'This logbook entry no longer exists.'} testID="logbook-error" />
@@ -60,6 +60,7 @@ export function LogbookEntryScreen({
 
   return (
     <FormScreen
+      largeTitle
       title={readOnly ? 'Flight Details' : 'Edit Entry'}
       leading={back}
       trailing={

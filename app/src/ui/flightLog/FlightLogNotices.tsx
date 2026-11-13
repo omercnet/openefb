@@ -2,10 +2,12 @@
 // NEXT; nothing when all is well. The banners it stacks are other tickets' views (GPSFailureNotice,
 // AirspaceCheckUnavailableBanner, IsraelAlertsSuspendedBanner: U4); they are drawn here from the same text until those
 // ports land. Not stacked yet: IsraelAlertBanner, CurrencyWarningBanner, DataAgeBadge, OverlayStalenessBadges,
-// IsraelChartHintBanner (U4) and RecordingNotices (U8).
+// IsraelChartHintBanner (U4). RecordingNotices (U8) come last, from the recording store the shell provides.
 import { Text, View } from 'react-native';
 import { gpsFailureMessage, gpsFailureOffersSettings, gpsFailureTitle } from '../../domain/location/gpsStatus';
 import { WarningTriangle } from '../Icons';
+import { RecordingNotices } from '../recording/RecordingNotices';
+import { useRecordingStore } from '../recording/RecordingStoreContext';
 import { Pressy, useTheme } from '../Primitives';
 import { MapControlMetrics, Space, Type } from '../tokens';
 import { useFlightLog } from './hooks';
@@ -14,6 +16,7 @@ import { NoticeRow, Slashed } from './parts';
 export function FlightLogNotices() {
   const t = useTheme();
   const { data, gpsFailure, stale } = useFlightLog();
+  const recordingStore = useRecordingStore();
   const card = {
     padding: Space.m,
     backgroundColor: t.paperSecondary,
@@ -101,6 +104,7 @@ export function FlightLogNotices() {
       </NoticeRow>,
     );
   }
+  if (recordingStore) notices.push(<RecordingNotices key="recording-notices" store={recordingStore} />);
   // Recording database failed: the rest of the app works, but say so (no silent missing button).
   if (!data.recording && data.recordingUnavailable) {
     notices.push(

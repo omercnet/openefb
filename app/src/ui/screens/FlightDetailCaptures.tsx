@@ -14,7 +14,7 @@ import { FlightDetailScreen } from '../flights/FlightDetailScreen';
 import { FormType } from '../form/formStyle';
 import { Pressy, useTheme } from '../Primitives';
 import { FontFiles } from '../tokens';
-import { StripFrame } from './CaptureScreens';
+import { ScreenFrame } from './CaptureScreens';
 import {
   CAPTURE_DETAIL_FLIGHT,
   CAPTURE_SHORT_FLIGHT,
@@ -96,10 +96,10 @@ function DetailPreviewBar({
   );
 }
 
-/** The StripFrame once the bundled faces are registered (the strip does this before it shows any text). */
+/** The ScreenFrame once the bundled faces are registered (the strip does this before it shows any text). */
 function WithFonts({ children }: { children: ReactNode }) {
   const [loaded, error] = useFonts(FontFiles);
-  return <StripFrame>{loaded || error != null ? children : null}</StripFrame>;
+  return <ScreenFrame>{loaded || error != null ? children : null}</ScreenFrame>;
 }
 
 function FlightDetailLabScreen() {

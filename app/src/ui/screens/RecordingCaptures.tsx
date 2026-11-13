@@ -1,16 +1,17 @@
 // The recording controls as the fidelity captures and the web preview mount them (routes kanaf-dev://recording,
 // recordingstopped, recordingstop; iOS -KanafScreen). A real view model over a coordinator on fakes, no navigation: the shell
-// (I1) mounts the notices and the stop dialog under the flight log's record button (U3) over the real recording services.
-import { useFonts } from 'expo-font';
-import { useState } from 'react';
+// (I1) mounts the notices in the strip (FlightLogNotices) and the stop dialog over the real recording services; here the lab store is provided.
+import { useLayoutEffect, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { useStore } from 'zustand';
+import { dayFixture } from '../flightLog/fixtures';
+import { flightLog } from '../flightLog/store';
 import { FormType } from '../form/formStyle';
 import { Pressy, useTheme } from '../Primitives';
-import { RecordingNotices } from '../recording/RecordingNotices';
 import { StopRecordingDialog } from '../recording/StopRecordingDialog';
-import { FontFiles, Space } from '../tokens';
-import { StripFrame } from './CaptureScreens';
+import { RecordingStoreContext } from '../recording/RecordingStoreContext';
+import { Space } from '../tokens';
+import { MapScreen } from './MapScreen';
 import {
   captureRecordingLab,
   enterScene,
@@ -52,6 +53,28 @@ function PreviewControls({ lab }: { lab: RecordingLab }) {
   );
 }
 
+/** What the record button shows per scene (the references': 6 s into the recording, 3 s into the stop dialog). */
+const ELAPSED: Record<RecordingScene, number> = { recording: 6, stopped: 0, stopDialog: 3 };
+
+/** The flight log slice with the record button following the lab's view model, as I1's shell feeds it from the real one. */
+function useLabFlightLog(lab: RecordingLab, scene: RecordingScene) {
+  const [flightLogStore] = useState(() => flightLog.make(dayFixture));
+  const status = useStore(lab.store, (s) => s.status);
+  const audioLevel = useStore(lab.store, (s) => s.audioLevel);
+  const microphoneDenied = useStore(lab.store, (s) => s.microphoneDenied);
+  useLayoutEffect(() => {
+    flightLogStore.setState({
+      recording: { status, elapsedSeconds: ELAPSED[scene], levelDBFS: audioLevel, microphoneDenied },
+      actions: { ...dayFixture.actions, record: () => void lab.store.getState().press() },
+    });
+  }, [flightLogStore, lab, scene, status, audioLevel, microphoneDenied]);
+  return flightLogStore;
+}
+
+/**
+ * The map screen the references show: the strip with the notices under its header (FlightLogNotices stacks them from the
+ * recording store) beside the chart, and the "End recording?" dialog over it.
+ */
 function RecordingLabScreen({ scene }: { scene: RecordingScene }) {
   // The scene is entered while the lab is made (a StrictMode double call builds and drops a whole lab, so it cannot run twice on one).
   const [lab] = useState(() => {
@@ -59,15 +82,19 @@ function RecordingLabScreen({ scene }: { scene: RecordingScene }) {
     void enterScene(made, scene);
     return made;
   });
-  // The notices' captions are in the bundled face, which the strip registers before it shows any text.
-  const [fontsLoaded, fontError] = useFonts(FontFiles);
-  if (!fontsLoaded && fontError == null) return <StripFrame>{null}</StripFrame>;
+  const flightLogStore = useLabFlightLog(lab, scene);
   return (
-    <StripFrame>
-      <RecordingNotices store={lab.store} />
-      <StopRecordingDialog store={lab.store} />
-      {Platform.OS === 'web' ? <PreviewControls lab={lab} /> : null}
-    </StripFrame>
+    <RecordingStoreContext.Provider value={lab.store}>
+      <flightLog.Provider store={flightLogStore}>
+        <MapScreen screen="map" />
+        <StopRecordingDialog store={lab.store} />
+        {Platform.OS === 'web' ? (
+          <View style={{ position: 'absolute', right: 0, bottom: 0, width: 400 }}>
+            <PreviewControls lab={lab} />
+          </View>
+        ) : null}
+      </flightLog.Provider>
+    </RecordingStoreContext.Provider>
   );
 }
 
