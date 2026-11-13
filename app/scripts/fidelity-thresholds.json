@@ -30,56 +30,52 @@
     },
     "settings": {
       "min": 0.85,
-      "interim": 0.51,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.66,
+      "reason": "text rows drift a few px against SwiftUI (row and section spacing, config and version strings differ)"
     },
     "onboarding": {
       "min": 0.9
     },
     "disclaimers": {
       "min": 0.85,
-      "interim": 0.65,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.7,
+      "reason": "paragraph line breaks and section spacing differ from the SwiftUI Form"
     },
     "aircraft": {
-      "min": 0.85,
-      "interim": 0.84,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "min": 0.85
     },
     "aircraftedit": {
       "min": 0.85,
-      "interim": 0.69,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.71,
+      "reason": "form field values and row spacing differ from the SwiftUI editor"
     },
     "pilot": {
-      "min": 0.85,
-      "interim": 0.68,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "min": 0.85
     },
     "logbookentry": {
       "min": 0.85,
-      "interim": 0.71,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.79,
+      "reason": "row spacing and the iOS 26 glass toolbar buttons differ"
     },
     "logbooklocked": {
       "min": 0.85,
-      "interim": 0.57,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.77,
+      "reason": "row spacing and the iOS 26 glass banner differ"
     },
     "recording": {
       "min": 0.9,
-      "interim": 0.63,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.67,
+      "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
     "recordingstopped": {
       "min": 0.9,
-      "interim": 0.67,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.71,
+      "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
     "recordingstop": {
       "min": 0.9,
-      "interim": 0.72,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.77,
+      "reason": "End recording dialog is a centred modal, Swift anchors a popover under the record button"
     }
   },
   "android": {
@@ -106,8 +102,8 @@
     },
     "settings": {
       "min": 0.8,
-      "interim": 0.61,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.6,
+      "reason": "text rows drift a few px against SwiftUI (row and section spacing, config and version strings differ)"
     },
     "onboarding": {
       "min": 0.8,
@@ -116,48 +112,46 @@
     },
     "disclaimers": {
       "min": 0.8,
-      "interim": 0.51,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.56,
+      "reason": "paragraph line breaks and section spacing differ from the SwiftUI Form"
     },
     "aircraft": {
-      "min": 0.8,
-      "interim": 0.79,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "min": 0.8
     },
     "aircraftedit": {
       "min": 0.8,
       "interim": 0.69,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "reason": "form field values and row spacing differ from the SwiftUI editor"
     },
     "pilot": {
       "min": 0.8,
-      "interim": 0.56,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.77,
+      "reason": "row text drifts a few px against SwiftUI"
     },
     "logbookentry": {
       "min": 0.8,
-      "interim": 0.6,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.7,
+      "reason": "row spacing and the iOS 26 glass toolbar buttons differ"
     },
     "logbooklocked": {
       "min": 0.8,
-      "interim": 0.54,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.78,
+      "reason": "row spacing and the iOS 26 glass banner differ"
     },
     "recording": {
       "min": 0.85,
-      "interim": 0.46,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.51,
+      "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
     "recordingstopped": {
       "min": 0.85,
-      "interim": 0.53,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.57,
+      "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
     "recordingstop": {
       "min": 0.85,
-      "interim": 0.66,
-      "reason": "provisional, from run 2 of PR 66 minus 0.07; final value follows the last run"
+      "interim": 0.7,
+      "reason": "End recording dialog is a centred modal, Swift anchors a popover under the record button"
     }
   }
 }
