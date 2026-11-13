@@ -10,6 +10,7 @@
 
 import Testing
 import Foundation
+import AVFAudio
 import GRDB
 import SwiftData
 @testable import efb_212
@@ -150,7 +151,9 @@ struct ScreenCaptureHooksTests {
         _ = try await coordinator.startRecording()
         vm.startSyncLoopForTesting()
         try await Task.sleep(for: .milliseconds(1_200))
-        #expect(vm.microphoneDenied)
+        // Forced only while permission is not granted; once it is, the normal refresh applies (and clears the notice).
+        let granted = AVAudioApplication.shared.recordPermission == .granted
+        #expect(vm.microphoneDenied == !granted)
         _ = await coordinator.stopRecording()
     }
 
