@@ -285,6 +285,9 @@ struct MapContainerView: View {
             )
             recVM.persistence = persistence
             recordingViewModel = recVM
+            #if DEBUG
+            ScreenCaptureHooks.applyRecording(to: recVM)
+            #endif
 
             // Rebuild History rows for any recording a crash or kill left without a FlightRecord.
             FlightRecoveryService(recordingDB: recordingDB, persistence: persistence).recoverOrphans(

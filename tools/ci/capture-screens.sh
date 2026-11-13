@@ -8,6 +8,10 @@
 # shots go direct to KOAK so NEXT shows a waypoint, map-noplan does not),
 # screenshots it as <device>-<shot>.png (device ipad|iphone) and fails when the app is not running after the wait or
 # a crash report appears. Image content is not asserted. The iPad also gets the Israel route (il-map-day).
+# Wave 2 shots (iPad only, named after the React Native screens): onboarding, map-layers (every layer on), briefing,
+# israel-plan, recording problems (recording, recordingstopped, recordingstop) and, last because -OpenEFBSeed leaves its
+# data in the simulator, settings and the seeded pages (-OpenEFBRoute: disclaimers, aircraft, aircraftedit, pilot,
+# logbookentry, logbooklocked, flightdetail, cvfr, debrief, replay, replayfast); the data is in docs/capture-seed.md.
 # Recording runs without the microphone (-OpenEFBNoAudio), as in tools/ci/fly-scenarios.sh.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
@@ -94,7 +98,7 @@ shot() {
   [ "$first_launch" -eq 1 ] && deadline=300
   first_launch=0
   limited "$deadline" xcrun simctl launch --terminate-running-process "$sim" "$BUNDLE" \
-    -hasSeenOnboarding YES -OpenEFBNoAudio YES -OpenEFBScenario "$SCENARIOS/$scenario.json" \
+    -hasSeenOnboarding "${seen_onboarding:-YES}" -OpenEFBNoAudio YES -OpenEFBScenario "$SCENARIOS/$scenario.json" \
     -OpenEFBScenarioSpeed 1 -OpenEFBScenarioStart "$start" "$@" >/dev/null || problems+=("launch failed or timed out")
   if [ ${#problems[@]} -eq 0 ]; then
     sleep "$WAIT"   # the map, the first frame and a few fixes
@@ -148,6 +152,24 @@ shots "$IPAD" ipad
 # Herzliya to Rosh Pina from 600 s: on the CVFR route at 1500 ft.
 shot "$IPAD" ipad il-map-day il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day
 shot "$IPAD" ipad il-map-predictions il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -showsPredictions YES
+# Wave 2 screens. The map-layers and briefing shots need no stored data; onboarding is the first-run screen.
+shot "$IPAD" ipad map-layers us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -OpenEFBLayers all
+shot "$IPAD" ipad briefing il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBBriefing YES
+shot "$IPAD" ipad israel-plan il-cvfr-llhz-llib-nominal 600 -OpenEFBScreen map -OpenEFBRoute israel-plan -OpenEFBDisplayMode day
+seen_onboarding=NO
+shot "$IPAD" ipad onboarding us-kpao-ksql 150
+seen_onboarding=YES
+# Recording problems and the stop dialog over the flying map (ScreenCaptureHooks.applyRecording).
+for rec in "notices recording" "stopped recordingstopped" "stop recordingstop"; do
+  # shellcheck disable=SC2086
+  set -- $rec
+  shot "$IPAD" ipad "$2" us-kpao-ksql 150 -OpenEFBScreen map -OpenEFBStripColumn log -OpenEFBDisplayMode day -OpenEFBDirectTo KOAK -OpenEFBRecording "$1"
+done
+# Seeded pages (CaptureSeed: the data is listed in docs/capture-seed.md). Seeding replaces the stored rows each launch.
+shot "$IPAD" ipad settings il-cvfr-llhz-llib-nominal 600 -OpenEFBSeed capture-fresh -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute settings
+for route in disclaimers aircraft aircraftedit pilot logbookentry logbooklocked flightdetail cvfr debrief replay replayfast; do
+  shot "$IPAD" ipad "$route" il-cvfr-llhz-llib-nominal 600 -OpenEFBSeed capture -OpenEFBScreen map -OpenEFBDisplayMode day -OpenEFBRoute "$route"
+done
 echo "::endgroup::"
 
 # The iPad is done: shut it down so the iPhone boots on a runner with only one simulator running.

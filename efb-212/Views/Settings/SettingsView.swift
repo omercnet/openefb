@@ -388,3 +388,10 @@ private struct DisclaimersView: View {
     }
     .environment(AppState())
 }
+
+#if DEBUG
+/// DisclaimersView is file-private; the -OpenEFBRoute capture page reaches it through this.
+struct CaptureDisclaimersView: View {
+    var body: some View { DisclaimersView() }
+}
+#endif
