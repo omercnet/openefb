@@ -671,15 +671,25 @@ function StatusCard({
       {status.kind === 'feed' ? (
         <>
           <Row first>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.s }}>
-              <Text style={[Type.label, { color: t.secondaryText }]}>Feed</Text>
+            {/* HStack { label, badge, Spacer, count }: only the spacer gives way, the labels keep their full width
+                (flexShrink 0, no numberOfLines or width). An Android device showed "Fee"; the likely cause is Android's
+                highQuality line breaker wrapping the last glyph of a tightly measured word onto a hidden second line,
+                which the simple strategy avoids (U4b-plan.md: unverified on a device). */}
+            <View testID="briefing-feed-row" style={{ flexDirection: 'row', alignItems: 'center', gap: Space.s }}>
+              <Text
+                testID="briefing-feed-label"
+                textBreakStrategy="simple"
+                style={[Type.label, { color: t.secondaryText, flexShrink: 0 }]}
+              >
+                Feed
+              </Text>
               <DataAgeBadge
                 level={status.freshness.level}
                 text={status.freshness.text}
                 productName={status.productName}
               />
               <View style={{ flex: 1 }} />
-              <Text style={[Type.caption, { color: t.secondaryText }]}>{`${status.count} NOTAMs`}</Text>
+              <Text style={[Type.caption, { color: t.secondaryText, flexShrink: 0 }]}>{`${status.count} NOTAMs`}</Text>
             </View>
           </Row>
           {status.banners.map((banner) => (

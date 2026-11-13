@@ -136,3 +136,33 @@ one element with hidden children).
 Not done: while a reroute is in flight the previous plan stays visible (dimming it is a UI choice; activation is blocked
 instead), and a reroute does not re-sync an already active plan with navigation: Swift's `isActive` also drops on reroute
 (`isActive: false`) and the pilot activates again.
+
+## Briefing sheet on Android (device findings)
+
+Two Android findings on the briefing route (kanaf-dev://briefing), compared with app/reference/ipad-briefing.png and
+Views/Briefing/IsraelBriefingView.swift.
+
+The Feed row showed "Fee". The row had no numberOfLines or width on the label, and Yoga's flexShrink already defaults to 0,
+so no RN layout constraint explains the clip. The label and the count now set `flexShrink: 0` explicitly (Swift's HStack:
+label, badge, Spacer, count; only the spacer gives way) and the label uses `textBreakStrategy="simple"`: the likely cause
+is Android's highQuality line breaker wrapping the last glyph of a tightly measured word onto a second line that the
+one-line measured height hides. The Compose-hosted RNHostView (below) was the other suspect and is gone on Android.
+Test: the label renders the whole word at a 320 dp width with no numberOfLines, width, maxWidth, flex or flexBasis on it
+or on anything up to the row, and the count and spacer are where Swift has them.
+
+The sheet was a Material 3 ModalBottomSheet (@expo/ui's BottomSheet on Android): capped width, centred, grab handle. The
+reference is an iPad page sheet: inset from the edges, rounded on all corners, map and strip dimmed behind, Done at the
+left and Mark all read at the right. @expo/ui's ModalBottomSheet exposes no width (no sheetMaxWidth), so
+`BriefingPresentation` draws the sheet in React Native on Android: an absolute-fill overlay, an rgba(0,0,0,0.3) backdrop
+that swallows touches (a tap on it does not dismiss, like the iPad sheet), and the sheet container 16 dp from the left,
+right, top and bottom safe-area edges, radius 28 (Material's extra-large shape; the iOS 26 sheet corners are a bit
+larger), grouped background. The system back gesture dismisses. iOS and the web preview keep the BottomSheet exactly as
+before (full detent, #F2F2F7, presentationSizing page on iOS). Tests: Android container and backdrop styles, back and
+dismissed states; iOS props unchanged; web without the iOS modifier.
+
+Unverified without a device: that "Feed" now renders whole on the device that clipped it (if it still clips, the next
+step is measuring the Text's onLayout width against the glyph advance on that device); the look of the overlay on a
+phone and a tablet (the top inset is 16 dp below the status bar, where the iPad reference is about 18 pt below it);
+edge-to-edge insets with gesture navigation; that the backdrop keeps MapLibre's native view from taking gestures; no
+enter or exit animation (the native sheet slid up). `expo export --platform web` could not be run here: it stops on the
+missing built asset assets/aviation.sqlite before reaching this code.

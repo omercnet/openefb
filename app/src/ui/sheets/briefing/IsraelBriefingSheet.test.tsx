@@ -1,19 +1,20 @@
 // Render tests of the briefing sheet (Views/Briefing/IsraelBriefingView.swift has no view tests): the capture fixture's
 // expired feed, the stale gate, read/unread, raw text, filters and "Show on map".
-import { Alert } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { press, render, callHandler } from '../../../../tests/support/ui';
 import { FIXTURE_NOW, MemoryNotamReadStore, captureBriefingData, fixtureReport } from './fixture';
 import { IsraelBriefingSheet } from './IsraelBriefingSheet';
 import { IsraelBriefingViewModel, briefing, noBriefingActions, type BriefingActions } from './store';
 
-async function renderSheet(actions: Partial<BriefingActions> = {}) {
+async function renderSheet(actions: Partial<BriefingActions> = {}, width?: number) {
   const readStore = new MemoryNotamReadStore();
   const model = new IsraelBriefingViewModel(briefing.make(captureBriefingData()), {
     fetcher: async () => fixtureReport(),
     readStore,
     now: () => FIXTURE_NOW,
   });
-  const view = await render(<IsraelBriefingSheet model={model} actions={{ ...noBriefingActions, ...actions }} />);
+  const sheet = <IsraelBriefingSheet model={model} actions={{ ...noBriefingActions, ...actions }} />;
+  const view = await render(width === undefined ? sheet : <View style={{ width }}>{sheet}</View>);
   return { view, model, readStore };
 }
 
@@ -33,6 +34,30 @@ describe('IsraelBriefingSheet', () => {
     expect(model.unreadCount).toBe(0);
     await press(view.byTestId('briefing-mark-all-read')); // disabled: nothing listed
     expect(model.store.getState().readVersion).toBe(0);
+  });
+
+  it('keeps the whole Feed label at a narrow width: label, badge, spacer, count, and only the spacer gives way', async () => {
+    const { view } = await renderSheet({}, 320); // a phone-width sheet
+    const label = view.byTestId('briefing-feed-label');
+    expect(label.children).toEqual(['Feed']);
+    expect(label.props.numberOfLines).toBeUndefined();
+    expect(label.props.textBreakStrategy).toBe('simple');
+    const style = StyleSheet.flatten(label.props.style);
+    expect(style.flexShrink).toBe(0);
+    for (const key of ['width', 'maxWidth', 'flex', 'flexBasis'] as const) expect(style[key]).toBeUndefined();
+    // Nothing between the label and the card narrows it either.
+    const row = view.byTestId('briefing-feed-row');
+    for (let node = label.parent; node && node !== row.parent; node = node.parent) {
+      const s = StyleSheet.flatten(node.props.style) ?? {};
+      expect(s.width).toBeUndefined();
+      expect(s.maxWidth).toBeUndefined();
+    }
+    const [, badge, spacer, count] = row.children as (typeof row)[];
+    expect(badge.props.testID).toBe('data-age-badge');
+    expect(StyleSheet.flatten(spacer.props.style).flex).toBe(1);
+    expect(count.children).toEqual(['117 NOTAMs']);
+    expect(count.props.numberOfLines).toBeUndefined();
+    expect(StyleSheet.flatten(count.props.style).flexShrink).toBe(0);
   });
 
   it('lists the last known feed on request, closures first, and marks rows read', async () => {
