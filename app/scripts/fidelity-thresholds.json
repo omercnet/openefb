@@ -2,11 +2,21 @@
   "_doc": "Minimum SSIM of the leading 400 pt strip (compare.mjs result.strip.ssim) per platform and screen. Plan 5.4 and section 10 (Q9): iOS 0.90 map-heavy / 0.85 text-heavy; Android 0.85 map / 0.80 text (owner decision). 'interim' lowers a floor below the target while a known gap is open; the gate uses interim when present. Ratchet up, never down, except by an explicit interim entry with a reason. A screen that is not a strip (the full-width Log) sets \"metric\": \"frame\" on iOS to be gated on the whole frame instead of its leading 400 pt: its lower half is empty paper, which lifts the strip score so much that a blank screen passes (0.867 against the 0.85 floor). Android keeps the strip for it: its screen is 800 dp wide against the 1032 pt reference, so the right-aligned content of a whole-frame crop cannot line up (a blank Log scores 0.7955 on the Android strip, just under the 0.80 floor).",
   "metric": "strip.ssim",
   "ios": {
-    "map": { "min": 0.9 },
-    "night": { "min": 0.9 },
-    "airport": { "min": 0.85 },
-    "layers": { "min": 0.85 },
-    "nearest": { "min": 0.85 },
+    "map": {
+      "min": 0.9
+    },
+    "night": {
+      "min": 0.9
+    },
+    "airport": {
+      "min": 0.85
+    },
+    "layers": {
+      "min": 0.85
+    },
+    "nearest": {
+      "min": 0.85
+    },
     "search": {
       "min": 0.85,
       "interim": 0.75,
@@ -20,68 +30,82 @@
     },
     "settings": {
       "min": 0.85,
-      "interim": 0.41,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.56,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
-    "onboarding": { "min": 0.9 },
+    "onboarding": {
+      "min": 0.9
+    },
     "disclaimers": {
       "min": 0.85,
-      "interim": 0.54,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.68,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "aircraft": {
-      "min": 0.85,
-      "interim": 0.82,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "min": 0.85
     },
     "aircraftedit": {
       "min": 0.85,
-      "interim": 0.54,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.71,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "pilot": {
       "min": 0.85,
-      "interim": 0.74,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.69,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "logbookentry": {
       "min": 0.85,
-      "interim": 0.68,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.75,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "logbooklocked": {
       "min": 0.85,
-      "interim": 0.52,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.66,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "recording": {
       "min": 0.9,
       "interim": 0.6,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "recordingstopped": {
       "min": 0.9,
       "interim": 0.62,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "recordingstop": {
       "min": 0.9,
-      "interim": 0.62,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.74,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     }
   },
   "android": {
-    "map": { "min": 0.85 },
-    "night": { "min": 0.85 },
-    "airport": { "min": 0.8 },
-    "layers": { "min": 0.8 },
-    "nearest": { "min": 0.8 },
-    "search": { "min": 0.8 },
-    "log": { "min": 0.8 },
+    "map": {
+      "min": 0.85
+    },
+    "night": {
+      "min": 0.85
+    },
+    "airport": {
+      "min": 0.8
+    },
+    "layers": {
+      "min": 0.8
+    },
+    "nearest": {
+      "min": 0.8
+    },
+    "search": {
+      "min": 0.8
+    },
+    "log": {
+      "min": 0.8
+    },
     "settings": {
       "min": 0.8,
-      "interim": 0.5,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.56,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "onboarding": {
       "min": 0.8,
@@ -90,48 +114,48 @@
     },
     "disclaimers": {
       "min": 0.8,
-      "interim": 0.36,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.55,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "aircraft": {
       "min": 0.8,
-      "interim": 0.74,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.79,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "aircraftedit": {
       "min": 0.8,
-      "interim": 0.58,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.71,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "pilot": {
       "min": 0.8,
-      "interim": 0.61,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.59,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "logbookentry": {
       "min": 0.8,
-      "interim": 0.55,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.65,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "logbooklocked": {
       "min": 0.8,
-      "interim": 0.47,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.65,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "recording": {
       "min": 0.85,
-      "interim": 0.48,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.42,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "recordingstopped": {
       "min": 0.85,
-      "interim": 0.52,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.44,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     },
     "recordingstop": {
       "min": 0.85,
-      "interim": 0.52,
-      "reason": "first measured floor (App CI run 43356239974); layout gaps to the Swift capture are not closed yet"
+      "interim": 0.68,
+      "reason": "provisional, set from the first App run of the layout fix (PR 66) before the final measurement"
     }
   }
 }

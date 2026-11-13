@@ -14,6 +14,7 @@ export function BorderedButton({
   prominent = false,
   minSize = 44,
   stretch = false,
+  framedLabel = false,
   testID,
 }: {
   title: string;
@@ -27,6 +28,11 @@ export function BorderedButton({
   minSize?: number;
   /** Fills the width (frame(maxWidth: .infinity)). */
   stretch?: boolean;
+  /**
+   * `minSize` frames the label inside the button (`Text.frame(minWidth:minHeight:)` in a large bordered button, as the recording
+   * notices do), so the button is the frame plus the control's own padding (about 14 pt by 20 pt) and 88 pt tall at 60.
+   */
+  framedLabel?: boolean;
   testID?: string;
 }) {
   const t = useTheme();
@@ -37,14 +43,15 @@ export function BorderedButton({
       onPress={onPress}
       testID={testID}
       style={{
-        minWidth: minSize,
-        minHeight: minSize,
-        paddingHorizontal: Space.l,
+        minWidth: framedLabel ? undefined : minSize,
+        minHeight: framedLabel ? undefined : minSize,
+        paddingHorizontal: framedLabel ? 20 : Space.l,
+        paddingVertical: framedLabel ? 14 : undefined,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: Space.xs,
-        borderRadius: minSize / 2,
+        borderRadius: framedLabel ? 44 : minSize / 2,
         alignSelf: stretch ? 'stretch' : undefined,
         backgroundColor: prominent ? t.accent : t.infoFill,
       }}
@@ -54,7 +61,17 @@ export function BorderedButton({
           {icon}
         </View>
       ) : null}
-      <Text style={[FormType.body, { color: text }]}>{title}</Text>
+      <View
+        style={{
+          minWidth: framedLabel ? minSize : undefined,
+          minHeight: framedLabel ? minSize : undefined,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={[FormType.body, { color: text }]}>{title}</Text>
+      </View>
     </Pressy>
   );
 }

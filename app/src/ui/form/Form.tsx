@@ -63,7 +63,7 @@ export function NavBar({
 function LargeTitle({ title }: { title: string }) {
   const t = useTheme();
   return (
-    <View style={{ height: 53, paddingTop: 13, paddingHorizontal: FormMetrics.margin }}>
+    <View style={{ height: 49, paddingTop: 9, paddingHorizontal: FormMetrics.margin }}>
       <Text accessibilityRole="header" numberOfLines={1} style={[FormType.largeTitle, { color: t.primaryText }]}>
         {title}
       </Text>
@@ -170,7 +170,7 @@ export function Separator() {
     <View
       accessibilityElementsHidden
       importantForAccessibility="no"
-      style={{ height: 1, marginLeft: FormMetrics.pad, backgroundColor: t.rule, opacity: 0.6 }}
+      style={{ height: 1, marginTop: -1, marginLeft: FormMetrics.pad, backgroundColor: t.rule, opacity: 0.6 }}
     />
   );
 }
