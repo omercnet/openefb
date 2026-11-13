@@ -176,13 +176,14 @@ instead), and a reroute does not re-sync an already active plan with navigation:
 Two Android findings on the briefing route (kanaf-dev://briefing), compared with app/reference/ipad-briefing.png and
 Views/Briefing/IsraelBriefingView.swift.
 
-The Feed row showed "Fee". The row had no numberOfLines or width on the label, and Yoga's flexShrink already defaults to 0,
-so no RN layout constraint explains the clip. The label and the count now set `flexShrink: 0` explicitly (Swift's HStack:
-label, badge, Spacer, count; only the spacer gives way) and the label uses `textBreakStrategy="simple"`: the likely cause
-is Android's highQuality line breaker wrapping the last glyph of a tightly measured word onto a second line that the
-one-line measured height hides. The Compose-hosted RNHostView (below) was the other suspect and is gone on Android.
-Test: the label renders the whole word at a 320 dp width with no numberOfLines, width, maxWidth, flex or flexBasis on it
-or on anything up to the row, and the count and spacer are where Swift has them.
+The Feed row showed "Fee" on Android (CI run 43366825392 and run 43377482551, both with the native sheet and with the
+first RN overlay). The row has no numberOfLines or width on the label, and Yoga's flexShrink already defaults to 0, so no
+layout constraint explains it; `textBreakStrategy="simple"` (the first guess) did not change it on the next device run
+(43402642037). Remaining cause, still a hypothesis until the next run: the sheet rendered before the bundled faces were
+registered, so Android measured the content-sized label in a fallback face and drew the wider Archivo into that box; texts
+that stretch to their parent (every other row) are not clipped. `BriefingOverMap` now renders the sheet only once
+`useFonts(FontFiles)` reports loaded or failed, the same rule the strip and the log screen use, and the label and the count
+keep `flexShrink: 0` (Swift's HStack: label, badge, Spacer, count).
 
 The sheet was a Material 3 ModalBottomSheet (@expo/ui's BottomSheet on Android): capped width, centred, grab handle. The
 reference is an iPad page sheet: inset from the edges, rounded on all corners, map and strip dimmed behind, Done at the

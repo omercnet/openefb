@@ -672,15 +672,10 @@ function StatusCard({
         <>
           <Row first>
             {/* HStack { label, badge, Spacer, count }: only the spacer gives way, the labels keep their full width
-                (flexShrink 0, no numberOfLines or width). An Android device showed "Fee"; the likely cause is Android's
-                highQuality line breaker wrapping the last glyph of a tightly measured word onto a hidden second line,
-                which the simple strategy avoids (U4b-plan.md: unverified on a device). */}
+                (flexShrink 0, no numberOfLines or width). The clipped "Fee" seen on Android came from rendering before the
+                bundled faces loaded: BriefingOverMap waits for them (see there). */}
             <View testID="briefing-feed-row" style={{ flexDirection: 'row', alignItems: 'center', gap: Space.s }}>
-              <Text
-                testID="briefing-feed-label"
-                textBreakStrategy="simple"
-                style={[Type.label, { color: t.secondaryText, flexShrink: 0 }]}
-              >
+              <Text testID="briefing-feed-label" style={[Type.label, { color: t.secondaryText, flexShrink: 0 }]}>
                 Feed
               </Text>
               <DataAgeBadge

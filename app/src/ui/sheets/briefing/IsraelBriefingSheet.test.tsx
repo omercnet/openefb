@@ -41,7 +41,6 @@ describe('IsraelBriefingSheet', () => {
     const label = view.byTestId('briefing-feed-label');
     expect(label.children).toEqual(['Feed']);
     expect(label.props.numberOfLines).toBeUndefined();
-    expect(label.props.textBreakStrategy).toBe('simple');
     const style = StyleSheet.flatten(label.props.style);
     expect(style.flexShrink).toBe(0);
     for (const key of ['width', 'maxWidth', 'flex', 'flexBasis'] as const) expect(style[key]).toBeUndefined();

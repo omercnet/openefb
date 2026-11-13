@@ -64,14 +64,9 @@
       "min": 0.85,
       "interim": 0.75,
       "metric": "frame",
-      "reason": "measured PR #64 App run 43356486570: whole-frame 0.7836, gap to the target not diagnosed yet; floor 0.03 under it, ratchet up"
+      "reason": "measured run 43402642037: whole-frame 0.7835; the strip under the sheet shows the day scenario where the reference has the Israel route, and the RN sheet has a grab handle; floor 0.03 under it, ratchet up"
     },
-    "israel-plan": {
-      "min": 0.85,
-      "interim": 0.8,
-      "metric": "frame",
-      "reason": "measured PR #64 App run 43356486570: whole-frame 0.8278, gap to the target not diagnosed yet; floor 0.03 under it, ratchet up"
-    }
+    "israel-plan": { "min": 0.85, "metric": "frame" }
   },
   "android": {
     "map": { "min": 0.85 },
@@ -141,10 +136,6 @@
       "interim": 0.5,
       "reason": "measured PR #64 App run 43356486570: strip 0.5279, gap to the target not diagnosed yet; floor 0.03 under it, ratchet up"
     },
-    "israel-plan": {
-      "min": 0.8,
-      "interim": 0.69,
-      "reason": "measured PR #64 App run 43356486570: strip 0.7218, gap to the target not diagnosed yet; floor 0.03 under it, ratchet up"
-    }
+    "israel-plan": { "min": 0.8 }
   }
 }
