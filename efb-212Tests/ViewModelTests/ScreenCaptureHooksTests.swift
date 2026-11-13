@@ -77,7 +77,7 @@ struct ScreenCaptureHooksTests {
         #expect(!state.isAutoStartEnabled)
     }
 
-    private func seed(_ profile: String) throws -> ModelContext {
+    private func seed(_ profile: String) throws -> ModelContainer {
         let container = try ModelContainer(
             for: SchemaV1.AircraftProfile.self, SchemaV1.PilotProfile.self, SchemaV1.UserSettings.self,
             SchemaV1.FlightPlanRecord.self, SchemaV1.FlightRecord.self, SchemaV1.LogbookEntry.self,
@@ -93,15 +93,17 @@ struct ScreenCaptureHooksTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: audio.path).isEmpty)
         let flights = try db.flightIDsWithRecordedData().count
         #expect(flights == (profile == "capture" ? 1 : 0))
-        return container.mainContext
+        return container  // the caller keeps it: a ModelContext does not keep its container alive
     }
 
     @Test func captureSeedFillsTheDocumentedData() throws {
-        let ctx = try seed("capture")
+        let container = try seed("capture")
+        let ctx = container.mainContext
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.AircraftProfile>()).map(\.nNumber).sorted() == ["4X-ABC", "N172KF", "N28PA"])
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.PilotProfile>()).count == 1)
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.FlightRecord>()).count == 1)
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.LogbookEntry>()).count == 2)
+        withExtendedLifetime(container) {}
     }
 
     @Test func seedFailsLoudlyWhenAudioCannotBeRemoved() throws {
@@ -125,11 +127,13 @@ struct ScreenCaptureHooksTests {
     }
 
     @Test func captureFreshLeavesNothingBehind() throws {
-        let ctx = try seed("capture-fresh")
+        let container = try seed("capture-fresh")
+        let ctx = container.mainContext
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.AircraftProfile>()).isEmpty)
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.PilotProfile>()).isEmpty)
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.FlightRecord>()).isEmpty)
         #expect(try ctx.fetch(FetchDescriptor<SchemaV1.LogbookEntry>()).isEmpty)
+        withExtendedLifetime(container) {}
     }
 
     @Test func microphoneNoticeIsForcedAgainstTheSyncLoop() async throws {
