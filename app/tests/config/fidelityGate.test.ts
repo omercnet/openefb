@@ -48,6 +48,9 @@ const NOT_GATED = [
   'recordingstop',
   'replay',
   'replayfast',
+  'flightdetail',
+  'cvfr',
+  'debrief',
 ];
 
 describe('fidelity gate registration', () => {
