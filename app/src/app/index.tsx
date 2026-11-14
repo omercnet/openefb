@@ -9,6 +9,7 @@ import { LiveAppGate } from '../ui/shell/LiveAppGate';
 // accepted headlessly; on web `?screen=airport`. Android uses the kanaf-dev://<screen> deep link, which the router
 // resolves straight to its route, so this screen only sees launches without a URL.
 const LAUNCH_SCREENS = [
+  'map', // the fixture map the gate captures; the root route itself is the live app
   'airport',
   'night',
   'layers',
