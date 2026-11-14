@@ -50,6 +50,11 @@ const OTA_CERT = process.env.KANAF_OTA_CERT;
 if (OTA_URL && !OTA_CERT) throw new Error('KANAF_OTA_URL is set without KANAF_OTA_CERT: refusing to build unsigned updates');
 const OTA_SMOKE = process.env.KANAF_OTA_SMOKE === '1';
 
+// Build number (CFBundleVersion). Expo writes it into Info.plist literally (default "1"), so xcodebuild overrides
+// cannot change it; fastlane's beta_rn sets KANAF_BUILD_NUMBER before the prebuild. Unset keeps Expo's default.
+const BUILD_NUMBER = process.env.KANAF_BUILD_NUMBER?.trim() || undefined;
+if (BUILD_NUMBER !== undefined && !/^\d+$/.test(BUILD_NUMBER)) throw new Error(`KANAF_BUILD_NUMBER must be an integer, got ${BUILD_NUMBER}`);
+
 export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioBackground({
   ...config,
   name: DEV ? 'Kanaf EFB Dev' : 'Kanaf EFB',
@@ -61,6 +66,7 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
   icon: './assets/splash-icon.png',
   ios: {
     bundleIdentifier: BUNDLE_ID,
+    ...(BUILD_NUMBER ? { buildNumber: BUILD_NUMBER } : {}),
     supportsTablet: true,
     // MapLibre Native needs iOS 15.5+; Expo SDK 58 modules (expo-sqlite podspec) already require 16.4.
     deploymentTarget: '16.4',

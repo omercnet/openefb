@@ -171,9 +171,10 @@ end
 
 # Generates ios/ and installs pods. The aviation database is not committed (app/assets/aviation.sqlite is ignored);
 # like app.yml it comes from the Swift app's resources.
-def rn_prebuild(version)
+def rn_prebuild(version, build)
   ENV["KANAF_VARIANT"] = "production"
   ENV["KANAF_VERSION"] = version
+  ENV["KANAF_BUILD_NUMBER"] = build
   database = File.join(RN_DIR, "assets/aviation.sqlite")
   FileUtils.cp(File.join(ROOT, "efb-212/Resources/aviation.sqlite"), database) unless File.exist?(database)
   # fastlane's sh runs from the fastlane/ folder, so each command changes directory itself.
@@ -269,7 +270,7 @@ platform :ios do
     if unsigned
       build = build_number
       UI.message("Kanaf RN #{version} (#{build}), unsigned archive")
-      rn_prebuild(version)
+      rn_prebuild(version, build)
       build_app(
         workspace: File.join(RN_IOS_DIR, "#{RN_SCHEME}.xcworkspace"),
         scheme: RN_SCHEME,
@@ -299,7 +300,7 @@ platform :ios do
     )
     profile_name = lane_context[SharedValues::SIGH_NAME] || PROFILE_NAME
 
-    rn_prebuild(version)
+    rn_prebuild(version, build)
     # ios/ is generated and ignored, so the project file needs no restoring.
     update_code_signing_settings(
       path: File.join(RN_IOS_DIR, "#{RN_SCHEME}.xcodeproj"),
