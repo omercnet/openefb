@@ -29,4 +29,22 @@ distribution).
 The metafile comes from `https://aeronav.faa.gov/d-tpp/{cycle}/xml_data/d-tpp_Metafile.xml` and PDFs from
 `https://aeronav.faa.gov/d-tpp/{cycle}/{pdf_name}`; both are cached under `--cache`.
 
+## The `us-diagrams` chart pack (M5)
+
+`--pack DIR` also writes the pack the RN app downloads (owner decision Q6: georeferencing is computed offline, never on
+the device). `PackWriter.swift` writes `DIR/<cycle>/`: `<ICAO>.png` (transparent ink, `--pack-scale`, default 2) and
+`<ICAO>.json` (the georeference) for every accepted diagram, `index.json` (product `us-diagrams`, edition = the d-TPP
+cycle, `accuracyFeet` = the runway gate) and `manifest.json` (`published: false`, bytes and sha256 per file, the input of
+`web/charts/publish.sh`). Rejected diagrams are not in the pack (no FAA sheet PDFs: they would add hundreds of MB) and the
+app draws nothing for them.
+
+```
+tools/apd-georef/apd-georef --cycle 2611 --pack /var/tmp/us-pack --report /var/tmp/apd-report.md
+node tools/apd-georef/check-pack.mjs /var/tmp/us-pack/2611        # the app's format, manifest hashes, file sets
+node --test tools/apd-georef/check-pack.test.mjs                  # tests of the checker
+```
+
+CI builds it without a Mac of your own: `.github/workflows/us-diagrams.yml` (sample on pull requests, full pack by
+`workflow_dispatch`, artifact only). Publishing is the owner's step, see `docs/CI.md`.
+
 `prototype.swift` is the original throwaway research prototype (~70% success); it is kept for reference only.

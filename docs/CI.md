@@ -62,6 +62,29 @@ Owner steps at cutover (nobody else sets these):
 
 The same lane runs on the owner's Mac (`bundle install`, then `bundle exec fastlane ios beta`, `upload:false` to stop after signing); see `dist-prep/TESTFLIGHT.md`.
 
+## Workflow: `.github/workflows/us-diagrams.yml`
+
+Builds the `us-diagrams` chart pack (M5): the FAA airport diagrams of one d-TPP cycle, georeferenced by `tools/apd-georef --pack` (the same core the Swift app used on device; owner decision Q6 moves that offline). Runs on `macos-latest`, uses no secrets and publishes nothing.
+
+|Trigger|What it does|
+|---|---|
+|Pull request touching `tools/apd-georef/**`, the georeferencer or the workflow|Builds a five-airport sample (`KPAO,KSFO,KBOS,KSEA,KDEN`), checks it with `tools/apd-georef/check-pack.mjs` (the format `diagramPack.ts` reads, manifest bytes and sha256, the file set) and prints its size and the extrapolation to the whole cycle in the job summary|
+|`workflow_dispatch` (inputs `cycle`, `airports`)|The full pack (or the airports listed) for the cycle, uploaded as the artifact `us-diagrams-pack` (14 days) with the report|
+
+Owner steps to publish a cycle (one edition per d-TPP cycle, only when you choose; nothing is scheduled):
+
+1. Actions, "US diagrams pack", Run workflow (leave `cycle` empty for the current one). Download the `us-diagrams-pack` artifact and unzip it to `<dir>/<cycle>/`.
+2. Upload as unpublished, then approve (`web/charts/README.md` has the one-time bucket setup):
+
+```
+cd <repo root>; dir=<dir>/<cycle>; packs=()
+for f in "$dir"/*; do [ "$(basename "$f")" = manifest.json ] || packs+=(--pack "$f"); done
+web/charts/publish.sh --product us-diagrams --edition <cycle> "${packs[@]}" --manifest "$dir/manifest.json" --remote --base-url https://<public-host>
+web/charts/publish.sh --product us-diagrams --edition <cycle> "${packs[@]}" --manifest "$dir/manifest.json" --remote --base-url https://<public-host> --manifest-only --approve
+```
+
+The app shows the cycle on the map badge and in settings, so a stale pack is visible. The FAA diagrams are US government works; no permission is needed.
+
 ## Workflow: `.github/workflows/testflight-crashes.yml`
 
 Manual. Fetches the newest TestFlight crash submissions of the app (`GET /v1/apps/6829641724/betaFeedbackCrashSubmissions`, then each `crashLog`) with the `testflight` environment's App Store Connect key. The repository and its artifacts are public and a crash log carries tester and device details, so the job prints only counts and uploads a one-day artifact encrypted (CMS, AES-256) to a certificate you pass in. `tools/testflight-crashes.sh [limit]` does all of it from a shell: creates a key and certificate in `~/.config/kanaf` once, dispatches the workflow on `main`, waits, downloads and decrypts into `build/testflight-crashes/` (`<id>.crash` plus `<id>.json` with the tester's comment, device and build). The same fetch runs on a Mac with `tools/testflight-crashes.py` when the key is in `~/.appstoreconnect/`.
