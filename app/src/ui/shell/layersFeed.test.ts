@@ -41,7 +41,7 @@ describe('bindLayers', () => {
     const store = layers.make();
     const { controller } = fakeController(['sectional', 'ownship']);
     const stop = bindLayers(controller, store, () => 777);
-    expect(store.getState().visibleLayers.sort()).toEqual(['ownship', 'sectional']);
+    expect(store.getState().visibleLayers.toSorted()).toEqual(['ownship', 'sectional']);
     expect(store.getState().now).toBe(777);
     stop();
   });
@@ -53,7 +53,7 @@ describe('bindLayers', () => {
     store.setState({ visibleLayers: ['sectional', 'ownship', 'tfrs'] });
     store.setState({ visibleLayers: ['ownship', 'tfrs'] });
     expect(toggled).toEqual(['tfrs', 'sectional']);
-    expect(store.getState().visibleLayers.sort()).toEqual(['ownship', 'tfrs']);
+    expect(store.getState().visibleLayers.toSorted()).toEqual(['ownship', 'tfrs']);
     stop();
   });
 
