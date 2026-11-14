@@ -9,7 +9,7 @@ import { DatabaseUnavailableBanner, RemoteConfigBanner } from '../components/Com
 import { flightLog } from '../flightLog/store';
 import { MapScreen } from '../screens/MapScreen';
 import { appStore, useAppStore } from '../state/appStore';
-import { useRegion } from '../state/region';
+import { regionSlice, useRegion } from '../state/region';
 import { RuntimeContext } from '../state/runtimeContext';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';

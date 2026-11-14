@@ -21,6 +21,8 @@ jest.mock(
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
 let lastSurface: {
+  region: string;
+  initialView: { center: { lat: number } };
   onViewChange: (c: unknown) => void;
   night: boolean;
   sectional: boolean;
@@ -44,7 +46,9 @@ const KPAO = FIXTURE_AIRPORTS.find((a) => a.icao === 'KPAO')!;
 
 const offlineSnapshot = { packs: [], storageUsedBytes: 0, lastError: null };
 
-function fakeRuntime(over: { aviation?: Partial<AppRuntime['started']['aviation'] & object> | null } = {}) {
+function fakeRuntime(
+  over: { aviation?: Partial<AppRuntime['started']['aviation'] & object> | null; region?: 'us' | 'israel' } = {},
+) {
   const queries = { nearestAirports: jest.fn(async () => [KPAO] as never[]), searchAirports: jest.fn(async () => []) };
   const db = {
     airportsNear: async () => [],
@@ -59,7 +63,7 @@ function fakeRuntime(over: { aviation?: Partial<AppRuntime['started']['aviation'
     started: {
       userDb: {},
       userDbInMemory: false,
-      region: 'us',
+      region: over.region ?? 'us',
       aviation: over.aviation === null ? null : db,
       databaseError: null,
       israel: null,
@@ -160,5 +164,12 @@ describe('live MapScreen (MapContainerView)', () => {
     expect(lastSurface!.sectionalOpacity).toBe(0.4);
     await act(async () => layers.store.setState({ visibleLayers: ['ownship'] }));
     expect(lastSurface!.sectional).toBe(false);
+  });
+
+  it('opens on the restored region, not the default: Israel home view, layers and controller', async () => {
+    const { runtime } = fakeRuntime({ region: 'israel' });
+    await mountLive(runtime);
+    expect(lastSurface!.region).toBe('israel');
+    expect(lastSurface!.initialView.center.lat).toBeLessThan(34); // Israel, not the US centre
   });
 });

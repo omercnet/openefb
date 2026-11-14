@@ -18,7 +18,6 @@ import { useAppStore } from '../state/appStore';
 import { flightLog } from '../flightLog/store';
 import { useOwnship } from '../state/ownship';
 import { useIsNight } from '../state/night';
-import { useRegion } from '../state/region';
 import { useRuntime } from '../state/runtimeContext';
 import { layers } from '../columns/layers/store';
 import { bindLayers } from '../shell/layersFeed';
@@ -42,7 +41,8 @@ function failClosed(): never {
  */
 export function MapScreen() {
   const runtime = useRuntime();
-  const region = useRegion();
+  // The region the launch sequence restored, not the slice: LiveApp writes the slice in an effect, after this first render.
+  const region = runtime.started.region;
   const [initial] = useState(() => ({ center: regionDefaultCenter(region), zoom: regionDefaultZoom(region) }));
   const [appState] = useState(() => ({
     region,
