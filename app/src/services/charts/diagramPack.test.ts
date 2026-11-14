@@ -13,6 +13,7 @@ import {
 import {
   decodeDiagramIndex,
   DIAGRAM_PRODUCT,
+  US_DIAGRAM_PRODUCT,
   IsraelDiagramPack,
   loadDiagramPack,
   loadGeoreference,
@@ -151,6 +152,21 @@ test('Index JSON written by tools/caai-apd decodes', () => {
   expect(decoded.aerodromes.LLHA.georeferenced).toBe(false);
 });
 
+test('The US pack badge names the FAA, the cycle and the accuracy, not CAAI', () => {
+  const us = new IsraelDiagramPack(
+    {
+      product: 'us-diagrams',
+      edition: '2611',
+      editionLabel: 'd-TPP cycle 2611 (12 NOV 2026)',
+      aipDate: '2026-11-12',
+      accuracyFeet: 50,
+      aerodromes: {},
+    },
+    () => null,
+  );
+  expect(us.badgeText).toBe('FAA airport diagrams d-TPP cycle 2611 (12 NOV 2026) \u00b150 ft');
+});
+
 test('The badge shows the edition and the accuracy the diagrams were gated to', () => {
   expect(pack(index({}), []).badgeText).toBe('CAAI aerodrome diagrams AIRAC AMDT 001/2026 (06 AUG 2026) \u00b1100 ft');
 });
@@ -263,4 +279,51 @@ test('clipCornersForImageSource reorders the Swift quad (TL, BL, BR, TR) to Imag
   expect(a[1]).toBeGreaterThan(d[1]); // top above bottom
   expect(a[0]).toBeLessThan(b[0]); // left west of right
   expect(c[0]).toBeGreaterThan(d[0]);
+});
+
+// MARK: US pack (M5): the same loader and format, product us-diagrams
+
+function installedUs(indexProduct: string, edition = '2611') {
+  const fs = new MemoryFileSystem();
+  fs.put(
+    '/u/index.json',
+    bytesOf(
+      JSON.stringify({
+        product: indexProduct,
+        edition,
+        editionLabel: 'd-TPP cycle 2611 (12 NOV 2026)',
+        aipDate: '2026-11-12',
+        accuracyFeet: 50,
+        aerodromes: {
+          KPAO: { ...record('KPAO', true), sheet: '' },
+        },
+      }),
+    ),
+  );
+  fs.put('/u/KPAO.png', new Uint8Array([1]));
+  fs.put('/u/KPAO.json', bytesOf(JSON.stringify(georeference)));
+  const installed = { ...installedRecord('2611'), product: 'us-diagrams' };
+  const service = {
+    product: US_DIAGRAM_PRODUCT,
+    installed: async () => installed,
+    fileLocation: (_r: ChartPackInstalled, name: string) => (fs.exists(`/u/${name}`) ? `/u/${name}` : null),
+  } as unknown as ChartPackServiceLike;
+  return { fs, service };
+}
+
+test('A served US pack loads and draws a georeferenced airport that has no sheet PDF', async () => {
+  const { fs, service } = installedUs('us-diagrams');
+  const loaded = await loadDiagramPack({ service, fs, servedEdition: '2611', allowUnpublished: false });
+  expect(loaded?.edition).toBe('2611');
+  expect(loaded?.georeferencedICAOs).toEqual(['KPAO']);
+  expect(loaded?.sheetPath('KPAO')).toBeNull();
+  expect((await loadGeoreference(loaded!, fs, 'KPAO'))?.imagePath).toBe('/u/KPAO.png');
+});
+
+test('A US service never loads an index of another product, and an unknown product loads nothing', async () => {
+  const mismatch = installedUs('il-diagrams');
+  expect(await loadDiagramPack({ ...mismatch, servedEdition: '2611', allowUnpublished: false })).toBeNull();
+  const other = installedUs('us-diagrams');
+  (other.service as { product: string }).product = 'israel-cvfr';
+  expect(await loadDiagramPack({ ...other, servedEdition: '2611', allowUnpublished: false })).toBeNull();
 });

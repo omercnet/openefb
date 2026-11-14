@@ -15,7 +15,7 @@ function pack(mutate = () => {}) {
   const dir = mkdtempSync(join(tmpdir(), 'pack-'));
   const files = { 'KPAO.png': png, 'KPAO.json': Buffer.from(JSON.stringify(geo)) };
   const index = {
-    product: 'us-diagrams', edition: '2611', editionLabel: 'FAA d-TPP cycle 2611', aipDate: '2026-11-12', accuracyFeet: 50,
+    product: 'us-diagrams', edition: '2611', editionLabel: 'd-TPP cycle 2611 (12 NOV 2026)', aipDate: '2026-11-12', accuracyFeet: 50,
     aerodromes: { KPAO: { chart: 'KPAO.PDF', language: 'en', scale: 'as charted', georeferenced: true, reason: 'accepted', sheet: '', image: 'KPAO.png', georeference: 'KPAO.json' } },
   };
   files['index.json'] = Buffer.from(JSON.stringify(index));

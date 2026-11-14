@@ -9,7 +9,7 @@ import { failureText } from '../http';
 import type { Logger, TextStorage } from '../ports';
 import { regionName, type ChartPackServiceLike } from './chartPackService';
 import { DownloadSlot } from './downloadSlot';
-import { IsraelDiagramPack, loadDiagramPack } from './diagramPack';
+import { DIAGRAM_PRODUCT, IsraelDiagramPack, loadDiagramPack } from './diagramPack';
 import {
   chartBadgeText,
   isServable,
@@ -203,6 +203,9 @@ export class IsraelChartStore extends Observable {
 /** Storage key of the edition that was published and validated when it was downloaded (Swift: UserDefaults
  * `israelDiagramsServedEdition`). */
 export const DIAGRAM_SERVED_EDITION_KEY = 'IsraelDiagrams/served-edition.txt';
+/** Where the served edition of a diagram pack is kept. The Israel key is the Swift one, unchanged. */
+export const diagramServedEditionKey = (product: string): string =>
+  product === DIAGRAM_PRODUCT ? DIAGRAM_SERVED_EDITION_KEY : `Diagrams/${product}/served-edition.txt`;
 
 export interface DiagramStoreOptions extends ChartStoreOptions {
   fs: ChartFileSystem;
@@ -210,7 +213,8 @@ export interface DiagramStoreOptions extends ChartStoreOptions {
   storage?: TextStorage;
 }
 
-/** The CAAI aerodrome diagram pack (IL-13). Download, verification and install are ChartPackService with product `il-diagrams`. */
+/** A diagram pack: the CAAI aerodrome diagrams (IL-13, `il-diagrams`) or the FAA airport diagrams (M5, `us-diagrams`); the
+ * service's product says which. Download, verification and install are ChartPackService. */
 export class IsraelDiagramStore extends Observable {
   pack: IsraelDiagramPack | null = null;
   /** Latest servable edition on the host; null when none is published or the host was unreachable. */
@@ -235,7 +239,7 @@ export class IsraelDiagramStore extends Observable {
   static async open(options: DiagramStoreOptions): Promise<IsraelDiagramStore> {
     const store = new IsraelDiagramStore(options);
     try {
-      store.servedEdition = (await options.storage?.read(DIAGRAM_SERVED_EDITION_KEY)) ?? null;
+      store.servedEdition = (await options.storage?.read(diagramServedEditionKey(options.service.product))) ?? null;
     } catch {
       store.servedEdition = null;
     }
@@ -318,7 +322,7 @@ export class IsraelDiagramStore extends Observable {
         if (isServable(manifest, false)) {
           this.servedEdition = installed.edition;
           try {
-            await this.options.storage?.write(DIAGRAM_SERVED_EDITION_KEY, installed.edition);
+            await this.options.storage?.write(diagramServedEditionKey(this.service.product), installed.edition);
           } catch (error) {
             this.options.log?.(`Could not save the served diagram edition: ${String(error)}`);
           }

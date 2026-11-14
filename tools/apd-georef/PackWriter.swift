@@ -92,7 +92,11 @@ func writeUSDiagramPack(directory: URL, cycle: String, accuracyFeet: Int, entrie
             sheet: "", image: "\(entry.icao).png", georeference: "\(entry.icao).json")
     }
 
-    let label = "FAA d-TPP cycle \(cycle)"
+    let shown = DateFormatter()
+    shown.dateFormat = "dd MMM yyyy"
+    shown.locale = Locale(identifier: "en_US_POSIX")
+    shown.timeZone = TimeZone(identifier: "UTC")
+    let label = "d-TPP cycle \(cycle) (\(shown.string(from: effective).uppercased()))"   // the app's badge: "FAA airport diagrams <label> +/-50 ft"
     let index = Index(product: "us-diagrams", edition: cycle, editionLabel: label, aipDate: day.string(from: effective),
                       accuracyFeet: accuracyFeet, aerodromes: records)
     try add("index.json", try encoder.encode(index))
