@@ -9,6 +9,7 @@ function load(env: Record<string, string | undefined>) {
   try {
     let config: { version?: string; ios?: { bundleIdentifier?: string } } = {};
     jest.isolateModules(() => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- isolateModules needs a synchronous load
       const make = require('../../app.config').default as (c: ConfigContext) => typeof config;
       config = make({ config: {} } as ConfigContext);
     });
