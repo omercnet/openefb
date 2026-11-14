@@ -177,7 +177,7 @@ def rn_prebuild(version)
   database = File.join(RN_DIR, "assets/aviation.sqlite")
   FileUtils.cp(File.join(ROOT, "efb-212/Resources/aviation.sqlite"), database) unless File.exist?(database)
   # fastlane's sh runs from the fastlane/ folder, so each command changes directory itself.
-  sh("cd #{Shellwords.escape(RN_DIR)} && { [ -d node_modules ] || npm ci; } && npx expo prebuild -p ios --no-install --clean")
+  sh("cd #{Shellwords.escape(RN_DIR)} && npm ci && npx expo prebuild -p ios --no-install --clean")
   sh("cd #{Shellwords.escape(RN_IOS_DIR)} && pod install")
 end
 
@@ -264,7 +264,7 @@ platform :ios do
     unsigned = options[:unsigned].to_s == "true"
     upload = options[:upload].to_s != "false" && !unsigned
     version = marketing_version
-    UI.important("TESTFLIGHT_GROUPS is ignored: React Native builds go to internal testers only") unless testflight_groups.empty?
+    UI.important("TESTFLIGHT_GROUPS is ignored: React Native builds go to internal testers only") unless ENV["TESTFLIGHT_GROUPS"].to_s.strip.empty?
 
     if unsigned
       build = build_number

@@ -16,6 +16,9 @@ on:
       - app/**
       - web/ota/**
       - fastlane/**
+      - Gemfile
+      - Gemfile.lock
+      - version.txt
       - .github/workflows/app.yml
   workflow_dispatch:
 
@@ -176,6 +179,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # the build number is the commit count
+          persist-credentials: false # the unsigned lane needs no token
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -199,6 +203,9 @@ jobs:
           echo "$APP $ID $VER"
           test "$ID" = io.omer.efb
           test "$VER" = "$(tr -d '[:space:]' < version.txt)"
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP/Info.plist")
+          echo "build $BUILD"
+          test "$BUILD" = "$(git rev-list --count HEAD)" # the lane's build number reaches the Info.plist
 
   android:
     name: Android (Pixel Tablet API 35 emulator, Release)
