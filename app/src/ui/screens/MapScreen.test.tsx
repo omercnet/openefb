@@ -19,11 +19,15 @@ jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
-let lastSurface: { onViewChange: (c: unknown) => void } | null = null;
+let lastSurface: {
+  region: string;
+  initialView: { center: { lat: number } };
+  onViewChange: (c: unknown) => void;
+} | null = null;
 jest.mock('../map/MapSurface', () => ({
-  MapSurface: (props: { onViewChange: (c: unknown) => void }) => <MockSurface {...props} />,
+  MapSurface: (props: NonNullable<typeof lastSurface>) => <MockSurface {...props} />,
 }));
-const MockSurface = (props: { onViewChange: (c: unknown) => void }) => {
+const MockSurface = (props: NonNullable<typeof lastSurface>) => {
   useEffect(() => {
     lastSurface = props;
   });
@@ -36,7 +40,9 @@ jest.mock('../map/mapStatus', () => ({ getCurrentMapStatus: () => null }));
 
 const KPAO = FIXTURE_AIRPORTS.find((a) => a.icao === 'KPAO')!;
 
-function fakeRuntime(over: { aviation?: Partial<AppRuntime['started']['aviation'] & object> | null } = {}) {
+function fakeRuntime(
+  over: { aviation?: Partial<AppRuntime['started']['aviation'] & object> | null; region?: 'us' | 'israel' } = {},
+) {
   const queries = { nearestAirports: jest.fn(async () => [KPAO] as never[]), searchAirports: jest.fn(async () => []) };
   const db = {
     airportsNear: async () => [],
@@ -51,7 +57,7 @@ function fakeRuntime(over: { aviation?: Partial<AppRuntime['started']['aviation'
     started: {
       userDb: {},
       userDbInMemory: false,
-      region: 'us',
+      region: over.region ?? 'us',
       aviation: over.aviation === null ? null : db,
       databaseError: null,
       israel: null,
@@ -134,5 +140,12 @@ describe('live MapScreen (MapContainerView)', () => {
     const { runtime } = fakeRuntime({ aviation: null });
     const view = await mountLive(runtime);
     expect(view.byTestId('map-surface')).toBeTruthy();
+  });
+
+  it('opens on the restored region, not the default: Israel home view, layers and controller', async () => {
+    const { runtime } = fakeRuntime({ region: 'israel' });
+    await mountLive(runtime);
+    expect(lastSurface!.region).toBe('israel');
+    expect(lastSurface!.initialView.center.lat).toBeLessThan(34); // Israel, not the US centre
   });
 });
