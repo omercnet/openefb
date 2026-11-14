@@ -6,6 +6,7 @@
     "@expo/metro-runtime": "~58.0.17",
     "@expo/ui": "~58.0.27",
     "@maplibre/maplibre-react-native": "^11.5.1",
+    "@react-native-community/netinfo": "12.0.1",
     "expo": "~58.0.23",
     "expo-asset": "~58.0.20",
     "expo-audio": "~58.0.11",

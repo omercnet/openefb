@@ -1,12 +1,12 @@
 // The flight log slice: the plain data the strip reads (the AppState, RecordingViewModel and MapViewModel values the
 // SwiftUI views in Views/Log/FlightLogStrip.swift and FlightLogRows.swift read). GPS quality comes from state/gps.ts,
-// the panel toggles from state/panels.ts and the nearest airport from columns/nearest/store.ts. I1 feeds the services in.
+// the panel toggles from state/panels.ts and the nearest airport from columns/nearest/store.ts. The app shell
+// (ui/shell/liveData.ts) feeds ownship, navigation, region and network; capture routes provide their fixture stores.
 import type { Region } from '../../domain/core';
 import type { GpsFix } from '../../domain/location/gpsStatus';
 import type { PredictedEvent } from '../../domain/prediction';
 import type { RecordingStatus } from '../../domain/recording/recordingCoordinator';
 import { createStoreContext } from '../state/storeContext';
-import { dayFixture } from './fixtures';
 import type { NavState } from './logic';
 
 /** RecordingViewModel's displayed state. */
@@ -78,7 +78,39 @@ export interface FlightLogData extends NavState {
   actions: FlightLogActions;
 }
 
-export const flightLog = createStoreContext<FlightLogData>(dayFixture);
+const noop = () => {};
+
+/** Before the first fix and with nothing active: what the strip shows at launch until the services report. */
+export const EMPTY_FLIGHT_LOG: FlightLogData = {
+  region: 'us',
+  directTo: null,
+  activeFlightPlan: false,
+  activeRoute: null,
+  planDeparture: null,
+  planDestination: null,
+  gpsAvailable: false,
+  ownshipFix: null,
+  hasPosition: false,
+  hasAltitude: false,
+  groundSpeed: 0,
+  track: 0,
+  altitude: 0,
+  verticalSpeed: 0,
+  distanceToNext: null,
+  bearingToNext: null,
+  estimatedTimeEnroute: null,
+  predictedEvents: [],
+  nowMs: Date.now(),
+  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  recording: null,
+  recordingUnavailable: false,
+  isOffline: false,
+  airspaceCheckUnavailable: false,
+  israelAlertsSuspended: false,
+  actions: { clear: noop, sequenceRoute: noop, openLog: noop, openBriefing: noop, record: noop, openSettings: noop },
+};
+
+export const flightLog = createStoreContext<FlightLogData>(EMPTY_FLIGHT_LOG);
 
 /** The whole slice: the state object is replaced on every setState, so it is a stable selector result. */
 export const useFlightLogData = (): FlightLogData => flightLog.useData((s) => s);

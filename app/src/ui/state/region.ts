@@ -6,7 +6,7 @@ export interface RegionData {
   region: Region;
 }
 
-/** US until I1 feeds the location service's region in. */
+/** The saved region, set by the app shell at launch (RegionStore.load); US until then. */
 export const regionSlice = createStoreContext<RegionData>({ region: 'us' });
 
 export const useRegion = (): Region => regionSlice.useData((s) => s.region);

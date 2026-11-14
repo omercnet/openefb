@@ -1,9 +1,9 @@
-// The airport queries the Nearest and Search columns run, behind a context so tests and I1 swap them. The default is the
-// in-memory FAKE with the reference's airports; I1 provides the bundled aviation and Israel databases.
+// The airport queries the Nearest and Search columns run, behind a context so tests and the app swap them. The app shell
+// provides the bundled aviation and Israel databases; the default (nothing open yet) fails every query.
 import { createContext } from 'react';
 import type { AviationDatabase } from '../../../data/aviation/aviationDatabase';
 import type { IsraelAviationDatabase } from '../../../data/aviation/israelDatabase';
-import { createFakeAviationDatabase } from './fixture';
+import { AppFailure } from '../../../domain/errors';
 
 /**
  * The NOTAM ids that name a field closed now. TODO(S1/L3): the feed is IsraelNotamService (S1) and the matching is
@@ -21,8 +21,13 @@ export interface AirportQueries {
   now: () => number;
 }
 
+const notOpen = async (): Promise<never> => {
+  throw new AppFailure({ kind: 'databaseCorrupted' });
+};
+
+/** No database open: every query fails, which the columns show as unavailable (never as "no airports"). */
 export const defaultAirportQueries: AirportQueries = {
-  aviation: createFakeAviationDatabase(),
+  aviation: { nearestAirports: notOpen, searchAirports: notOpen },
   israel: null,
   fetchNotamClosures: null,
   now: () => Date.now(),
