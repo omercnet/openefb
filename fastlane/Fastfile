@@ -179,7 +179,9 @@ def rn_prebuild(version, build)
   FileUtils.cp(File.join(ROOT, "efb-212/Resources/aviation.sqlite"), database) unless File.exist?(database)
   # fastlane's sh runs from the fastlane/ folder, so each command changes directory itself.
   sh("cd #{Shellwords.escape(RN_DIR)} && npm ci && npx expo prebuild -p ios --no-install --clean")
-  sh("cd #{Shellwords.escape(RN_IOS_DIR)} && pod install")
+  # CocoaPods is not in the Gemfile; under `bundle exec` it would inherit Bundler's environment (RUBYOPT=-rbundler/setup)
+  # and fail to load the Gemfile with its own Ruby. Run it without Bundler's variables.
+  sh("cd #{Shellwords.escape(RN_IOS_DIR)} && env -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH -u BUNDLER_SETUP -u BUNDLER_VERSION -u RUBYOPT -u RUBYLIB pod install")
 end
 
 platform :ios do
