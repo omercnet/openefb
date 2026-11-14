@@ -44,7 +44,10 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
   const { started } = runtime;
   const databaseError = useAppStore((s) => s.databaseError);
   // The saved orientation, opacity and display mode go in before the map's first render.
-  useState(() => layers.store.setState(runtime.layerSettings));
+  useState(() => {
+    layers.store.setState(runtime.layerSettings);
+    regionSlice.store.setState({ region: started.region });
+  });
   const queries = useMemo(() => airportQueriesFor(runtime), [runtime]);
 
   useEffect(() => {
