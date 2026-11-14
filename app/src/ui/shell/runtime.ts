@@ -12,6 +12,7 @@ import type { LocationSource } from '../../domain/ports/location';
 import { AirSigmetService } from '../../services/airSigmetService';
 import { createRemoteConfigService } from '../../services/remoteConfigService';
 import { RemoteConfigStore } from '../../services/remoteConfigStore';
+import { IsraelNotamService } from '../../services/israelNotamService';
 import { TfrService } from '../../services/tfrService';
 import { WeatherService } from '../../services/weatherService';
 import { runStartup, type StartedApp } from './startup';
@@ -23,6 +24,7 @@ export interface AppRuntime {
   started: StartedApp<RemoteConfigStore>;
   weather: WeatherService;
   tfr: TfrService;
+  israelNotam: IsraelNotamService;
   advisories: AirSigmetService;
   location: LocationSource;
   network: NetworkStatusSource;
@@ -51,6 +53,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     started,
     weather: new WeatherService({ fetch: fetchLike, log }),
     tfr: new TfrService({ fetch: fetchLike, log }),
+    israelNotam: new IsraelNotamService({ fetch: fetchLike, storage: fileTextStorage, log }),
     advisories: new AirSigmetService({ fetch: fetchLike, log }),
     location: createLocationSource(),
     network: createNetworkStatusSource(),

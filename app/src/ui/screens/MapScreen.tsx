@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppFailure } from '../../domain/errors';
 import { regionContains, regionDefaultCenter, regionDefaultZoom } from '../../domain/core';
 import type { MapDataSource } from '../../domain/map/mapDataController';
+import type { IsraelClosureStatus } from '../../domain/map/israel';
 import { initialVisibleLayers } from '../../domain/map/initialLayers';
 import { useNearestAirports } from '../columns/nearest/refresh';
 import { footer } from '../flightLog/footerStore';
 import { MapLayout } from '../map/MapLayout';
 import { navigationRoute } from '../map/navigationRoute';
+import { useIsraelChart } from '../map/useIsraelChart';
 import { useDataRefresh } from '../map/refreshDue';
 import { useMapController, useMapModel } from '../map/useMapData';
 import { useAppStore } from '../state/appStore';
@@ -56,15 +58,32 @@ export function MapScreen() {
   const ownship = useOwnship();
   const navigation = useAppStore((s) => s.navigation);
   const route = useMemo(() => navigationRoute(navigation, ownship.position), [navigation, ownship.position]);
+  const layersStore = layers.useStoreApi();
+  const onClosureStatus = useCallback(
+    (status: IsraelClosureStatus) =>
+      layersStore.setState({
+        closureStatus:
+          status.kind === 'noFeed'
+            ? { kind: 'noFeed' }
+            : { kind: 'loaded', generatedAt: status.generatedAt, level: status.level, closed: status.closedSegments },
+      }),
+    [layersStore],
+  );
+  const israelSources = useIsraelChart({
+    db: runtime.started.israel,
+    notam: runtime.israelNotam,
+    enabled: region === 'israel',
+    onClosureStatus,
+  });
   const model = useMapModel({
     controller,
     ownship,
     ownshipInRegion: ownship.position !== null && regionContains(region, ownship.position),
     route,
+    extraSources: israelSources,
   });
 
   // The Layers column and the controller follow each other; the footer's zoom cells follow the camera.
-  const layersStore = layers.useStoreApi();
   useEffect(() => bindLayers(controller, layersStore, Date.now), [controller, layersStore]);
   const footerStore = footer.useStoreApi();
   const { zoomTo, recenter } = model;
