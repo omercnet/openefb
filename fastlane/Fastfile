@@ -180,8 +180,8 @@ def rn_prebuild(version, build)
   # fastlane's sh runs from the fastlane/ folder, so each command changes directory itself.
   sh("cd #{Shellwords.escape(RN_DIR)} && npm ci && npx expo prebuild -p ios --no-install --clean")
   # CocoaPods is not in the Gemfile; under `bundle exec` it would inherit Bundler's environment (RUBYOPT=-rbundler/setup)
-  # and fail to load the Gemfile with its own Ruby. Run it without Bundler's variables.
-  sh("cd #{Shellwords.escape(RN_IOS_DIR)} && env -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH -u BUNDLER_SETUP -u BUNDLER_VERSION -u RUBYOPT -u RUBYLIB pod install")
+  # and the setup-ruby gem paths, which hide the Homebrew CocoaPods gems from its own Ruby. Run it without them.
+  sh("cd #{Shellwords.escape(RN_IOS_DIR)} && env -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH -u BUNDLER_SETUP -u BUNDLER_VERSION -u RUBYOPT -u RUBYLIB -u GEM_HOME -u GEM_PATH -u GEM_ROOT pod install")
 end
 
 platform :ios do
