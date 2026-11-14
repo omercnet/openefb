@@ -154,4 +154,85 @@ describe('airport column loader', () => {
     expect(column.getState().columns.KXXX!.airport).toBeNull();
     stop();
   });
+
+  it('an older weather load that finishes last does not overwrite the newer one', async () => {
+    const first = Promise.withResolvers<string>();
+    const newer = { stationID: 'KSQL', fetchedAt: 2 } as never;
+    const older = { stationID: 'KSQL', fetchedAt: 1 } as never;
+    let calls = 0;
+    const { app, column, settle, stop } = setup({
+      weather: {
+        fetchMETAR: async () => (++calls === 1 ? older : newer),
+        fetchTAF: () => (calls === 1 ? first.promise : Promise.resolve('TAF new')),
+        cachedWeather: () => null,
+        clearCache: () => undefined,
+      },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    expect(column.getState().columns.KSQL!.weather).toMatchObject({ metar: newer, taf: 'TAF new', isLoading: false });
+    first.resolve('TAF old');
+    await settle();
+    expect(column.getState().columns.KSQL!.weather).toMatchObject({ metar: newer, taf: 'TAF new', isLoading: false });
+    stop();
+  });
+
+  it('a failed refresh keeps the report on screen even though the cache was cleared', async () => {
+    let failing = false;
+    const cache = new Map<string, unknown>();
+    const { app, column, settle, stop } = setup({
+      weather: {
+        fetchMETAR: async (icao: string) => {
+          if (failing) throw new Error('offline');
+          cache.set(icao, METAR);
+          return METAR;
+        },
+        fetchTAF: async () => 'TAF',
+        cachedWeather: (icao: string) => (cache.get(icao) ?? null) as never,
+        clearCache: (icao: string) => void cache.delete(icao),
+      },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    failing = true;
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    const shown = column.getState().columns.KSQL!.weather;
+    expect(shown.metar).toBe(METAR);
+    expect(shown.errorMessage).not.toBeNull();
+    stop();
+  });
+
+  it('a failed airport lookup is not "no such airport": the refresh button looks it up again', async () => {
+    let failing = true;
+    const { app, column, settle, stop } = setup({
+      aviation: {
+        airport: async () => {
+          if (failing) throw new Error('db closed');
+          return KSQL;
+        },
+      },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    expect(column.getState().columns.KSQL!.airport).toBeNull();
+    failing = false;
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    expect(column.getState().columns.KSQL!.airport).toBe(KSQL);
+    stop();
+  });
+
+  it('once stopped, a pending load writes nothing', async () => {
+    const gate = Promise.withResolvers<Airport | null>();
+    const { app, column, settle, stop } = setup({ aviation: { airport: () => gate.promise as never } });
+    app.getState().showAirport('KSQL');
+    await settle();
+    stop();
+    gate.resolve(KSQL);
+    await settle();
+    expect(column.getState().columns.KSQL!.airport).toBeNull();
+  });
 });

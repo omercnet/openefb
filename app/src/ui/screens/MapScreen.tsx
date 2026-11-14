@@ -7,7 +7,7 @@ import { useNearestAirports } from '../columns/nearest/refresh';
 import { footer } from '../flightLog/footerStore';
 import { MapLayout } from '../map/MapLayout';
 import { navigationRoute } from '../map/navigationRoute';
-import { useDataRefresh } from '../map/refreshDue';
+import { refreshableMapFor, useDataRefresh } from '../map/refreshDue';
 import { useMapController, useMapModel } from '../map/useMapData';
 import { useAppStore } from '../state/appStore';
 import { flightLog } from '../flightLog/store';
@@ -86,23 +86,11 @@ export function MapScreen() {
 
   // The NRST cell refreshes on every fix while another column is open (MapContainerView's onChange(ownshipPosition)).
   useNearestAirports();
-  useDataRefresh(() => {
-    const snapshot = controller.getSnapshot();
-    return {
-      map: {
-        region: snapshot.region,
-        visibleLayers: snapshot.visibleLayers,
-        weatherFetchedAt: snapshot.weatherFetchedAt,
-        tfrFetchedAt: snapshot.tfrFetchedAt,
-        advisoriesFetchedAt: snapshot.advisoriesFetchedAt,
-        loadWeatherDots: () => controller.loadWeatherDots(),
-        loadTFRs: () => controller.loadTFRs(),
-        loadAdvisories: () => controller.loadAdvisories(),
-      },
-      lowPower: false,
-      networkAvailable: !flightLog.store.getState().isOffline,
-    };
-  });
+  useDataRefresh(() => ({
+    map: refreshableMapFor(controller),
+    lowPower: false,
+    networkAvailable: !flightLog.store.getState().isOffline,
+  }));
 
   return <MapLayout model={modelWithZoom} initialView={initial} />;
 }

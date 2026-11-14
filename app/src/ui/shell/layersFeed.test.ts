@@ -1,5 +1,6 @@
 import type { MapLayer } from '../../domain/core';
 import type { MapDataSnapshot } from '../../domain/map/mapDataController';
+import { currentSectionalCycle } from '../../domain/offline/layers';
 import { layers } from '../columns/layers/store';
 import { bindLayers, LAYERS_NOW_TICK_MS, type LayersController } from './layersFeed';
 
@@ -75,9 +76,11 @@ describe('bindLayers', () => {
     store.getState().retryAdvisories();
     expect(controller.loadTFRs).toHaveBeenCalledTimes(1);
     expect(controller.loadAdvisories).toHaveBeenCalledTimes(1);
-    now = 60_001;
+    now = Date.UTC(2027, 5, 1);
     jest.advanceTimersByTime(LAYERS_NOW_TICK_MS);
-    expect(store.getState().now).toBe(60_001);
+    expect(store.getState().now).toBe(now);
+    // The chart cycle follows the clock (MapViewModel.chartExpirationDate), not the launch time.
+    expect(store.getState().chartExpiration).toBe(currentSectionalCycle(now).expires);
     stop();
     store.setState({ visibleLayers: ['sectional'] });
     expect(toggled).toEqual([]);

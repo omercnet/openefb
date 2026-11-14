@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { AppState as NativeAppState, View } from 'react-native';
 import { airport } from '../columns/airport/store';
 import { AirportQueriesContext } from '../columns/nearest/sources';
@@ -40,6 +40,8 @@ const zeroVersion = () => 0;
 export function LiveApp({ runtime }: { runtime: AppRuntime }) {
   const { started } = runtime;
   const databaseError = useAppStore((s) => s.databaseError);
+  // The restored region goes in before the first render (the Nearest hook reads the slice).
+  useState(() => regionSlice.store.setState({ region: started.region }));
   const queries = useMemo(() => airportQueriesFor(runtime), [runtime]);
 
   useEffect(() => {

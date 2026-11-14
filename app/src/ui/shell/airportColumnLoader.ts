@@ -45,15 +45,23 @@ const EMPTY_WEATHER: AirportWeather = {
 export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => void {
   const { app, column, weather } = deps;
   const requested = new Set<string>();
+  /** Lookups that failed (not "no such airport"): the refresh buttons retry them. */
+  const lookupFailed = new Set<string>();
+  /** Per station, the newest weather load: an older one that finishes later must not overwrite it. */
+  const weatherRequest = new Map<string, number>();
+  let stopped = false;
   const patchColumn = (icao: string, change: (data: AirportColumnData) => AirportColumnData) => {
     const state = column.getState();
     const current = state.columns[icao];
-    if (!current) return;
+    if (stopped || !current) return;
     column.setState({ columns: { ...state.columns, [icao]: change(current) } });
   };
 
   /** WeatherViewModel.loadWeather for one station. */
-  async function loadWeather(icao: string): Promise<void> {
+  async function loadWeather(icao: string, fallback: AirportWeather['metar'] = null): Promise<void> {
+    const request = (weatherRequest.get(icao) ?? 0) + 1;
+    weatherRequest.set(icao, request);
+    const isLatest = () => !stopped && weatherRequest.get(icao) === request;
     const region = deps.region();
     const station = weatherStation(region, icao);
     const metarPublished = region === 'israel' ? (station?.hasMetar ?? false) : true;
@@ -70,7 +78,8 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
         metar = await weather.fetchMETAR(icao);
       } catch (error) {
         errorMessage = describeError(error);
-        metar = weather.cachedWeather(icao); // keep cached weather; the error says the refresh failed
+        // Keep the report that was shown (or the cache); the error says the refresh failed.
+        metar = fallback ?? weather.cachedWeather(icao);
       }
     }
     let taf: string | null | undefined;
@@ -87,6 +96,7 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
       taf = null;
       tafFetchedAt = null;
     }
+    if (!isLatest()) return;
     patchColumn(icao, (d) => ({
       ...d,
       weather: {
@@ -101,7 +111,9 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     }));
   }
 
-  async function lookup(icao: string): Promise<{ airport: Airport | null; elevationPublished: boolean }> {
+  async function lookup(
+    icao: string,
+  ): Promise<{ airport: Airport | null; elevationPublished: boolean; failed?: boolean }> {
     try {
       if (deps.region() === 'israel') {
         const aerodrome = (await deps.israel?.aerodrome(icao)) ?? null;
@@ -111,8 +123,16 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
       }
       return { airport: (await deps.aviation?.airport(icao)) ?? null, elevationPublished: true };
     } catch {
-      return { airport: null, elevationPublished: true };
+      return { airport: null, elevationPublished: true, failed: true };
     }
+  }
+
+  /** Finds the airport record; a failed lookup is remembered so the refresh buttons retry it. */
+  async function resolveAirport(icao: string): Promise<void> {
+    const { failed, ...found } = await lookup(icao);
+    if (failed) lookupFailed.add(icao);
+    else lookupFailed.delete(icao);
+    patchColumn(icao, (d) => ({ ...d, ...found }));
   }
 
   async function load(icao: string): Promise<void> {
@@ -128,8 +148,7 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
         },
       },
     });
-    const found = await lookup(icao);
-    patchColumn(icao, (d) => ({ ...d, ...found }));
+    await resolveAirport(icao);
     await loadWeather(icao);
   }
 
@@ -138,8 +157,11 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     now: deps.clock(),
     directTo: deps.directTo,
     refreshWeather: (icao) => {
+      // The cache is cleared so the fetch goes to the network; the report on screen stays the fallback if it fails.
+      const shown = column.getState().columns[icao]?.weather.metar ?? weather.cachedWeather(icao);
       weather.clearCache(icao);
-      void loadWeather(icao);
+      if (lookupFailed.has(icao)) void resolveAirport(icao);
+      void loadWeather(icao, shown);
     },
   });
 
@@ -154,6 +176,7 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
   });
   const tick = setInterval(() => column.setState({ now: deps.clock() }), NOW_TICK_MS);
   return () => {
+    stopped = true;
     unsubscribe();
     clearInterval(tick);
   };

@@ -1,6 +1,8 @@
+import { act } from 'react';
+import { render } from '../../../tests/support/ui';
 import type { MapLayer } from '../../domain/core';
 import { DataRefreshScheduler } from '../../services/dataRefreshScheduler';
-import { refreshDueData, type RefreshableMap } from './refreshDue';
+import { REFRESH_TICK_MS, refreshDueData, refreshableMapFor, useDataRefresh, type RefreshableMap } from './refreshDue';
 
 const NOW = 10_000_000_000;
 const MIN = 60_000;
@@ -67,5 +69,56 @@ describe('refreshDueData (MapViewModel.refreshDueData)', () => {
     await refreshDueData(map, scheduler, input);
     await refreshDueData(map, scheduler, { ...input, nowMs: NOW + 11 * MIN });
     expect(calls).toEqual(['tfr']); // 2x backoff: 20 minutes after the failed attempt
+  });
+});
+
+describe('refreshableMapFor', () => {
+  it('reads the controller live, so a refresh that moved the time counts as a success (no backoff)', async () => {
+    const snapshot = {
+      region: 'us' as const,
+      visibleLayers: new Set<MapLayer>(['tfrs']),
+      weatherFetchedAt: null,
+      tfrFetchedAt: null as number | null,
+      advisoriesFetchedAt: null,
+    };
+    const controller = {
+      getSnapshot: () => snapshot,
+      loadWeatherDots: async () => true,
+      loadTFRs: async () => void (snapshot.tfrFetchedAt = NOW),
+      loadAdvisories: async () => undefined,
+    };
+    const scheduler = new DataRefreshScheduler();
+    await refreshDueData(refreshableMapFor(controller), scheduler, input);
+    // Success: the next refresh is due after the base 10 minutes, not the doubled 20.
+    expect(scheduler.interval('tfr', false)).toBe(600);
+  });
+});
+
+describe('useDataRefresh', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('does not start a second run while the previous one is still pending', async () => {
+    const gate = Promise.withResolvers<boolean>();
+    const loadWeatherDots = jest.fn(() => gate.promise);
+    const map: RefreshableMap = {
+      ...fakeMap().map,
+      visibleLayers: new Set<MapLayer>(['weatherDots']),
+      loadWeatherDots,
+    };
+    function Probe() {
+      useDataRefresh(
+        () => ({ map, lowPower: false, networkAvailable: true }),
+        () => NOW,
+      );
+      return null;
+    }
+    await render(<Probe />);
+    await act(async () => {
+      jest.advanceTimersByTime(REFRESH_TICK_MS * 3);
+    });
+    expect(loadWeatherDots).toHaveBeenCalledTimes(1);
+    gate.resolve(true);
+    await act(async () => undefined);
   });
 });
