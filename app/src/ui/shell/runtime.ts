@@ -15,6 +15,7 @@ import { RemoteConfigStore } from '../../services/remoteConfigStore';
 import { IsraelNotamService } from '../../services/israelNotamService';
 import { TfrService } from '../../services/tfrService';
 import { WeatherService } from '../../services/weatherService';
+import { loadLayerSettings, type LayerSettings } from './layersSettings';
 import { runStartup, type StartedApp } from './startup';
 
 /** The user database file (SwiftData's default store in the Swift app); the in-memory fallback uses ':memory:'. */
@@ -26,6 +27,7 @@ export interface AppRuntime {
   tfr: TfrService;
   israelNotam: IsraelNotamService;
   advisories: AirSigmetService;
+  layerSettings: LayerSettings;
   location: LocationSource;
   network: NetworkStatusSource;
 }
@@ -49,8 +51,10 @@ export async function startRuntime(): Promise<AppRuntime> {
       RemoteConfigStore.open({ service: remote, storage: fileTextStorage, buildNumber: buildNumber(), log }),
     log,
   });
+  const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage);
   return {
     started,
+    layerSettings,
     weather: new WeatherService({ fetch: fetchLike, log }),
     tfr: new TfrService({ fetch: fetchLike, log }),
     israelNotam: new IsraelNotamService({ fetch: fetchLike, storage: fileTextStorage, log }),

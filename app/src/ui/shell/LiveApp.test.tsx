@@ -54,6 +54,7 @@ function runtime(over: Partial<AppRuntime['started']> = {}) {
     weather: {},
     tfr: {},
     advisories: {},
+    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7 },
     location,
     network,
   } as unknown as AppRuntime;

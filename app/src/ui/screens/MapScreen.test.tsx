@@ -5,6 +5,7 @@ import { createFakeNetworkStatus } from '../../adapters/network';
 import { FakeLocationSource, makeFix } from '../../domain/ports/location';
 import { AirportQueriesContext } from '../columns/nearest/sources';
 import { FIXTURE_AIRPORTS } from '../columns/nearest/fixture';
+import { layers } from '../columns/layers/store';
 import { nearest } from '../columns/nearest/store';
 import { footer } from '../flightLog/footerStore';
 import { EMPTY_FLIGHT_LOG, flightLog } from '../flightLog/store';
@@ -19,11 +20,16 @@ jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
-let lastSurface: { onViewChange: (c: unknown) => void } | null = null;
+let lastSurface: {
+  onViewChange: (c: unknown) => void;
+  night: boolean;
+  sectional: boolean;
+  sectionalOpacity?: number;
+} | null = null;
 jest.mock('../map/MapSurface', () => ({
-  MapSurface: (props: { onViewChange: (c: unknown) => void }) => <MockSurface {...props} />,
+  MapSurface: (props: NonNullable<typeof lastSurface>) => <MockSurface {...props} />,
 }));
-const MockSurface = (props: { onViewChange: (c: unknown) => void }) => {
+const MockSurface = (props: NonNullable<typeof lastSurface>) => {
   useEffect(() => {
     lastSurface = props;
   });
@@ -60,6 +66,7 @@ function fakeRuntime(over: { aviation?: Partial<AppRuntime['started']['aviation'
     weather: { fetchWeatherForStations: async () => [] },
     tfr: { currentTFRs: async () => ({ tfrs: [], fetchedAt: Date.now() }) },
     advisories: { currentAdvisories: async () => ({ advisories: [], fetchedAt: Date.now() }) },
+    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7 },
     location,
     network,
   } as unknown as AppRuntime;
@@ -134,5 +141,16 @@ describe('live MapScreen (MapContainerView)', () => {
     const { runtime } = fakeRuntime({ aviation: null });
     const view = await mountLive(runtime);
     expect(view.byTestId('map-surface')).toBeTruthy();
+  });
+
+  it('the Layers column drives the map: display mode, sectional opacity and switch', async () => {
+    const { runtime } = fakeRuntime();
+    await mountLive(runtime);
+    expect(lastSurface!.night).toBe(false);
+    await act(async () => layers.store.setState({ displayMode: 'night', sectionalOpacity: 0.4 }));
+    expect(lastSurface!.night).toBe(true);
+    expect(lastSurface!.sectionalOpacity).toBe(0.4);
+    await act(async () => layers.store.setState({ visibleLayers: ['ownship'] }));
+    expect(lastSurface!.sectional).toBe(false);
   });
 });

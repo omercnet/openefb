@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppFailure } from '../../domain/errors';
 import { regionContains, regionDefaultCenter, regionDefaultZoom } from '../../domain/core';
 import type { MapDataSource } from '../../domain/map/mapDataController';
@@ -14,6 +14,7 @@ import { useMapController, useMapModel } from '../map/useMapData';
 import { useAppStore } from '../state/appStore';
 import { flightLog } from '../flightLog/store';
 import { useOwnship } from '../state/ownship';
+import { useIsNight } from '../state/night';
 import { useRegion } from '../state/region';
 import { useRuntime } from '../state/runtimeContext';
 import { layers } from '../columns/layers/store';
@@ -56,6 +57,10 @@ export function MapScreen() {
   });
 
   const ownship = useOwnship();
+  const displayMode = layers.useData((s) => s.displayMode);
+  const sectionalOpacity = layers.useData((s) => s.sectionalOpacity);
+  const mapMode = layers.useData((s) => s.mapMode);
+  const night = useIsNight(displayMode, ownship.position);
   const navigation = useAppStore((s) => s.navigation);
   const route = useMemo(() => navigationRoute(navigation, ownship.position), [navigation, ownship.position]);
   const layersStore = layers.useStoreApi();
@@ -80,9 +85,22 @@ export function MapScreen() {
     ownship,
     ownshipInRegion: ownship.position !== null && regionContains(region, ownship.position),
     route,
+    initialMode: mapMode,
     extraSources: israelSources,
   });
 
+  // Orientation (North up / Track up) set in the Layers column drives the camera (MapViewModel.setMapMode).
+  const { setMode } = model;
+  const setModeRef = useRef(setMode);
+  const appliedMode = useRef(mapMode);
+  useEffect(() => {
+    setModeRef.current = setMode;
+  });
+  useEffect(() => {
+    if (appliedMode.current === mapMode) return;
+    appliedMode.current = mapMode;
+    setModeRef.current(mapMode);
+  }, [mapMode]);
   // The Layers column and the controller follow each other; the footer's zoom cells follow the camera.
   useEffect(() => bindLayers(controller, layersStore, Date.now), [controller, layersStore]);
   const footerStore = footer.useStoreApi();
@@ -123,5 +141,14 @@ export function MapScreen() {
     };
   });
 
-  return <MapLayout model={modelWithZoom} initialView={initial} />;
+  return (
+    <MapLayout
+      model={modelWithZoom}
+      initialView={initial}
+      night={night}
+      liveNight={night}
+      sectional={model.snapshot.visibleLayers.has('sectional')}
+      sectionalOpacity={sectionalOpacity}
+    />
+  );
 }

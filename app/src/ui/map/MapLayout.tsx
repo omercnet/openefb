@@ -4,6 +4,7 @@ import { layerSpecsFor } from '../../domain/map/registry';
 import { useLocalGlyphs } from '../../adapters/glyphInstall';
 import { CompactMapLayout } from '../CompactMapLayout';
 import { useWidthClass, usesCompactLayout } from '../layout';
+import { NightContext } from '../state/night';
 import { panels } from '../state/panels';
 import { StripColumn, type StripScreen } from '../StripColumn';
 import { StripMetrics } from '../tokens';
@@ -19,11 +20,18 @@ import type { useMapModel } from './useMapData';
 export function MapLayout({
   screen,
   night = false,
+  liveNight,
+  sectional = true,
+  sectionalOpacity,
   model,
   initialView,
 }: {
   screen?: StripScreen;
   night?: boolean;
+  /** The live app's resolved display mode; the strip then follows it instead of the capture screen. */
+  liveNight?: boolean;
+  sectional?: boolean;
+  sectionalOpacity?: number;
   model: ReturnType<typeof useMapModel>;
   initialView: { center: { lat: number; lon: number }; zoom: number };
 }) {
@@ -37,7 +45,8 @@ export function MapLayout({
       <MapSurface
         night={night}
         glyphsUrl={glyphs.status === 'ready' ? glyphs.url : REMOTE_GLYPHS_URL}
-        sectional
+        sectional={sectional}
+        sectionalOpacity={sectionalOpacity}
         region={model.snapshot.region}
         visibleLayers={model.snapshot.visibleLayers}
         layers={layerSpecsFor(model.snapshot.region)}
@@ -50,6 +59,7 @@ export function MapLayout({
       />
     );
   return (
+    <NightContext.Provider value={liveNight ?? null}>
     <SafeAreaProvider>
       {usesCompactLayout(widthClass, showsFlightLog) ? (
         <CompactMapLayout screen={screen} width={width} compact={widthClass === 'compact'} chart={chart} />
@@ -60,6 +70,7 @@ export function MapLayout({
         </View>
       )}
     </SafeAreaProvider>
+    </NightContext.Provider>
   );
 }
 

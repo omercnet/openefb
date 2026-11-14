@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { AppState as NativeAppState, View } from 'react-native';
+import { fileTextStorage } from '../../adapters/fileTextStorage';
 import { airport } from '../columns/airport/store';
+import { layers } from '../columns/layers/store';
 import { AirportQueriesContext } from '../columns/nearest/sources';
 import { nearest } from '../columns/nearest/store';
 import { DatabaseUnavailableBanner, RemoteConfigBanner } from '../components/Components';
@@ -12,6 +14,7 @@ import { RuntimeContext } from '../state/runtimeContext';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';
 import { bannerItems } from './banners';
+import { persistLayerSettings } from './layersSettings';
 import { startLiveData } from './liveData';
 import { startRemoteConfigChecks } from './remoteConfigChecks';
 import type { AppRuntime } from './runtime';
@@ -40,6 +43,8 @@ const zeroVersion = () => 0;
 export function LiveApp({ runtime }: { runtime: AppRuntime }) {
   const { started } = runtime;
   const databaseError = useAppStore((s) => s.databaseError);
+  // The saved orientation, opacity and display mode go in before the map's first render.
+  useState(() => layers.store.setState(runtime.layerSettings));
   const queries = useMemo(() => airportQueriesFor(runtime), [runtime]);
 
   useEffect(() => {
@@ -71,7 +76,9 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
           },
         })
       : () => undefined;
+    const stopSettings = persistLayerSettings(layers.store, started.userDb, fileTextStorage, console.warn);
     return () => {
+      stopSettings();
       stopData();
       stopAirport();
       stopChecks();

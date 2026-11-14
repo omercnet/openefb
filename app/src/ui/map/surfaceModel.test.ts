@@ -22,6 +22,14 @@ describe('styleFor', () => {
     expect(sectionalOf(true, true).paint).toMatchObject({ 'raster-brightness-max': 0.55, 'raster-saturation': -0.35 });
     expect(sectionalOf(false, true).paint).not.toHaveProperty('raster-brightness-max');
   });
+  it('applies the pilot\'s sectional opacity, and keeps the style\'s own when none is given', () => {
+    const at = (o?: number) => {
+      const l = styleFor(false, true, GLYPHS, o).layers.find((x) => x.id === 'base-vfr-sectional');
+      return l && l.type === 'raster' ? l.paint?.['raster-opacity'] : undefined;
+    };
+    expect(at(0.4)).toBe(0.4);
+    expect(at()).toBe(0.7);
+  });
   it('leaves every other layer untouched', () => {
     const a = styleFor(false, true, GLYPHS).layers.filter((l) => l.id !== 'base-vfr-sectional');
     const b = styleFor(true, false, GLYPHS).layers.filter((l) => l.id !== 'base-vfr-sectional');

@@ -8,7 +8,13 @@ import { NIGHT_RASTER } from '../../domain/map/layers';
 /** The remote glyph endpoint authored in base-style.json: the fallback if the local install fails (labels then need a network). */
 export const REMOTE_GLYPHS_URL: string = (baseStyle as unknown as { glyphs: string }).glyphs;
 
-export function styleFor(night: boolean, sectional: boolean, glyphsUrl: string): StyleSpecification {
+export function styleFor(
+  night: boolean,
+  sectional: boolean,
+  glyphsUrl: string,
+  /** 0...1; the style's own 0.7 when omitted (AppState.sectionalOpacity). */
+  sectionalOpacity?: number,
+): StyleSpecification {
   const style = baseStyle as unknown as StyleSpecification;
   return {
     ...style,
@@ -19,7 +25,11 @@ export function styleFor(night: boolean, sectional: boolean, glyphsUrl: string):
         ? {
             ...l,
             layout: { ...l.layout, visibility: sectional ? 'visible' : 'none' },
-            paint: night ? { ...l.paint, ...NIGHT_RASTER } : l.paint,
+            paint: {
+              ...l.paint,
+              ...(sectionalOpacity === undefined ? undefined : { 'raster-opacity': sectionalOpacity }),
+              ...(night ? NIGHT_RASTER : undefined),
+            },
           }
         : l,
     ),
