@@ -1,3 +1,4 @@
+import { applyCaptureSeeds } from '../capture/seeds';
 import { act, useEffect } from 'react';
 import { DeviceEventEmitter, Dimensions, Platform, StyleSheet, View } from 'react-native';
 import { ancestorProp, press, render, type Rendered } from '../../../tests/support/ui';
@@ -5,6 +6,8 @@ import { EMPTY_SEARCH, searchSlice } from '../columns/search/search';
 import { appStore } from '../state/appStore';
 import { panels } from '../state/panels';
 import { MapScreen } from './MapScreen';
+
+beforeEach(applyCaptureSeeds);
 
 // The real provider waits for native insets; the library's mock reports them at once. The map is a native view: a
 // stand-in marks where it is mounted (called at render time, after this module has run).

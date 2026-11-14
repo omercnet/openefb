@@ -1,5 +1,6 @@
 // SearchViewModel behaviour (debounce, minimum length, region, failures) and the request token, plus render tests for
 // SearchColumn: autofocus, typing to results, selecting, the searching / no-match / failed states.
+import { applyCaptureSeeds, captureAirportQueries } from '../../capture/seeds';
 import { act } from 'react';
 import { AccessibilityInfo } from 'react-native';
 import { callHandler, press, render } from '../../../../tests/support/ui';
@@ -8,7 +9,7 @@ import type { Region } from '../../../domain/core';
 import { appStore } from '../../state/appStore';
 import { SearchColumn } from '../SearchColumn';
 import { createFakeAviationDatabase } from '../nearest/fixture';
-import { AirportQueriesContext, defaultAirportQueries, type AirportQueries } from '../nearest/sources';
+import { AirportQueriesContext, type AirportQueries } from '../nearest/sources';
 import { regionSlice } from '../../state/region';
 import {
   EMPTY_SEARCH,
@@ -18,6 +19,9 @@ import {
   searchSlice,
   type SearchState,
 } from './search';
+
+const defaultAirportQueries = captureAirportQueries();
+beforeEach(applyCaptureSeeds);
 
 const fake = createFakeAviationDatabase();
 

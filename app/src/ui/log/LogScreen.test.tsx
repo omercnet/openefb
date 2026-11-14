@@ -1,3 +1,4 @@
+import { applyCaptureSeeds } from '../capture/seeds';
 import { useFonts } from 'expo-font';
 import { render, type Rendered } from '../../../tests/support/ui';
 import LogRoute from '../../app/log';
@@ -6,6 +7,8 @@ import { dayFixture } from '../flightLog/fixtures';
 import { Day, Night } from '../tokens';
 import { NowProvider } from './clock';
 import { LogReference } from './LogReference';
+
+beforeEach(applyCaptureSeeds);
 
 // The real provider waits for native inset events; the library's mock reports zero insets at once (as web does).
 jest.mock(

@@ -1,6 +1,7 @@
 // Ports of efb-212Tests/ViewModelTests/NearestAirportViewModelTests.swift (all 8), the NearestAirportEntry part of
 // ServiceTests/LandableAirportFilterTests.militaryIsFlaggedMilNotPvtAndStillListed, and the JS-only refresh policy
 // (move threshold, region switch, request token, failures keep the list).
+import { applyCaptureSeeds, captureAirportQueries } from '../../capture/seeds';
 import type { Airport as AviationAirport } from '../../../data/aviation/types';
 import { makeAirport, type Airport } from '../../../domain/core';
 import { kpao, ksfo, ksql, rwy } from './__fixtures__/swiftAirports';
@@ -18,8 +19,11 @@ import {
 } from './logic';
 import { printfFixed } from '../../flightLog/logic';
 import { createNearestRefresher } from './refresh';
-import { defaultAirportQueries, type AirportQueries } from './sources';
+import { type AirportQueries } from './sources';
 import { nearest, type NearestData } from './store';
+
+const defaultAirportQueries = captureAirportQueries();
+beforeEach(applyCaptureSeeds);
 
 const EMPTY: NearestData = {
   entries: [],
