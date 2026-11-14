@@ -15,6 +15,10 @@ on:
     paths:
       - app/**
       - web/ota/**
+      - fastlane/**
+      - Gemfile
+      - Gemfile.lock
+      - version.txt
       - .github/workflows/app.yml
   workflow_dispatch:
 
@@ -159,6 +163,49 @@ jobs:
             /tmp/app-ios
             !/tmp/app-ios/build.log
           retention-days: 14
+
+  # The release lane without credentials: the same `fastlane ios beta_rn` code path as release.yml (production variant
+  # io.omer.efb, prebuild, pods, Release archive) with unsigned:true, so it needs no secrets and uploads nothing.
+  ios-release-archive:
+    name: iOS release lane (prebuild + unsigned archive)
+    needs: checks
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+      FASTLANE_SKIP_UPDATE_CHECK: '1'
+      FASTLANE_OPT_OUT_USAGE: '1'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # the build number is the commit count
+          persist-credentials: false # the unsigned lane needs no token
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+          working-directory: .
+      - name: Prebuild and archive without signing
+        working-directory: .
+        run: bundle exec fastlane ios beta_rn unsigned:true
+      - name: Check the archive is the production app
+        working-directory: .
+        run: |
+          APP=$(find build/release/rn/KanafEFB.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP"
+          ID=$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP/Info.plist")
+          VER=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Info.plist")
+          echo "$APP $ID $VER"
+          test "$ID" = io.omer.efb
+          test "$VER" = "$(tr -d '[:space:]' < version.txt)"
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP/Info.plist")
+          echo "build $BUILD"
+          test "$BUILD" = "$(git rev-list --count HEAD)" # the lane's build number reaches the Info.plist
 
   android:
     name: Android (Pixel Tablet API 35 emulator, Release)

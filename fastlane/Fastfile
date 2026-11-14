@@ -1,13 +1,15 @@
 # Release build and TestFlight upload. One lane for CI (.github/workflows/release.yml) and the owner's Mac:
 #   bundle exec fastlane ios beta                 # version from version.txt, build number = commit count
 #   bundle exec fastlane ios beta upload:false    # archive and sign only (checks signing without uploading)
+#   bundle exec fastlane ios beta_rn              # the same for the React Native app (app/), internal TestFlight only
+#   bundle exec fastlane ios beta_rn unsigned:true  # prebuild and an unsigned archive; no credentials (PR check)
 #
 # Credentials come from the environment, never from the repo:
 #   ASC_KEY_ID, ASC_ISSUER_ID               App Store Connect API key ids
 #   ASC_KEY_P8 or ASC_KEY_PATH              the key itself (CI) or its file (default ~/.appstoreconnect/private_keys/AuthKey_<id>.p8)
 #   DIST_CERT_P12_BASE64, DIST_CERT_P12_PASSWORD
 #                                           Apple Distribution identity; CI only. Locally the login keychain has it.
-# Optional:
+# Optional (beta_rn ignores TESTFLIGHT_GROUPS: React Native builds reach internal testers only):
 #   VERSION                                 marketing version (release-please sets it; default version.txt)
 #   BUILD_NUMBER                            default `git rev-list --count HEAD`; must beat every earlier upload of the version
 #   TESTFLIGHT_GROUPS                       comma-separated external groups: distribute and submit for Beta App Review
@@ -15,6 +17,8 @@
 # On a Mac, ASC_KEY_ID and ASC_ISSUER_ID are read from ~/.appstoreconnect/openefb.env when they aren't set.
 
 require "base64"
+require "fileutils"
+require "shellwords"
 require "tmpdir"
 
 default_platform(:ios)
@@ -144,6 +148,42 @@ def verify_external_groups(groups)
   UI.user_error!("TESTFLIGHT_GROUPS: no external group named #{missing.join(', ')} (external groups: #{external.join(', ')})") unless missing.empty?
 end
 
+# React Native app (app/): `expo prebuild -p ios` generates ios/ (git-ignored) for the production identity io.omer.efb.
+RN_DIR = File.join(ROOT, "app")
+RN_IOS_DIR = File.join(RN_DIR, "ios")
+RN_SCHEME = "KanafEFB".freeze # expo names the project after app.config.ts `name` ("Kanaf EFB") without spaces
+
+# The build number must beat every upload App Store Connect already has for the app, or Apple rejects the build.
+# Read the newest TestFlight build (across versions, and for this version) and go one above it; the commit count
+# is the floor, as in the Swift lane. BUILD_NUMBER overrides all of it.
+def rn_build_number(api_key, version)
+  override = ENV["BUILD_NUMBER"].to_s.strip
+  return build_number unless override.empty?
+
+  floor = build_number.to_i
+  newest = [
+    latest_testflight_build_number(api_key: api_key, app_identifier: BUNDLE_ID, initial_build_number: 0),
+    latest_testflight_build_number(api_key: api_key, app_identifier: BUNDLE_ID, version: version, initial_build_number: 0)
+  ].max
+  UI.message("Newest TestFlight build #{newest}, commit count #{floor}")
+  [floor, newest + 1].max.to_s
+end
+
+# Generates ios/ and installs pods. The aviation database is not committed (app/assets/aviation.sqlite is ignored);
+# like app.yml it comes from the Swift app's resources.
+def rn_prebuild(version, build)
+  ENV["KANAF_VARIANT"] = "production"
+  ENV["KANAF_VERSION"] = version
+  ENV["KANAF_BUILD_NUMBER"] = build
+  database = File.join(RN_DIR, "assets/aviation.sqlite")
+  FileUtils.cp(File.join(ROOT, "efb-212/Resources/aviation.sqlite"), database) unless File.exist?(database)
+  # fastlane's sh runs from the fastlane/ folder, so each command changes directory itself.
+  sh("cd #{Shellwords.escape(RN_DIR)} && npm ci && npx expo prebuild -p ios --no-install --clean")
+  # CocoaPods is not in the Gemfile; under `bundle exec` it would inherit Bundler's environment (RUBYOPT=-rbundler/setup)
+  # and the setup-ruby gem paths, which hide the Homebrew CocoaPods gems from its own Ruby. Run it without them.
+  sh("cd #{Shellwords.escape(RN_IOS_DIR)} && env -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH -u BUNDLER_SETUP -u BUNDLER_VERSION -u RUBYOPT -u RUBYLIB -u GEM_HOME -u GEM_PATH -u GEM_ROOT pod install")
+end
+
 platform :ios do
   desc "Archive a Release build and upload it to TestFlight (upload:false stops after signing)"
   lane :beta do |options|
@@ -219,6 +259,94 @@ platform :ios do
       distribute_external: !groups.empty?,
       groups: groups.empty? ? nil : groups,
       notify_external_testers: true
+    )
+  end
+
+  desc "React Native app: prebuild, archive, sign and upload to internal TestFlight (unsigned:true stops after an unsigned archive; upload:false stops after signing)"
+  lane :beta_rn do |options|
+    unsigned = options[:unsigned].to_s == "true"
+    upload = options[:upload].to_s != "false" && !unsigned
+    version = marketing_version
+    UI.important("TESTFLIGHT_GROUPS is ignored: React Native builds go to internal testers only") unless ENV["TESTFLIGHT_GROUPS"].to_s.strip.empty?
+
+    if unsigned
+      build = build_number
+      UI.message("Kanaf RN #{version} (#{build}), unsigned archive")
+      rn_prebuild(version, build)
+      build_app(
+        workspace: File.join(RN_IOS_DIR, "#{RN_SCHEME}.xcworkspace"),
+        scheme: RN_SCHEME,
+        configuration: "Release",
+        destination: "generic/platform=iOS",
+        clean: true,
+        skip_package_ipa: true,
+        skip_codesigning: true,
+        archive_path: File.join(OUTPUT_DIR, "rn/#{RN_SCHEME}.xcarchive"),
+        xcargs: "CODE_SIGNING_ALLOWED=NO MARKETING_VERSION=#{version} CURRENT_PROJECT_VERSION=#{build}"
+      )
+      UI.success("Unsigned archive built at #{lane_context[SharedValues::XCODEBUILD_ARCHIVE]}")
+      next
+    end
+
+    api_key = asc_api_key
+    import_distribution_identity
+    build = rn_build_number(api_key, version)
+    UI.message("Kanaf RN #{version} (#{build}), internal TestFlight")
+
+    get_provisioning_profile(
+      api_key: api_key,
+      app_identifier: BUNDLE_ID,
+      provisioning_name: PROFILE_NAME,
+      ignore_profiles_with_different_name: true,
+      output_path: OUTPUT_DIR
+    )
+    profile_name = lane_context[SharedValues::SIGH_NAME] || PROFILE_NAME
+
+    rn_prebuild(version, build)
+    # ios/ is generated and ignored, so the project file needs no restoring.
+    update_code_signing_settings(
+      path: File.join(RN_IOS_DIR, "#{RN_SCHEME}.xcodeproj"),
+      use_automatic_signing: false,
+      targets: [RN_SCHEME],
+      build_configurations: ["Release"],
+      team_id: TEAM_ID,
+      code_sign_identity: "Apple Distribution",
+      profile_name: profile_name
+    )
+    build_app(
+      workspace: File.join(RN_IOS_DIR, "#{RN_SCHEME}.xcworkspace"),
+      scheme: RN_SCHEME,
+      configuration: "Release",
+      destination: "generic/platform=iOS",
+      clean: true,
+      output_directory: OUTPUT_DIR,
+      output_name: "Kanaf-RN-#{version}-#{build}.ipa",
+      include_symbols: true,
+      xcargs: "MARKETING_VERSION=#{version} CURRENT_PROJECT_VERSION=#{build}",
+      export_method: "app-store",
+      export_options: {
+        teamID: TEAM_ID,
+        signingStyle: "manual",
+        signingCertificate: "Apple Distribution",
+        provisioningProfiles: { BUNDLE_ID => profile_name },
+        uploadSymbols: true,
+        manageAppVersionAndBuildNumber: false
+      }
+    )
+
+    unless upload
+      UI.success("Signed #{lane_context[SharedValues::IPA_OUTPUT_PATH]}; upload skipped")
+      next
+    end
+
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: lane_context[SharedValues::IPA_OUTPUT_PATH],
+      changelog: testflight_notes(ENV["TESTFLIGHT_CHANGELOG"].to_s, version, build),
+      uses_non_exempt_encryption: false,
+      skip_waiting_for_build_processing: true,
+      distribute_external: false, # internal testers only (owner decision Q12)
+      notify_external_testers: false
     )
   end
 end
