@@ -42,7 +42,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     migrate: (db) => migrate(db),
     openAviation: openAviationDatabase,
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- a Metro asset module, as aviationDb.ts does
-    openIsrael: () => openIsraelDatabase(require('../../assets/israel-aviation.sqlite')),
+    openIsrael: () => openIsraelDatabase(require('../../../assets/israel-aviation.sqlite')),
     openRemoteConfig: () =>
       RemoteConfigStore.open({ service: remote, storage: fileTextStorage, buildNumber: buildNumber(), log }),
     log,
