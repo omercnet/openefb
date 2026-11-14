@@ -41,6 +41,25 @@ Secrets, in the `testflight` environment (only that job sees them):
 
 Repository variable `TESTFLIGHT_GROUPS` (comma-separated, now `Public Beta`, the external group with the public link) names the external groups; empty means internal testing only. Repository secret `RELEASE_PLEASE_TOKEN` (optional, fine-grained token with Contents and Pull requests read/write on this repo): a release pull request opened with the default `GITHUB_TOKEN` does not trigger CI, so its required `CI gate` never reports. Without the token, close and reopen the release pull request to start CI.
 
+### Choosing the app: Swift or React Native (R1)
+
+Repository variable `TESTFLIGHT_APP` picks what the TestFlight job builds. Unset or `swift` (the default) runs `fastlane ios beta` on the Swift app, exactly as before. `rn` runs `fastlane ios beta_rn`: `expo prebuild -p ios` on `app/` (production variant, bundle id `io.omer.efb`, the same App Store Connect key, certificate and provisioning profile), then a signed Release archive and an upload to TestFlight. Any other value fails the job. Merging the lane changes nothing until the owner sets the variable.
+
+What the RN lane does differently:
+
+- Internal testers only: `TESTFLIGHT_GROUPS` is ignored, nothing is distributed externally or submitted for Beta App Review (owner decision Q12). Plain-text "What to Test" notes are built from the release notes as for Swift.
+- Version: `version.txt` (or the tag's version) reaches `app/app.config.ts` as `KANAF_VERSION`; without it the config keeps `1.0.0`.
+- Build number: read from App Store Connect, not guessed. The lane asks for the newest TestFlight build (any version, and this version) and uses one above it, never below the commit count. The `build_number` input of a manual run overrides it.
+- `app/assets/aviation.sqlite` (not committed) is copied from `efb-212/Resources` before the prebuild, as `app.yml` does.
+
+PR-time proof, no secrets: the `iOS release lane (prebuild + unsigned archive)` job in `app.yml` (macOS, runs when `app/**` or `fastlane/**` change) runs `bundle exec fastlane ios beta_rn unsigned:true`, which does the same prebuild, pod install and Release archive with `CODE_SIGNING_ALLOWED=NO`, then checks the archive's bundle id is `io.omer.efb` and its version is `version.txt`. It uploads nothing and needs no credentials.
+
+Owner steps at cutover (nobody else sets these):
+
+1. Check signing without uploading: Actions, Release, Run workflow with `upload` off (leave `tag` empty). With `TESTFLIGHT_APP` unset this builds the Swift app, so set the variable to `rn` first (and do not merge a release pull request until the check passes). Or locally on the Mac: `bundle exec fastlane ios beta_rn upload:false`. A green run proves the RN app signs with the existing distribution identity and profile.
+2. Set the repository variable `TESTFLIGHT_APP` to `rn`. The next release-please release then uploads the RN app to the internal group. Set it back to `swift` to roll back.
+
+
 The same lane runs on the owner's Mac (`bundle install`, then `bundle exec fastlane ios beta`, `upload:false` to stop after signing); see `dist-prep/TESTFLIGHT.md`.
 
 ## Workflow: `.github/workflows/testflight-crashes.yml`

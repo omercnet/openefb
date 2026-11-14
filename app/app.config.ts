@@ -33,6 +33,11 @@ const withOnlyLocationAudioBackground: ConfigPlugin = (c) =>
 const VARIANT = process.env.KANAF_VARIANT ?? 'production';
 if (VARIANT !== 'production' && VARIANT !== 'dev') throw new Error(`KANAF_VARIANT must be dev or production, got ${VARIANT}`);
 const DEV = VARIANT === 'dev';
+
+// Marketing version. fastlane's RN lane (fastlane/Fastfile, beta_rn) sets KANAF_VERSION from version.txt (release-please)
+// at build time; without it the config keeps 1.0.0, so every other build is unchanged.
+const VERSION = process.env.KANAF_VERSION?.trim() || '1.0.0';
+if (!/^\d+(\.\d+){0,2}$/.test(VERSION)) throw new Error(`KANAF_VERSION must be 1 to 3 integers like 1.2.0, got ${VERSION}`);
 const BUNDLE_ID = DEV ? 'io.omer.efb.dev' : 'io.omer.efb';
 
 // OTA updates (web/ota) are built in only when KANAF_OTA_URL is set; otherwise the app has no update config.
@@ -50,7 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
   name: DEV ? 'Kanaf EFB Dev' : 'Kanaf EFB',
   slug: 'kanaf',
   scheme: DEV ? 'kanaf-dev' : 'kanaf',
-  version: '1.0.0',
+  version: VERSION,
   orientation: 'default',
   userInterfaceStyle: 'automatic',
   icon: './assets/splash-icon.png',

@@ -95,6 +95,25 @@ jobs:
           ref: ${{ steps.target.outputs.ref }}
           fetch-depth: 0 # the build number is the commit count
           persist-credentials: false
+      # Which app ships is the repository variable TESTFLIGHT_APP: unset or "swift" builds the Swift app (the default, so
+      # nothing changes until the owner sets "rn" at cutover); "rn" builds the React Native app in app/ (docs/CI.md).
+      - name: Choose the app
+        id: app
+        env:
+          TESTFLIGHT_APP: ${{ vars.TESTFLIGHT_APP }}
+        run: |
+          case "${TESTFLIGHT_APP:-swift}" in
+            swift) echo "lane=beta" >> "$GITHUB_OUTPUT" ;;
+            rn) echo "lane=beta_rn" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::vars.TESTFLIGHT_APP must be swift or rn, got '$TESTFLIGHT_APP'"; exit 1 ;;
+          esac
+          echo "Building the ${TESTFLIGHT_APP:-swift} app"
+      - uses: actions/setup-node@v7
+        if: steps.app.outputs.lane == 'beta_rn'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: app/package-lock.json
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "4.0"
@@ -111,7 +130,8 @@ jobs:
           TESTFLIGHT_CHANGELOG: ${{ needs.release-please.outputs.body }}
           BUILD_NUMBER: ${{ inputs.build_number }}
           UPLOAD: ${{ steps.target.outputs.upload }}
-        run: bundle exec fastlane ios beta "upload:$UPLOAD"
+          LANE: ${{ steps.app.outputs.lane }}
+        run: bundle exec fastlane ios "$LANE" "upload:$UPLOAD"
       - name: Upload build logs
         if: failure()
         uses: actions/upload-artifact@v7
