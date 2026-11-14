@@ -140,3 +140,12 @@ describe('gestureSuspendsFollow', () => {
     expect(gestureSuspendsFollow(a, { ...a, bearing: Number.NaN }, true)).toBe(false);
   });
 });
+
+describe('zoomTo (the footer ZOOM buttons)', () => {
+  it('animates the zoom only: no centre, the current rotation, follow state untouched', () => {
+    const before = run(initialCameraState(), { type: 'directionChanged', direction: 40 }).state;
+    const { state, command } = run(before, { type: 'zoomTo', level: 12 });
+    expect(command).toEqual({ center: null, zoom: 12, direction: 40, animated: true });
+    expect(state).toBe(before);
+  });
+});

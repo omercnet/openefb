@@ -1,3 +1,4 @@
+import { applyLayersCaptureSeed } from '../../capture/seeds';
 import { StyleSheet } from 'react-native';
 import type { StoreApi } from 'zustand';
 import { callHandler, press, render } from '../../../../tests/support/ui';
@@ -7,6 +8,8 @@ import { regionSlice } from '../../state/region';
 import { Day } from '../../tokens';
 import { LayersColumn } from '../LayersColumn';
 import { layers, type LayersData } from './store';
+
+beforeEach(applyLayersCaptureSeed);
 
 async function renderLayers(patch: Partial<LayersData> = {}, region: Region = 'us') {
   const store = layers.make({ ...layers.store.getState(), ...patch });

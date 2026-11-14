@@ -9,6 +9,7 @@ import { nearest } from '../columns/nearest/store';
 import type { AirportQueries } from '../columns/nearest/sources';
 import { dayFixture } from '../flightLog/fixtures';
 import { flightLog } from '../flightLog/store';
+import { layers } from '../columns/layers/store';
 import { gps } from '../state/gps';
 
 /** The Nearest and Search columns' reference airports, as an in-memory database. */
@@ -30,4 +31,20 @@ export function applyCaptureSeeds(): void {
   });
   gps.store.setState({ status: { kind: 'ok' }, failure: null });
   flightLog.store.setState(dayFixture);
+  applyLayersCaptureSeed();
+}
+
+const LAYERS_NOW = Date.UTC(2026, 10, 12, 0, 35); // 4:35 PM PST, 11 Nov 2026
+
+/** The Layers column reference (reference/ipad-layers.png): its clock, chart cycle and data ages. */
+export function applyLayersCaptureSeed(): void {
+  layers.store.setState({
+    displayMode: 'day',
+    visibleLayers: ['sectional', 'tfrs', 'weatherDots', 'route', 'ownship'],
+    sectionalCycleExpires: Date.UTC(2026, 11, 24, 9, 1),
+    chartExpiration: Date.UTC(2026, 11, 24, 9, 1),
+    tfrFetchedAt: LAYERS_NOW - 20_000,
+    oldestWeatherObservation: LAYERS_NOW - 48 * 60_000,
+    now: LAYERS_NOW,
+  });
 }
