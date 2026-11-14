@@ -5,7 +5,7 @@ import { ancestorProp, press, render, type Rendered } from '../../../tests/suppo
 import { EMPTY_SEARCH, searchSlice } from '../columns/search/search';
 import { appStore } from '../state/appStore';
 import { panels } from '../state/panels';
-import { MapScreen } from './MapScreen';
+import { MapCaptureScreen } from './MapCaptureScreen';
 
 beforeEach(applyCaptureSeeds);
 
@@ -53,7 +53,7 @@ const width = (view: Rendered, testID: string) => StyleSheet.flatten(view.byTest
 const hasBackButton = (view: Awaited<ReturnType<typeof render>>) =>
   view.all((n) => n.props?.testID === 'column-back-to-log').length > 0;
 
-describe('MapScreen', () => {
+describe('MapCaptureScreen', () => {
   // Reset before each test, not after: the helper unmounts the trees after each test, and an update to a mounted tree needs act.
   beforeEach(() => {
     appStore.setState({ stripColumn: 'log', selectedAirportId: null });
@@ -69,20 +69,20 @@ describe('MapScreen', () => {
     ['night', 'log', null],
   ] as const)('the %s route opens the strip with the %s column', async (screen, column, airport) => {
     appStore.setState({ stripColumn: 'search', selectedAirportId: 'KPAO' });
-    await render(<MapScreen screen={screen} />);
+    await render(<MapCaptureScreen screen={screen} />);
     expect(appStore.getState().stripColumn).toBe(column);
     expect(appStore.getState().selectedAirportId).toBe(airport);
   });
 
   it('without a route screen the strip follows the app store as it is', async () => {
     appStore.setState({ stripColumn: 'layers' });
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(appStore.getState().stripColumn).toBe('layers');
     expect(hasBackButton(view)).toBe(true);
   });
 
   it('after seeding, the strip follows the store: the Log back button returns to the flight log', async () => {
-    const view = await render(<MapScreen screen="layers" />);
+    const view = await render(<MapCaptureScreen screen="layers" />);
     expect(hasBackButton(view)).toBe(true);
     await act(async () => appStore.getState().setStripColumn('log'));
     expect(hasBackButton(view)).toBe(false);
@@ -94,13 +94,13 @@ describe('MapScreen', () => {
     const unsubscribe = appStore.subscribe((s) => seen.push(s.stripColumn));
     appStore.setState({ stripColumn: 'log' });
     seen.length = 0;
-    await render(<MapScreen screen="layers" />);
+    await render(<MapCaptureScreen screen="layers" />);
     unsubscribe();
     expect(seen).toEqual(['layers']);
   });
 });
 
-describe('MapScreen layouts (U5)', () => {
+describe('MapCaptureScreen layouts (U5)', () => {
   const panelsDefault = panels.store.getState();
   beforeEach(async () => {
     appStore.setState({ stripColumn: 'log', selectedAirportId: null });
@@ -113,7 +113,7 @@ describe('MapScreen layouts (U5)', () => {
   });
 
   it('a regular window: the 400 pt strip beside the chart, no rail', async () => {
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(has(view, 'compact-map-layout')).toBe(false);
     expect(has(view, 'flight-log-above-now')).toBe(true);
     expect(has(view, 'map-surface')).toBe(true);
@@ -121,7 +121,7 @@ describe('MapScreen layouts (U5)', () => {
 
   it('an iPhone: header, the 104 pt rail beside the chart, NOW and the full-width footer under it', async () => {
     await setWindow(...IPHONE);
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(has(view, 'compact-map-layout')).toBe(true);
     expect(has(view, 'flight-log-above-now')).toBe(false);
     expect(width(view, 'flight-log-rail')).toBe(104);
@@ -136,7 +136,7 @@ describe('MapScreen layouts (U5)', () => {
 
   it('an iPhone in landscape keeps the compact layout (Swift: compact size class), at the rotated width', async () => {
     await setWindow(...IPHONE_LANDSCAPE);
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(has(view, 'compact-map-layout')).toBe(true);
     expect(has(view, 'flight-log-above-now')).toBe(false);
     expect(width(view, 'flight-log-rail')).toBe(104);
@@ -146,7 +146,7 @@ describe('MapScreen layouts (U5)', () => {
 
   it('an iPhone Plus or Max in landscape is a regular size class in UIKit: the strip layout', async () => {
     await setWindow(...IPHONE_MAX_LANDSCAPE);
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(has(view, 'compact-map-layout')).toBe(false);
     expect(has(view, 'flight-log-above-now')).toBe(true);
   });
@@ -154,7 +154,7 @@ describe('MapScreen layouts (U5)', () => {
   it('rotating a phone does not remount the map', async () => {
     await setWindow(...IPHONE);
     mapMounts = 0;
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(mapMounts).toBe(1);
     await setWindow(...IPHONE_LANDSCAPE);
     expect(has(view, 'compact-map-layout')).toBe(true);
@@ -165,7 +165,7 @@ describe('MapScreen layouts (U5)', () => {
 
   it('an iPad in landscape keeps the strip layout', async () => {
     await setWindow(1376, 1032, true);
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(has(view, 'compact-map-layout')).toBe(false);
     expect(has(view, 'flight-log-above-now')).toBe(true);
   });
@@ -173,14 +173,14 @@ describe('MapScreen layouts (U5)', () => {
   it.each(['ios', 'android'] as const)('on %s the compact layout pads for the software keyboard', async (os) => {
     jest.replaceProperty(Platform, 'OS', os);
     await setWindow(...IPHONE);
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(ancestorProp(view.byTestId('NRST'), 'behavior')).toBe('padding');
     jest.restoreAllMocks();
   });
 
   it('the compact footer drops the home-indicator padding while the keyboard covers it', async () => {
     await setWindow(...IPHONE);
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     const nrst = () => StyleSheet.flatten(view.byTestId('NRST').props.style);
     const before = nrst().paddingBottom;
     expect(before).toBeGreaterThan(0);
@@ -191,7 +191,7 @@ describe('MapScreen layouts (U5)', () => {
   });
 
   it('follows a resize across the threshold', async () => {
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(has(view, 'compact-map-layout')).toBe(false);
     await setWindow(...IPHONE);
     expect(has(view, 'compact-map-layout')).toBe(true);
@@ -201,7 +201,7 @@ describe('MapScreen layouts (U5)', () => {
 
   it('an opened column covers the area above NOW; NOW and the footer stay, the covered views leave the a11y tree', async () => {
     await setWindow(...IPHONE);
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     await press(view.byTestId('NRST'));
     expect(appStore.getState().stripColumn).toBe('nearest');
     expect(has(view, 'compact-column')).toBe(true);
@@ -217,7 +217,7 @@ describe('MapScreen layouts (U5)', () => {
 
   it('flight log hidden on a regular window: the compact layout at full width, no rail, the time-to in the header', async () => {
     panels.store.setState({ showsFlightLog: false });
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(has(view, 'compact-map-layout')).toBe(true);
     expect(has(view, 'flight-log-rail')).toBe(false);
     expect(view.text()).toContain('DIRECT KOAK \u00B7 9:12');
@@ -229,7 +229,7 @@ describe('MapScreen layouts (U5)', () => {
   it('instruments hidden: no NOW cell, Clear moves to the header', async () => {
     await setWindow(...IPHONE);
     panels.store.setState({ showsInstruments: false });
-    const view = await render(<MapScreen />);
+    const view = await render(<MapCaptureScreen />);
     expect(has(view, 'flight-log-now')).toBe(false);
     expect(view.byTestId('clear-direct-to').props.accessibilityLabel).toBe('Clear DIRECT KOAK');
   });

@@ -2,7 +2,7 @@ import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, Settings } from 'react-native';
 import { OTA_RELOAD_FILE, readResult } from '../adapters/resultFile';
-import { MapScreen } from '../ui/screens/MapScreen';
+import { LiveAppGate } from '../ui/shell/LiveAppGate';
 
 // CI picks a screen without a deep link where it cannot: on iOS the launch argument `-KanafScreen airport`
 // (NSUserDefaults), because `simctl openurl` with a custom scheme stops at a system confirmation that cannot be
@@ -50,7 +50,7 @@ function launchScreen(): string | null {
   return raw && LAUNCH_SCREENS.includes(raw) ? raw : null;
 }
 
-/** Root route: the map, or the screen requested at launch (also after an Android OTA reload). */
+/** Root route: the live app (the map), or the screen requested at launch (also after an Android OTA reload). */
 export default function Index() {
   const router = useRouter();
   const [screen] = useState(launchScreen);
@@ -62,5 +62,5 @@ export default function Index() {
       .catch(() => null);
   }, [router]);
   if (screen) return <Redirect href={`/${screen}`} />;
-  return <MapScreen />;
+  return <LiveAppGate />;
 }

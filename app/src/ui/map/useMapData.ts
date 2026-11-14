@@ -132,6 +132,7 @@ export function useMapModel(input: MapModelInput) {
     () => dispatch({ type: 'recenter', position: ownship.position, trackDeg: ownship.trackDeg }),
     [dispatch, ownship.position, ownship.trackDeg],
   );
+  const zoomTo = useCallback((level: number) => dispatch({ type: 'zoomTo', level }), [dispatch]);
   const setMode = useCallback(
     (mode: MapMode) => dispatch({ type: 'setMode', mode, position: ownship.position, trackDeg: ownship.trackDeg }),
     [dispatch, ownship.position, ownship.trackDeg],
@@ -157,5 +158,6 @@ export function useMapModel(input: MapModelInput) {
     onStyleLoaded: useCallback(() => void controller.onMapStyleLoaded(), [controller]),
     recenter,
     setMode,
+    zoomTo,
   };
 }

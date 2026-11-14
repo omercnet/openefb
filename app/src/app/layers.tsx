@@ -1,6 +1,6 @@
-import { MapScreen } from '../ui/screens/MapScreen';
+import { MapCaptureScreen } from '../ui/capture/MapCaptureScreen';
 
 /** Route layers: the map with the layers column in the strip. */
 export default function LayersRoute() {
-  return <MapScreen screen="layers" />;
+  return <MapCaptureScreen screen="layers" />;
 }

@@ -56,7 +56,9 @@ export const REFRESH_TICK_MS = 60_000;
 /** Runs `refreshDueData` now and every minute while mounted. `read` returns the live map state and inputs each time. */
 export function useDataRefresh(read: () => { map: RefreshableMap } & Omit<RefreshInput, 'nowMs'>, now: () => number = Date.now): void {
   const readRef = useRef(read);
-  readRef.current = read;
+  useEffect(() => {
+    readRef.current = read;
+  });
   useEffect(() => {
     const scheduler = new DataRefreshScheduler();
     const run = () => {
