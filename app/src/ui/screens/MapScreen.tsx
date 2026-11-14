@@ -9,6 +9,9 @@ import { footer } from '../flightLog/footerStore';
 import { MapLayout } from '../map/MapLayout';
 import { navigationRoute } from '../map/navigationRoute';
 import { useIsraelChart } from '../map/useIsraelChart';
+import { offlineStatusFor } from '../map/offlineStatus';
+import { useOfflineMaps } from '../map/useOfflineMaps';
+import type { OfflineRegionBounds } from '../../domain/offline/bounds';
 import { useDataRefresh } from '../map/refreshDue';
 import { useMapController, useMapModel } from '../map/useMapData';
 import { useAppStore } from '../state/appStore';
@@ -112,9 +115,21 @@ export function MapScreen() {
     footerStore.setState({ following: model.isFollowing });
   }, [footerStore, model.isFollowing]);
   const { onViewChange } = model;
+  const [bounds, setBounds] = useState<OfflineRegionBounds | null>(null);
+  const offline = useOfflineMaps(runtime.offline);
+  const sectionalOn = model.snapshot.visibleLayers.has('sectional');
+  useEffect(() => {
+    layersStore.setState({ offlineStatus: offlineStatusFor(runtime.offline, bounds, sectionalOn, Date.now()) });
+  }, [layersStore, runtime.offline, bounds, sectionalOn, offline]);
   const trackedViewChange = useCallback(
     (change: Parameters<typeof onViewChange>[0]) => {
       footerStore.setState({ zoom: change.zoom });
+      setBounds({
+        south: change.southWest.lat,
+        west: change.southWest.lon,
+        north: change.northEast.lat,
+        east: change.northEast.lon,
+      });
       onViewChange(change);
     },
     [footerStore, onViewChange],

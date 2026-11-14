@@ -42,6 +42,8 @@ jest.mock('../map/mapStatus', () => ({ getCurrentMapStatus: () => null }));
 
 const KPAO = FIXTURE_AIRPORTS.find((a) => a.icao === 'KPAO')!;
 
+const offlineSnapshot = { packs: [], storageUsedBytes: 0, lastError: null };
+
 function fakeRuntime(over: { aviation?: Partial<AppRuntime['started']['aviation'] & object> | null } = {}) {
   const queries = { nearestAirports: jest.fn(async () => [KPAO] as never[]), searchAirports: jest.fn(async () => []) };
   const db = {
@@ -66,6 +68,12 @@ function fakeRuntime(over: { aviation?: Partial<AppRuntime['started']['aviation'
     weather: { fetchWeatherForStations: async () => [] },
     tfr: { currentTFRs: async () => ({ tfrs: [], fetchedAt: Date.now() }) },
     advisories: { currentAdvisories: async () => ({ advisories: [], fetchedAt: Date.now() }) },
+    offline: {
+      status: () => 'notDownloaded',
+      subscribe: () => () => undefined,
+      getSnapshot: () => offlineSnapshot,
+      refresh: async () => undefined,
+    },
     layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7 },
     location,
     network,

@@ -4,6 +4,9 @@
 import Constants from 'expo-constants';
 import { createLocationSource } from '../../adapters/location';
 import { createNetworkStatusSource, type NetworkStatusSource } from '../../adapters/network';
+import baseStyle from '../../../assets/base-style.json';
+import { createMapLibreOfflineEngine } from '../../adapters/maplibreOffline';
+import { OfflineMapService } from '../../domain/offline/offlineMapService';
 import { openAviationDatabase, openIsraelDatabase } from '../../adapters/aviationDb';
 import { fileTextStorage } from '../../adapters/fileTextStorage';
 import { openExpoSqliteDb } from '../../adapters/expoSqliteDb';
@@ -26,6 +29,7 @@ export interface AppRuntime {
   weather: WeatherService;
   tfr: TfrService;
   israelNotam: IsraelNotamService;
+  offline: OfflineMapService;
   advisories: AirSigmetService;
   layerSettings: LayerSettings;
   location: LocationSource;
@@ -57,6 +61,10 @@ export async function startRuntime(): Promise<AppRuntime> {
     layerSettings,
     weather: new WeatherService({ fetch: fetchLike, log }),
     tfr: new TfrService({ fetch: fetchLike, log }),
+    offline: new OfflineMapService({
+      engine: createMapLibreOfflineEngine(),
+      baseStyle: () => baseStyle,
+    }),
     israelNotam: new IsraelNotamService({ fetch: fetchLike, storage: fileTextStorage, log }),
     advisories: new AirSigmetService({ fetch: fetchLike, log }),
     location: createLocationSource(),
