@@ -16,6 +16,11 @@ on:
         description: Upload to TestFlight (off = archive and sign only)
         type: boolean
         default: true
+      app:
+        description: App to build; "variable" uses the TESTFLIGHT_APP repository variable, then swift (manual runs only)
+        type: choice
+        options: [variable, swift, rn]
+        default: variable
       build_number:
         description: Build number (default = commit count; use a higher one to retry after Apple accepted an upload)
         type: string
@@ -97,10 +102,11 @@ jobs:
           persist-credentials: false
       # Which app ships is the repository variable TESTFLIGHT_APP: unset or "swift" builds the Swift app (the default, so
       # nothing changes until the owner sets "rn" at cutover); "rn" builds the React Native app in app/ (docs/CI.md).
+      # A manual run's `app` input overrides the variable for that run only; push runs read only the variable.
       - name: Choose the app
         id: app
         env:
-          TESTFLIGHT_APP: ${{ vars.TESTFLIGHT_APP }}
+          TESTFLIGHT_APP: ${{ (github.event_name == 'workflow_dispatch' && inputs.app != 'variable' && inputs.app) || vars.TESTFLIGHT_APP }}
         run: |
           case "${TESTFLIGHT_APP:-swift}" in
             swift) echo "lane=beta" >> "$GITHUB_OUTPUT" ;;

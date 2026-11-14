@@ -43,7 +43,7 @@ Repository variable `TESTFLIGHT_GROUPS` (comma-separated, now `Public Beta`, the
 
 ### Choosing the app: Swift or React Native (R1)
 
-Repository variable `TESTFLIGHT_APP` picks what the TestFlight job builds. Unset or `swift` (the default) runs `fastlane ios beta` on the Swift app, exactly as before. `rn` runs `fastlane ios beta_rn`: `expo prebuild -p ios` on `app/` (production variant, bundle id `io.omer.efb`, the same App Store Connect key, certificate and provisioning profile), then a signed Release archive and an upload to TestFlight. Any other value fails the job. Merging the lane changes nothing until the owner sets the variable.
+Repository variable `TESTFLIGHT_APP` picks what the TestFlight job builds (a manual run's `app` input overrides it for that run only; push runs read only the variable). Unset or `swift` (the default) runs `fastlane ios beta` on the Swift app, exactly as before. `rn` runs `fastlane ios beta_rn`: `expo prebuild -p ios` on `app/` (production variant, bundle id `io.omer.efb`, the same App Store Connect key, certificate and provisioning profile), then a signed Release archive and an upload to TestFlight. Any other value fails the job. Merging the lane changes nothing until the owner sets the variable.
 
 What the RN lane does differently:
 
@@ -56,8 +56,8 @@ PR-time proof, no secrets: the `iOS release lane (prebuild + unsigned archive)` 
 
 Owner steps at cutover (nobody else sets these):
 
-1. Check signing without uploading: Actions, Release, Run workflow with `upload` off (leave `tag` empty). With `TESTFLIGHT_APP` unset this builds the Swift app, so set the variable to `rn` first (and do not merge a release pull request until the check passes). Or locally on the Mac: `bundle exec fastlane ios beta_rn upload:false`. A green run proves the RN app signs with the existing distribution identity and profile.
-2. Set the repository variable `TESTFLIGHT_APP` to `rn`. The next release-please release then uploads the RN app to the internal group. Set it back to `swift` to roll back.
+1. Check signing without uploading: Actions, Release, Run workflow with `app` = `rn` (the default `variable` reads `TESTFLIGHT_APP`), `upload` off and `tag` empty (or locally on the Mac: `bundle exec fastlane ios beta_rn upload:false`). The `app` input overrides the variable for that manual run only, so the variable stays unset and no release can pick the RN app meanwhile. A green run proves the RN app signs with the existing distribution identity and profile.
+2. At cutover, set the repository variable `TESTFLIGHT_APP` to `rn`. The next release-please release then uploads the RN app to the internal group. Set it back to `swift` to roll back.
 
 
 The same lane runs on the owner's Mac (`bundle install`, then `bundle exec fastlane ios beta`, `upload:false` to stop after signing); see `dist-prep/TESTFLIGHT.md`.
