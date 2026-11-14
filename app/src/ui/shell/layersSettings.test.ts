@@ -27,21 +27,19 @@ describe('layer settings', () => {
     expect(await loadLayerSettings(await freshDb(), memoryStorage())).toEqual(DEFAULT_LAYER_SETTINGS);
   });
 
-  it('reads the saved orientation, opacity and display mode', async () => {
+  it('reads only the saved display mode: orientation and opacity are not restored (Swift keeps them in memory)', async () => {
     const db = await freshDb();
     await settingsRepository(db).update({ defaultMapMode: 'trackUp', sectionalOpacity: 0.4 });
     const loaded = await loadLayerSettings(db, memoryStorage({ 'Preferences/displayMode': 'night' }));
-    expect(loaded).toEqual({ displayMode: 'night', mapMode: 'trackUp', sectionalOpacity: 0.4 });
+    expect(loaded).toEqual({ displayMode: 'night', mapMode: 'northUp', sectionalOpacity: 0.7 });
   });
 
-  it('ignores values it does not know', async () => {
-    const db = await freshDb();
-    await settingsRepository(db).update({ defaultMapMode: 'sideways', sectionalOpacity: 7 });
-    const loaded = await loadLayerSettings(db, memoryStorage({ 'Preferences/displayMode': 'dusk' }));
+  it('ignores a display mode it does not know', async () => {
+    const loaded = await loadLayerSettings(await freshDb(), memoryStorage({ 'Preferences/displayMode': 'dusk' }));
     expect(loaded).toEqual(DEFAULT_LAYER_SETTINGS);
   });
 
-  it('writes a change of each value back, and only the changes', async () => {
+  it('writes a change of the display mode back, and never the settings row', async () => {
     const db = await freshDb();
     const storage = memoryStorage();
     const store = layers.make();
@@ -50,8 +48,7 @@ describe('layer settings', () => {
     store.setState({ mapMode: 'trackUp', sectionalOpacity: 0.5 });
     await settle();
     expect(storage.data['Preferences/displayMode']).toBe('night');
-    const row = await settingsRepository(db).get();
-    expect(row).toMatchObject({ defaultMapMode: 'trackUp', sectionalOpacity: 0.5 });
+    expect(await settingsRepository(db).get()).toBeNull();
     stop();
     store.setState({ displayMode: 'day' });
     await settle();
