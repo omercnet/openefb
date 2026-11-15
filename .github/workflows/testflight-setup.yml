@@ -1,0 +1,88 @@
+name: TestFlight setup
+
+# Manual look at, and setup of, the app's TestFlight beta groups with the App Store Connect API key (`fastlane ios
+# testflight_setup`, fastlane/testflight_setup.rb). It lists groups and builds, or makes sure an INTERNAL group exists with
+# automatic distribution and the team's testers. It never uploads, never touches an external group, never submits for Beta
+# App Review, never deletes and never changes a build. Emails are masked in the log. See docs/CI.md.
+#
+# The pull request job only checks the lane's logic against fakes (no key, no environment); the real run is the manual one.
+on:
+  pull_request:
+    paths:
+      - fastlane/**
+      - Gemfile
+      - Gemfile.lock
+      - .github/workflows/testflight-setup.yml
+  workflow_dispatch:
+    inputs:
+      action:
+        description: status = list groups and builds; ensure-internal-group = create or fix the internal group
+        type: choice
+        options: [status, ensure-internal-group]
+        default: status
+      group:
+        description: Internal group name (ensure-internal-group)
+        type: string
+        default: RN beta
+
+concurrency:
+  group: testflight-setup-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check the setup lane (fakes, no key)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+      - name: Syntax
+        run: ruby -c fastlane/Fastfile && ruby -c fastlane/testflight_setup.rb
+      - name: Logic against fake groups, testers and builds
+        run: ruby fastlane/test/testflight_setup_test.rb
+      - name: The Spaceship calls the adapter makes exist in the locked fastlane
+        run: bundle exec ruby fastlane/test/spaceship_names_check.rb
+      - name: The lane refuses an unknown action before it needs a key
+        run: |
+          if out=$(bundle exec fastlane ios testflight_setup action:bogus 2>&1); then echo "$out"; exit 1; fi
+          echo "$out" | grep -q "action must be one of status, ensure-internal-group"
+        env:
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_OPT_OUT_USAGE: '1'
+
+  setup:
+    name: TestFlight setup (${{ inputs.action }})
+    # Only from main: a run from another branch would hand the App Store Connect key to unreviewed Fastlane code.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest # Spaceship needs no Xcode; use macos-26 if this ever fails on Linux
+    timeout-minutes: 20
+    environment: testflight
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '4.0'
+          bundler-cache: true
+      - name: Run
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ACTION: ${{ inputs.action }}
+          GROUP: ${{ inputs.group }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_OPT_OUT_USAGE: '1'
+        run: bundle exec fastlane ios testflight_setup "action:$ACTION" "group:$GROUP"

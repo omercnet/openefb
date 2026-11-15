@@ -85,6 +85,20 @@ web/charts/publish.sh --product us-diagrams --edition <cycle> "${packs[@]}" --ma
 
 The app shows the cycle on the map badge and in settings, so a stale pack is visible. The FAA diagrams are US government works; no permission is needed.
 
+## Workflow: `.github/workflows/testflight-setup.yml`
+
+Looks at, and sets up, the TestFlight beta groups of `io.omer.efb` with the App Store Connect API key (`fastlane ios testflight_setup`, on `ubuntu-latest`: Spaceship needs no Xcode). It never uploads, touches an external group, submits for Beta App Review, deletes anything or changes a build, and masks emails (`a***@example.com`) everywhere it prints.
+
+Prerequisites: the `testflight` environment holds `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8` (the same as the release lane, see above). The run step only runs from `main`, so unreviewed Fastlane code never sees the key.
+
+1. Open Actions, "TestFlight setup", Run workflow, branch `main`.
+2. To look first: leave `action` = `status` and run it. It prints every beta group (name, internal or external, automatic distribution, tester count, `200+` for a bigger group; the people of internal groups, masked) and the newest builds with their groups.
+3. To set up the internal group: choose `action` = `ensure-internal-group` and `group` (default `RN beta`, 1 to 64 printable characters), then run it. It creates the internal group or turns on automatic distribution, then adds every tester who is in another internal group.
+4. Read the log. "Added ..." lines are testers added; "Skipped ..." lines are people the API turned down (for example, not an App Store Connect user) with the reason: fix them in App Store Connect and run again. Running again is safe: with nothing left to do it prints "Nothing to change."
+5. If the run fails, it stops with the cause: an `action` or `group` that is not valid, an external group that already has that name (rename it or pick another name), or an API error (key, network, rate limit; the lane does not report those as skipped testers). Nothing is half-reported as done; run again after fixing.
+
+Pull requests that change `fastlane/**` run only a check job with no key: Ruby syntax, the lane's decisions against fake groups, testers and builds (`fastlane/test/testflight_setup_test.rb`), and `fastlane/test/spaceship_names_check.rb`, which checks that the Spaceship calls it uses exist in the locked fastlane.
+
 ## Workflow: `.github/workflows/testflight-crashes.yml`
 
 Manual. Fetches the newest TestFlight crash submissions of the app (`GET /v1/apps/6829641724/betaFeedbackCrashSubmissions`, then each `crashLog`) with the `testflight` environment's App Store Connect key. The repository and its artifacts are public and a crash log carries tester and device details, so the job prints only counts and uploads a one-day artifact encrypted (CMS, AES-256) to a certificate you pass in. `tools/testflight-crashes.sh [limit]` does all of it from a shell: creates a key and certificate in `~/.config/kanaf` once, dispatches the workflow on `main`, waits, downloads and decrypts into `build/testflight-crashes/` (`<id>.crash` plus `<id>.json` with the tester's comment, device and build). The same fetch runs on a Mac with `tools/testflight-crashes.py` when the key is in `~/.appstoreconnect/`.

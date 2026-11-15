@@ -20,6 +20,7 @@ require "base64"
 require "fileutils"
 require "shellwords"
 require "tmpdir"
+require_relative "testflight_setup"
 
 default_platform(:ios)
 skip_docs
@@ -188,6 +189,34 @@ def rn_prebuild(version, build)
 end
 
 platform :ios do
+  desc "TestFlight setup (manual workflow): action:status lists beta groups and builds; action:ensure-internal-group makes sure an internal group (group:) has automatic distribution and the team's testers. No uploads, no external groups, no deletes."
+  lane :testflight_setup do |options|
+    begin
+      action, group = TestflightSetup.validate_inputs(options[:action] || "status", options[:group])
+    rescue TestflightSetup::InvalidInput => e
+      UI.user_error!(e.message)
+    end
+
+    begin
+      TestflightSetup.guarded do
+        TestflightSetup.step("setting up the App Store Connect API key") { asc_api_key } # sets the Spaceship token
+        app = TestflightSetup.step("looking up the app") do
+          Spaceship::ConnectAPI::App.find(BUNDLE_ID) || raise("No App Store Connect app for #{BUNDLE_ID}")
+        end
+        api = TestflightSetup::ConnectApi.new
+        if action == "status"
+          TestflightSetup.status_lines(api, app).each { |line| UI.message(line) }
+        else
+          result = TestflightSetup.ensure_internal_group(api, app, group)
+          result[:lines].each { |line| UI.message(line) }
+          UI.success("Done: #{result[:added].size} added, #{result[:skipped].size} skipped")
+        end
+      end
+    rescue TestflightSetup::Refused, TestflightSetup::RunFailed => e
+      UI.user_error!(e.message)
+    end
+  end
+
   desc "Archive a Release build and upload it to TestFlight (upload:false stops after signing)"
   lane :beta do |options|
     api_key = asc_api_key
