@@ -64,7 +64,7 @@ jobs:
           if [ -n "$CYCLE" ] && ! [[ "$CYCLE" =~ ^[0-9]{4}$ ]]; then echo "::error::cycle must be four digits (YYNN)"; exit 1; fi
           args=(--cache "$WORK/cache" --report "$WORK/report.md" --json "$WORK/results.json" --pack "$WORK/pack")
           [ -n "$CYCLE" ] && args+=(--cycle "$CYCLE")
-          if [ "$EVENT" = pull_request ]; then args+=(--only "$SAMPLE")
+          if [ "$EVENT" = pull_request ]; then args+=(--only "$SAMPLE" --render "$WORK/render")
           elif [ -n "$AIRPORTS" ]; then args+=(--only "$AIRPORTS"); fi
           mkdir -p "$WORK"
           tools/apd-georef/apd-georef "${args[@]}" 2>&1 | tee "$WORK/build.log"
@@ -83,6 +83,26 @@ jobs:
             echo "- airports: $airports, size: ${bytes} KiB"
             echo "- per airport: $((bytes / airports)) KiB; about $((bytes * 820 / airports / 1024)) MiB for the 820 airports the 2611 cycle placed"
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Sample images, the FAA diagram next to what the pack draws (pull requests)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          mkdir -p "$WORK/images"
+          # <ICAO>-<pdf>.png from --render: the pack's image on white with the database runway ends (red) and ARP (blue).
+          cp "$WORK/render"/*.png "$WORK/images/"
+          # The FAA sheet itself, first page, for comparison.
+          for pdf in "$WORK"/cache/*/*.PDF "$WORK"/cache/*/*.pdf; do
+            [ -f "$pdf" ] || continue
+            sips -s format png "$pdf" --out "$WORK/images/faa-$(basename "${pdf%.*}").png" >/dev/null
+          done
+          ls -l "$WORK/images"
+      - name: Upload the sample images
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: us-diagrams-sample-images
+          path: ${{ runner.temp }}/us-diagrams/images
+          retention-days: 14
       - name: Upload the pack artifact
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
