@@ -1,0 +1,25 @@
+name: Release selection
+
+# The table of cases of "what does the TestFlight job build" (tools/ci/resolve-testflight-target.sh): push, dispatch, app, tag,
+# upload. No secrets, nothing is built or uploaded. Runs only when the script, its test or release.yml change.
+on:
+  pull_request:
+    paths:
+      - tools/ci/resolve-testflight-target.sh
+      - tools/ci/resolve-testflight-target.test.sh
+      - .github/workflows/release.yml
+      - .github/workflows/release-selection.yml
+
+permissions:
+  contents: read
+
+jobs:
+  table:
+    name: Selection table
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - run: tools/ci/resolve-testflight-target.test.sh
