@@ -2,11 +2,11 @@
 // clipped it to "Fee" when it rendered before they loaded).
 import { useFonts } from 'expo-font';
 import { Platform } from 'react-native';
-import { press, render } from '../../../../tests/support/ui';
+import { press, render } from '../../../tests/support/ui';
 import { BriefingOverMap } from './BriefingOverMap';
 
 jest.mock('expo-font', () => ({ ...jest.requireActual('expo-font'), useFonts: jest.fn(() => [true, null]) }));
-jest.mock('../../capture/MapCaptureScreen', () => ({ MapCaptureScreen: () => null }));
+jest.mock('./MapCaptureScreen', () => ({ MapCaptureScreen: () => null }));
 jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,

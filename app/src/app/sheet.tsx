@@ -1,3 +1,3 @@
-import { SheetScreen } from '../ui/screens/SheetScreen';
+import { SheetScreen } from '../ui/capture/SheetScreen';
 
 export default SheetScreen;

@@ -6,12 +6,12 @@
 import { useFonts } from 'expo-font';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
-import { MapCaptureScreen } from '../../capture/MapCaptureScreen';
-import { FontFiles } from '../../tokens';
-import { BriefingPresentation } from './BriefingPresentation';
-import { FIXTURE_NOW, MemoryNotamReadStore, captureBriefingData, fixtureReport } from './fixture';
-import { IsraelBriefingSheet } from './IsraelBriefingSheet';
-import { IsraelBriefingViewModel, briefing, noBriefingActions } from './store';
+import { MapCaptureScreen } from './MapCaptureScreen';
+import { FontFiles } from '../tokens';
+import { BriefingPresentation } from '../sheets/briefing/BriefingPresentation';
+import { FIXTURE_NOW, MemoryNotamReadStore, captureBriefingData, fixtureReport } from '../sheets/briefing/fixture';
+import { IsraelBriefingSheet } from '../sheets/briefing/IsraelBriefingSheet';
+import { IsraelBriefingViewModel, briefing, noBriefingActions } from '../sheets/briefing/store';
 
 const HIDDEN_FROM_ASSISTIVE_TECH = {
   importantForAccessibility: 'no-hide-descendants',
