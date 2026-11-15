@@ -65,8 +65,8 @@ function setup(
     {
       product: 'us-diagrams',
       edition: '2611',
-      editionLabel: 'd-TPP cycle 2611 (12 NOV 2026)',
-      aipDate: '2026-11-12',
+      editionLabel: 'd-TPP cycle 2611 (29 OCT 2026)',
+      aipDate: '2026-10-29',
       accuracyFeet: 50,
       aerodromes: { KPAO: rec('KPAO'), KSFO: rec('KSFO'), KBOS: rec('KBOS') },
     },

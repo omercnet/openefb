@@ -11,6 +11,12 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 // Untrusted values in a message: their type and at most 24 characters, so a crafted pack cannot flood the log.
 const brief = (v) => (typeof v === 'string' ? `${JSON.stringify(v.slice(0, 24))}${v.length > 24 ? ` (${v.length} chars)` : ''}` : typeof v);
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+// d-TPP cycle 2001 began 2020-01-02 0901Z and every cycle is 28 days (PackWriter.swift cycleEffectiveDate).
+function cycleDate(cycle) {
+  const first = Math.ceil((Date.UTC(2000 + Number(cycle.slice(0, 2)), 0, 1) - Date.UTC(2020, 0, 2, 9, 1)) / (28 * 86400000));
+  return new Date(Date.UTC(2020, 0, 2, 9, 1) + (first + Number(cycle.slice(2)) - 1) * 28 * 86400000);
+}
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 const rect = (v) => isObj(v) && ['x', 'y', 'width', 'height'].every((k) => num(v[k]));
@@ -70,8 +76,14 @@ export function checkPack(dir, { min = 1 } = {}) {
 
   if (index.product !== 'us-diagrams') errors.push(`index.product is ${brief(index.product)}`);
   if (typeof index.edition !== 'string' || !/^\d{2}(0[1-9]|1[0-4])$/.test(index.edition)) errors.push(`index.edition ${brief(index.edition)} is not a d-TPP cycle (YYNN, NN from 01 to 14)`);
-  // The label is exactly what PackWriter writes, "d-TPP cycle 2611 (12 NOV 2026)": a prefix match would pass 26110.
-  if (typeof index.edition === 'string' && /^\d{4}$/.test(index.edition) && typeof index.editionLabel === 'string' && !new RegExp(`^d-TPP cycle ${index.edition} \\(\\d{2} [A-Z]{3} \\d{4}\\)$`).test(index.editionLabel)) errors.push(`index.editionLabel ${brief(index.editionLabel)} is not "d-TPP cycle ${index.edition} (DD MMM YYYY)"`);
+  // aipDate and the label are what PackWriter derives from the cycle: the cycle's effective date, "d-TPP cycle 2611 (29 OCT 2026)".
+  if (typeof index.edition === 'string' && /^\d{2}(0[1-9]|1[0-4])$/.test(index.edition)) {
+    const effective = cycleDate(index.edition);
+    const day = effective.toISOString().slice(0, 10);
+    if (index.aipDate !== day) errors.push(`index.aipDate ${brief(index.aipDate)} is not the effective date ${day} of cycle ${index.edition}`);
+    const label = `d-TPP cycle ${index.edition} (${String(effective.getUTCDate()).padStart(2, '0')} ${MONTHS[effective.getUTCMonth()]} ${effective.getUTCFullYear()})`;
+    if (index.editionLabel !== label) errors.push(`index.editionLabel ${brief(index.editionLabel)} is not "${label}"`);
+  }
   for (const k of ['editionLabel', 'aipDate']) if (typeof index[k] !== 'string' || !index[k]) errors.push(`index.${k} missing`);
   if (typeof index.aipDate === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(index.aipDate)) errors.push('index.aipDate is not yyyy-MM-dd');
   if (!Number.isInteger(index.accuracyFeet)) errors.push('index.accuracyFeet is not an integer');

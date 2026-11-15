@@ -20,7 +20,7 @@ function pack(mutate = () => {}) {
   made.push(dir);
   const files = { 'KPAO.png': png, 'KPAO.json': Buffer.from(JSON.stringify(geo)) };
   const index = {
-    product: 'us-diagrams', edition: '2611', editionLabel: 'd-TPP cycle 2611 (12 NOV 2026)', aipDate: '2026-11-12', accuracyFeet: 50,
+    product: 'us-diagrams', edition: '2611', editionLabel: 'd-TPP cycle 2611 (29 OCT 2026)', aipDate: '2026-10-29', accuracyFeet: 50,
     aerodromes: { KPAO: { chart: 'KPAO.PDF', language: 'en', scale: 'as charted', georeferenced: true, reason: 'accepted', sheet: '', image: 'KPAO.png', georeference: 'KPAO.json' } },
   };
   files['index.json'] = Buffer.from(JSON.stringify(index));
@@ -141,14 +141,25 @@ test('a non-string edition object reports errors instead of crashing the checker
 });
 
 test('an edition label that does not name exactly the edition is rejected', () => {
-  for (const label of ['d-TPP cycle 26110 (12 NOV 2026)', 'd-TPP cycle 2611 (12 NOV 2026) extra', 'd-TPP cycle 2610 (12 NOV 2026)', 'FAA cycle 2611']) {
+  for (const label of ['d-TPP cycle 26110 (29 OCT 2026)', 'd-TPP cycle 2611 (29 OCT 2026) extra', 'd-TPP cycle 2611 (00 JAN 2026)', 'd-TPP cycle 2611 (99 XYZ 2026)', 'd-TPP cycle 2611 (12 ABC 0000)', 'd-TPP cycle 2611 (12 NOV 2026)', 'd-TPP cycle 2610 (29 OCT 2026)', 'FAA cycle 2611']) {
     const dir = pack(({ files, index, manifest }) => {
       index.editionLabel = label;
       files['index.json'] = Buffer.from(JSON.stringify(index));
       manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
     });
     const errors = checkPack(dir).errors;
-    assert.ok(errors.some((e) => /index.editionLabel .* is not "d-TPP cycle 2611/.test(e)), label);
+    assert.ok(errors.some((e) => /index.editionLabel .* is not "d-TPP cycle 2611 \(29 OCT 2026\)"/.test(e)), label);
     assert.ok(!errors.some((e) => /index.edition /.test(e)), 'the edition itself is valid');
+  }
+});
+
+test('an aipDate that is not the cycle\'s effective date is rejected', () => {
+  for (const aipDate of ['2026-11-12', '2026-02-30', 'soon']) {
+    const dir = pack(({ files, index, manifest }) => {
+      index.aipDate = aipDate;
+      files['index.json'] = Buffer.from(JSON.stringify(index));
+      manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+    });
+    assert.ok(checkPack(dir).errors.some((e) => /index.aipDate .* is not the effective date 2026-10-29 of cycle 2611/.test(e)), aipDate);
   }
 });

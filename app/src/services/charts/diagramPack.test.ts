@@ -157,14 +157,14 @@ test('The US pack badge names the FAA, the cycle and the accuracy, not CAAI', ()
     {
       product: 'us-diagrams',
       edition: '2611',
-      editionLabel: 'd-TPP cycle 2611 (12 NOV 2026)',
-      aipDate: '2026-11-12',
+      editionLabel: 'd-TPP cycle 2611 (29 OCT 2026)',
+      aipDate: '2026-10-29',
       accuracyFeet: 50,
       aerodromes: {},
     },
     () => null,
   );
-  expect(us.badgeText).toBe('FAA airport diagrams d-TPP cycle 2611 (12 NOV 2026) \u00b150 ft');
+  expect(us.badgeText).toBe('FAA airport diagrams d-TPP cycle 2611 (29 OCT 2026) \u00b150 ft');
 });
 
 test('The badge shows the edition and the accuracy the diagrams were gated to', () => {
@@ -291,8 +291,8 @@ function installedUs(indexProduct: string, edition = '2611') {
       JSON.stringify({
         product: indexProduct,
         edition,
-        editionLabel: 'd-TPP cycle 2611 (12 NOV 2026)',
-        aipDate: '2026-11-12',
+        editionLabel: 'd-TPP cycle 2611 (29 OCT 2026)',
+        aipDate: '2026-10-29',
         accuracyFeet: 50,
         aerodromes: {
           KPAO: { ...record('KPAO', true), sheet: '' },

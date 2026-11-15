@@ -370,8 +370,8 @@ test('diagram store: the US pack downloads on request and keeps its own served e
     JSON.stringify({
       product: 'us-diagrams',
       edition: '2611',
-      editionLabel: 'd-TPP cycle 2611 (12 NOV 2026)',
-      aipDate: '2026-11-12',
+      editionLabel: 'd-TPP cycle 2611 (29 OCT 2026)',
+      aipDate: '2026-10-29',
       accuracyFeet: 50,
       aerodromes: {},
     }),
@@ -387,7 +387,7 @@ test('diagram store: the US pack downloads on request and keeps its own served e
   await settle(store);
   expect(storage.files.get(diagramServedEditionKey('us-diagrams'))).toBe('2611');
   expect(storage.files.get(DIAGRAM_SERVED_EDITION_KEY)).toBe('2026-08');
-  expect(store.pack?.badgeText).toBe('FAA airport diagrams d-TPP cycle 2611 (12 NOV 2026) \u00b150 ft');
+  expect(store.pack?.badgeText).toBe('FAA airport diagrams d-TPP cycle 2611 (29 OCT 2026) \u00b150 ft');
 });
 
 test('diagram store: the served-edition keys of the two packs differ, the Israel one is unchanged', () => {
