@@ -48,3 +48,14 @@ describe('app.config build number', () => {
     expect(() => load({ KANAF_BUILD_NUMBER: '8.1.2' })).toThrow(/KANAF_BUILD_NUMBER/);
   });
 });
+
+describe('app.config purpose strings', () => {
+  it('has a photo library purpose string (a linked Photos API without one is rejected by Apple, ITMS-90683)', () => {
+    const config = load({}) as { ios?: { infoPlist?: Record<string, unknown> } };
+    const text = config.ios?.infoPlist?.NSPhotoLibraryUsageDescription;
+    expect(typeof text).toBe('string');
+    expect((text as string).length).toBeGreaterThan(40);
+    // Apple's review also reads it: it must say what is true, never claim the app does not access the library at all.
+    expect(text).not.toMatch(/^Kanaf does not access your photo library\.?$/);
+  });
+});

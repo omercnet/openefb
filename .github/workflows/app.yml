@@ -19,6 +19,7 @@ on:
       - Gemfile
       - Gemfile.lock
       - version.txt
+      - tools/ci/check_purpose_strings.py
       - .github/workflows/app.yml
   workflow_dispatch:
 
@@ -208,6 +209,18 @@ jobs:
           BUILD=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP/Info.plist")
           echo "build $BUILD"
           test "$BUILD" = "$(git rev-list --count HEAD)" # the lane's build number reaches the Info.plist
+      - name: Check the purpose strings and that no development client is in the archive
+        # Apple rejects a binary that uses a privacy-sensitive API without its Info.plist purpose string (ITMS-90683) while
+        # processing it, after the upload succeeded. Lists the frameworks the app links, then checks every sensitive class the
+        # code uses (Photos, Camera, Contacts, Location, Microphone, Speech, Bluetooth, Motion) against Info.plist, and that
+        # a production build carries no Dev Launcher (tools/ci/check_purpose_strings.py).
+        working-directory: .
+        run: |
+          APP=$(find build/release/rn/KanafEFB.xcarchive/Products/Applications -maxdepth 1 -name '*.app' | head -1)
+          test -n "$APP"
+          echo "--- linked frameworks"
+          otool -L "$APP/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP/Info.plist")" | awk '/\.framework/ {print $1}' | sort -u
+          python3 tools/ci/check_purpose_strings.py "$APP" --production
 
   android:
     name: Android (Pixel Tablet API 35 emulator, Release)

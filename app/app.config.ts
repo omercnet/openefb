@@ -20,6 +20,14 @@ const LOCATION_WHEN_IN_USE =
 const LOCATION_ALWAYS_AND_WHEN_IN_USE =
   'Kanaf uses your location in the background to continue tracking your flight when the screen is off.';
 
+// Photos: the app has no photo feature, but two bundled native libraries link the Photos framework and apple rejects such a binary
+// ("90683 Missing purpose string", build 158 of the 2026-11-15 preview) unless Info.plist says why: expo-file-system's legacy
+// module (PHPhotoLibrary.authorizationStatus, for `ph://` copies) and react-native-blob-util (PHAsset, a peer dependency of
+// react-native-pdf). Neither can be dropped without patching third-party native code. The text says only what is true: nothing
+// browses the library, and a photo is read only if the pilot hands one to the app (no screen offers it today).
+const PHOTO_LIBRARY =
+  'Kanaf does not browse your photo library. Its file handling can read a photo or video only when you choose to hand one to the app.';
+
 // expo-task-manager adds UIBackgroundModes "fetch"; the SwiftUI app declares only location and audio.
 const withOnlyLocationAudioBackground: ConfigPlugin = (c) =>
   withInfoPlist(c, (mod) => {
@@ -70,7 +78,7 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
     supportsTablet: true,
     // MapLibre Native needs iOS 15.5+; Expo SDK 58 modules (expo-sqlite podspec) already require 16.4.
     deploymentTarget: '16.4',
-    infoPlist: { ITSAppUsesNonExemptEncryption: false },
+    infoPlist: { ITSAppUsesNonExemptEncryption: false, NSPhotoLibraryUsageDescription: PHOTO_LIBRARY },
   },
   android: {
     package: BUNDLE_ID,
