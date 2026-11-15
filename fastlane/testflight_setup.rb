@@ -118,10 +118,22 @@ module TestflightSetup
       ).to_models
     end
 
+    # Every processing state, named: a build that is still PROCESSING, or that Apple turned down (FAILED, INVALID), is exactly
+    # what status must show (Spaceship's own Build.all asks for the same four).
+    BUILD_STATES = "PROCESSING,FAILED,INVALID,VALID".freeze
+
     def latest_builds(app, count)
       Spaceship::ConnectAPI.get_builds(
-        filter: { app: app.id }, includes: BUILD_INCLUDES, sort: "-uploadedDate", limit: count
+        filter: { app: app.id, processingState: BUILD_STATES }, includes: BUILD_INCLUDES, sort: "-uploadedDate", limit: count
       ).to_models.first(count)
+    end
+
+    # The app's recent build uploads with their state and what Apple said (errors, warnings). One page; sorted here, newest
+    # first, because the endpoint's order is not documented.
+    def build_uploads(app, count)
+      Spaceship::ConnectAPI.get_build_uploads(app_id: app.id, limit: PAGE).to_models
+                           .sort_by { |u| u.uploaded_date.to_s.empty? ? u.created_date.to_s : u.uploaded_date.to_s }
+                           .reverse.first(count)
     end
 
     def create_internal_group(app, name)
@@ -167,7 +179,49 @@ module TestflightSetup
       names = names_by_build[build.id]
       lines << "  #{train} (#{build.version}) | #{build.processing_state} | groups: #{names.empty? ? 'none' : names.join(', ')}"
     end
+    lines.concat(build_upload_lines(api, app, build_count))
+  end
+
+  # "<version> (<build>) | <platform> | <state>" and, when Apple gave any, its errors and warnings. A failed read here does not
+  # fail status (it is a diagnostic): it says why it could not read.
+  def self.build_upload_lines(api, app, count)
+    uploads = step("reading the build uploads") { api.build_uploads(app, count) }
+    lines = ["Recent build uploads (#{uploads.size}):"]
+    uploads.each do |upload|
+      lines << "  #{upload.cf_build_short_version_string} (#{upload.cf_build_version}) | #{upload.platform} | " \
+               "uploaded #{upload.uploaded_date || upload.created_date || '?'} | #{upload_state_text(upload.state)}"
+      upload_findings(upload.state).each { |finding| lines << "    #{finding}" }
+    end
     lines
+  rescue RunFailed => e
+    ["Recent build uploads: not available (#{e.message[0, 300]})"]
+  end
+
+  # The RN lane's failure when an uploaded build never appears (fastlane waited, then gave up): what it most likely means and
+  # where to look. Lives here so it is tested.
+  def self.not_appeared_message(version, build, minutes, detail)
+    "Kanaf RN #{version} (#{build}) was uploaded but did not appear in App Store Connect within #{minutes} minutes, so Apple " \
+      "most likely rejected it while processing (the Account Holder gets an email with the ITMS reason). Run 'TestFlight setup' " \
+      "with action=status: it lists the build and its uploads with their state and errors. (#{mask_text(detail)[0, 120]})"
+  end
+
+  # The state is a Hash ({"state"=>"FAILED","errors"=>[{"code"=>..,"description"=>..}],"warnings"=>[...]}) or a plain string.
+  def self.upload_state_text(state)
+    return mask_text(state.to_s)[0, 60] unless state.is_a?(Hash)
+
+    mask_text((state["state"] || state[:state]).to_s)[0, 60]
+  end
+
+  def self.upload_findings(state)
+    return [] unless state.is_a?(Hash)
+
+    %w[errors warnings].flat_map do |kind|
+      Array(state[kind] || state[kind.to_sym]).first(10).map do |item|
+        code = item.is_a?(Hash) ? (item["code"] || item[:code]) : nil
+        description = item.is_a?(Hash) ? (item["description"] || item[:description]) : item
+        mask_text("#{kind.chomp('s')}: #{[code, description].compact.join(' - ')}")[0, 300]
+      end
+    end
   end
 
   # Idempotent. Returns { created:, enabled_all_builds:, added: [emails], skipped: [[email, reason]], lines: [...] }.

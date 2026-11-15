@@ -153,6 +153,8 @@ end
 RN_DIR = File.join(ROOT, "app")
 RN_IOS_DIR = File.join(RN_DIR, "ios")
 RN_SCHEME = "KanafEFB".freeze # expo names the project after app.config.ts `name` ("Kanaf EFB") without spaces
+# How long the RN lane waits for an uploaded build to appear in App Store Connect.
+RN_BUILD_APPEAR_TIMEOUT_SECONDS = 30 * 60
 
 # The build number must beat every upload App Store Connect already has for the app, or Apple rejects the build.
 # Read the newest TestFlight build (across versions, and for this version) and go one above it; the commit count
@@ -371,14 +373,21 @@ platform :ios do
       next
     end
 
-    upload_to_testflight(
-      api_key: api_key,
-      ipa: lane_context[SharedValues::IPA_OUTPUT_PATH],
-      changelog: testflight_notes(ENV["TESTFLIGHT_CHANGELOG"].to_s, version, build),
-      uses_non_exempt_encryption: false,
-      skip_waiting_for_build_processing: true,
-      distribute_external: false, # internal testers only (owner decision Q12)
-      notify_external_testers: false
-    )
+    begin
+      upload_to_testflight(
+        api_key: api_key,
+        ipa: lane_context[SharedValues::IPA_OUTPUT_PATH],
+        changelog: testflight_notes(ENV["TESTFLIGHT_CHANGELOG"].to_s, version, build),
+        uses_non_exempt_encryption: false,
+        # With a changelog, fastlane waits for the build to APPEAR (to set the notes) even when it skips processing. If Apple
+        # turns the binary down it never appears, and an unbounded wait ran a whole job to its timeout (2026-11-15). Bounded.
+        skip_waiting_for_build_processing: true,
+        wait_processing_timeout_duration: RN_BUILD_APPEAR_TIMEOUT_SECONDS,
+        distribute_external: false, # internal testers only (owner decision Q12)
+        notify_external_testers: false
+      )
+    rescue FastlaneCore::Interface::FastlaneCrash => e
+      UI.user_error!(TestflightSetup.not_appeared_message(version, build, RN_BUILD_APPEAR_TIMEOUT_SECONDS / 60, e.message))
+    end
   end
 end
