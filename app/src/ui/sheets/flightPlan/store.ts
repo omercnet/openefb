@@ -130,6 +130,8 @@ export function createFlightPlanStore(deps: FlightPlanDeps): StoreApi<FlightPlan
   const searchTokens = { departure: 0, destination: 0 };
   /** Bumped by loadPlan, clearPlan and the picks; a plan lookup whose number is no longer current writes nothing. */
   let generation = 0;
+  /** Plans deleted while a load of them may still be pending: a late lookup must not bring them back. */
+  const deletedPlanIDs = new Set<string>();
 
   return createStore<FlightPlanState>()((set, get) => {
     const search = async (field: 'departure' | 'destination', query: string): Promise<Airport[] | null> => {
@@ -176,7 +178,11 @@ export function createFlightPlanStore(deps: FlightPlanDeps): StoreApi<FlightPlan
       async configure() {
         if (configured) return;
         configured = true;
+        const mine = generation;
         await get().loadSavedPlans();
+        // JS-only guard: a pick or Clear made while the saved plans were loading is the pilot's route, not to be replaced by
+        // the restored plan (Swift loads synchronously, so nothing can happen in between).
+        if (mine !== generation) return;
         if (get().savedPlans.length > 0) await get().loadMostRecentPlan();
       },
 
@@ -242,12 +248,14 @@ export function createFlightPlanStore(deps: FlightPlanDeps): StoreApi<FlightPlan
           },
           { now: deps.now, newId },
         );
+        const mine = generation;
         try {
           await deps.plans.insert(record);
         } catch {
           return; // try? context.save(): a failed write shows nothing
         }
-        set({ activePlanID: record.id });
+        // JS-only guard: Clear or another pick while the insert was pending ends this plan's turn as the active one.
+        if (mine === generation) set({ activePlanID: record.id });
         await get().loadSavedPlans();
       },
 
@@ -264,7 +272,7 @@ export function createFlightPlanStore(deps: FlightPlanDeps): StoreApi<FlightPlan
           lookup(record.departureICAO),
           lookup(record.destinationICAO),
         ]);
-        if (mine !== generation) return;
+        if (mine !== generation || deletedPlanIDs.has(record.id)) return;
         const lastUsedAt = deps.now();
         set((s) => ({
           selectedDeparture: departure,
@@ -304,8 +312,16 @@ export function createFlightPlanStore(deps: FlightPlanDeps): StoreApi<FlightPlan
 
       async deletePlan(record) {
         if (!configured) return;
+        deletedPlanIDs.add(record.id); // a load of this plan that is still looking up its airports must not restore it
+        let removed = true;
+        await deps.plans.remove(record.id).catch(() => {
+          removed = false;
+        });
+        if (!removed) {
+          deletedPlanIDs.delete(record.id); // a failed delete changes nothing
+          return;
+        }
         if (record.id === get().activePlanID) get().clearPlan();
-        await deps.plans.remove(record.id).catch(() => false);
         await get().loadSavedPlans();
       },
 

@@ -75,6 +75,11 @@ saved plans (Save Plan and Delete); those are what the sheet tests cover.
   newer load makes it stale, so a slow lookup cannot overwrite what the pilot did meanwhile. A pick also drops a search
   still in flight for either field.
 - The dropdown after a pick: reproduced, see "Swift-parity bugs kept" below.
+- JS-only guards (`flightPlanRaces.test.ts`; Swift's steps cannot interleave): a pick or Clear made while the saved plans
+  load stops `configure()` restoring the last plan over it; a save that finishes after Clear does not mark the plan
+  active; a delete that fails changes nothing (the active plan is cleared only after a successful remove); a plan deleted
+  while its airports are being looked up is not restored by that load. A failed save still shows nothing, as in Swift
+  (`try? context.save()`).
 - `configure()` is the ModelContext handover: before it the store reads no aircraft and touches no repository, like Swift
   with a nil `modelContext`. It runs once per store (Swift's `guard viewModel == nil`).
 - `activeAircraft` is Swift's `isActive == true` fetch: a single inactive profile is not used (the Israel planner's
