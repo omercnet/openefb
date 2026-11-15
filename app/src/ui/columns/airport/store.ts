@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { weatherStation, type Airport, type Region, type WeatherStation } from '../../../domain/core';
 import { useAppStore } from '../../state/appStore';
 import { createStoreContext } from '../../state/storeContext';
+import type { IsraelAerodrome } from '../../../data/aviation/israelTypes';
 import type { NotamReport } from '../../../services/notam';
 import type { AirportWeather, ChartCycle, TerminalChart } from './logic';
 
@@ -33,6 +34,8 @@ export interface AirportColumnData {
   charts: AirportCharts;
   /** NotamService.isConfigured: false shows the "free FAA API key" hint instead of the NOTAM list. */
   notamKeyConfigured: boolean;
+  /** The curated Israeli aerodrome record behind `airport` (Israel region): its section replaces the generic runways. */
+  aerodrome?: IsraelAerodrome;
   /** The NOTAM list's state; see NotamState. */
   notams?: NotamState;
 }

@@ -29,6 +29,7 @@ import {
   type InfoChipIcon,
   type TerminalChart,
 } from './logic';
+import { IsraelAerodromeEntry } from './israelAerodromeSection';
 import { NotamsSection } from './notamSection';
 import type { AirportColumnModel } from './store';
 
@@ -629,7 +630,12 @@ export interface AirportSection {
  */
 export const AIRPORT_SECTIONS: readonly AirportSection[] = [
   { id: 'frequencies', Component: FrequenciesSection },
-  { id: 'runways', Component: RunwaysSection },
+  { id: 'runways', isShown: (m) => m.data?.aerodrome === undefined, Component: RunwaysSection },
+  {
+    id: 'israel-aerodrome',
+    isShown: (m) => m.data?.aerodrome !== undefined,
+    Component: (props) => <IsraelAerodromeEntry {...props} />,
+  },
   {
     id: 'notams',
     layer: 'notams',

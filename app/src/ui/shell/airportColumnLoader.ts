@@ -2,6 +2,7 @@
 // is selected, its record comes from the aviation database (the curated aerodromes in Israel) and its METAR and TAF from
 // the weather service. Charts and the NOTAM list are I1b (the airport sheet); until then the column says so.
 import type { StoreApi } from 'zustand';
+import type { IsraelAerodrome } from '../../data/aviation/israelTypes';
 import type { IsraelAviationDatabase } from '../../data/aviation/israelDatabase';
 import type { AviationDatabase } from '../../data/aviation/aviationDatabase';
 import { weatherStation, type Airport, type Region } from '../../domain/core';
@@ -126,11 +127,13 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
   }
 
   /** Rejects when the database cannot answer; "no such airport" is a null airport. */
-  async function lookup(icao: string): Promise<{ airport: Airport | null; elevationPublished: boolean }> {
+  async function lookup(
+    icao: string,
+  ): Promise<{ airport: Airport | null; elevationPublished: boolean; aerodrome?: IsraelAerodrome }> {
     if (deps.region() === 'israel') {
       const aerodrome = (await deps.israel?.aerodrome(icao)) ?? null;
       return aerodrome
-        ? { airport: israelAirport(aerodrome), elevationPublished: aerodrome.elevationFeet != null }
+        ? { airport: israelAirport(aerodrome), elevationPublished: aerodrome.elevationFeet != null, aerodrome }
         : { airport: null, elevationPublished: true };
     }
     return { airport: (await deps.aviation?.airport(icao)) ?? null, elevationPublished: true };
@@ -140,7 +143,7 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
   async function resolveAirport(icao: string): Promise<void> {
     const request = (lookupRequest.get(icao) ?? 0) + 1;
     lookupRequest.set(icao, request);
-    let found: { airport: Airport | null; elevationPublished: boolean };
+    let found: { airport: Airport | null; elevationPublished: boolean; aerodrome?: IsraelAerodrome };
     let failed = false;
     try {
       found = await lookup(icao);

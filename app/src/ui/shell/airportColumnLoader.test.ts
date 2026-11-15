@@ -418,4 +418,23 @@ describe('airport column loader', () => {
       stop();
     });
   });
+
+  it('an Israeli aerodrome record is kept for its section', async () => {
+    const record = {
+      code: 'LLHZ',
+      nameEnglish: 'Herzliya',
+      latitude: 32,
+      longitude: 34.8,
+      elevationFeet: 135,
+      type: 'airport',
+      use: 'civil',
+      runways: [],
+      frequencies: [],
+    } as never;
+    const { app, column, settle, stop } = setup({ region: () => 'israel', israel: { aerodrome: async () => record } });
+    app.getState().showAirport('LLHZ');
+    await settle();
+    expect(column.getState().columns.LLHZ!.aerodrome).toBe(record);
+    stop();
+  });
 });
