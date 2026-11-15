@@ -199,8 +199,10 @@ platform :ios do
 
     begin
       TestflightSetup.guarded do
-        asc_api_key # sets the Spaceship token
-        app = Spaceship::ConnectAPI::App.find(BUNDLE_ID) || raise("No App Store Connect app for #{BUNDLE_ID}")
+        TestflightSetup.step("setting up the App Store Connect API key") { asc_api_key } # sets the Spaceship token
+        app = TestflightSetup.step("looking up the app") do
+          Spaceship::ConnectAPI::App.find(BUNDLE_ID) || raise("No App Store Connect app for #{BUNDLE_ID}")
+        end
         api = TestflightSetup::ConnectApi.new
         if action == "status"
           TestflightSetup.status_lines(api, app).each { |line| UI.message(line) }

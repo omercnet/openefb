@@ -35,13 +35,19 @@ module TestflightSetup
     message.to_s.match?(REFUSAL_TEXT)
   end
 
-  # Runs the block; any error that escapes is re-raised as RunFailed with its text masked and cut to 500 characters.
-  def self.guarded
+  # Runs the block; any error that escapes is re-raised as RunFailed with its text masked and cut to 500 characters, and
+  # with the name of the step it happened in ("while adding a tester: ..."), so a log says what failed, not only how.
+  def self.step(name)
     yield
-  rescue Refused, InvalidInput, RunFailed
+  rescue Refused, InvalidInput, RunFailed, TesterRefused
     raise
   rescue StandardError => e
-    raise RunFailed, "#{e.class}: #{mask_text(e.message)[0, 500]}"
+    raise RunFailed, "while #{name}: #{e.class}: #{mask_text(e.message)[0, 500]}"
+  end
+
+  # The outermost boundary: whatever escapes, even outside a named step, is masked and bounded.
+  def self.guarded(&block)
+    step("running the setup", &block)
   end
 
   # Returns [action, group]. A bad value is reported by its type and length only.
@@ -128,10 +134,10 @@ module TestflightSetup
 
   # Every beta group (name, kind, automatic distribution, testers) and the newest builds (version, build, state, groups).
   def self.status_lines(api, app, build_count: 10)
-    groups = api.groups(app)
+    groups = step("listing the beta groups") { api.groups(app) }
     lines = ["Beta groups (#{groups.size}):"]
     groups.each do |group|
-      testers = api.group_testers(group)
+      testers = step("reading the testers of a group") { api.group_testers(group) }
       kind = group.is_internal_group ? "internal" : "external"
       automatic = group.is_internal_group ? yes_no(group.has_access_to_all_builds) : "n/a (external)"
       count = testers.size >= PAGE ? "#{PAGE}+" : testers.size.to_s
@@ -141,8 +147,8 @@ module TestflightSetup
     end
 
     names_by_build = Hash.new { |hash, id| hash[id] = [] }
-    groups.each { |group| api.group_builds(group, build_count).each { |build| names_by_build[build.id] << mask_text(group.name) } }
-    builds = api.latest_builds(app, build_count)
+    groups.each { |group| step("reading the builds of a group") { api.group_builds(group, build_count) }.each { |build| names_by_build[build.id] << mask_text(group.name) } }
+    builds = step("reading the newest builds") { api.latest_builds(app, build_count) }
     lines << "Newest builds (#{builds.size}):"
     builds.each do |build|
       train = build.respond_to?(:pre_release_version) && build.pre_release_version ? build.pre_release_version.version : "?"
@@ -154,7 +160,7 @@ module TestflightSetup
 
   # Idempotent. Returns { created:, enabled_all_builds:, added: [emails], skipped: [[email, reason]], lines: [...] }.
   def self.ensure_internal_group(api, app, group_name)
-    groups = api.groups(app)
+    groups = step("listing the beta groups") { api.groups(app) }
     same_name = groups.select { |g| g.name == group_name }
     target = same_name.find(&:is_internal_group)
     if target.nil? && !same_name.empty?
@@ -163,23 +169,23 @@ module TestflightSetup
 
     result = { created: false, enabled_all_builds: false, added: [], skipped: [], lines: [] }
     if target.nil?
-      target = api.create_internal_group(app, group_name)
+      target = step("creating the internal group") { api.create_internal_group(app, group_name) }
       result[:created] = true
       result[:lines] << "Created internal group '#{mask_text(group_name)}' with automatic distribution."
     elsif target.has_access_to_all_builds != true
-      api.enable_all_builds(target)
+      step("turning on automatic distribution") { api.enable_all_builds(target) }
       result[:enabled_all_builds] = true
       result[:lines] << "Turned on automatic distribution for '#{mask_text(group_name)}'."
     else
       result[:lines] << "Internal group '#{mask_text(group_name)}' exists with automatic distribution."
     end
 
-    present = result[:created] ? [] : api.group_testers(target).map { |t| t.email.to_s.downcase }
+    present = result[:created] ? [] : step("reading the testers of the group") { api.group_testers(target) }.map { |t| t.email.to_s.downcase }
     others = groups.select { |g| g.is_internal_group && g.id != target.id }
-    candidates = others.flat_map { |g| api.group_testers(g) }
+    candidates = others.flat_map { |g| step("reading the testers of an internal group") { api.group_testers(g) } }
     candidates = candidates.reject { |t| t.email.to_s.empty? }.uniq { |t| t.email.downcase }
     candidates.reject { |t| present.include?(t.email.downcase) }.each do |tester|
-      api.add_tester(target, tester)
+      step("adding a tester") { api.add_tester(target, tester) }
       result[:added] << mask_email(tester.email)
       result[:lines] << "Added #{mask_email(tester.email)}."
     rescue StandardError => e

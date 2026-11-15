@@ -181,13 +181,14 @@ class TestflightSetupTest < Minitest::Test
 
   def test_an_api_failure_that_is_not_a_refusal_fails_the_run_instead_of_being_skipped
     a = api(groups: [team], members: { "g-team" => [ALICE, BOB] }, fail_for: { "t1" => RuntimeError.new("connection reset") })
-    assert_raises(RuntimeError) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
+    assert_raises(TestflightSetup::RunFailed) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
   end
 
   def test_only_the_tester_refused_error_is_skipped_by_the_use_case
     assert_kind_of StandardError, TestflightSetup::TesterRefused.new("no")
     a = api(groups: [team], members: { "g-team" => [ALICE] }, fail_for: { "t1" => Timeout::Error.new("slow") })
-    assert_raises(Timeout::Error) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
+    error = assert_raises(TestflightSetup::RunFailed) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
+    assert_includes error.message, "Timeout::Error"
   end
 
   # Spaceship keeps only the title and detail of an API error; these are the shapes the adapter sees.
@@ -213,6 +214,45 @@ class TestflightSetupTest < Minitest::Test
     assert_includes error.message, "a***@example.com"
     refute_match(/alice/, error.message)
     assert_operator error.message.length, :<, 560
+  end
+
+  def test_a_failed_run_names_the_step_it_happened_in
+    [
+      ["adding a tester", { groups: [team], members: { "g-team" => [ALICE] }, fail_for: { "t1" => RuntimeError.new("boom") } }],
+      ["reading the testers of an internal group", nil],
+      ["listing the beta groups", nil],
+      ["creating the internal group", nil]
+    ].each do |step_name, options|
+      a = options ? api(**options) : api(groups: [team], members: { "g-team" => [ALICE] })
+      case step_name
+      when "reading the testers of an internal group" then a.define_singleton_method(:group_testers) { |_g| raise "no read" }
+      when "listing the beta groups" then a.define_singleton_method(:groups) { |_app| raise "no list" }
+      when "creating the internal group" then a.define_singleton_method(:create_internal_group) { |_app, _n| raise "no create" }
+      end
+      error = assert_raises(TestflightSetup::RunFailed) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
+      assert_includes error.message, "while #{step_name}:"
+    end
+  end
+
+  def test_status_failures_name_their_step
+    a = api(groups: [team])
+    a.define_singleton_method(:latest_builds) { |_app, _count| raise "builds down" }
+    error = assert_raises(TestflightSetup::RunFailed) { TestflightSetup.status_lines(a, APP) }
+    assert_includes error.message, "while reading the newest builds: RuntimeError: builds down"
+  end
+
+  def test_the_outer_boundary_names_a_step_too_and_a_step_error_is_not_wrapped_twice
+    error = assert_raises(TestflightSetup::RunFailed) { TestflightSetup.guarded { raise "x" } }
+    assert_includes error.message, "while running the setup:"
+    inner = assert_raises(TestflightSetup::RunFailed) { TestflightSetup.guarded { TestflightSetup.step("adding a tester") { raise "x" } } }
+    assert_equal 1, inner.message.scan("while ").size
+    assert_includes inner.message, "while adding a tester:"
+  end
+
+  def test_a_tester_refusal_passes_through_a_step_to_be_skipped
+    a = api(groups: [team], members: { "g-team" => [ALICE] }, fail_for: { "t1" => TestflightSetup::TesterRefused.new("no") })
+    r = TestflightSetup.ensure_internal_group(a, APP, "RN beta")
+    assert_equal 1, r[:skipped].size
   end
 
   def test_guarded_lets_the_lanes_own_errors_through_unchanged
