@@ -22,17 +22,26 @@ module TestflightSetup
   # Anything else (no network, a bad key, a server error, rate limit) is a failed run, never a skipped tester.
   class TesterRefused < StandardError; end
 
-  # What Spaceship keeps of an API error is only the title and detail text (no status), so a refusal is recognised by that
-  # text: the API's "state of another resource" (409) and "invalid relationship/attribute value" (entity) answers, or a
-  # message that names the tester. A missing group or build (404), "Unknown error", a temporary server error and every
-  # non-Spaceship error are failures of the run, so a deleted group or a systematic fault cannot print as success.
+  # The run failed (an API error, a bad key, no network): the message is masked and bounded before Fastlane prints it.
+  class RunFailed < StandardError; end
+
+  # What Spaceship keeps of an API error is only the title and detail text (no status), so the adapter recognises a refusal by
+  # that text: the API's "state of another resource" (409) and "invalid relationship/attribute value" (entity) answers, or a
+  # message that names the tester. A missing group or build (404), "Unknown error", a temporary server error and every other
+  # error are failures of the run, so a deleted group or a systematic fault cannot print as success.
   REFUSAL_TEXT = /state of another resource|relationship with an invalid value|attribute with an invalid value|\btester\b/i
 
-  def self.refusal?(error)
-    return true if error.is_a?(TesterRefused)
-    return false unless defined?(Spaceship::UnexpectedResponse) && error.is_a?(Spaceship::UnexpectedResponse)
+  def self.refusal_text?(message)
+    message.to_s.match?(REFUSAL_TEXT)
+  end
 
-    error.message.to_s.match?(REFUSAL_TEXT)
+  # Runs the block; any error that escapes is re-raised as RunFailed with its text masked and cut to 500 characters.
+  def self.guarded
+    yield
+  rescue Refused, InvalidInput, RunFailed
+    raise
+  rescue StandardError => e
+    raise RunFailed, "#{e.class}: #{mask_text(e.message)[0, 500]}"
   end
 
   # Returns [action, group]. A bad value is reported by its type and length only.
@@ -107,8 +116,13 @@ module TestflightSetup
       group.update(attributes: { has_access_to_all_builds: true })
     end
 
+    # An API answer that turns the tester down becomes TesterRefused (the use case skips them); every other error propagates.
     def add_tester(group, tester)
       group.add_beta_testers(beta_tester_ids: [tester.id])
+    rescue Spaceship::UnexpectedResponse => e
+      raise e unless TestflightSetup.refusal_text?(e.message)
+
+      raise TesterRefused, e.message
     end
   end
 
@@ -169,7 +183,7 @@ module TestflightSetup
       result[:added] << mask_email(tester.email)
       result[:lines] << "Added #{mask_email(tester.email)}."
     rescue StandardError => e
-      raise unless refusal?(e) # a failed run, not a refused tester
+      raise unless e.is_a?(TesterRefused) # a failed run, not a refused tester
 
       reason = mask_text(e.message).lines.first.to_s.strip[0, 200]
       result[:skipped] << [mask_email(tester.email), reason]

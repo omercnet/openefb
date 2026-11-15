@@ -2,6 +2,7 @@
 # Every Spaceship call TestflightSetup::ConnectApi makes exists in the locked fastlane, with the keywords it passes.
 # Plain script (Ruby 4 no longer ships minitest in the bundle): exits 1 and says what is missing.
 require "spaceship"
+require_relative "../testflight_setup"
 
 missing = []
 check = lambda do |ok, what|
@@ -28,6 +29,20 @@ check.call(Spaceship::ConnectAPI::App.method_defined?(:get_beta_groups), "App#ge
 check.call(Spaceship::ConnectAPI::BetaTester.method_defined?(:email), "BetaTester#email")
 check.call(Spaceship::ConnectAPI::Build.method_defined?(:pre_release_version), "Build#pre_release_version")
 check.call(Spaceship::ConnectAPI::Build.method_defined?(:processing_state), "Build#processing_state")
+
+# The adapter turns a tester refusal of the API into TesterRefused and lets every other API error through.
+group_fake = Object.new
+tester = Struct.new(:id).new("t1")
+[["Tester already invited - state of another resource", TestflightSetup::TesterRefused],
+ ["The specified resource does not exist", Spaceship::UnexpectedResponse]].each do |text, expected|
+  group_fake.define_singleton_method(:add_beta_testers) { |**| raise Spaceship::UnexpectedResponse, text }
+  begin
+    TestflightSetup::ConnectApi.new.add_tester(group_fake, tester)
+    missing << "add_tester raised nothing for #{text.inspect}"
+  rescue StandardError => e
+    missing << "add_tester raised #{e.class} for #{text.inspect}, expected #{expected}" unless e.instance_of?(expected)
+  end
+end
 
 if missing.empty?
   puts "Spaceship #{Gem.loaded_specs['fastlane']&.version}: all calls present"

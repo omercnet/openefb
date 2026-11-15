@@ -3,13 +3,6 @@
 # The setup logic against fake groups, testers and builds: what it creates, patches and adds, and what it must never do.
 require "minitest/autorun"
 require "timeout"
-
-# Without Spaceship (plain ruby in CI) the one class the refusal check looks at is stood in, with the same superclass.
-unless defined?(Spaceship::UnexpectedResponse)
-  module Spaceship
-    class UnexpectedResponse < StandardError; end
-  end
-end
 require_relative "../testflight_setup"
 
 Group = Struct.new(:id, :name, :is_internal_group, :has_access_to_all_builds)
@@ -187,31 +180,53 @@ class TestflightSetupTest < Minitest::Test
   end
 
   def test_an_api_failure_that_is_not_a_refusal_fails_the_run_instead_of_being_skipped
-    a = api(groups: [team], members: { "g-team" => [ALICE, BOB] }, fail_for: { "t1" => RuntimeError.new("connection reset by alice@example.com") })
+    a = api(groups: [team], members: { "g-team" => [ALICE, BOB] }, fail_for: { "t1" => RuntimeError.new("connection reset") })
     assert_raises(RuntimeError) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
   end
 
-  def test_a_refusal_is_recognized_by_class
-    assert TestflightSetup.refusal?(TestflightSetup::TesterRefused.new("no"))
-    refute TestflightSetup.refusal?(RuntimeError.new("no"))
-    refute TestflightSetup.refusal?(Timeout::Error.new("no"))
+  def test_only_the_tester_refused_error_is_skipped_by_the_use_case
+    assert_kind_of StandardError, TestflightSetup::TesterRefused.new("no")
+    a = api(groups: [team], members: { "g-team" => [ALICE] }, fail_for: { "t1" => Timeout::Error.new("slow") })
+    assert_raises(Timeout::Error) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
   end
 
-  # Spaceship keeps only the title and detail of an API error; these are the shapes the lane sees.
-  def test_only_a_tester_refusal_from_the_api_is_skipped_other_api_errors_fail_the_run
-    unexpected = ->(text) { Spaceship::UnexpectedResponse.new(text) }
+  # Spaceship keeps only the title and detail of an API error; these are the shapes the adapter sees.
+  def test_only_a_tester_refusal_text_is_a_refusal_other_api_text_fails_the_run
     [
       "The request cannot be fulfilled because of the state of another resource. - Tester already invited",
       "The provided entity includes a relationship with an invalid value - /data/relationships/betaTesters",
       "The provided entity includes an attribute with an invalid value",
       "Beta tester is not an App Store Connect user"
-    ].each { |text| assert TestflightSetup.refusal?(unexpected.call(text)), text }
+    ].each { |text| assert TestflightSetup.refusal_text?(text), text }
     [
       "The specified resource does not exist - There is no resource of type 'betaGroups' with id 'x'",
       "Unknown error",
       "Temporary App Store Connect error: {\"statusCode\"=>\"ERROR\"}",
-      "This request is forbidden for security reasons"
-    ].each { |text| refute TestflightSetup.refusal?(unexpected.call(text)), text }
+      "This request is forbidden for security reasons", nil, ""
+    ].each { |text| refute TestflightSetup.refusal_text?(text), text.inspect }
+  end
+
+  def test_guarded_masks_and_bounds_the_message_of_a_failed_run
+    error = assert_raises(TestflightSetup::RunFailed) do
+      TestflightSetup.guarded { raise "connection reset by alice!@example.com " + "x" * 2000 }
+    end
+    assert_includes error.message, "a***@example.com"
+    refute_match(/alice/, error.message)
+    assert_operator error.message.length, :<, 560
+  end
+
+  def test_guarded_lets_the_lanes_own_errors_through_unchanged
+    assert_raises(TestflightSetup::Refused) { TestflightSetup.guarded { raise TestflightSetup::Refused, "x" } }
+    assert_raises(TestflightSetup::InvalidInput) { TestflightSetup.guarded { raise TestflightSetup::InvalidInput, "x" } }
+    assert_equal 5, TestflightSetup.guarded { 5 }
+  end
+
+  def test_a_failed_run_in_the_use_case_reaches_the_boundary_masked
+    a = api(groups: [team], members: { "g-team" => [ALICE] }, fail_for: { "t1" => RuntimeError.new("connection reset by alice@example.com") })
+    error = assert_raises(TestflightSetup::RunFailed) do
+      TestflightSetup.guarded { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
+    end
+    refute_match(/alice@/, error.message)
   end
 
   def test_inputs_are_validated_before_use_and_never_echoed_in_full
