@@ -157,4 +157,16 @@ describe('frame (show a box on the map)', () => {
     expect(command).toEqual({ center: { lat: 32, lon: 35 }, zoom: 9, direction: 0, animated: true });
     expect(isFollowing(state.follow)).toBe(false);
   });
+
+  it('the first GPS fix after an explicit frame does not pull the camera back to ownship', () => {
+    const framed = run(initialCameraState(), { type: 'frame', center: { lat: 32, lon: 35 }, zoom: 9 }).state;
+    const { command } = run(framed, {
+      type: 'fix',
+      timestamp: 1,
+      position: { lat: 33, lon: 36 },
+      trackDeg: 0,
+      inRegion: true,
+    });
+    expect(command).toBeNull();
+  });
 });

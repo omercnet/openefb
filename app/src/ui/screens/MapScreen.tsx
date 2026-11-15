@@ -14,6 +14,8 @@ import { useOfflineMaps } from '../map/useOfflineMaps';
 import type { OfflineRegionBounds } from '../../domain/offline/bounds';
 import { refreshableMapFor, useDataRefresh } from '../map/refreshDue';
 import { useMapController, useMapModel } from '../map/useMapData';
+import { ThemeContext } from '../Primitives';
+import { Day, Night } from '../tokens';
 import { appStore, useAppStore } from '../state/appStore';
 import { flightLog } from '../flightLog/store';
 import { useOwnship } from '../state/ownship';
@@ -87,13 +89,11 @@ export function MapScreen() {
   });
   // IsraelBriefingMapHighlight: the NOTAM drawn from the briefing's "Show on map" until it is cleared.
   const [highlight, setHighlight] = useState<Highlight | null>(null);
-  const extraSources = useMemo(
-    () =>
-      israelChart.sources
-        ? { ...israelChart.sources, ...(highlight ? { 'il-brief-highlight': highlight.source } : null) }
-        : undefined,
-    [israelChart.sources, highlight],
-  );
+  // The highlight is drawn whether or not the chart data loaded (a polygon NOTAM needs no point lookup).
+  const extraSources = useMemo(() => {
+    if (!israelChart.sources && !highlight) return undefined;
+    return { ...israelChart.sources, ...(highlight ? { 'il-brief-highlight': highlight.source } : null) };
+  }, [israelChart.sources, highlight]);
   const model = useMapModel({
     controller,
     ownship,
@@ -126,12 +126,14 @@ export function MapScreen() {
     footerStore.setState({ following: model.isFollowing });
   }, [footerStore, model.isFollowing]);
   const { onViewChange } = model;
+  // The Layers clock ticks each minute: the status is judged again, so a pack expires at the cycle boundary.
+  const clock = layers.useData((s) => s.now);
   const [bounds, setBounds] = useState<OfflineRegionBounds | null>(null);
   const offline = useOfflineMaps(runtime.offline);
   const sectionalOn = model.snapshot.visibleLayers.has('sectional');
   useEffect(() => {
     layersStore.setState({ offlineStatus: offlineStatusFor(runtime.offline, bounds, sectionalOn, Date.now()) });
-  }, [layersStore, runtime.offline, bounds, sectionalOn, offline]);
+  }, [layersStore, runtime.offline, bounds, sectionalOn, offline, clock]);
   const trackedViewChange = useCallback(
     (change: Parameters<typeof onViewChange>[0]) => {
       footerStore.setState({ zoom: change.zoom });
@@ -178,16 +180,19 @@ export function MapScreen() {
         sectional={model.snapshot.visibleLayers.has('sectional')}
         sectionalOpacity={sectionalOpacity}
       />
-      <LiveBriefing
-        fetcher={fetchFeed}
-        readStore={runtime.notamReadStore}
-        ownship={ownship.position}
-        pointLookup={israelChart.pointLookup}
-        presented={presentingBriefing}
-        onDismiss={dismissBriefing}
-        onShow={showHighlight}
-        onClear={clearHighlight}
-      />
+      <ThemeContext.Provider value={night ? Night : Day}>
+        <LiveBriefing
+          highlightActive={highlight !== null}
+          fetcher={fetchFeed}
+          readStore={runtime.notamReadStore}
+          ownship={ownship.position}
+          pointLookup={israelChart.pointLookup}
+          presented={presentingBriefing}
+          onDismiss={dismissBriefing}
+          onShow={showHighlight}
+          onClear={clearHighlight}
+        />
+      </ThemeContext.Provider>
     </>
   );
 }

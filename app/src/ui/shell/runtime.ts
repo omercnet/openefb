@@ -79,7 +79,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     log,
   });
   const notamReadStore = await NotamReadStateStore.open(fileTextStorage, log);
-  const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage);
+  const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage, log);
   const telemetry = createTelemetry({ region: () => regionSlice.store.getState().region });
   startTelemetry(telemetry); // counts the launch; nothing is sent unless EXPO_PUBLIC_TELEMETRY_URL is set
   return {

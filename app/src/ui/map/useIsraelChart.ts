@@ -35,21 +35,34 @@ export function useIsraelChart({
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
     let input: IsraelChartInput | null = null;
-    const apply = async () => {
-      if (!input) return;
-      const report = await currentReport(notam);
-      const built = await israelChartSources(input, report, now());
-      if (cancelled) return;
-      setSources(built.sources);
-      onClosureStatus?.(built.status);
+    let running = false;
+    const apply = async (first: boolean) => {
+      if (!input || running) return;
+      running = true;
+      try {
+        // The chart itself needs only the database: draw it before the relay answers (or times out after 15 s).
+        if (first) {
+          const base = await israelChartSources(input, null, now());
+          if (cancelled) return;
+          setSources(base.sources);
+        }
+        // A scheduled refresh bypasses the service's five-minute copy, which would otherwise be skipped as still fresh.
+        const report = await currentReport(notam, !first);
+        const built = await israelChartSources(input, report, now());
+        if (cancelled) return;
+        setSources(built.sources);
+        onClosureStatus?.(built.status);
+      } finally {
+        running = false;
+      }
     };
     loadIsraelChart(db).then(
       (loaded) => {
         if (cancelled) return;
         input = loaded;
         setPoints(pointIndex(loaded));
-        void apply();
-        timer = setInterval(() => void apply(), ISRAEL_CLOSURE_REFRESH_MS);
+        void apply(true);
+        timer = setInterval(() => void apply(false), ISRAEL_CLOSURE_REFRESH_MS);
       },
       (error) => console.warn('Israel chart data failed to load', error),
     );

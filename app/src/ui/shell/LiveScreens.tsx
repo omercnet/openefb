@@ -5,15 +5,16 @@ import { ThemeContext } from '../Primitives';
 import { LogScreen } from '../screens/LogScreen';
 import { LogbookEntryScreen } from '../screens/LogbookEntryScreen';
 import { useAppStore, appStore } from '../state/appStore';
+import { useLiveTheme } from '../state/night';
 import type { LogbookEntryStore } from '../state/logbookEntryStore';
-import { Day } from '../tokens';
 
 /** A screen over the map (the map stays mounted underneath, as ContentView's ZStack keeps MapContainerView alive). */
 function Layer({ children, testID }: { children: ReactNode; testID: string }) {
+  const theme = useLiveTheme();
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: Day.paper }]} testID={testID}>
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.paper }]} testID={testID}>
       <SafeAreaProvider>
-        <ThemeContext.Provider value={Day}>{children}</ThemeContext.Provider>
+        <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
       </SafeAreaProvider>
     </View>
   );

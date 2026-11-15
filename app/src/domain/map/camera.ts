@@ -97,7 +97,12 @@ export function cameraReducer(
       };
     case 'frame':
       return {
-        state: isFollowing(state.follow) ? { ...state, follow: userMovedMap(state.follow) } : state,
+        // An explicit framing also settles the first-fix jump: the first GPS fix must not pull the camera back to ownship.
+        state: {
+          ...state,
+          hasCenteredOnFirstFix: true,
+          follow: isFollowing(state.follow) ? userMovedMap(state.follow) : state.follow,
+        },
         command: { center: action.center, zoom: action.zoom, direction: state.mapDirection, animated: true },
       };
     case 'zoomTo':

@@ -5,7 +5,7 @@ import type { IsraelNotam } from '../../domain/israel/notamTypes';
 import type { BriefingActions, IsraelBriefingViewModel } from '../sheets/briefing/store';
 import { LiveBriefing, type LiveBriefingProps } from './LiveBriefing';
 
-let sheet: { model: IsraelBriefingViewModel; actions: BriefingActions } | null = null;
+let sheet: { model: IsraelBriefingViewModel; actions: BriefingActions; highlightActive?: boolean } | null = null;
 jest.mock('expo-font', () => ({ useFonts: () => [true, null] }));
 jest.mock('../sheets/briefing/BriefingPresentation', () => ({
   BriefingPresentation: ({ presented, children }: { presented: boolean; children: ReactNode }) =>
@@ -84,5 +84,10 @@ describe('LiveBriefing', () => {
     expect(p.onClear).toHaveBeenCalled();
     expect(open).toHaveBeenCalledWith('https://example.org');
     open.mockRestore();
+  });
+
+  it('tells the sheet the map still shows a highlight, so it offers to clear it after a reopen', async () => {
+    await render(<LiveBriefing {...props({ highlightActive: true })} />);
+    expect(sheet!.highlightActive).toBe(true);
   });
 });
