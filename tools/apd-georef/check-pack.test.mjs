@@ -139,3 +139,16 @@ test('a non-string edition object reports errors instead of crashing the checker
   });
   assert.ok(checkPack(dir).errors.some((e) => /index.edition/.test(e)));
 });
+
+test('an edition label that does not name exactly the edition is rejected', () => {
+  for (const label of ['d-TPP cycle 26110 (12 NOV 2026)', 'd-TPP cycle 2611 (12 NOV 2026) extra', 'd-TPP cycle 2610 (12 NOV 2026)', 'FAA cycle 2611']) {
+    const dir = pack(({ files, index, manifest }) => {
+      index.editionLabel = label;
+      files['index.json'] = Buffer.from(JSON.stringify(index));
+      manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+    });
+    const errors = checkPack(dir).errors;
+    assert.ok(errors.some((e) => /index.editionLabel .* is not "d-TPP cycle 2611/.test(e)), label);
+    assert.ok(!errors.some((e) => /index.edition /.test(e)), 'the edition itself is valid');
+  }
+});

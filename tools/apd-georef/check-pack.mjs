@@ -70,7 +70,8 @@ export function checkPack(dir, { min = 1 } = {}) {
 
   if (index.product !== 'us-diagrams') errors.push(`index.product is ${brief(index.product)}`);
   if (typeof index.edition !== 'string' || !/^\d{2}(0[1-9]|1[0-4])$/.test(index.edition)) errors.push(`index.edition ${brief(index.edition)} is not a d-TPP cycle (YYNN, NN from 01 to 14)`);
-  if (typeof index.edition === 'string' && typeof index.editionLabel === 'string' && !index.editionLabel.startsWith(`d-TPP cycle ${index.edition}`)) errors.push(`index.editionLabel ${brief(index.editionLabel)} does not name the cycle`);
+  // The label is exactly what PackWriter writes, "d-TPP cycle 2611 (12 NOV 2026)": a prefix match would pass 26110.
+  if (typeof index.edition === 'string' && /^\d{4}$/.test(index.edition) && typeof index.editionLabel === 'string' && !new RegExp(`^d-TPP cycle ${index.edition} \\(\\d{2} [A-Z]{3} \\d{4}\\)$`).test(index.editionLabel)) errors.push(`index.editionLabel ${brief(index.editionLabel)} is not "d-TPP cycle ${index.edition} (DD MMM YYYY)"`);
   for (const k of ['editionLabel', 'aipDate']) if (typeof index[k] !== 'string' || !index[k]) errors.push(`index.${k} missing`);
   if (typeof index.aipDate === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(index.aipDate)) errors.push('index.aipDate is not yyyy-MM-dd');
   if (!Number.isInteger(index.accuracyFeet)) errors.push('index.accuracyFeet is not an integer');
