@@ -170,13 +170,16 @@ def rn_build_number(api_key, version)
 end
 
 # Generates ios/ and installs pods. The aviation database is not committed (app/assets/aviation.sqlite is ignored);
-# like app.yml it comes from the Swift app's resources.
+# like app.yml they come from the Swift app's resources.
 def rn_prebuild(version, build)
   ENV["KANAF_VARIANT"] = "production"
   ENV["KANAF_VERSION"] = version
   ENV["KANAF_BUILD_NUMBER"] = build
   database = File.join(RN_DIR, "assets/aviation.sqlite")
   FileUtils.cp(File.join(ROOT, "efb-212/Resources/aviation.sqlite"), database) unless File.exist?(database)
+  # The live app route bundles the Israel database too (src/ui/shell/runtime.ts).
+  israel = File.join(RN_DIR, "assets/israel-aviation.sqlite")
+  FileUtils.cp(File.join(ROOT, "efb-212/Resources/israel-aviation.sqlite"), israel) unless File.exist?(israel)
   # fastlane's sh runs from the fastlane/ folder, so each command changes directory itself.
   sh("cd #{Shellwords.escape(RN_DIR)} && npm ci && npx expo prebuild -p ios --no-install --clean")
   # CocoaPods is not in the Gemfile; under `bundle exec` it would inherit Bundler's environment (RUBYOPT=-rbundler/setup)
