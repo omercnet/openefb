@@ -511,3 +511,43 @@ test('regionName names the US diagram pack for error messages', () => {
   expect(regionName('us-diagrams')).toBe('US airport diagrams');
   expect(regionName('israel-cvfr')).toBe('Israel CVFR');
 });
+
+// MARK: Single file of an edition (M5b: on-demand US diagrams)
+
+test('downloadFile fetches one verified file of an edition into a folder, without installing', async () => {
+  const manifest = decode(manifestJSON());
+  const { service, fs, downloader } = rig((url) => {
+    expect(url).toBe(`${BASE}/israel-cvfr/2025-02/${PACK_FILE}`);
+    return { status: 200, body: packBytes };
+  });
+  const path = await service.downloadFile(manifest, PACK_FILE, '/cache/2025-02');
+  expect(path).toBe(`/cache/2025-02/${PACK_FILE}`);
+  expect(fs.files.get(path)).toEqual(packBytes);
+  expect(await service.installed()).toBeNull();
+  expect(downloader.requests).toHaveLength(1);
+});
+
+test('downloadFile removes a file whose checksum is wrong, and refuses unknown or unsafe names', async () => {
+  const bad = decode(manifestJSON({ sha256: '0'.repeat(64) }));
+  const { service, fs } = rig(() => ({ status: 200, body: packBytes }));
+  await expect(service.downloadFile(bad, PACK_FILE, '/cache/x')).rejects.toMatchObject({
+    error: { kind: 'chartCorrupted' },
+  });
+  expect(fs.exists(`/cache/x/${PACK_FILE}`)).toBe(false);
+  const manifest = decode(manifestJSON());
+  await expect(service.downloadFile(manifest, 'nope.png', '/cache/x')).rejects.toMatchObject({
+    error: { kind: 'chartDownloadFailed' },
+  });
+  const sneaky = decode(manifestJSON().replace(`"name":"israel-cvfr-2025-02.mbtiles"`, '"name":"../evil.png"'));
+  await expect(service.downloadFile(sneaky, '../evil.png', '/cache/x')).rejects.toBeInstanceOf(AppFailure);
+});
+
+test('downloadFile reports a lost connection as networkUnavailable so the caller can retry later', async () => {
+  const manifest = decode(manifestJSON());
+  const { service } = rig(() => {
+    throw new Error('offline');
+  });
+  await expect(service.downloadFile(manifest, PACK_FILE, '/cache/x')).rejects.toMatchObject({
+    error: { kind: 'networkUnavailable' },
+  });
+});

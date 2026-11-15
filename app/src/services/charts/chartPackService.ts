@@ -63,6 +63,9 @@ export interface ChartPackServiceLike {
     manifest: ChartManifest,
     options?: { progress?: (fraction: number) => void; signal?: AbortSignal },
   ): Promise<ChartPackInstalled>;
+  /** Downloads one named file of an edition into `destinationDir` (not the install folder), verified against the manifest's
+   * size and SHA-256; a bad file is deleted. Returns its path. Used by the on-demand US diagrams: no pack is installed. */
+  downloadFile(manifest: ChartManifest, name: string, destinationDir: string, signal?: AbortSignal): Promise<string>;
   installed(): Promise<ChartPackInstalled | null>;
   /** Re-hashes every installed file against its recorded SHA-256. A pack that fails is removed. True when the pack is
    * intact, or when nothing is installed. */
@@ -307,6 +310,34 @@ export class ChartPackService implements ChartPackServiceLike {
     );
     this.running = { edition: manifest.edition, controller, done };
     return done;
+  }
+
+  async downloadFile(
+    manifest: ChartManifest,
+    name: string,
+    destinationDir: string,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const region = regionName(this.product);
+    const file = manifest.files.find((f) => f.name === name);
+    if (!file || !isSafeName(name) || !isSafeName(manifest.edition)) {
+      throw new AppFailure({ kind: 'chartDownloadFailed', region });
+    }
+    await this.fs.ensureDir(destinationDir);
+    const destination = this.fs.join(destinationDir, name);
+    await this.fetchWithRetry(
+      file,
+      manifest.edition,
+      destination,
+      signal ?? new AbortController().signal,
+      () => undefined,
+    );
+    const digest = await this.sha256Of(destination);
+    if (digest === null || digest !== file.sha256.toLowerCase()) {
+      await this.fs.remove(destination).catch(() => undefined);
+      throw new AppFailure({ kind: 'chartCorrupted', region });
+    }
+    return destination;
   }
 
   private async runDownload(
