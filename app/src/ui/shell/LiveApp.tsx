@@ -11,6 +11,10 @@ import { MapScreen } from '../screens/MapScreen';
 import { appStore, useAppStore } from '../state/appStore';
 import { useRegion } from '../state/region';
 import { RuntimeContext } from '../state/runtimeContext';
+import { RecordingStoreContext } from '../recording/RecordingStoreContext';
+import { StopRecordingDialog } from '../recording/StopRecordingDialog';
+import { bindRecording, markRecordingUnavailable } from './recordingBinding';
+import type { RecordingRuntime } from './recordingRuntime';
 import { ChartViewer } from './ChartViewer';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';
@@ -47,7 +51,15 @@ const zeroVersion = () => 0;
  * ContentView.swift: the banners above the always-mounted map, with the services connected behind them. Mounted by the
  * app shell once the launch sequence (startup.ts) is done.
  */
-export function LiveApp({ runtime }: { runtime: AppRuntime }) {
+export function LiveApp({
+  runtime,
+  startRecording,
+}: {
+  runtime: AppRuntime;
+  /** Builds the recording services (runtime.ts `startRecordingServices`); omitted: no recorder (tests). */
+  startRecording?: (runtime: AppRuntime) => Promise<RecordingRuntime>;
+}) {
+  const [recording, setRecording] = useState<RecordingRuntime | null>(null);
   const { started } = runtime;
   const databaseError = useAppStore((s) => s.databaseError);
   // The restored region goes in before the first render (the Nearest hook reads the slice).
@@ -94,17 +106,48 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
     };
   }, [runtime, started]);
 
+  useEffect(() => {
+    if (!startRecording) return;
+    let cancelled = false;
+    let stop: (() => void) | null = null;
+    let built: RecordingRuntime | null = null;
+    startRecording(runtime).then(
+      async (services) => {
+        if (cancelled) return services.dispose();
+        built = services;
+        stop = bindRecording(services, flightLog.store, NativeAppState);
+        setRecording(services);
+        // Crash recovery (Swift: FlightRecoveryService at launch): the profiles settle the active ids first.
+        await runtime.profiles.load().catch(() => undefined);
+        await services.recoverOrphans(runtime.profiles.activeIds()).catch((e) => console.warn('Recovery failed', e));
+      },
+      (error) => {
+        console.warn('Recording database unavailable', error);
+        if (!cancelled) markRecordingUnavailable(flightLog.store);
+      },
+    );
+    return () => {
+      cancelled = true;
+      stop?.();
+      built?.dispose();
+      setRecording(null);
+    };
+  }, [runtime, startRecording]);
+
   return (
     <RuntimeContext.Provider value={runtime}>
       <AirportQueriesContext.Provider value={queries}>
-        <View style={{ flex: 1 }}>
-          <DatabaseUnavailableBanner visible={databaseError !== null} />
-          <RemoteBanner runtime={runtime} />
+        <RecordingStoreContext.Provider value={recording?.store ?? null}>
           <View style={{ flex: 1 }}>
-            <MapScreen />
+            <DatabaseUnavailableBanner visible={databaseError !== null} />
+            <RemoteBanner runtime={runtime} />
+            <View style={{ flex: 1 }}>
+              <MapScreen />
+            </View>
+            <ChartViewer terminal={runtime.terminal} />
+            {recording ? <StopRecordingDialog store={recording.store} /> : null}
           </View>
-          <ChartViewer terminal={runtime.terminal} />
-        </View>
+        </RecordingStoreContext.Provider>
       </AirportQueriesContext.Provider>
     </RuntimeContext.Provider>
   );

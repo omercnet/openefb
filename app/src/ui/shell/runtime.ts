@@ -25,6 +25,18 @@ import { IsraelNotamService } from '../../services/israelNotamService';
 import { TfrService } from '../../services/tfrService';
 import { WeatherService } from '../../services/weatherService';
 import { loadLayerSettings, type LayerSettings } from './layersSettings';
+import { asCoordinatorAudio } from '../../adapters/coordinatorAudio';
+import { createAudioRecorder } from '../../adapters/audioRecorder';
+import { createMicrophonePermission } from '../../adapters/microphonePermission';
+import { createPreferences } from '../../adapters/preferences';
+import { createRecordingFiles } from '../../adapters/recordingFiles';
+import { createTelemetry, startTelemetry } from '../../adapters/telemetry';
+import { createTranscriptionService } from '../../adapters/transcription';
+import type { Telemetry } from '../../domain/telemetry/telemetry';
+import { appStore } from '../state/appStore';
+import { regionSlice } from '../state/region';
+import { createProfiles, type Profiles } from './profiles';
+import { createRecordingRuntime, type RecordingRuntime } from './recordingRuntime';
 import { runStartup, type StartedApp } from './startup';
 
 /** The user database file (SwiftData's default store in the Swift app); the in-memory fallback uses ':memory:'. */
@@ -37,6 +49,8 @@ export interface AppRuntime {
   israelNotam: IsraelNotamService;
   notamReadStore: NotamReadStateStore;
   terminal: TerminalProcedureService;
+  profiles: Profiles;
+  telemetry: Telemetry;
   notamConfigured: () => Promise<boolean>;
   offline: OfflineMapService;
   advisories: AirSigmetService;
@@ -66,10 +80,14 @@ export async function startRuntime(): Promise<AppRuntime> {
   });
   const notamReadStore = await NotamReadStateStore.open(fileTextStorage, log);
   const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage);
+  const telemetry = createTelemetry({ region: () => regionSlice.store.getState().region });
+  startTelemetry(telemetry); // counts the launch; nothing is sent unless EXPO_PUBLIC_TELEMETRY_URL is set
   return {
     started,
     layerSettings,
     notamReadStore,
+    profiles: createProfiles(started.userDb, createPreferences()),
+    telemetry,
     terminal: new TerminalProcedureService({
       fetch: fetchLike,
       downloader: fileDownloader,
@@ -95,4 +113,22 @@ export async function startRuntime(): Promise<AppRuntime> {
 let starting: Promise<AppRuntime> | null = null;
 
 /** One runtime per process: the route may remount, the databases and services must not be opened twice. */
+/** The recording services on the real adapters (Swift: MapContainerView.initializeServices). Rejects when the recording database cannot be opened. */
+export function startRecordingServices(runtime: AppRuntime): Promise<RecordingRuntime> {
+  const files = createRecordingFiles();
+  return createRecordingRuntime({
+    userDb: runtime.started.userDb,
+    openRecordingDb: () => openExpoSqliteDb('recording.sqlite'),
+    aviation: runtime.started.aviation,
+    location: runtime.location,
+    audio: asCoordinatorAudio(createAudioRecorder()),
+    makeTranscription: (store) => createTranscriptionService({ store }),
+    microphone: createMicrophonePermission(),
+    files,
+    telemetry: runtime.telemetry,
+    activeProfileIds: () => runtime.profiles.activeIds(),
+    activeRouteLegs: () => appStore.getState().navigation.activeRoute?.legs ?? [],
+  });
+}
+
 export const getRuntime = (): Promise<AppRuntime> => (starting ??= startRuntime());

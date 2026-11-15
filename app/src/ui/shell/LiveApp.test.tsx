@@ -12,6 +12,11 @@ import { gps } from '../state/gps';
 import { regionSlice } from '../state/region';
 import { applyCaptureSeeds } from '../capture/seeds';
 import { resetLiveSlices } from './resetSlices';
+import { openNodeSqliteDb } from '../../../tests/support/nodeSqliteDb';
+import { migrate } from '../../data/migrate';
+import { FakeMicrophonePermission } from '../../domain/ports/microphonePermission';
+import { MockAudioRecorder, MockTranscriptionService } from '../../domain/recording/testSupport';
+import { createRecordingRuntime } from './recordingRuntime';
 import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
 
@@ -181,5 +186,75 @@ describe('LiveApp (ContentView)', () => {
     applyCaptureSeeds();
     resetLiveSlices('us');
     expect(layers.store.getState().displayMode).toBe('auto');
+  });
+
+  describe('recording services', () => {
+    const settle = () => act(async () => new Promise((r) => setTimeout(r, 20)));
+    const withProfiles = (rt: AppRuntime) =>
+      Object.assign(rt, {
+        profiles: { load: async () => undefined, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) },
+      });
+    const services = async () => {
+      const userDb = openNodeSqliteDb();
+      await migrate(userDb);
+      return createRecordingRuntime({
+        userDb,
+        openRecordingDb: async () => openNodeSqliteDb(),
+        aviation: null,
+        location: new FakeLocationSource(),
+        audio: new MockAudioRecorder(),
+        makeTranscription: () => new MockTranscriptionService(),
+        microphone: new FakeMicrophonePermission('granted'),
+        files: {
+          appSupportRoot: 'file:///support',
+          pathFor: (id) => `file:///support/Recordings/${id}.m4a`,
+          removeFile: async () => undefined,
+          listFileNames: async () => [],
+          exists: async () => true,
+          durationSeconds: async () => 60,
+          creationDate: async () => null,
+        },
+        activeProfileIds: () => ({ aircraftProfileID: null, pilotProfileID: null }),
+        activeRouteLegs: () => [],
+      });
+    };
+
+    it('puts the recorder on the strip and runs crash recovery once the profiles are known', async () => {
+      const { rt } = runtime();
+      withProfiles(rt);
+      let built: Awaited<ReturnType<typeof services>> | null = null;
+      const recover = jest.fn(async () => []);
+      await render(
+        <LiveApp
+          runtime={rt}
+          startRecording={async () => {
+            built = await services();
+            built.recoverOrphans = recover as never;
+            return built;
+          }}
+        />,
+      );
+      await settle();
+      expect(flightLog.store.getState().recording?.status).toEqual({ kind: 'idle' });
+      expect(flightLog.store.getState().recordingUnavailable).toBe(false);
+      expect(recover).toHaveBeenCalledWith({ aircraftProfileID: null, pilotProfileID: null });
+    });
+
+    it('an unavailable recording database hides the record control', async () => {
+      const { rt } = runtime();
+      withProfiles(rt);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      await render(
+        <LiveApp
+          runtime={rt}
+          startRecording={async () => {
+            throw new Error('cannot open');
+          }}
+        />,
+      );
+      await settle();
+      expect(flightLog.store.getState()).toMatchObject({ recording: null, recordingUnavailable: true });
+      warn.mockRestore();
+    });
   });
 });

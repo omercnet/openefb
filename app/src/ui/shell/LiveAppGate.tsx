@@ -4,7 +4,7 @@ import { describeError } from '../../domain/describeError';
 import { Day } from '../tokens';
 import { resetLiveSlices } from './resetSlices';
 import { LiveApp } from './LiveApp';
-import { getRuntime, type AppRuntime } from './runtime';
+import { getRuntime, startRecordingServices, type AppRuntime } from './runtime';
 
 /**
  * The launch sequence in front of the first screen: the user database and its migrations, the saved region, the aviation
@@ -26,7 +26,7 @@ export function LiveAppGate() {
       cancelled = true;
     };
   }, []);
-  if (state && 'runtime' in state) return <LiveApp runtime={state.runtime} />;
+  if (state && 'runtime' in state) return <LiveApp runtime={state.runtime} startRecording={startRecordingServices} />;
   return (
     <View style={styles.paper} testID="launchScreen">
       {state ? <Text style={styles.error}>{`Kanaf could not start: ${state.error}`}</Text> : null}

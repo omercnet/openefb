@@ -1,4 +1,5 @@
 import { Slot } from 'expo-router';
+import '../adapters/locationTaskRegistration';
 import { DefaultStatusBar } from '../ui/SystemBars';
 
 // One screen at a time, like the spike's route switch: Slot unmounts the previous route, so only one MapLibre view
