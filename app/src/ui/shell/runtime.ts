@@ -36,6 +36,7 @@ import { DebriefEngine as DomainDebriefEngine } from '../../domain/debriefEngine
 import type { ReplayAudioPlayer } from '../../domain/replay/types';
 import { createPreferences } from '../../adapters/preferences';
 import { createRecordingFiles } from '../../adapters/recordingFiles';
+import { prepareSpeechAssets } from '../../adapters/speechAnalyzer';
 import { createTelemetry, startTelemetry } from '../../adapters/telemetry';
 import { createTranscriptionService } from '../../adapters/transcription';
 import type { Telemetry } from '../../domain/telemetry/telemetry';
@@ -97,6 +98,8 @@ export async function startRuntime(): Promise<AppRuntime> {
   const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage, log);
   const preferences = createPreferences();
   const telemetry = createTelemetry({ region: () => regionSlice.store.getState().region });
+  // iOS has no SFSpeechRecognizer fallback: fetch the on-device speech model now, so a flight can be transcribed.
+  void prepareSpeechAssets().catch((e) => log(`Speech assets: ${String(e)}`));
   startTelemetry(telemetry); // counts the launch; nothing is sent unless EXPO_PUBLIC_TELEMETRY_URL is set
   const debriefModel = createDebriefModel();
   const debrief = debriefModel.offered ? new DomainDebriefEngine({ model: debriefModel, telemetry }) : null;
