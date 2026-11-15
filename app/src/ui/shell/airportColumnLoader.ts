@@ -130,16 +130,19 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     const request = (lookupRequest.get(icao) ?? 0) + 1;
     lookupRequest.set(icao, request);
     let found: { airport: Airport | null; elevationPublished: boolean };
+    let failed = false;
     try {
       found = await lookup(icao);
-      lookupFailed.delete(icao);
     } catch (error) {
-      lookupFailed.add(icao);
+      failed = true;
       (deps.log ?? console.warn)(`Airport lookup for ${icao} failed: ${describeError(error)}`);
       found = { airport: null, elevationPublished: true };
     }
-    // Overlapping lookups (two refresh taps): only the newest may write, so a late failure never blanks a result.
+    // Overlapping lookups (two refresh taps): only the newest may write, the retry marker included, so a late failure
+    // neither blanks a newer result nor makes a good airport look retryable.
     if (lookupRequest.get(icao) !== request) return;
+    if (failed) lookupFailed.add(icao);
+    else lookupFailed.delete(icao);
     patchColumn(icao, (d) => ({ ...d, ...found }));
   }
 

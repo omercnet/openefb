@@ -276,6 +276,11 @@ describe('airport column loader', () => {
     slow.reject(new Error('late'));
     await settle();
     expect(column.getState().columns.KSQL!.airport).toBe(KSQL);
+    // The late failure must not have marked the good airport as retryable: a refresh does not look it up again.
+    const lookups = calls;
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    expect(calls).toBe(lookups);
     stop();
   });
 });
