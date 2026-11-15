@@ -97,7 +97,11 @@ describe('LiveFlight', () => {
   it('a read that fails is not a deleted flight: it says so, logs the flight, and Try again reads it again', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
     const onClose = jest.fn();
-    const load = jest.fn().mockRejectedValueOnce(new Error('disk I/O error')).mockResolvedValueOnce(flight);
+    let finishRead: () => void = () => undefined;
+    const load = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('disk I/O error'))
+      .mockImplementationOnce(() => new Promise<FlightRecord>((resolve) => (finishRead = () => resolve(flight))));
     const view = await render(
       <LiveFlight
         flightId="f1"
@@ -111,8 +115,14 @@ describe('LiveFlight', () => {
     await settle();
     expect(onClose).not.toHaveBeenCalled();
     expect(view.text()).toContain('disk I/O error');
+    expect(view.byTestId('flight-load-failed').props).toMatchObject({
+      accessibilityRole: 'alert',
+      accessibilityLiveRegion: 'assertive',
+    });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('f1'));
     await press(view.byTestId('flight-load-retry'));
+    expect(view.byTestId('flight-load-retrying')).toBeTruthy(); // not a blank screen while the read is pending
+    finishRead();
     await settle();
     expect(load).toHaveBeenCalledTimes(2);
     expect(detail).toHaveBeenCalled();

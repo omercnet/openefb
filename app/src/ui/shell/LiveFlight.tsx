@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Linking, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Text, View } from 'react-native';
 import { describeError } from '../../domain/describeError';
 import { Pressy, useTheme } from '../Primitives';
 import type { FlightRecord } from '../../data/models';
@@ -67,7 +67,7 @@ export function LiveFlight({
         onClose={onClose}
       />
     );
-  if (!loaded) return null;
+  if (!loaded) return attempt > 0 ? <Retrying /> : null;
   const { flight, stores } = loaded;
   const back = () => setPage('detail');
   if (page === 'debrief' && stores.debrief) return <DebriefScreen store={stores.debrief} onBack={back} />;
@@ -89,12 +89,24 @@ export function LiveFlight({
   );
 }
 
+/** Try again was tapped: the read is pending, say so instead of showing a blank screen. */
+function Retrying() {
+  const t = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: t.paper, justifyContent: 'center' }} testID="flight-load-retrying">
+      <ActivityIndicator accessibilityLabel="Opening the flight" />
+    </View>
+  );
+}
+
 function LoadFailure({ message, onRetry, onClose }: { message: string; onRetry: () => void; onClose: () => void }) {
   const t = useTheme();
   return (
     <View
       style={{ flex: 1, backgroundColor: t.paper, padding: 24, gap: 12, justifyContent: 'center' }}
       testID="flight-load-failed"
+      accessibilityRole="alert"
+      accessibilityLiveRegion="assertive"
     >
       <Text style={{ color: t.ink, fontSize: 17, fontWeight: '600' }}>This flight could not be opened</Text>
       <Text style={{ color: t.secondaryText, fontSize: 15 }}>{message}</Text>
