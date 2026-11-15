@@ -153,7 +153,7 @@ export function MapScreen() {
   useNearestAirports();
   useDataRefresh(() => ({
     map: refreshableMapFor(controller),
-    lowPower: false,
+    lowPower: runtime.lowPower.isEnabled(),
     networkAvailable: !flightLog.store.getState().isOffline,
   }));
 

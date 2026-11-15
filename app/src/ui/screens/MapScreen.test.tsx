@@ -92,6 +92,7 @@ function fakeRuntime(
     weather: { fetchWeatherForStations: async () => [] },
     tfr: { currentTFRs: async () => ({ tfrs: [], fetchedAt: Date.now() }) },
     advisories: { currentAdvisories: async () => ({ advisories: [], fetchedAt: Date.now() }) },
+    lowPower: { isEnabled: () => false, stop: () => undefined },
     offline: {
       status: () => 'notDownloaded',
       subscribe: () => () => undefined,

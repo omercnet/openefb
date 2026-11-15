@@ -27,6 +27,7 @@ import { WeatherService } from '../../services/weatherService';
 import { loadLayerSettings, type LayerSettings } from './layersSettings';
 import { asCoordinatorAudio } from '../../adapters/coordinatorAudio';
 import { createAudioRecorder } from '../../adapters/audioRecorder';
+import { createLowPowerMode, type LowPowerSource } from '../../adapters/lowPower';
 import { createMicrophonePermission } from '../../adapters/microphonePermission';
 import type { Preferences } from '../../domain/ports/preferences';
 import { createDebriefModel } from '../../adapters/debriefModel';
@@ -60,6 +61,8 @@ export interface AppRuntime {
   openReplayAudio: (relativePath: string) => ReplayAudioPlayer | null;
   profiles: Profiles;
   preferences: Preferences;
+  /** Low Power Mode doubles the data refresh intervals. */
+  lowPower: LowPowerSource;
   telemetry: Telemetry;
   notamConfigured: () => Promise<boolean>;
   offline: OfflineMapService;
@@ -100,6 +103,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     layerSettings,
     notamReadStore,
     preferences,
+    lowPower: createLowPowerMode(),
     profiles: createProfiles(started.userDb, preferences),
     telemetry,
     debrief,
