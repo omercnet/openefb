@@ -25,6 +25,8 @@ struct Options {
     var reportPath = "docs/design/apd-georef-report.md"
     var jsonPath: String?
     var renderDirectory: String?
+    var packDirectory: String?
+    var packScale = 2.0
     var only: Set<String> = []
     var limit: Int?
     var jobs = max(2, ProcessInfo.processInfo.activeProcessorCount - 1)
@@ -36,7 +38,7 @@ struct Options {
 func usage() -> Never {
     print("""
     usage: apd-georef [--cycle YYNN] [--db aviation.sqlite] [--cache DIR] [--report FILE.md] [--json FILE.json]
-                      [--render DIR] [--only KPAO,KBOS,...] [--limit N] [--jobs N] [--verbose] [--inspect] [--runway-tolerance FEET]
+                      [--render DIR] [--pack DIR] [--pack-scale N] [--only KPAO,KBOS,...] [--limit N] [--jobs N] [--verbose] [--inspect] [--runway-tolerance FEET]
     """)
     exit(2)
 }
@@ -56,6 +58,11 @@ while !arguments.isEmpty {
     case "--report": options.reportPath = value()
     case "--json": options.jsonPath = value()
     case "--render": options.renderDirectory = value()
+    case "--pack": options.packDirectory = value()
+    case "--pack-scale":
+        // Finite and sane before any airport is processed: a bad scale would crash the render after the old pack was removed.
+        guard let scale = Double(value()), scale.isFinite, scale > 0, scale <= 4 else { print("--pack-scale must be a number above 0 and at most 4"); exit(2) }
+        options.packScale = scale
     case "--only": options.only = Set(value().split(separator: ",").map { $0.uppercased() })
     case "--limit": options.limit = Int(value())
     case "--jobs": options.jobs = Int(value()) ?? options.jobs
@@ -441,6 +448,19 @@ if let jsonPath = options.jsonPath {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     try encoder.encode(results).write(to: URL(fileURLWithPath: jsonPath))
+}
+if let packDirectory = options.packDirectory {
+    // The us-diagrams chart pack (PackWriter.swift): accepted diagrams only, nothing is uploaded.
+    var entries: [PackEntry] = []
+    for (index, outcome) in outcomes.enumerated() {
+        guard let outcome, outcome.ok, let georeference = outcome.georeference else { continue }
+        // An accepted airport whose PDF cannot be read stops the build: a pack must not silently lack airports.
+        let data = try Data(contentsOf: jobs[index].pdfURL)
+        entries.append(PackEntry(icao: outcome.icao, chart: outcome.pdfName, pdfData: data, georeference: georeference))
+    }
+    let summary = try writeUSDiagramPack(directory: URL(fileURLWithPath: packDirectory, isDirectory: true), cycle: cycle,
+                                         accuracyFeet: Int(options.tolerances.runwayFeet), entries: entries, scale: CGFloat(options.packScale))
+    print("pack: \(summary.airports) airports, \(summary.bytes) bytes, \(summary.directory.path)")
 }
 print("\(passed.count)/\(total) accepted (\(percent(passed.count, total))) in \(String(format: "%.0f", elapsed)) s; report: \(reportURL.path)")
 for (k, v) in categories.sorted(by: { $0.value > $1.value }) { print("  \(k): \(v)") }

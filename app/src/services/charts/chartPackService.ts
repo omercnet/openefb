@@ -95,6 +95,7 @@ export interface ChartPackServiceOptions {
 export const isSafeName = (name: string): boolean => /^[A-Za-z0-9][A-Za-z0-9._ -]*$/.test(name) && !name.includes('..');
 
 export function regionName(product: string): string {
+  if (product === 'us-diagrams') return 'US airport diagrams';
   return product === ISRAEL_CVFR_PRODUCT ? 'Israel CVFR' : `Israel ${product}`;
 }
 

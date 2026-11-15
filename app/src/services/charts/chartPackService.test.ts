@@ -2,7 +2,7 @@
 // published/validated rule, resume, edition-update detection and the fallback state. Network and disk are fakes.
 import { AppFailure } from '../../domain/errors';
 import { fakeFetch, type FakeFetch, type StubReply } from '../testSupport';
-import { ChartPackService, isSafeName, NO_RETRY, retryDelayMs, type RetryPolicy } from './chartPackService';
+import { ChartPackService, isSafeName, NO_RETRY, regionName, retryDelayMs, type RetryPolicy } from './chartPackService';
 import {
   chartBadgeText,
   compareNumeric,
@@ -505,4 +505,9 @@ test('a body larger than the manifest says is rejected, removed, sent with a byt
   expect(downloader.requests).toHaveLength(1);
   expect(downloader.requests[0].maxBytes).toBe(packBytes.length);
   expect(fs.exists(`${ROOT}/israel-cvfr/.partial-2025-02/${PACK_FILE}`)).toBe(false);
+});
+
+test('regionName names the US diagram pack for error messages', () => {
+  expect(regionName('us-diagrams')).toBe('US airport diagrams');
+  expect(regionName('israel-cvfr')).toBe('Israel CVFR');
 });
