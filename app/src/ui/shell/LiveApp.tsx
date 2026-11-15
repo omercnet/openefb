@@ -95,7 +95,7 @@ export function LiveApp({
   useEffect(() => {
     if (!recording) return;
     return recording.store.subscribe((state, previous) => {
-      if (state.lastPersistenceResult !== previous.lastPersistenceResult) void feed.refresh();
+      if (state.persistenceSerial !== previous.persistenceSerial) void feed.refresh();
     });
   }, [recording, feed]);
   const { started } = runtime;
@@ -188,15 +188,22 @@ export function LiveApp({
     if (!startRecording) return;
     let cancelled = false;
     let stop: (() => void) | null = null;
-    let built: RecordingRuntime | null = null;
     startRecording(runtime).then(
       async (services) => {
-        if (cancelled) return services.dispose();
-        built = services;
+        // The services are the process's (startRecordingServices): a recording in progress outlives this screen, and a
+        // remount binds to the same coordinator instead of starting a second one.
+        if (cancelled) return;
         stop = bindRecording(services, flightLog.store, NativeAppState);
         setRecording(services);
         // Crash recovery (Swift: FlightRecoveryService at launch): the profiles settle the active ids first.
-        await runtime.profiles.load().catch(() => undefined);
+        try {
+          await runtime.profiles.load();
+        } catch (error) {
+          // Recovering now would save the flights with no aircraft or pilot, and a saved flight is never revisited: they
+          // stay in the recording database for the next launch.
+          console.warn('Crash recovery postponed: the profiles did not load', error);
+          return;
+        }
         await services.recoverOrphans(runtime.profiles.activeIds()).catch((e) => console.warn('Recovery failed', e));
       },
       (error) => {
@@ -207,7 +214,6 @@ export function LiveApp({
     return () => {
       cancelled = true;
       stop?.();
-      built?.dispose();
       setRecording(null);
     };
   }, [runtime, startRecording]);

@@ -3,7 +3,7 @@
 // decision Q8) nor where the app has no debrief engine. What each section shows is decided in domain/debrief/flightDetail.ts.
 // Navigation is the shell's (I1): the screen reports where the user wants to go.
 import { useEffect, type ReactNode } from 'react';
-import { ActivityIndicator, Platform, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Platform, Text, View, useWindowDimensions } from 'react-native';
 import { useStore } from 'zustand';
 import type { FlightRecord } from '../../data/models';
 import {
@@ -16,7 +16,7 @@ import {
 } from '../../domain/debrief/flightDetail';
 import { Airplane, Chevron, InfoCircle, WarningTriangle } from '../Icons';
 import { FormType } from '../form/formStyle';
-import { NavBar } from '../form/Form';
+import { FormScreen } from '../form/Form';
 import { Pressy, useTheme } from '../Primitives';
 import type { FlightDetailStore } from '../state/flightDetailStore';
 import type { RecordingViewStore } from '../state/recordingStore';
@@ -321,7 +321,6 @@ export function FlightDetailScreen({
   navigation,
   platform = Platform.OS,
 }: FlightDetailScreenProps) {
-  const t = useTheme();
   const cvfr = useStore(store, (s) => s.cvfr);
   const availability = useStore(store, (s) => s.availability);
   const hasEngine = useStore(store, (s) => s.hasEngine);
@@ -354,16 +353,15 @@ export function FlightDetailScreen({
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.paper }} testID="flight-detail-screen">
-      <NavBar title="Flight Details" onBack={navigation.onBack} />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 20 }}>
+    <FormScreen title="Flight Details" largeTitle onBack={navigation.onBack} testID="flight-detail-screen">
+      <View style={{ padding: 16, gap: 20 }}>
         {sections.map((section, index) => (
           <View key={section} style={{ gap: 20 }}>
             {index > 0 ? <Divider /> : null}
             {view[section]}
           </View>
         ))}
-      </ScrollView>
-    </View>
+      </View>
+    </FormScreen>
   );
 }

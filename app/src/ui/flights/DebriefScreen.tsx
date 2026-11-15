@@ -2,7 +2,7 @@
 // phase, improvements and an overall rating, shown as the model streams them in, with Regenerate. Not shown on Android (owner
 // decision Q8). Navigation is the shell's (I1).
 import { useEffect, type ReactNode } from 'react';
-import { ActivityIndicator, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Text, View, useWindowDimensions } from 'react-native';
 import { useStore } from 'zustand';
 import {
   debriefErrorText,
@@ -14,7 +14,7 @@ import {
 import type { FlightDebrief, PhaseObservation } from '../../domain/debrief/types';
 import type { PartialPhaseObservation } from '../../domain/ports/debriefEngine';
 import { BorderedButton } from '../components/BorderedButton';
-import { NavBar } from '../form/Form';
+import { FormScreen } from '../form/Form';
 import { FormType } from '../form/formStyle';
 import { WarningTriangle, XmarkCircleFill } from '../Icons';
 import { useTheme } from '../Primitives';
@@ -220,9 +220,8 @@ export function DebriefScreen({ store, onBack }: { store: DebriefViewStore; onBa
   }, [store]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.paper }} testID="debrief-screen">
-      <NavBar title="AI Debrief" onBack={onBack} />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
+    <FormScreen title="AI Debrief" largeTitle onBack={onBack} testID="debrief-screen">
+      <View style={{ padding: 16, gap: 16 }}>
         {pane === 'completed' && completed ? (
           <>
             <CompletedContent debrief={completed} />
@@ -287,7 +286,7 @@ export function DebriefScreen({ store, onBack }: { store: DebriefViewStore; onBa
             />
           </View>
         ) : null}
-      </ScrollView>
-    </View>
+      </View>
+    </FormScreen>
   );
 }

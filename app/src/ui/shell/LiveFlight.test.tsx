@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { render } from '../../../tests/support/ui';
+import { press, render } from '../../../tests/support/ui';
 import type { FlightRecord } from '../../data/models';
 import { createStore } from 'zustand';
 import type { RecordingViewStore } from '../state/recordingStore';
@@ -92,6 +92,31 @@ describe('LiveFlight', () => {
     await settle();
     expect(onClose).toHaveBeenCalled();
     expect(detail).not.toHaveBeenCalled();
+  });
+
+  it('a read that fails is not a deleted flight: it says so, logs the flight, and Try again reads it again', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const onClose = jest.fn();
+    const load = jest.fn().mockRejectedValueOnce(new Error('disk I/O error')).mockResolvedValueOnce(flight);
+    const view = await render(
+      <LiveFlight
+        flightId="f1"
+        load={load}
+        build={() => stores()}
+        recording={recording}
+        databaseOpened
+        onClose={onClose}
+      />,
+    );
+    await settle();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(view.text()).toContain('disk I/O error');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('f1'));
+    await press(view.byTestId('flight-load-retry'));
+    await settle();
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(detail).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('frees the model and the stores when the screen goes away', async () => {

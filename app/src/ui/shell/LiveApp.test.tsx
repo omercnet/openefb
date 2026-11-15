@@ -251,6 +251,44 @@ describe('LiveApp (ContentView)', () => {
       expect(recover).toHaveBeenCalledWith({ aircraftProfileID: null, pilotProfileID: null });
     });
 
+    it('leaving the screen does not tear the recording services down: they belong to the process', async () => {
+      const { rt } = runtime();
+      withProfiles(rt);
+      const shared = await services();
+      const dispose = jest.spyOn(shared, 'dispose');
+      const start = async () => shared;
+      const first = await render(<LiveApp runtime={rt} startRecording={start} />);
+      await settle();
+      await first.unmount();
+      expect(dispose).not.toHaveBeenCalled();
+      await render(<LiveApp runtime={rt} startRecording={start} />);
+      await settle();
+      expect(flightLog.store.getState().recording?.status).toEqual({ kind: 'idle' });
+      expect(dispose).not.toHaveBeenCalled();
+    });
+
+    it('crash recovery waits for a launch where the profiles load: nothing is saved with no aircraft or pilot', async () => {
+      const { rt } = runtime();
+      withProfiles(rt);
+      Object.assign(rt.profiles, { load: async () => Promise.reject(new Error('no profiles')) });
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const recover = jest.fn(async () => []);
+      await render(
+        <LiveApp
+          runtime={rt}
+          startRecording={async () => {
+            const built = await services();
+            built.recoverOrphans = recover as never;
+            return built;
+          }}
+        />,
+      );
+      await settle();
+      expect(recover).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Crash recovery postponed'), expect.anything());
+      warn.mockRestore();
+    });
+
     it('an unavailable recording database hides the record control', async () => {
       const { rt } = runtime();
       withProfiles(rt);

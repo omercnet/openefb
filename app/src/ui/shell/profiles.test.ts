@@ -14,4 +14,10 @@ describe('profiles', () => {
     await profiles.load();
     expect(profiles.activeIds().pilotProfileID).not.toBeNull(); // Q5=A: the first pilot profile is active
   });
+
+  it('load rejects when the profiles cannot be read, so nothing assumes "no active profile"', async () => {
+    const db = openNodeSqliteDb(); // no migration: the profile tables are missing
+    const profiles = createProfiles(db, new FakePreferences());
+    await expect(profiles.load()).rejects.toThrow();
+  });
 });

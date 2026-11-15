@@ -145,6 +145,18 @@ let starting: Promise<AppRuntime> | null = null;
 /** One runtime per process: the route may remount, the databases and services must not be opened twice. */
 /** The recording services on the real adapters (Swift: MapContainerView.initializeServices). Rejects when the recording database cannot be opened. */
 export function startRecordingServices(runtime: AppRuntime): Promise<RecordingRuntime> {
+  // One set per process, like the runtime: the route may remount mid-recording, and a second coordinator would start a
+  // second recording (and a second connection to the recording database) beside the one running.
+  recordingServices ??= openRecordingServices(runtime).catch((error) => {
+    recordingServices = null; // a failed open may succeed later
+    throw error;
+  });
+  return recordingServices;
+}
+
+let recordingServices: Promise<RecordingRuntime> | null = null;
+
+function openRecordingServices(runtime: AppRuntime): Promise<RecordingRuntime> {
   const files = createRecordingFiles();
   return createRecordingRuntime({
     userDb: runtime.started.userDb,

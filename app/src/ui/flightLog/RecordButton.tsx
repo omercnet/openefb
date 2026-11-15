@@ -4,6 +4,7 @@
 // (the iPhone header): the glyph only, no level meter or elapsed time (the time is still spoken).
 import { Text, View } from 'react-native';
 import type { RecordingStatus } from '../../domain/recording/recordingCoordinator';
+import { registerRecordButtonAnchor } from '../recording/stopAnchor';
 import { Pressy, useTheme } from '../Primitives';
 import { Radius, Space, StripMetrics, Type } from '../tokens';
 import { MicFill } from './parts';
@@ -108,7 +109,11 @@ export function RecordButton({
         justifyContent: 'center',
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xs }}>
+      <View
+        ref={registerRecordButtonAnchor}
+        collapsable={false}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xs }}
+      >
         {glyph}
         {recording && !compact && !microphoneDenied ? <AudioLevelMeter dBFS={level} /> : null}
       </View>
