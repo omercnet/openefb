@@ -50,11 +50,12 @@ const geo = (lat: number, lon: number): AirportDiagramGeoreference => ({
     maskedInsets: 0,
   },
 });
-const AIRPORTS: Record<string, { icao: string; latitude: number; longitude: number }> = {
+const AIRPORTS: Record<string, { icao: string; type?: string; latitude: number; longitude: number }> = {
   KPAO: { icao: 'KPAO', latitude: 37.4611, longitude: -122.115 },
   KSFO: { icao: 'KSFO', latitude: 37.6213, longitude: -122.379 },
   KBOS: { icao: 'KBOS', latitude: 42.3643, longitude: -71.0052 },
   KXXX: { icao: 'KXXX', latitude: 37.47, longitude: -122.12 }, // in the database, not in the pack
+  KHLI: { icao: 'KPAO', type: 'heliport', latitude: 37.46, longitude: -122.11 }, // a pack id on a non-airport row
 };
 
 function setup(
@@ -85,11 +86,13 @@ function setup(
     airportsNear: async (center, radius) => {
       calls.push({ ...center, radius });
       if (opts.failNear) throw new Error('db down');
-      if (opts.wholeDatabase) return Object.values(AIRPORTS) as never; // a box can return airports beyond the circle
+      if (opts.wholeDatabase) return Object.values(AIRPORTS).map((a) => ({ type: 'airport', ...a })) as never; // a box can return airports beyond the circle
       const dLat = radius / 60;
-      return Object.values(AIRPORTS).filter(
-        (a) => Math.abs(a.latitude - center.lat) <= dLat && Math.abs(a.longitude - center.lon) <= dLat * 1.5,
-      ) as never;
+      return Object.values(AIRPORTS)
+        .map((a) => ({ type: 'airport', ...a }))
+        .filter(
+          (a) => Math.abs(a.latitude - center.lat) <= dLat && Math.abs(a.longitude - center.lon) <= dLat * 1.5,
+        ) as never;
     },
   };
   const source = createUsDiagramSource({ loadPack: async () => (opts.noPack ? null : pack), fs, aviation });
@@ -103,6 +106,12 @@ describe('US diagram source', () => {
     expect(near.map((c) => c.icao).sort()).toEqual(['KPAO', 'KSFO']); // KXXX is in the database but not in the pack
     expect(near.find((c) => c.icao === 'KPAO')?.position).toEqual({ lat: 37.4611, lon: -122.115 });
     expect(calls).toEqual([{ lat: 37.5, lon: -122.2, radius: 30 }]);
+  });
+
+  it('offers only airports, not a heliport row that carries a pack id', async () => {
+    const { source } = setup({ wholeDatabase: true });
+    const near = await source.candidates('us', { lat: 37.46, lon: -122.11 }, 5);
+    expect(near).toEqual([expect.objectContaining({ icao: 'KPAO', position: { lat: 37.4611, lon: -122.115 } })]);
   });
 
   it('cuts the database box to the requested radius', async () => {

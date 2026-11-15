@@ -37,8 +37,10 @@ test('a well-formed pack passes', () => {
 });
 
 test('a corrupted file is caught by the manifest hash', () => {
-  const dir = pack(({ files }) => { files['KPAO.png'] = Buffer.concat([png, Buffer.from('!')]); }); // manifest was computed before the change
-  assert.ok(checkPack(dir).errors.some((e) => /KPAO.png/.test(e)));
+  const dir = pack(({ files }) => { files['KPAO.png'] = Buffer.concat([png.subarray(0, png.length - 1), Buffer.from('y')]); }); // same length and signature; the manifest was computed before the change
+  const errors = checkPack(dir).errors;
+  assert.ok(errors.some((e) => /KPAO.png: sha256 differs/.test(e)));
+  assert.ok(!errors.some((e) => /bytes, manifest says/.test(e)));
 });
 
 test('a singular transform, a non-PNG image and a wrong product fail', () => {
@@ -73,4 +75,22 @@ test('a manifest name that is a path or traversal is rejected, not read', () => 
   const errors = checkPack(dir).errors;
   assert.equal(errors.filter((e) => /unsafe or missing name/.test(e)).length, 2);
   assert.ok(!errors.some((e) => /passwd|hosts/.test(e)));
+});
+
+test('JSON roots that are not objects, and a numeric edition, are rejected', () => {
+  for (const [file, value] of [['index.json', null], ['manifest.json', null], ['KPAO.json', null]]) {
+    const dir = pack(({ files, manifest }) => {
+      if (file === 'manifest.json') return;
+      files[file] = Buffer.from(JSON.stringify(value));
+      manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+    });
+    if (file === 'manifest.json') writeFileSync(join(dir, 'manifest.json'), 'null');
+    assert.ok(checkPack(dir).errors.some((e) => new RegExp(`${file}: the JSON root is not an object`).test(e)), file);
+  }
+  const dir = pack(({ files, index, manifest }) => {
+    index.edition = 2611;
+    files['index.json'] = Buffer.from(JSON.stringify(index));
+    manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+  });
+  assert.ok(checkPack(dir).errors.some((e) => /index.edition/.test(e)));
 });

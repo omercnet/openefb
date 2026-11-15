@@ -25,13 +25,18 @@ export function createUsDiagramSource(deps: UsDiagramSourceDeps): DiagramPackSou
       if (region !== 'us') return [];
       const pack = await deps.loadPack();
       if (!pack) return [];
-      const drawable = new Set(pack.georeferencedICAOs);
-      if (drawable.size === 0) return [];
+      // Query the box first: the pack's own check (a file lookup per airport) then runs only for the few airports in view.
       const airports = await deps.aviation.airportsNear(center, radiusNM);
       return (
         airports
-          // airportsNear returns a bounding box (its corners are farther than the radius): cut it to the circle.
-          .filter((a) => drawable.has(a.icao) && distanceNm(center, { lat: a.latitude, lon: a.longitude }) <= radiusNM)
+          // airportsNear returns a bounding box (its corners are farther than the radius): cut it to the circle. Only
+          // airports (not heliports or seaplane bases) are offered, as in Swift.
+          .filter(
+            (a) =>
+              a.type === 'airport' &&
+              distanceNm(center, { lat: a.latitude, lon: a.longitude }) <= radiusNM &&
+              pack.availability(a.icao).kind === 'georeferenced',
+          )
           .map((a) => ({ icao: a.icao, position: { lat: a.latitude, lon: a.longitude } }))
       );
     },

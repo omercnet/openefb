@@ -15,7 +15,12 @@ const rect = (v) => isObj(v) && ['x', 'y', 'width', 'height'].every((k) => num(v
 
 function readJson(path, errors) {
   try {
-    return JSON.parse(readFileSync(path, 'utf8'));
+    const value = JSON.parse(readFileSync(path, 'utf8'));
+    if (!isObj(value)) {
+      errors.push(`${basename(path)}: the JSON root is not an object`);
+      return null;
+    }
+    return value;
   } catch (e) {
     errors.push(`${basename(path)}: not readable JSON (${e.message})`);
     return null;
@@ -62,7 +67,7 @@ export function checkPack(dir, { min = 1 } = {}) {
   if (!index) return { errors, airports: 0, bytes: 0 };
 
   if (index.product !== 'us-diagrams') errors.push(`index.product is ${index.product}`);
-  if (!/^\d{4}$/.test(String(index.edition))) errors.push(`index.edition '${index.edition}' is not a d-TPP cycle (YYNN)`);
+  if (typeof index.edition !== 'string' || !/^\d{4}$/.test(index.edition)) errors.push(`index.edition '${index.edition}' is not a d-TPP cycle (YYNN)`);
   if (typeof index.editionLabel === 'string' && !index.editionLabel.startsWith(`d-TPP cycle ${index.edition}`)) errors.push(`index.editionLabel '${index.editionLabel}' does not name the cycle`);
   for (const k of ['editionLabel', 'aipDate']) if (typeof index[k] !== 'string' || !index[k]) errors.push(`index.${k} missing`);
   if (typeof index.aipDate === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(index.aipDate)) errors.push('index.aipDate is not yyyy-MM-dd');

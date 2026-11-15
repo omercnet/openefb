@@ -61,6 +61,8 @@ struct PackSummary {
 func writeUSDiagramPack(directory: URL, cycle: String, accuracyFeet: Int, entries: [PackEntry], scale: CGFloat) throws -> PackSummary {
     guard let effective = cycleEffectiveDate(cycle) else { throw NSError(domain: "apd-pack", code: 1, userInfo: [NSLocalizedDescriptionKey: "cycle '\(cycle)' is not YYNN"]) }
     let day = DateFormatter()
+    day.locale = Locale(identifier: "en_US_POSIX")
+    day.calendar = Calendar(identifier: .gregorian)
     day.dateFormat = "yyyy-MM-dd"
     day.timeZone = TimeZone(identifier: "UTC")
     let out = directory.appendingPathComponent(cycle, isDirectory: true)
@@ -93,8 +95,9 @@ func writeUSDiagramPack(directory: URL, cycle: String, accuracyFeet: Int, entrie
     }
 
     let shown = DateFormatter()
-    shown.dateFormat = "dd MMM yyyy"
     shown.locale = Locale(identifier: "en_US_POSIX")
+    shown.calendar = Calendar(identifier: .gregorian)
+    shown.dateFormat = "dd MMM yyyy"
     shown.timeZone = TimeZone(identifier: "UTC")
     let label = "d-TPP cycle \(cycle) (\(shown.string(from: effective).uppercased()))"   // the app's badge: "FAA airport diagrams <label> +/-50 ft"
     let index = Index(product: "us-diagrams", edition: cycle, editionLabel: label, aipDate: day.string(from: effective),

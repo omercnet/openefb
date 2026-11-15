@@ -59,7 +59,10 @@ while !arguments.isEmpty {
     case "--json": options.jsonPath = value()
     case "--render": options.renderDirectory = value()
     case "--pack": options.packDirectory = value()
-    case "--pack-scale": options.packScale = Double(value()) ?? options.packScale
+    case "--pack-scale":
+        // Finite and sane before any airport is processed: a bad scale would crash the render after the old pack was removed.
+        guard let scale = Double(value()), scale.isFinite, scale > 0, scale <= 4 else { print("--pack-scale must be a number above 0 and at most 4"); exit(2) }
+        options.packScale = scale
     case "--only": options.only = Set(value().split(separator: ",").map { $0.uppercased() })
     case "--limit": options.limit = Int(value())
     case "--jobs": options.jobs = Int(value()) ?? options.jobs
@@ -450,7 +453,9 @@ if let packDirectory = options.packDirectory {
     // The us-diagrams chart pack (PackWriter.swift): accepted diagrams only, nothing is uploaded.
     var entries: [PackEntry] = []
     for (index, outcome) in outcomes.enumerated() {
-        guard let outcome, outcome.ok, let georeference = outcome.georeference, let data = try? Data(contentsOf: jobs[index].pdfURL) else { continue }
+        guard let outcome, outcome.ok, let georeference = outcome.georeference else { continue }
+        // An accepted airport whose PDF cannot be read stops the build: a pack must not silently lack airports.
+        let data = try Data(contentsOf: jobs[index].pdfURL)
         entries.append(PackEntry(icao: outcome.icao, chart: outcome.pdfName, pdfData: data, georeference: georeference))
     }
     let summary = try writeUSDiagramPack(directory: URL(fileURLWithPath: packDirectory, isDirectory: true), cycle: cycle,
