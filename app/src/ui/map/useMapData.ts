@@ -24,6 +24,13 @@ export function useMapController(deps: MapDataDeps): MapDataController {
 export const useMapData = (controller: MapDataController): MapDataSnapshot =>
   useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
 
+/** The centre and web-mercator zoom that fit `box` in a map about 500 pt across (Swift padded the box by 100 pt a side). */
+export function frameFor(box: { south: number; west: number; north: number; east: number }): { center: Coordinate; zoom: number } {
+  const span = Math.max(box.north - box.south, box.east - box.west, 0.01);
+  const zoom = Math.min(14, Math.max(4, Math.log2((360 * 600) / (512 * span))));
+  return { center: { lat: (box.south + box.north) / 2, lon: (box.west + box.east) / 2 }, zoom };
+}
+
 export interface CameraModel {
   state: CameraState;
   camera: { seq: number; command: CameraCommand | null };
@@ -132,6 +139,10 @@ export function useMapModel(input: MapModelInput) {
     () => dispatch({ type: 'recenter', position: ownship.position, trackDeg: ownship.trackDeg }),
     [dispatch, ownship.position, ownship.trackDeg],
   );
+  const frame = useCallback(
+    (box: { south: number; west: number; north: number; east: number }) => dispatch({ type: 'frame', ...frameFor(box) }),
+    [dispatch],
+  );
   const zoomTo = useCallback((level: number) => dispatch({ type: 'zoomTo', level }), [dispatch]);
   const setMode = useCallback(
     (mode: MapMode) => dispatch({ type: 'setMode', mode, position: ownship.position, trackDeg: ownship.trackDeg }),
@@ -159,5 +170,6 @@ export function useMapModel(input: MapModelInput) {
     recenter,
     setMode,
     zoomTo,
+    frame,
   };
 }

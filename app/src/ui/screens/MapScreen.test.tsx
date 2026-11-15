@@ -27,6 +27,7 @@ let lastSurface: {
   night: boolean;
   sectional: boolean;
   sectionalOpacity?: number;
+  sources: Record<string, { features: unknown[] }>;
 } | null = null;
 jest.mock('../map/MapSurface', () => ({
   MapSurface: (props: NonNullable<typeof lastSurface>) => <MockSurface {...props} />,
@@ -39,6 +40,17 @@ const MockSurface = (props: NonNullable<typeof lastSurface>) => {
 };
 jest.mock('../../adapters/glyphInstall', () => ({
   useLocalGlyphs: () => ({ status: 'ready', url: 'file:///g/{fontstack}/{range}.pbf' }),
+}));
+let briefingProps: {
+  presented: boolean;
+  onShow: (h: { source: unknown; bounds: unknown }) => void;
+  onDismiss: () => void;
+} | null = null;
+jest.mock('../shell/LiveBriefing', () => ({
+  LiveBriefing: (props: NonNullable<typeof briefingProps>) => {
+    briefingProps = props;
+    return null;
+  },
 }));
 jest.mock('../map/mapStatus', () => ({ getCurrentMapStatus: () => null }));
 
@@ -172,5 +184,35 @@ describe('live MapScreen (MapContainerView)', () => {
     await mountLive(runtime);
     expect(lastSurface!.region).toBe('israel');
     expect(lastSurface!.initialView.center.lat).toBeLessThan(34); // Israel, not the US centre
+  });
+
+  it('the briefing sheet follows the app store, and Done closes it', async () => {
+    const { runtime } = fakeRuntime();
+    await mountLive(runtime);
+    expect(briefingProps!.presented).toBe(false);
+    await act(async () => appStore.getState().setPresentingBriefing(true));
+    expect(briefingProps!.presented).toBe(true);
+    await act(async () => briefingProps!.onDismiss());
+    expect(appStore.getState().isPresentingBriefing).toBe(false);
+  });
+
+  it('Show on map draws the highlight on the Israel chart sources', async () => {
+    const { runtime } = fakeRuntime({ region: 'israel' });
+    (runtime.started as { israel: unknown }).israel = {
+      reportingPoints: async () => [],
+      routeSegments: async () => [],
+      airspacesOfKind: async () => [],
+      runwaysIn: async () => [],
+      aerodromesIn: async () => [],
+    };
+    await mountLive(runtime);
+    await act(async () => undefined);
+    await act(async () =>
+      briefingProps!.onShow({
+        source: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { color: '#FF3B30' } }] },
+        bounds: { south: 32, west: 34.8, north: 32.2, east: 35 },
+      }),
+    );
+    expect(lastSurface!.sources['il-brief-highlight']?.features).toHaveLength(1);
   });
 });

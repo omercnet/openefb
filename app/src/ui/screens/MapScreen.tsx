@@ -14,13 +14,15 @@ import { useOfflineMaps } from '../map/useOfflineMaps';
 import type { OfflineRegionBounds } from '../../domain/offline/bounds';
 import { refreshableMapFor, useDataRefresh } from '../map/refreshDue';
 import { useMapController, useMapModel } from '../map/useMapData';
-import { useAppStore } from '../state/appStore';
+import { appStore, useAppStore } from '../state/appStore';
 import { flightLog } from '../flightLog/store';
 import { useOwnship } from '../state/ownship';
 import { useIsNight } from '../state/night';
 import { useRuntime } from '../state/runtimeContext';
 import { layers } from '../columns/layers/store';
 import { bindLayers } from '../shell/layersFeed';
+import { LiveBriefing } from '../shell/LiveBriefing';
+import type { Highlight } from '../sheets/briefing/briefingHighlight';
 import { advisorySource } from '../shell/mapSources';
 
 /** With the aviation database closed every query fails; the controller reports it and the red banner explains. */
@@ -77,19 +79,28 @@ export function MapScreen() {
       }),
     [layersStore],
   );
-  const israelSources = useIsraelChart({
+  const israelChart = useIsraelChart({
     db: runtime.started.israel,
     notam: runtime.israelNotam,
     enabled: region === 'israel',
     onClosureStatus,
   });
+  // IsraelBriefingMapHighlight: the NOTAM drawn from the briefing's "Show on map" until it is cleared.
+  const [highlight, setHighlight] = useState<Highlight | null>(null);
+  const extraSources = useMemo(
+    () =>
+      israelChart.sources
+        ? { ...israelChart.sources, ...(highlight ? { 'il-brief-highlight': highlight.source } : null) }
+        : undefined,
+    [israelChart.sources, highlight],
+  );
   const model = useMapModel({
     controller,
     ownship,
     ownshipInRegion: ownship.position !== null && regionContains(region, ownship.position),
     route,
     initialMode: mapMode,
-    extraSources: israelSources,
+    extraSources,
   });
 
   // Orientation (North up / Track up) set in the Layers column drives the camera (MapViewModel.setMapMode).
@@ -144,14 +155,39 @@ export function MapScreen() {
     networkAvailable: !flightLog.store.getState().isOffline,
   }));
 
+  const presentingBriefing = useAppStore((s) => s.isPresentingBriefing);
+  const dismissBriefing = useCallback(() => appStore.getState().setPresentingBriefing(false), []);
+  const { frame } = model;
+  const showHighlight = useCallback(
+    (shown: Highlight) => {
+      setHighlight(shown);
+      frame(shown.bounds);
+    },
+    [frame],
+  );
+  const clearHighlight = useCallback(() => setHighlight(null), []);
+  const fetchFeed = useCallback((force: boolean) => runtime.israelNotam.fetchFeed(force), [runtime.israelNotam]);
+
   return (
-    <MapLayout
-      model={modelWithZoom}
-      initialView={initial}
-      night={night}
-      liveNight={night}
-      sectional={model.snapshot.visibleLayers.has('sectional')}
-      sectionalOpacity={sectionalOpacity}
-    />
+    <>
+      <MapLayout
+        model={modelWithZoom}
+        initialView={initial}
+        night={night}
+        liveNight={night}
+        sectional={model.snapshot.visibleLayers.has('sectional')}
+        sectionalOpacity={sectionalOpacity}
+      />
+      <LiveBriefing
+        fetcher={fetchFeed}
+        readStore={runtime.notamReadStore}
+        ownship={ownship.position}
+        pointLookup={israelChart.pointLookup}
+        presented={presentingBriefing}
+        onDismiss={dismissBriefing}
+        onShow={showHighlight}
+        onClear={clearHighlight}
+      />
+    </>
   );
 }

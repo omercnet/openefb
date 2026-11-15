@@ -12,10 +12,12 @@ const db = {
 };
 
 let seen: Readonly<Record<string, FeatureCollection>> | undefined;
+let lookup: ((code: string) => unknown) | undefined;
 function Probe(props: IsraelChartInputs) {
-  const sources = useIsraelChart(props);
+  const chart = useIsraelChart(props);
   useEffect(() => {
-    seen = sources;
+    seen = chart.sources;
+    lookup = chart.pointLookup;
   });
   return null;
 }
@@ -61,5 +63,19 @@ describe('useIsraelChart', () => {
     await flush();
     expect(fetchFeed).toHaveBeenCalledTimes(2);
     expect(db.reportingPoints).toHaveBeenCalledTimes(1);
+  });
+
+  it('looks a code up among the reporting points, then the aerodromes (the briefing highlight)', async () => {
+    db.reportingPoints.mockResolvedValueOnce([{ code: 'GALIM', latitude: 32.1, longitude: 34.8 }] as never);
+    db.aerodromesIn.mockResolvedValueOnce([
+      { code: 'LLHZ', latitude: 32.18, longitude: 34.83, use: 'civil' },
+      { code: 'GALIM', latitude: 1, longitude: 1, use: 'civil' },
+    ] as never);
+    await render(<Probe db={db} notam={null} enabled />);
+    await flush();
+    await flush();
+    expect(lookup?.('galim')).toEqual({ lat: 32.1, lon: 34.8 });
+    expect(lookup?.('LLHZ')).toEqual({ lat: 32.18, lon: 34.83 });
+    expect(lookup?.('NOPE')).toBeNull();
   });
 });

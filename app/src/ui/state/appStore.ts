@@ -17,6 +17,9 @@ export interface AppState {
   /** Select an airport and show its column (the SwiftUI app always does both together). */
   showAirport: (icao: string) => void;
   reportDatabaseError: (error: AppError) => void;
+  /** The Israel NOTAM briefing sheet is up (AppState.isPresentingIsraelBriefing). */
+  isPresentingBriefing: boolean;
+  setPresentingBriefing: (presenting: boolean) => void;
   clearDatabaseError: () => void;
   setNavigation: (navigation: ActiveNavigation) => void;
 }
@@ -28,6 +31,8 @@ export const createAppStore = () =>
     selectedAirportId: null,
     databaseError: null,
     navigation: NO_NAVIGATION,
+    isPresentingBriefing: false,
+    setPresentingBriefing: (isPresentingBriefing) => set({ isPresentingBriefing }),
     setStripColumn: (stripColumn) => set({ stripColumn }),
     showAirport: (icao) => set({ selectedAirportId: icao, stripColumn: 'airport' }),
     reportDatabaseError: (databaseError) => set({ databaseError }),

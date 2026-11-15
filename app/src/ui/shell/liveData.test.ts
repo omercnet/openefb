@@ -139,4 +139,11 @@ describe('live data', () => {
     expect(stores.flightLog.getState()).toMatchObject({ directTo: 'KSQL', activeFlightPlan: true });
     stop();
   });
+
+  it('the Brief control presents the NOTAM briefing', () => {
+    const { stores, stop } = setup();
+    stores.flightLog.getState().actions.openBriefing();
+    expect(stores.app.getState().isPresentingBriefing).toBe(true);
+    stop();
+  });
 });

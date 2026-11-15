@@ -31,7 +31,9 @@ export type CameraAction =
   | { type: 'setMode'; mode: MapMode; position: Coordinate | null; trackDeg: number }
   | { type: 'directionChanged'; direction: number }
   /** The footer's ZOOM buttons (MapViewModel.setZoomLevel): zoom only, centre and rotation stay. */
-  | { type: 'zoomTo'; level: number };
+  | { type: 'zoomTo'; level: number }
+  /** Show a box (IsraelBriefingMapHighlight.show: setVisibleCoordinateBounds): the camera stops following ownship. */
+  | { type: 'frame'; center: Coordinate; zoom: number };
 
 export const initialCameraState = (mode: MapMode = 'northUp'): CameraState => ({
   follow: followModeState(),
@@ -92,6 +94,11 @@ export function cameraReducer(
           direction: directionFor(action.mode, action.trackDeg),
           animated: true,
         },
+      };
+    case 'frame':
+      return {
+        state: isFollowing(state.follow) ? { ...state, follow: userMovedMap(state.follow) } : state,
+        command: { center: action.center, zoom: action.zoom, direction: state.mapDirection, animated: true },
       };
     case 'zoomTo':
       return { state, command: { center: null, zoom: action.level, direction: state.mapDirection, animated: true } };

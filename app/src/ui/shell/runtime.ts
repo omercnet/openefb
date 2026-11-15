@@ -15,6 +15,7 @@ import type { LocationSource } from '../../domain/ports/location';
 import { AirSigmetService } from '../../services/airSigmetService';
 import { createRemoteConfigService } from '../../services/remoteConfigService';
 import { RemoteConfigStore } from '../../services/remoteConfigStore';
+import { NotamReadStateStore } from '../../services/notamReadStateStore';
 import { IsraelNotamService } from '../../services/israelNotamService';
 import { TfrService } from '../../services/tfrService';
 import { WeatherService } from '../../services/weatherService';
@@ -29,6 +30,7 @@ export interface AppRuntime {
   weather: WeatherService;
   tfr: TfrService;
   israelNotam: IsraelNotamService;
+  notamReadStore: NotamReadStateStore;
   offline: OfflineMapService;
   advisories: AirSigmetService;
   layerSettings: LayerSettings;
@@ -55,10 +57,12 @@ export async function startRuntime(): Promise<AppRuntime> {
       RemoteConfigStore.open({ service: remote, storage: fileTextStorage, buildNumber: buildNumber(), log }),
     log,
   });
+  const notamReadStore = await NotamReadStateStore.open(fileTextStorage, log);
   const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage);
   return {
     started,
     layerSettings,
+    notamReadStore,
     weather: new WeatherService({ fetch: fetchLike, log }),
     tfr: new TfrService({ fetch: fetchLike, log }),
     offline: new OfflineMapService({

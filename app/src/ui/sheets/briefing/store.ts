@@ -1,7 +1,8 @@
 // The briefing slice and IsraelBriefingViewModel (ViewModels/IsraelBriefingViewModel.swift): loads the relay feed,
 // applies the flight-window, distance and aerodrome filters, and tracks read/unread. A feed past the NOTAM freshness limit
 // is never listed as current. The slice holds the plain state; the view model writes it and derives the rows through
-// logic.ts. I1 passes the real IsraelNotamService and NotamReadStateStore in; until then the capture fixture feeds it.
+// logic.ts. The live app (shell/LiveBriefing.tsx) passes the real IsraelNotamService and NotamReadStateStore in; the capture
+// route passes its fixture.
 import type { StoreApi } from 'zustand';
 import type { DataFreshness } from '../../../domain/core/freshness';
 import { errorDescription } from '../../../domain/core/errorInfo';
@@ -16,8 +17,8 @@ import type {
 import type { IsraelLatLon, IsraelNotam } from '../../../domain/israel/notamTypes';
 import type { IsraelNotamReport } from '../../../services/israelNotam';
 import { createStoreContext } from '../../state/storeContext';
-import { captureBriefingData } from './fixture';
 import {
+  DEFAULT_FILTERS,
   briefingFreshness,
   briefingQuery,
   briefingWindow,
@@ -40,7 +41,12 @@ export interface BriefingData extends BriefingInputs {
 }
 
 /** FAKE: the capture fixture (an expired 117-NOTAM feed on the Herzliya to Rosh Pina route) until I1 loads the relay. */
-export const briefing = createStoreContext<BriefingData>(captureBriefingData());
+/** A briefing before anything is loaded: default filters, the given route and ownship, no report. */
+export function emptyBriefingData(route: BriefingRoute | null, ownship: IsraelLatLon | null): BriefingData {
+  return { ...DEFAULT_FILTERS, route, ownship, report: null, isLoading: false, errorMessage: null, readVersion: 0 };
+}
+
+export const briefing = createStoreContext<BriefingData>(emptyBriefingData(null, null));
 
 /** Downloads the feed; `force` bypasses the service's five-minute cache (pull to refresh, Retry). */
 export type BriefingFetcher = (force: boolean) => Promise<IsraelNotamReport>;
