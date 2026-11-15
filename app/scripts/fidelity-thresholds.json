@@ -52,11 +52,8 @@
       "interim": 0.71,
       "reason": "notice text wraps and button sizes differ from the SwiftUI notices; strip text drift"
     },
-    "recordingstop": {
-      "min": 0.9,
-      "interim": 0.77,
-      "reason": "End recording dialog is a centred modal, Swift anchors a popover under the record button"
-    },
+    "recordingstop": { "min": 0.9 },
+    "debrief": { "min": 0.85, "metric": "frame" },
     "briefing": {
       "min": 0.85,
       "interim": 0.75,
@@ -122,7 +119,7 @@
     "recordingstop": {
       "min": 0.85,
       "interim": 0.7,
-      "reason": "End recording dialog is a centred modal, Swift anchors a popover under the record button"
+      "reason": "Android keeps the in-app End recording dialog (centred modal); Swift anchors a popover under the record button, which iOS now gets from the system sheet"
     },
     "briefing": {
       "min": 0.8,

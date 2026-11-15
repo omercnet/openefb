@@ -34,7 +34,9 @@ const referenceFile = (screen: string) => `reference/${referenceNames[screen] ??
 // rule that both platforms gate the same screens cannot hold for it; and the flight screens whose Swift reference seeds a different
 // flight than the RN fixture (cvfr and flightdetail show another route, replay and replayfast another track), so the score would
 // measure the data, not the layout. Gate them once the fixtures are aligned.
-const NOT_GATED = ['sheet', 'map-layers', 'debrief', 'flightdetail', 'cvfr', 'replay', 'replayfast'];
+const NOT_GATED = ['sheet', 'map-layers', 'flightdetail', 'cvfr', 'replay', 'replayfast'];
+// The AI debrief exists on iOS only (Q8): gated there, with no Android capture or floor.
+const IOS_ONLY = ['debrief'];
 
 describe('fidelity gate registration', () => {
   const screens = Object.keys(thresholds.ios);
@@ -48,17 +50,17 @@ describe('fidelity gate registration', () => {
   });
 
   it('gates the same screens on iOS and Android', () => {
-    expect(Object.keys(thresholds.android).sort()).toEqual([...screens].sort());
+    expect(Object.keys(thresholds.android).sort()).toEqual(screens.filter((s) => !IOS_ONLY.includes(s)).sort());
   });
 
   it.each(screens)('%s has a route, a launch entry, both captures and a reference', (screen) => {
     expect(existsSync(join(root, `src/app/${screen}.tsx`))).toBe(true);
     if (screen !== 'map') expect(launchScreens).toContain(screen);
     expect(iosCaptured).toContain(screen);
-    expect(androidCaptured).toContain(screen);
+    if (!IOS_ONLY.includes(screen)) expect(androidCaptured).toContain(screen);
     // A screen whose SwiftUI reference arrives with Q6 (#48) says so in both platforms' floors and is not gated until then.
     const pending = [thresholds.ios[screen], thresholds.android[screen]].map((e) => e?.referencePending === true);
-    expect(pending[0]).toBe(pending[1]);
+    if (!IOS_ONLY.includes(screen)) expect(pending[0]).toBe(pending[1]);
     const hasReference = existsSync(join(root, referenceFile(screen)));
     expect(hasReference || pending[0]).toBe(true);
     // The flag is only for a missing reference: once the file lands the entry must drop it, or a missing capture passes.
