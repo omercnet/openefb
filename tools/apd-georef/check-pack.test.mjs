@@ -115,3 +115,18 @@ test('impossible cycles such as 0000 and 2699 are rejected, real ones pass', () 
     assert.deepEqual(checkPack(dir).errors.filter((e) => /not a d-TPP cycle/.test(e)), [], edition);
   }
 });
+
+test('messages never echo a long or hostile value from the pack', () => {
+  const secret = 'SECRET-' + 'x'.repeat(5000);
+  const dir = pack(({ files, index, manifest }) => {
+    index.product = secret;
+    index.edition = secret;
+    index.editionLabel = secret;
+    index.aerodromes[secret] = index.aerodromes.KPAO;
+    files['index.json'] = Buffer.from(JSON.stringify(index));
+    manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+  });
+  const errors = checkPack(dir).errors;
+  assert.ok(errors.length > 0);
+  assert.ok(errors.every((e) => e.length < 200 && !e.includes('x'.repeat(30))), errors.join('\n').slice(0, 300));
+});

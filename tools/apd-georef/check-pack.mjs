@@ -8,7 +8,9 @@ import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+// Untrusted values in a message: their type and at most 24 characters, so a crafted pack cannot flood the log.
+const brief = (v) => (typeof v === 'string' ? `${JSON.stringify(v.slice(0, 24))}${v.length > 24 ? ` (${v.length} chars)` : ''}` : typeof v);
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 const rect = (v) => isObj(v) && ['x', 'y', 'width', 'height'].every((k) => num(v[k]));
@@ -38,8 +40,8 @@ function checkGeoreference(g, name, errors) {
   if (!isObj(d)) errors.push(`${name}: diagnostics missing`);
   else {
     // What decodeGeoreference requires: without these the app drops the airport's overlay.
-    if (!['grid', 'gridRunwayChecked', 'runway'].includes(d.method)) errors.push(`${name}: diagnostics.method is ${d.method}`);
-    if (!['text', 'ocr', 'none'].includes(d.labelSource)) errors.push(`${name}: diagnostics.labelSource is ${d.labelSource}`);
+    if (!['grid', 'gridRunwayChecked', 'runway'].includes(d.method)) errors.push(`${name}: diagnostics.method is ${brief(d.method)}`);
+    if (!['text', 'ocr', 'none'].includes(d.labelSource)) errors.push(`${name}: diagnostics.labelSource is ${brief(d.labelSource)}`);
     for (const k of ['latitudeLabels', 'longitudeLabels', 'rotationDegrees', 'runwaysMatched', 'maskedInsets']) {
       if (!Number.isInteger(d[k])) errors.push(`${name}: diagnostics.${k} is not an integer`);
     }
@@ -66,9 +68,9 @@ export function checkPack(dir, { min = 1 } = {}) {
   const manifest = existsSync(manifestPath) ? readJson(manifestPath, errors) : (errors.push('manifest.json missing'), null);
   if (!index) return { errors, airports: 0, bytes: 0 };
 
-  if (index.product !== 'us-diagrams') errors.push(`index.product is ${index.product}`);
-  if (typeof index.edition !== 'string' || !/^\d{2}(0[1-9]|1[0-4])$/.test(index.edition)) errors.push(`index.edition '${index.edition}' is not a d-TPP cycle (YYNN, NN from 01 to 14)`);
-  if (typeof index.editionLabel === 'string' && !index.editionLabel.startsWith(`d-TPP cycle ${index.edition}`)) errors.push(`index.editionLabel '${index.editionLabel}' does not name the cycle`);
+  if (index.product !== 'us-diagrams') errors.push(`index.product is ${brief(index.product)}`);
+  if (typeof index.edition !== 'string' || !/^\d{2}(0[1-9]|1[0-4])$/.test(index.edition)) errors.push(`index.edition ${brief(index.edition)} is not a d-TPP cycle (YYNN, NN from 01 to 14)`);
+  if (typeof index.editionLabel === 'string' && !index.editionLabel.startsWith(`d-TPP cycle ${index.edition}`)) errors.push(`index.editionLabel ${brief(index.editionLabel)} does not name the cycle`);
   for (const k of ['editionLabel', 'aipDate']) if (typeof index[k] !== 'string' || !index[k]) errors.push(`index.${k} missing`);
   if (typeof index.aipDate === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(index.aipDate)) errors.push('index.aipDate is not yyyy-MM-dd');
   if (!Number.isInteger(index.accuracyFeet)) errors.push('index.accuracyFeet is not an integer');
@@ -78,12 +80,12 @@ export function checkPack(dir, { min = 1 } = {}) {
   const icaos = Object.keys(index.aerodromes);
   for (const icao of icaos) {
     const r = index.aerodromes[icao];
-    if (!/^[A-Z0-9]{3,4}$/.test(icao)) errors.push(`${icao}: not an airport identifier`);
+    if (!/^[A-Z0-9]{3,4}$/.test(icao)) { errors.push(`${brief(icao)}: not an airport identifier`); continue; }
     if (!isObj(r)) { errors.push(`${icao}: record is not an object`); continue; }
     for (const k of ['chart', 'language', 'scale', 'reason']) if (typeof r[k] !== 'string') errors.push(`${icao}: ${k} is not a string`);
     if (typeof r.sheet !== 'string') errors.push(`${icao}: sheet is not a string`);
     if (r.georeferenced !== true) { errors.push(`${icao}: the US pack lists only georeferenced airports`); continue; }
-    if (r.image !== `${icao}.png` || r.georeference !== `${icao}.json`) { errors.push(`${icao}: image/georeference names are ${r.image}/${r.georeference}`); continue; }
+    if (r.image !== `${icao}.png` || r.georeference !== `${icao}.json`) { errors.push(`${icao}: image/georeference names are ${brief(r.image)}/${brief(r.georeference)}`); continue; }
     named.add(r.image); named.add(r.georeference);
     const png = join(dir, r.image);
     if (!existsSync(png)) errors.push(`${icao}: ${r.image} missing`);
