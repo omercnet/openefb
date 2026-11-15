@@ -44,6 +44,30 @@ tester = Struct.new(:id).new("t1")
   end
 end
 
+# Both build reads pass `includes:` explicitly, without betaBuildMetrics (Apple rejects it; Spaceship's default asks for it).
+default_includes = testflight.instance_method(:get_builds).parameters.any? { |kind, name| name == :includes && kind == :key }
+check.call(default_includes, "get_builds(includes:)")
+seen = []
+Spaceship::ConnectAPI.singleton_class.send(:alias_method, :real_get_builds, :get_builds)
+Spaceship::ConnectAPI.define_singleton_method(:get_builds) do |**args|
+  seen << args
+  Struct.new(:to_models).new([])
+end
+begin
+  adapter = TestflightSetup::ConnectApi.new
+  adapter.group_builds(Struct.new(:id).new("g1"), 5)
+  adapter.latest_builds(Struct.new(:id).new("app1"), 5)
+ensure
+  Spaceship::ConnectAPI.singleton_class.send(:alias_method, :get_builds, :real_get_builds)
+end
+check.call(seen.size == 2, "both build reads call get_builds (saw #{seen.size})")
+seen.each_with_index do |args, i|
+  name = %w[group_builds latest_builds][i]
+  check.call(args.key?(:includes), "#{name} passes includes: explicitly")
+  check.call(!args[:includes].to_s.include?("betaBuildMetrics"), "#{name} must not include betaBuildMetrics")
+end
+check.call(TestflightSetup::ConnectApi::BUILD_INCLUDES == "preReleaseVersion", "BUILD_INCLUDES is preReleaseVersion")
+
 if missing.empty?
   puts "Spaceship #{Gem.loaded_specs['fastlane']&.version}: all calls present"
 else

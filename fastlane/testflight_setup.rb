@@ -107,14 +107,20 @@ module TestflightSetup
       Spaceship::ConnectAPI.get_beta_testers(filter: { betaGroups: group.id }, limit: PAGE).to_models
     end
 
+    # Spaceship's get_builds asks for "buildBetaDetail,betaBuildMetrics" unless told otherwise, and Apple now rejects
+    # betaBuildMetrics ("not a valid relationship name"). Both build reads therefore pass `includes:` explicitly.
+    BUILD_INCLUDES = "preReleaseVersion".freeze
+
     # The newest builds of the group, as many as status prints: never the whole history.
     def group_builds(group, count)
-      Spaceship::ConnectAPI.get_builds(filter: { betaGroups: group.id }, sort: "-uploadedDate", limit: count).to_models
+      Spaceship::ConnectAPI.get_builds(
+        filter: { betaGroups: group.id }, includes: BUILD_INCLUDES, sort: "-uploadedDate", limit: count
+      ).to_models
     end
 
     def latest_builds(app, count)
       Spaceship::ConnectAPI.get_builds(
-        filter: { app: app.id }, includes: "preReleaseVersion", sort: "-uploadedDate", limit: count
+        filter: { app: app.id }, includes: BUILD_INCLUDES, sort: "-uploadedDate", limit: count
       ).to_models.first(count)
     end
 
