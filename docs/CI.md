@@ -56,7 +56,22 @@ PR-time proof, no secrets: the `iOS release lane (prebuild + unsigned archive)` 
 
 ### RN preview upload (before cutover)
 
-To put an RN build into the owner's INTERNAL TestFlight group without cutting over: Actions, Release, Run workflow from branch `main` with `app` = `rn`, `upload` on and `tag` empty. It builds the current commit of `main` (marketing version from `version.txt`, build number one above App Store Connect's newest) and uploads it to the internal group only; the What to Test notes are "RN preview from <short sha>". It does not need `TESTFLIGHT_APP` and does not change it. The selector is always read from `main`, and the Release job fails at its first step (it does not skip, so a run from another branch is never a silent green) unless it was dispatched on `main`: this applies to every manual run, tagged uploads and sign-only checks included. A workflow file is read from the branch a run is dispatched on, so the durable guard is the owner's setting: the `testflight` environment's deployment branches rule, limited to `main`. Anything else without a tag still fails: `app` = `swift` or `variable` with upload on and no tag, a run from a branch other than `main`, and push runs (which build only the release-please tag). What gets built is chosen by `tools/ci/resolve-testflight-target.sh`; `tools/ci/resolve-testflight-target.test.sh` holds the table of cases (push or dispatch, app, tag, upload) and runs in the `lint` job of `ci.yml`, so the required CI gate enforces it on every pull request.
+Puts an RN build into the owner's INTERNAL TestFlight group without cutting over. It does not need `TESTFLIGHT_APP` and does not change it.
+
+Prerequisites: the `testflight` environment holds `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `DIST_CERT_P12_BASE64` and `DIST_CERT_P12_PASSWORD` (see above). The owner's setting, recommended: limit the environment's deployment branches to `main`.
+
+1. Open Actions, Release, Run workflow, and choose branch `main`.
+2. Set `app` = `rn`, leave `upload` on, and leave `tag` empty. (`build_number` stays empty: the lane reads the next number from App Store Connect.)
+3. Run it. It builds the current commit of `main`, with the marketing version from `version.txt`, and uploads to the internal group only. The What to Test notes are "RN preview from <short sha>".
+4. Check the result: the run is green, the log ends with the upload, and the build shows in App Store Connect under TestFlight, internal group, after Apple's processing.
+5. Next: to ship the next preview, run it again (the build number rises by itself). To check signing without uploading, run it with `upload` off. Cutover is separate: set `TESTFLIGHT_APP` = `rn` (steps below).
+
+What else fails, on purpose:
+
+- Any other untagged upload: `app` = `swift` or `variable` with upload on and no tag, and push runs (they build only the release-please tag).
+- A manual run from a branch other than `main`. With the environment rule above, GitHub rejects the run before the job starts (the environment's own message, and none of the job's steps run). Without that rule, the job's first step fails with "the TestFlight job runs only from main". Either way the run is red, never a silent green. It applies to every manual run: tagged uploads and sign-only checks too.
+
+How it is chosen: `tools/ci/resolve-testflight-target.sh` decides what to build and always comes from `main`. A workflow file is read from the branch a run is dispatched on, so the environment's deployment branches rule is the durable guard. `tools/ci/resolve-testflight-target.test.sh` holds the table of cases (push or dispatch, app, tag, upload) and runs in the `lint` job of `ci.yml`, so the required CI gate enforces it on every pull request.
 
 Owner steps at cutover (nobody else sets these):
 

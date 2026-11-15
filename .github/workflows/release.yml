@@ -62,9 +62,10 @@ jobs:
   testflight:
     name: TestFlight upload
     needs: release-please
-    # Only from main (first step below, which FAILS instead of skipping so a run from a branch is never a silent green): this
-    # job holds the App Store Connect key and the signing identity. (A workflow file is read from the ref it runs on, so the
-    # durable guard is the `testflight` environment's deployment branches rule, set to main only: docs/CI.md.)
+    # Only from main: this job holds the App Store Connect key and the signing identity. A workflow file is read from the ref it
+    # runs on, so the durable guard is the `testflight` environment's deployment branches rule (main only, an owner setting):
+    # GitHub then rejects a run from another branch before this job starts. The first step below is the fallback without that
+    # rule: it FAILS instead of skipping, so a run from a branch is never a silent green (docs/CI.md).
     if: ${{ !cancelled() && !failure() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     timeout-minutes: 90
