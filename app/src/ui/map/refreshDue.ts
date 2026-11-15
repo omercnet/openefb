@@ -51,6 +51,41 @@ export async function refreshDueData(map: RefreshableMap, scheduler: DataRefresh
   }
 }
 
+/** The controller as `RefreshableMap`: every field is read live, so a refresh's success is seen after the load settles. */
+export function refreshableMapFor(controller: {
+  getSnapshot(): {
+    region: Region;
+    visibleLayers: ReadonlySet<MapLayer>;
+    weatherFetchedAt: number | null;
+    tfrFetchedAt: number | null;
+    advisoriesFetchedAt: number | null;
+  };
+  loadWeatherDots(): Promise<boolean>;
+  loadTFRs(): Promise<void>;
+  loadAdvisories(): Promise<void>;
+}): RefreshableMap {
+  return {
+    get region() {
+      return controller.getSnapshot().region;
+    },
+    get visibleLayers() {
+      return controller.getSnapshot().visibleLayers;
+    },
+    get weatherFetchedAt() {
+      return controller.getSnapshot().weatherFetchedAt;
+    },
+    get tfrFetchedAt() {
+      return controller.getSnapshot().tfrFetchedAt;
+    },
+    get advisoriesFetchedAt() {
+      return controller.getSnapshot().advisoriesFetchedAt;
+    },
+    loadWeatherDots: () => controller.loadWeatherDots(),
+    loadTFRs: () => controller.loadTFRs(),
+    loadAdvisories: () => controller.loadAdvisories(),
+  };
+}
+
 export const REFRESH_TICK_MS = 60_000;
 
 /** Runs `refreshDueData` now and every minute while mounted. `read` returns the live map state and inputs each time. */
@@ -61,9 +96,17 @@ export function useDataRefresh(read: () => { map: RefreshableMap } & Omit<Refres
   });
   useEffect(() => {
     const scheduler = new DataRefreshScheduler();
+    let running = false;
     const run = () => {
+      // A tick while the previous run is still pending would start a second request for the same product.
+      if (running) return;
+      running = true;
       const { map, ...rest } = readRef.current();
-      refreshDueData(map, scheduler, { ...rest, nowMs: now() }).catch(() => undefined);
+      refreshDueData(map, scheduler, { ...rest, nowMs: now() })
+        .catch(() => undefined)
+        .finally(() => {
+          running = false;
+        });
     };
     run();
     const id = setInterval(run, REFRESH_TICK_MS);

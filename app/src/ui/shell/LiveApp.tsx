@@ -9,7 +9,7 @@ import { DatabaseUnavailableBanner, RemoteConfigBanner } from '../components/Com
 import { flightLog } from '../flightLog/store';
 import { MapScreen } from '../screens/MapScreen';
 import { appStore, useAppStore } from '../state/appStore';
-import { regionSlice, useRegion } from '../state/region';
+import { useRegion } from '../state/region';
 import { RuntimeContext } from '../state/runtimeContext';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';
@@ -28,9 +28,15 @@ function RemoteBanner({ runtime }: { runtime: AppRuntime }) {
     store?.getVersion ?? zeroVersion,
     store?.getVersion ?? zeroVersion,
   );
+  // Notices and the config expire by the clock without the store changing: re-derive the items every minute.
+  const [minute, setMinute] = useState(() => Math.floor(Date.now() / 60_000));
+  useEffect(() => {
+    const id = setInterval(() => setMinute(Math.floor(Date.now() / 60_000)), 60_000);
+    return () => clearInterval(id);
+  }, []);
   // The version changes whenever the store's notices or dismissals do; the items are derived from them.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const items = useMemo(() => (store ? bannerItems(store, region) : []), [store, region, version]);
+  const items = useMemo(() => (store ? bannerItems(store, region) : []), [store, region, version, minute]);
   return <RemoteConfigBanner items={items} onDismiss={(id) => store?.dismissBanner(id)} />;
 }
 const noSubscribe = () => () => undefined;
@@ -43,11 +49,7 @@ const zeroVersion = () => 0;
 export function LiveApp({ runtime }: { runtime: AppRuntime }) {
   const { started } = runtime;
   const databaseError = useAppStore((s) => s.databaseError);
-  // The saved orientation, opacity and display mode go in before the map's first render.
-  useState(() => {
-    layers.store.setState(runtime.layerSettings);
-    regionSlice.store.setState({ region: started.region });
-  });
+  // The restored region goes in before the first render (the Nearest hook reads the slice).
   const queries = useMemo(() => airportQueriesFor(runtime), [runtime]);
 
   useEffect(() => {

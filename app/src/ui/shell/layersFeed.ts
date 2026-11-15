@@ -4,6 +4,7 @@
 import type { StoreApi } from 'zustand';
 import type { MapLayer } from '../../domain/core';
 import type { MapDataSnapshot } from '../../domain/map/mapDataController';
+import { currentSectionalCycle } from '../../domain/offline/layers';
 import type { LayersData } from '../columns/layers/store';
 
 export interface LayersController {
@@ -21,6 +22,12 @@ const sameSet = (a: ReadonlySet<MapLayer>, b: readonly MapLayer[]): boolean =>
   a.size === b.length && b.every((l) => a.has(l));
 
 export function bindLayers(controller: LayersController, store: StoreApi<LayersData>, clock: () => number): () => void {
+  // MapViewModel.chartExpirationDate is SectionalCycle.current(at: now).expires: it follows the clock across a cycle change.
+  const clockState = (): Partial<LayersData> => {
+    const now = clock();
+    const expires = currentSectionalCycle(now).expires;
+    return { now, sectionalCycleExpires: expires, chartExpiration: expires };
+  };
   const fromController = () => {
     const s = controller.getSnapshot();
     store.setState({
@@ -34,7 +41,7 @@ export function bindLayers(controller: LayersController, store: StoreApi<LayersD
   };
   fromController();
   store.setState({
-    now: clock(),
+    ...clockState(), // not only on the first tick: at a cycle boundary the column must not start a minute behind
     retryTfrs: () => void controller.loadTFRs(),
     retryAdvisories: () => void controller.loadAdvisories(),
   });
@@ -48,7 +55,7 @@ export function bindLayers(controller: LayersController, store: StoreApi<LayersD
       if (current.has(layer) !== wanted.has(layer)) void controller.toggleLayer(layer);
     }
   });
-  const tick = setInterval(() => store.setState({ now: clock() }), LAYERS_NOW_TICK_MS);
+  const tick = setInterval(() => store.setState(clockState()), LAYERS_NOW_TICK_MS);
   return () => {
     stopController();
     stopStore();

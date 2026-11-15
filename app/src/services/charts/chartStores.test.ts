@@ -2,7 +2,12 @@
 // Focus: download ownership (pause, remove, replace), refresh failure, once-per-launch verification, served-edition gate.
 import { fakeFetch, MemoryTextStorage, type StubReply } from '../testSupport';
 import { ChartPackService, NO_RETRY } from './chartPackService';
-import { DIAGRAM_SERVED_EDITION_KEY, IsraelChartStore, IsraelDiagramStore } from './chartStores';
+import {
+  DIAGRAM_SERVED_EDITION_KEY,
+  diagramServedEditionKey,
+  IsraelChartStore,
+  IsraelDiagramStore,
+} from './chartStores';
 import { DownloadSlot } from './downloadSlot';
 import { bytesOf, MemoryFileSystem, nodeSha256, ScriptedDownloader, type ScriptedReply } from './testSupport';
 
@@ -353,4 +358,39 @@ test('DownloadSlot: a throwing run frees the slot and does not leak a rejection'
   await slot.abort();
   await flush();
   expect(slot.active).toBe(false);
+});
+
+// MARK: US diagram pack (M5): a second store over the same classes, with its own served-edition record
+
+test('diagram store: the US pack downloads on request and keeps its own served edition', async () => {
+  const fs = new MemoryFileSystem();
+  const storage = new MemoryTextStorage();
+  storage.files.set(DIAGRAM_SERVED_EDITION_KEY, '2026-08'); // the Israel pack's record is never read for the US pack
+  const usIndex = bytesOf(
+    JSON.stringify({
+      product: 'us-diagrams',
+      edition: '2611',
+      editionLabel: 'd-TPP cycle 2611 (29 OCT 2026)',
+      aipDate: '2026-10-29',
+      accuracyFeet: 50,
+      aerodromes: {},
+    }),
+  );
+  const f = host('us-diagrams', { latest: '2611', bytes: usIndex });
+  const { service } = make('us-diagrams', fs, f, () => ({ status: 200, body: usIndex }));
+  const store = await IsraelDiagramStore.open({ service, fs, storage });
+  expect(store.pack).toBeNull();
+  await store.refresh();
+  expect(store.latest?.edition).toBe('2611');
+  expect(store.isDownloading).toBe(false); // offered, never started on its own
+  store.startDownload();
+  await settle(store);
+  expect(storage.files.get(diagramServedEditionKey('us-diagrams'))).toBe('2611');
+  expect(storage.files.get(DIAGRAM_SERVED_EDITION_KEY)).toBe('2026-08');
+  expect(store.pack?.badgeText).toBe('FAA airport diagrams d-TPP cycle 2611 (29 OCT 2026) \u00b150 ft');
+});
+
+test('diagram store: the served-edition keys of the two packs differ, the Israel one is unchanged', () => {
+  expect(diagramServedEditionKey('il-diagrams')).toBe(DIAGRAM_SERVED_EDITION_KEY);
+  expect(diagramServedEditionKey('us-diagrams')).not.toBe(DIAGRAM_SERVED_EDITION_KEY);
 });

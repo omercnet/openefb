@@ -1,0 +1,122 @@
+name: US diagrams pack
+
+# Builds the `us-diagrams` chart pack (M5) with tools/apd-georef --pack: the FAA airport diagrams of one d-TPP cycle,
+# georeferenced by the same core the app used on device (owner decision Q6: computed offline, never on the device).
+# Nothing is published and no secret is used: the pack is only a workflow artifact. Publishing it is the owner's step
+# (docs/CI.md, "US diagrams pack").
+#
+#   pull_request: a small pack (five airports) proves the builder compiles, runs and writes a pack the app can read
+#                 (tools/apd-georef/check-pack.mjs). Runs only when the builder or the georeferencer changes.
+#   workflow_dispatch: the full pack (all airports, or the list given) for one cycle, uploaded as an artifact.
+on:
+  pull_request:
+    paths:
+      - tools/apd-georef/**
+      - efb-212/Services/AirportDiagramGeoreferencer.swift
+      - .github/workflows/us-diagrams.yml
+  workflow_dispatch:
+    inputs:
+      cycle:
+        description: d-TPP cycle YYNN (empty = the current cycle)
+        type: string
+        default: ""
+      airports:
+        description: Comma-separated airport ids to build (empty = every airport)
+        type: string
+        default: ""
+
+concurrency:
+  group: us-diagrams-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    name: Build and check the pack (${{ github.event_name == 'pull_request' && 'sample' || 'full' }})
+    runs-on: macos-latest
+    timeout-minutes: 120
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+      SAMPLE: KPAO,KSFO,KBOS,KSEA,KDEN
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Scratch folder
+        run: echo "WORK=$RUNNER_TEMP/us-diagrams" >> "$GITHUB_ENV"
+      - name: Check the pack validator
+        run: node --test tools/apd-georef/check-pack.test.mjs
+      - name: Build the tool
+        run: tools/apd-georef/build.sh
+      - name: Build the pack
+        env:
+          EVENT: ${{ github.event_name }}
+          CYCLE: ${{ inputs.cycle }}
+          AIRPORTS: ${{ inputs.airports }}
+        run: |
+          set -euo pipefail
+          # The cycle becomes a folder name under the cache: digits only.
+          if [ -n "$CYCLE" ] && ! [[ "$CYCLE" =~ ^[0-9]{4}$ ]]; then echo "::error::cycle must be four digits (YYNN)"; exit 1; fi
+          args=(--cache "$WORK/cache" --report "$WORK/report.md" --json "$WORK/results.json" --pack "$WORK/pack")
+          [ -n "$CYCLE" ] && args+=(--cycle "$CYCLE")
+          if [ "$EVENT" = pull_request ]; then args+=(--only "$SAMPLE" --render "$WORK/render")
+          elif [ -n "$AIRPORTS" ]; then args+=(--only "$AIRPORTS"); fi
+          mkdir -p "$WORK"
+          tools/apd-georef/apd-georef "${args[@]}" 2>&1 | tee "$WORK/build.log"
+      - name: Validate the pack against the app's format
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          dir=$(find "$WORK/pack" -mindepth 1 -maxdepth 1 -type d | head -1)
+          min=3; [ "$EVENT" = pull_request ] || min=1
+          node tools/apd-georef/check-pack.mjs "$dir" --min "$min"
+          airports=$(find "$dir" -name '*.png' | wc -l | tr -d ' ')
+          bytes=$(du -sk "$dir" | cut -f1)
+          {
+            echo "### us-diagrams pack $(basename "$dir")"
+            echo "- airports: $airports, size: ${bytes} KiB"
+            echo "- per airport: $((bytes / airports)) KiB; about $((bytes * 820 / airports / 1024)) MiB for the 820 airports the 2611 cycle placed"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Sample images, the FAA diagram next to what the pack draws (pull requests)
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          mkdir -p "$WORK/images"
+          # <ICAO>-<pdf>.png from --render: the pack's image on white with the database runway ends (red) and ARP (blue).
+          cp "$WORK/render"/*.png "$WORK/images/"
+          # The FAA sheet itself, first page, for comparison.
+          for pdf in "$WORK"/cache/*/*.PDF "$WORK"/cache/*/*.pdf; do
+            [ -f "$pdf" ] || continue
+            sips -s format png "$pdf" --out "$WORK/images/faa-$(basename "${pdf%.*}").png" >/dev/null
+          done
+          ls -l "$WORK/images"
+      - name: Upload the sample images
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: us-diagrams-sample-images
+          path: ${{ runner.temp }}/us-diagrams/images
+          retention-days: 14
+      - name: Upload the pack artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: us-diagrams-pack
+          path: ${{ runner.temp }}/us-diagrams/pack
+          retention-days: 14
+      - name: Upload the build report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: us-diagrams-report
+          path: |
+            ${{ runner.temp }}/us-diagrams/report.md
+            ${{ runner.temp }}/us-diagrams/results.json
+            ${{ runner.temp }}/us-diagrams/build.log
+          retention-days: 7

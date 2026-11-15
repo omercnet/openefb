@@ -4,11 +4,14 @@ import { createFakeNetworkStatus } from '../../adapters/network';
 import { FakeLocationSource } from '../../domain/ports/location';
 import type { RemoteNotice } from '../../services/remoteConfig';
 import { UPDATE_BANNER_ID } from '../../services/remoteConfigStore';
+import { layers } from '../columns/layers/store';
 import { nearest } from '../columns/nearest/store';
 import { EMPTY_FLIGHT_LOG, flightLog } from '../flightLog/store';
 import { appStore } from '../state/appStore';
 import { gps } from '../state/gps';
 import { regionSlice } from '../state/region';
+import { applyCaptureSeeds } from '../capture/seeds';
+import { resetLiveSlices } from './resetSlices';
 import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
 
@@ -68,6 +71,8 @@ beforeEach(() => {
 });
 
 describe('LiveApp (ContentView)', () => {
+  afterEach(() => jest.useRealTimers());
+
   it('shows no banner when everything opened', async () => {
     const { rt } = runtime();
     const view = await render(<LiveApp runtime={rt} />);
@@ -118,5 +123,62 @@ describe('LiveApp (ContentView)', () => {
     );
     expect(nearest.store.getState().ownship).toEqual({ lat: 32, lon: 34.8 });
     expect(gps.store.getState().status).toEqual({ kind: 'ok' });
+  });
+
+  it('starts from launch state even if a capture route left fixtures in the slices', async () => {
+    const { rt, remote } = runtime({ region: 'israel' });
+    flightLog.store.setState({
+      recording: { status: { kind: 'recording' }, elapsedSeconds: 6, levelDBFS: -20, microphoneDenied: false },
+    });
+    resetLiveSlices('israel');
+    expect(flightLog.store.getState().region).toBe('israel'); // from the first render, not after an effect
+    await render(<LiveApp runtime={rt} />);
+    expect(flightLog.store.getState().recording).toBeNull();
+    expect(flightLog.store.getState().region).toBe('israel');
+    expect(remote.refreshIfDue).toHaveBeenCalledWith(false);
+  });
+
+  it('drops a notice when its deadline passes while the app is open', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(1_000_000);
+    const { rt, remote } = runtime();
+    let now = 1_000_000;
+    remote.notices = () =>
+      now < 1_000_000 + 90_000
+        ? [
+            {
+              id: 'n',
+              severity: 'info',
+              regions: new Set(),
+              untilMs: null,
+              text: { english: 'Soon gone', hebrew: null },
+            },
+          ]
+        : [];
+    const view = await render(<LiveApp runtime={rt} />);
+    expect(view.text()).toContain('Soon gone');
+    now += 120_000;
+    await act(async () => {
+      jest.advanceTimersByTime(120_000);
+    });
+    expect(view.text()).not.toContain('Soon gone');
+  });
+
+  it('the reset clears the strip column, the selected airport and the display mode too', () => {
+    appStore.setState({ stripColumn: 'airport', selectedAirportId: 'KSQL' });
+    applyCaptureSeeds(); // a capture route's fixtures, display mode 'day'
+    resetLiveSlices('us');
+    expect(appStore.getState()).toMatchObject({ stripColumn: 'log', selectedAirportId: null });
+    expect(layers.store.getState().displayMode).toBe('auto');
+  });
+
+  it("a remount keeps the pilot's Layers choices; only capture fixtures bring the reset back", () => {
+    resetLiveSlices('us');
+    layers.store.setState({ displayMode: 'night', sectionalOpacity: 0.3 });
+    resetLiveSlices('us'); // the root route remounted
+    expect(layers.store.getState()).toMatchObject({ displayMode: 'night', sectionalOpacity: 0.3 });
+    applyCaptureSeeds();
+    resetLiveSlices('us');
+    expect(layers.store.getState().displayMode).toBe('auto');
   });
 });

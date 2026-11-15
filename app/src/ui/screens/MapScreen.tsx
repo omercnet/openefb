@@ -12,7 +12,7 @@ import { useIsraelChart } from '../map/useIsraelChart';
 import { offlineStatusFor } from '../map/offlineStatus';
 import { useOfflineMaps } from '../map/useOfflineMaps';
 import type { OfflineRegionBounds } from '../../domain/offline/bounds';
-import { useDataRefresh } from '../map/refreshDue';
+import { refreshableMapFor, useDataRefresh } from '../map/refreshDue';
 import { useMapController, useMapModel } from '../map/useMapData';
 import { useAppStore } from '../state/appStore';
 import { flightLog } from '../flightLog/store';
@@ -138,23 +138,11 @@ export function MapScreen() {
 
   // The NRST cell refreshes on every fix while another column is open (MapContainerView's onChange(ownshipPosition)).
   useNearestAirports();
-  useDataRefresh(() => {
-    const snapshot = controller.getSnapshot();
-    return {
-      map: {
-        region: snapshot.region,
-        visibleLayers: snapshot.visibleLayers,
-        weatherFetchedAt: snapshot.weatherFetchedAt,
-        tfrFetchedAt: snapshot.tfrFetchedAt,
-        advisoriesFetchedAt: snapshot.advisoriesFetchedAt,
-        loadWeatherDots: () => controller.loadWeatherDots(),
-        loadTFRs: () => controller.loadTFRs(),
-        loadAdvisories: () => controller.loadAdvisories(),
-      },
-      lowPower: false,
-      networkAvailable: !flightLog.store.getState().isOffline,
-    };
-  });
+  useDataRefresh(() => ({
+    map: refreshableMapFor(controller),
+    lowPower: false,
+    networkAvailable: !flightLog.store.getState().isOffline,
+  }));
 
   return (
     <MapLayout

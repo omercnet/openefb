@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { describeError } from '../../domain/describeError';
 import { Day } from '../tokens';
+import { resetLiveSlices } from './resetSlices';
 import { LiveApp } from './LiveApp';
 import { getRuntime, type AppRuntime } from './runtime';
 
@@ -14,7 +15,11 @@ export function LiveAppGate() {
   useEffect(() => {
     let cancelled = false;
     getRuntime().then(
-      (runtime) => !cancelled && setState({ runtime }),
+      (runtime) => {
+        if (cancelled) return;
+        resetLiveSlices(runtime.started.region, runtime.layerSettings);
+        setState({ runtime });
+      },
       (error) => !cancelled && setState({ error: describeError(error) }),
     );
     return () => {

@@ -157,6 +157,7 @@ describe('live MapScreen (MapContainerView)', () => {
 
   it('the Layers column drives the map: display mode, sectional opacity and switch', async () => {
     const { runtime } = fakeRuntime();
+    layers.store.setState({ displayMode: 'day', sectionalOpacity: 0.7 });
     await mountLive(runtime);
     expect(lastSurface!.night).toBe(false);
     await act(async () => layers.store.setState({ displayMode: 'night', sectionalOpacity: 0.4 }));

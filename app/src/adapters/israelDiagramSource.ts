@@ -3,8 +3,7 @@
 // corners come from `clipCornersForImageSource` (TL, TR, BR, BL as [lon, lat]). A sheet-only or unreadable diagram is
 // "unavailable": a wrong overlay is worse than none.
 //
-// The US has no precomputed pack yet (S1c ships only `il-diagrams`; owner decision Q6 moves US georeferencing offline too),
-// so US candidates are empty and no US diagram is drawn until that pack exists.
+// US airports are drawn from their own pack (`us-diagrams`, usDiagramSource.ts); diagramSource.ts routes by region.
 import type { Coordinate, Region } from '../domain/core';
 import type { DiagramCandidate, DiagramLookup, DiagramPackSource } from '../domain/diagram/overlayController';
 import type { IsraelAviationDatabase } from '../data/aviation';

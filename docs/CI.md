@@ -41,7 +41,49 @@ Secrets, in the `testflight` environment (only that job sees them):
 
 Repository variable `TESTFLIGHT_GROUPS` (comma-separated, now `Public Beta`, the external group with the public link) names the external groups; empty means internal testing only. Repository secret `RELEASE_PLEASE_TOKEN` (optional, fine-grained token with Contents and Pull requests read/write on this repo): a release pull request opened with the default `GITHUB_TOKEN` does not trigger CI, so its required `CI gate` never reports. Without the token, close and reopen the release pull request to start CI.
 
+### Choosing the app: Swift or React Native (R1)
+
+Repository variable `TESTFLIGHT_APP` picks what the TestFlight job builds (a manual run's `app` input overrides it for that run only; push runs read only the variable). Unset or `swift` (the default) runs `fastlane ios beta` on the Swift app, exactly as before. `rn` runs `fastlane ios beta_rn`: `expo prebuild -p ios` on `app/` (production variant, bundle id `io.omer.efb`, the same App Store Connect key, certificate and provisioning profile), then a signed Release archive and an upload to TestFlight. Any other value fails the job. Merging the lane changes nothing until the owner sets the variable.
+
+What the RN lane does differently:
+
+- Internal testers only: `TESTFLIGHT_GROUPS` is ignored, nothing is distributed externally or submitted for Beta App Review (owner decision Q12). Plain-text "What to Test" notes are built from the release notes as for Swift.
+- Version: `version.txt` (or the tag's version) reaches `app/app.config.ts` as `KANAF_VERSION`; without it the config keeps `1.0.0`.
+- Build number: read from App Store Connect, not guessed. The lane asks for the newest TestFlight build (any version, and this version) and uses one above it, never below the commit count. The `build_number` input of a manual run overrides it.
+- `app/assets/aviation.sqlite` (not committed) is copied from `efb-212/Resources` before the prebuild, as `app.yml` does.
+
+PR-time proof, no secrets: the `iOS release lane (prebuild + unsigned archive)` job in `app.yml` (macOS, runs when `app/**` or `fastlane/**` change) runs `bundle exec fastlane ios beta_rn unsigned:true`, which does the same prebuild, pod install and Release archive with `CODE_SIGNING_ALLOWED=NO`, then checks the archive's bundle id is `io.omer.efb` and its version is `version.txt`. It uploads nothing and needs no credentials.
+
+Owner steps at cutover (nobody else sets these):
+
+1. Check signing without uploading: Actions, Release, Run workflow with `app` = `rn` (the default `variable` reads `TESTFLIGHT_APP`), `upload` off and `tag` empty (or locally on the Mac: `bundle exec fastlane ios beta_rn upload:false`). The `app` input overrides the variable for that manual run only, so the variable stays unset and no release can pick the RN app meanwhile. A green run proves the RN app signs with the existing distribution identity and profile.
+2. At cutover, set the repository variable `TESTFLIGHT_APP` to `rn`. The next release-please release then uploads the RN app to the internal group. Set it back to `swift` to roll back.
+
+
 The same lane runs on the owner's Mac (`bundle install`, then `bundle exec fastlane ios beta`, `upload:false` to stop after signing); see `dist-prep/TESTFLIGHT.md`.
+
+## Workflow: `.github/workflows/us-diagrams.yml`
+
+Builds the `us-diagrams` chart pack (M5): the FAA airport diagrams of one d-TPP cycle, georeferenced by `tools/apd-georef --pack` (the same core the Swift app used on device; owner decision Q6 moves that offline). Runs on `macos-latest`, uses no secrets and publishes nothing.
+
+|Trigger|What it does|
+|---|---|
+|Pull request touching `tools/apd-georef/**`, the georeferencer or the workflow|Builds a five-airport sample (`KPAO,KSFO,KBOS,KSEA,KDEN`), checks it with `tools/apd-georef/check-pack.mjs` (the format `diagramPack.ts` reads, manifest bytes and sha256, the file set) and prints its size and the extrapolation to the whole cycle in the job summary|
+|`workflow_dispatch` (inputs `cycle`, `airports`)|The full pack (or the airports listed) for the cycle, uploaded as the artifact `us-diagrams-pack` (14 days) with the report|
+
+Owner steps to publish a cycle (one edition per d-TPP cycle, only when you choose; nothing is scheduled):
+
+1. Actions, "US diagrams pack", Run workflow (leave `cycle` empty for the current one). Download the `us-diagrams-pack` artifact and unzip it into `<dir>`; it contains the folder `<cycle>/`, so the pack is `<dir>/<cycle>/`.
+2. Upload as unpublished, then approve (`web/charts/README.md` has the one-time bucket setup):
+
+```
+cd <repo root>; dir=<dir>/<cycle>; packs=()
+for f in "$dir"/*; do [ "$(basename "$f")" = manifest.json ] || packs+=(--pack "$f"); done
+web/charts/publish.sh --product us-diagrams --edition <cycle> "${packs[@]}" --manifest "$dir/manifest.json" --remote --base-url https://<public-host>
+web/charts/publish.sh --product us-diagrams --edition <cycle> "${packs[@]}" --manifest "$dir/manifest.json" --remote --base-url https://<public-host> --manifest-only --approve
+```
+
+The app shows the cycle on the map badge and in settings, so a stale pack is visible. The FAA diagrams are US government works; no permission is needed.
 
 ## Workflow: `.github/workflows/testflight-crashes.yml`
 

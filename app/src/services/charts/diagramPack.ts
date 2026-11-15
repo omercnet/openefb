@@ -14,6 +14,9 @@ import { decodeGeoreference, type AirportDiagramGeoreference } from './diagramGe
 import type { ChartFileSystem } from './ports';
 
 export const DIAGRAM_PRODUCT = 'il-diagrams';
+/** The FAA airport diagrams, built by tools/apd-georef --pack (M5): one edition per d-TPP cycle, the same format. */
+export const US_DIAGRAM_PRODUCT = 'us-diagrams';
+const DIAGRAM_PRODUCTS: readonly string[] = [DIAGRAM_PRODUCT, US_DIAGRAM_PRODUCT];
 export const DIAGRAM_INDEX_FILE = 'index.json';
 
 /** `index.json` of an edition: one record per aerodrome that has a chart. */
@@ -145,7 +148,8 @@ export class IsraelDiagramPack {
 
   /** Badge copy: edition and date of the chart on screen. Never implies currency the app cannot prove. */
   get badgeText(): string {
-    return `CAAI aerodrome diagrams ${this.index.editionLabel} \u00b1${this.index.accuracyFeet} ft`;
+    const source = this.index.product === US_DIAGRAM_PRODUCT ? 'FAA airport diagrams' : 'CAAI aerodrome diagrams';
+    return `${source} ${this.index.editionLabel} \u00b1${this.index.accuracyFeet} ft`;
   }
 }
 
@@ -157,20 +161,22 @@ export interface LoadDiagramPackOptions {
   allowUnpublished: boolean;
 }
 
-/** The installed pack, or null. Pilots only see an edition that was published and validated when it was downloaded
+/** The installed pack of the service's product (`il-diagrams` or `us-diagrams`), or null. Pilots only see an edition that was published and validated when it was downloaded
  * (`servedEdition`); a debug setting can lift that. The index must belong to the installed edition. */
 export async function loadDiagramPack(options: LoadDiagramPackOptions): Promise<IsraelDiagramPack | null> {
   const { service, fs, servedEdition, allowUnpublished } = options;
   try {
+    const product = service.product;
+    if (!DIAGRAM_PRODUCTS.includes(product)) return null;
     const installed = await service.installed();
-    if (!installed || installed.product !== DIAGRAM_PRODUCT) return null;
+    if (!installed || installed.product !== product) return null;
     if (!allowUnpublished && servedEdition !== installed.edition) return null;
     const indexPath = service.fileLocation(installed, DIAGRAM_INDEX_FILE);
     if (!indexPath) return null;
     const text = await fs.readText(indexPath);
     if (text === null) return null;
     const index = decodeDiagramIndex(text);
-    if (index.product !== DIAGRAM_PRODUCT || index.edition !== installed.edition) return null;
+    if (index.product !== product || index.edition !== installed.edition) return null;
     return new IsraelDiagramPack(index, (name) => service.fileLocation(installed, name));
   } catch {
     return null;

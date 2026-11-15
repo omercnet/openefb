@@ -10,6 +10,7 @@ import type { AirportQueries } from '../columns/nearest/sources';
 import { dayFixture } from '../flightLog/fixtures';
 import { flightLog } from '../flightLog/store';
 import { layers } from '../columns/layers/store';
+import { noteCaptureSeeded } from '../shell/resetSlices';
 import { gps } from '../state/gps';
 
 /** The Nearest and Search columns' reference airports, as an in-memory database. */
@@ -22,6 +23,7 @@ export const captureAirportQueries = (): AirportQueries => ({
 
 /** Writes the reference data (KSQL column, ten nearest airports, a good fix, the day flight log) into the default slices. */
 export function applyCaptureSeeds(): void {
+  noteCaptureSeeded();
   airport.store.setState({ now: KSQL_NOW, columns: { KSQL: KSQL_COLUMN } });
   nearest.store.setState({
     entries: rankLandable(FIXTURE_AIRPORTS, FIXTURE_OWNSHIP, MINIMUM_RUNWAY_LENGTH_FEET, LIST_COUNT),

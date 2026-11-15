@@ -71,8 +71,7 @@ export function startLiveData(deps: LiveDataDeps): () => void {
   stores.flightLog.setState({ region: deps.region });
 
   const navigation = (): ActiveNavigation => stores.app.getState().navigation;
-  const publishNavigation = (nav: ActiveNavigation): void => {
-    stores.app.getState().setNavigation(nav);
+  const projectNavigation = (nav: ActiveNavigation): void => {
     stores.flightLog.setState({
       directTo: nav.directTo?.icao ?? null,
       activeFlightPlan: nav.activeFlightPlan,
@@ -84,6 +83,12 @@ export function startLiveData(deps: LiveDataDeps): () => void {
       estimatedTimeEnroute: nav.estimatedTimeEnroute,
     });
   };
+  const publishNavigation = (nav: ActiveNavigation): void => {
+    stores.app.getState().setNavigation(nav);
+    projectNavigation(nav);
+  };
+  // The app store outlives a remount and the flight log was just reset: show the active Direct-To or route at once.
+  projectNavigation(navigation());
 
   /** Status and the map's ownship, evaluated at `now`: the same inputs as every update, so the tick can re-run it. */
   const publishPosition = (state: OwnshipState, now: number): void => {
