@@ -262,3 +262,26 @@ test('TFR alerts computed while an airspace lookup is running are kept when the 
   await next;
   expect(service.activeAlerts.filter((a) => a.type === 'tfr')).toHaveLength(0);
 });
+
+test('resetClearsAlertsTheThrottleAndALookupStillRunning', async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let calls = 0;
+  const source: AirspaceSource = {
+    airspaces: async () => {
+      calls += 1;
+      await gate;
+      return shelves;
+    },
+  };
+  const service = new ProximityAlertService({ source, now: () => 1_000_000 });
+  const first = service.checkProximity(centerPoint, 4000);
+  service.reset();
+  release();
+  await first;
+  expect(service.activeAlerts).toEqual([]); // the late answer of the old session is dropped
+  expect(service.checkUnavailable).toBe(false);
+  await service.checkProximity(centerPoint, 4000, 1_000_001); // within the 10 s throttle of the dropped check, but reset cleared it
+  expect(calls).toBe(2);
+  expect(service.activeAlerts.length).toBeGreaterThan(0);
+});
