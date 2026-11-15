@@ -54,6 +54,11 @@ Track A mounts both (I1d); no existing file is edited.
   was already running can still raise), no Israel alerts in the snapshot once the region is not Israel (the service only
   resets at the next fix), and the TFR alert's haptic is decided as soon as the TFR check publishes it, not after the
   airspace lookup settles.
+- Restart and region guards: `stop()` also resets the proximity service (new `ProximityAlertService.reset()`: alerts,
+  throttle and any lookup still running, whose late answer is dropped), so a restart starts clean. The Israel service is
+  suspended when the region leaves Israel and when a suspension ends (so what it raised unseen is raised afresh with a
+  haptic at the next fix), and the Israel haptic needs region Israel and a fresh fix. The Israel evaluation still runs on
+  every fix, also while suspended, so the squawk reminder keeps watching.
 - The banner announces nothing to screen readers, as in Swift (VoiceOver reads the rows by their labels); live-region or
   announcement semantics belong to the accessibility sweep after cutover.
 
@@ -71,7 +76,7 @@ Track A mounts both (I1d); no existing file is edited.
 
 ## Tests
 
-`alertsRuntime.test.ts` (18): fix and altitude routing, haptic once per new alert and not for a persisting one, TFR check
+`alertsRuntime.test.ts` (22): fix and altitude routing, haptic once per new alert and not for a persisting one, TFR check
 only with the layer on, check-unavailable state, Israel routing and haptic, suspend only on the change to stale and only in
 Israel, stop/start/idempotence/unsubscribe, snapshot stability and listener isolation, and two runs over the real
 `ProximityAlertService` (entering airspace, database failure). `IsraelAlertBanner.test.tsx` (6): empty, full top alert,

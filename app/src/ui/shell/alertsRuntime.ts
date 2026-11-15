@@ -43,6 +43,8 @@ export interface ProximityAlertsLike {
   getVersion(): number;
   checkProximity(position: { lat: number; lon: number }, altitude: number | null, nowMs?: number): Promise<void>;
   checkTFRProximity(position: { lat: number; lon: number }, tfrs: readonly Tfr[], nowMs?: number): void;
+  /** Drop all alerts, the throttle and any lookup still running. */
+  reset(): void;
 }
 
 /** The part of IsraelAlertService the runtime uses (the real class satisfies it). */
@@ -162,8 +164,9 @@ export function createAlertsRuntime(deps: AlertsRuntimeDeps): AlertsRuntime {
       knownProximity = new Set(proximity.activeAlerts.map((a) => a.id));
       // IsraelAlertService.onRaised = { _ in Haptics.warning() }. JS-only guard: an evaluation that was already running when the
       // alerts were suspended can still raise; the pilot must not feel a warning for alerts the snapshot hides.
+      // The haptic is only for alerts the pilot can see: Israel, with a fresh fix.
       israel.onRaised = () => {
-        if (!suspended()) haptics.warning();
+        if (context.region === 'israel' && !suspended()) haptics.warning();
       };
       unsubscribe = [proximity.subscribe(changed), israel.subscribe(changed)];
       changed();
@@ -176,15 +179,21 @@ export function createAlertsRuntime(deps: AlertsRuntimeDeps): AlertsRuntime {
       unsubscribe = [];
       israel.onRaised = null;
       israel.suspend(); // nothing may be shown as current once the runtime is gone
+      proximity.reset(); // and a restart starts clean: no old alerts, no throttle, no late lookup answer
+      knownProximity = new Set();
       changed();
     },
 
     setContext(next) {
       const was = suspended();
+      const wasIsrael = context.region === 'israel';
       context = next;
       if (!started) return;
-      // `.onChange(of: israelAlertsSuspended) { if suspended { israelAlertService?.suspend() } }`
-      if (!was && suspended()) israel.suspend();
+      // `.onChange(of: israelAlertsSuspended) { if suspended { israelAlertService?.suspend() } }`. JS-only additions: also
+      // when the suspension ends (an evaluation that ran meanwhile had its haptic dropped, so the service forgets what it
+      // published and the next fix raises it afresh) and when the region leaves Israel (an evaluation still running must
+      // not raise there, and old alerts must not come back on return).
+      if (was !== suspended() || (wasIsrael && next.region !== 'israel')) israel.suspend();
       changed();
     },
 

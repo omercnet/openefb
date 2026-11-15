@@ -77,6 +77,12 @@ class FakeProximity implements ProximityAlertsLike {
   checkTFRProximity(_position: { lat: number; lon: number }, tfrs: readonly Tfr[]): void {
     this.tfrCalls.push({ tfrs });
   }
+  resets = 0;
+  reset(): void {
+    this.resets += 1;
+    this.activeAlerts = [];
+    this.checkUnavailable = false;
+  }
 }
 
 class FakeIsraelAlerts implements IsraelAlertsLike {
@@ -257,7 +263,7 @@ describe('guards found in review', () => {
     runtime.setContext({ region: 'us', gpsStale: false });
     expect(runtime.getSnapshot().israelAlerts).toEqual([]);
     runtime.setContext({ region: 'israel', gpsStale: false });
-    expect(runtime.getSnapshot().israelAlerts).toHaveLength(1);
+    expect(runtime.getSnapshot().israelAlerts).toEqual([]); // the service was cleared on leaving, it raises again at the next fix
   });
 
   it('warns for a TFR alert as soon as it is published, not after a slow airspace lookup', async () => {
@@ -283,6 +289,82 @@ describe('guards found in review', () => {
     release();
     await updating;
     expect(haptics).toEqual(['warning']); // and not twice for the same alert
+  });
+});
+
+describe('guards from the second review', () => {
+  it('leaving Israel suspends the service and clears the alerts; returning raises them afresh with a haptic', () => {
+    const { runtime, israel, haptics } = setup();
+    runtime.setContext({ region: 'israel', gpsStale: false });
+    israel.raise([israelAlert('gaza')]);
+    expect(haptics).toEqual(['warning']);
+    runtime.setContext({ region: 'us', gpsStale: false });
+    expect(israel.suspended).toBe(1);
+    expect(runtime.getSnapshot().israelAlerts).toEqual([]);
+    israel.raise([israelAlert('late')]); // an evaluation that was still running
+    expect(haptics).toEqual(['warning']); // no haptic outside Israel
+    runtime.setContext({ region: 'israel', gpsStale: false });
+    israel.raise([israelAlert('gaza')]); // the service was cleared, so this is new again
+    expect(haptics).toEqual(['warning', 'warning']);
+  });
+
+  it('when the suspension ends the service forgets what it raised unseen, so the next fix raises it with a haptic', () => {
+    const { runtime, israel, haptics } = setup();
+    runtime.setContext({ region: 'israel', gpsStale: true });
+    israel.raise([israelAlert('gaza')]); // evaluated during the suspension: hidden, no haptic
+    expect(haptics).toEqual([]);
+    const before = israel.suspended;
+    runtime.setContext({ region: 'israel', gpsStale: false });
+    expect(israel.suspended).toBe(before + 1);
+    expect(israel.alerts).toEqual([]);
+  });
+
+  it('a restart while an airspace lookup is pending shows nothing from the old session and raises no haptic', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const airspace = {
+      id: 'sfo',
+      classification: 'bravo',
+      name: 'SFO Class B',
+      floor: 0,
+      ceiling: 10000,
+      geometry: {
+        kind: 'polygon',
+        coordinates: [
+          [37.4, -122.2],
+          [37.4, -122.0],
+          [37.5, -122.0],
+          [37.5, -122.2],
+          [37.4, -122.2],
+        ],
+      },
+    } as unknown as Airspace;
+    const real = new ProximityAlertService({
+      source: { airspaces: async () => (await gate, [airspace]) },
+      now: () => 1_000_000,
+    });
+    const haptics: string[] = [];
+    const runtime = createAlertsRuntime({
+      proximity: real,
+      israel: new FakeIsraelAlerts(),
+      haptics: { warning: () => haptics.push('warning') },
+    });
+    runtime.start();
+    const updating = runtime.update(fix({ nowMs: 1_000_000 }));
+    runtime.stop();
+    runtime.start();
+    release();
+    await updating;
+    expect(runtime.getSnapshot().proximityAlerts).toEqual([]);
+    expect(haptics).toEqual([]);
+    await runtime.update(fix({ nowMs: 1_000_001 })); // not throttled by the old session's check
+    expect(runtime.getSnapshot().proximityAlerts.length).toBeGreaterThan(0);
+  });
+
+  it('stop resets the proximity service', () => {
+    const { runtime, proximity } = setup();
+    runtime.stop();
+    expect(proximity.resets).toBe(1);
   });
 });
 

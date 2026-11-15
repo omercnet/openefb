@@ -59,6 +59,20 @@ export class ProximityAlertService {
     }
   }
 
+  /** Forget everything: alerts, the throttle and any lookup still running (its late answer is dropped). The runtime calls it
+   * when it stops, so a restart never shows, or raises a haptic for, what an earlier session left behind. */
+  reset(): void {
+    this.checkSeq += 1;
+    this.lastCheckMs = null;
+    this.lookupPending = false;
+    this.tfrDuringLookup = null;
+    this.activeAlerts = [];
+    this.isInAirspace = false;
+    this.nearestAirspaceDistance = null;
+    this.checkUnavailable = false;
+    this.changed();
+  }
+
   /** Check airspace proximity for the given position. Throttled to once per 10 seconds. `altitude` is GPS altitude in feet
    * MSL, or null when unknown (GPS Degraded, no vertical fix): unknown altitude never produces an INSIDE alert. A check that
    * is overtaken by a newer one (the database answered late) is dropped, so an old position never overwrites a new one. */
