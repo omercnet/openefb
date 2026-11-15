@@ -45,7 +45,7 @@ describe('useIsraelChart', () => {
     await flush();
     await flush();
     expect(Object.keys(seen ?? {})).toEqual(expect.arrayContaining(['il-routes', 'il-aerodromes', 'il-closures']));
-    expect(statuses).toEqual([{ kind: 'noFeed' }]);
+    expect(statuses).toEqual([{ kind: 'noFeed' }, { kind: 'noFeed' }]); // the base chart, then the (empty) feed
     expect(db.reportingPoints).toHaveBeenCalledTimes(1);
   });
 
@@ -95,5 +95,17 @@ describe('useIsraelChart', () => {
     });
     await flush();
     expect(fetchFeed).toHaveBeenLastCalledWith(true);
+  });
+
+  it('drawing the base chart resets the closure status, so a remount does not keep the old one', async () => {
+    const statuses: unknown[] = [];
+    const gate = Promise.withResolvers<never>();
+    await render(
+      <Probe db={db} notam={{ fetchFeed: () => gate.promise }} enabled onClosureStatus={(s) => statuses.push(s)} />,
+    );
+    await flush();
+    await flush();
+    expect(statuses[0]).toEqual({ kind: 'noFeed' }); // before the relay answers
+    gate.reject(new Error('timeout'));
   });
 });

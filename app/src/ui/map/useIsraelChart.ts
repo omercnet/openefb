@@ -45,6 +45,8 @@ export function useIsraelChart({
           const base = await israelChartSources(input, null, now());
           if (cancelled) return;
           setSources(base.sources);
+          // The base chart has no closures yet: the Layers row must not keep the previous status for data that is gone.
+          onClosureStatus?.({ kind: 'noFeed' });
         }
         // A scheduled refresh bypasses the service's five-minute copy, which would otherwise be skipped as still fresh.
         const report = await currentReport(notam, !first);

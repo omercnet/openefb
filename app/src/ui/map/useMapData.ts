@@ -30,13 +30,18 @@ export interface Viewport {
   height: number;
 }
 
-/** The viewport the camera's last report implies: pixels = degrees * 512 * 2^zoom / 360 (web mercator, 512 pt tiles). */
+/** Web mercator y of a latitude, in radians of the world circumference (the vertical scale grows as 1/cos(lat)). */
+const mercatorY = (latDeg: number): number => Math.log(Math.tan(Math.PI / 4 + (latDeg * Math.PI) / 360));
+
+/** Points per radian of the world at `zoom` (512 pt tiles: the world is 512 * 2^zoom points around). */
+const pointsPerRadian = (zoom: number): number => (512 * 2 ** zoom) / (2 * Math.PI);
+
+/** The viewport the camera's last report implies, from the projected corners of the reported bounds. */
 export function viewportOf(view: { zoom: number; northEast: Coordinate; southWest: Coordinate }): Viewport {
-  const pxPerDegree = (512 * 2 ** view.zoom) / 360;
-  const midLat = (view.northEast.lat + view.southWest.lat) / 2;
+  const scale = pointsPerRadian(view.zoom);
   return {
-    width: Math.abs(view.northEast.lon - view.southWest.lon) * pxPerDegree,
-    height: Math.abs(view.northEast.lat - view.southWest.lat) * pxPerDegree * Math.cos((midLat * Math.PI) / 180),
+    width: Math.abs(view.northEast.lon - view.southWest.lon) * (Math.PI / 180) * scale,
+    height: Math.abs(mercatorY(view.northEast.lat) - mercatorY(view.southWest.lat)) * scale,
   };
 }
 
@@ -44,20 +49,35 @@ export function viewportOf(view: { zoom: number; northEast: Coordinate; southWes
 export const FRAME_PADDING_PT = 100;
 
 /**
- * The centre and web-mercator zoom that fit `box` in `viewport` with the padding on every side. Without a viewport (the map
- * has not reported yet) a 600 pt square is assumed.
+ * The centre and web-mercator zoom that fit `box` in `viewport` with the padding on every side, for a map rotated by
+ * `bearingDeg` (the screen shows the box turned the other way, so its extent on screen is that of the rotated corners).
+ * Without a viewport (the map has not reported yet) a 600 pt square is assumed.
  */
 export function frameFor(
   box: { south: number; west: number; north: number; east: number },
   viewport: Viewport = { width: 600, height: 600 },
+  bearingDeg = 0,
 ): { center: Coordinate; zoom: number } {
-  const midLat = (box.south + box.north) / 2;
-  const lonSpan = Math.max(box.east - box.west, 0.01);
-  const latSpan = Math.max((box.north - box.south) * Math.cos((midLat * Math.PI) / 180), 0.01);
+  const center = { lat: (box.south + box.north) / 2, lon: (box.west + box.east) / 2 };
+  const cy = mercatorY(center.lat);
+  const turn = (bearingDeg * Math.PI) / 180;
+  let halfX = 0;
+  let halfY = 0;
+  for (const lat of [box.south, box.north]) {
+    for (const lon of [box.west, box.east]) {
+      const x = ((lon - center.lon) * Math.PI) / 180;
+      const y = mercatorY(lat) - cy;
+      // Rotating the map by `bearing` turns the north-up box by -bearing on screen.
+      halfX = Math.max(halfX, Math.abs(x * Math.cos(turn) - y * Math.sin(turn)));
+      halfY = Math.max(halfY, Math.abs(x * Math.sin(turn) + y * Math.cos(turn)));
+    }
+  }
+  const extentX = Math.max(2 * halfX, 0.0002);
+  const extentY = Math.max(2 * halfY, 0.0002);
   const usable = (px: number) => Math.max(px - 2 * FRAME_PADDING_PT, 100);
-  const fit = (px: number, span: number) => Math.log2((usable(px) * 360) / (512 * span));
-  const zoom = Math.min(14, Math.max(4, Math.min(fit(viewport.width, lonSpan), fit(viewport.height, latSpan))));
-  return { center: { lat: midLat, lon: (box.west + box.east) / 2 }, zoom };
+  const fit = (px: number, extent: number) => Math.log2((usable(px) * 2 * Math.PI) / (512 * extent));
+  const zoom = Math.min(14, Math.max(4, Math.min(fit(viewport.width, extentX), fit(viewport.height, extentY))));
+  return { center, zoom };
 }
 
 export interface CameraModel {
@@ -172,7 +192,7 @@ export function useMapModel(input: MapModelInput) {
   );
   const frame = useCallback(
     (box: { south: number; west: number; north: number; east: number }) =>
-      dispatch({ type: 'frame', ...frameFor(box, viewport.current ?? undefined) }),
+      dispatch({ type: 'frame', ...frameFor(box, viewport.current ?? undefined, lastView.current?.bearing ?? 0) }),
     [dispatch],
   );
   const zoomTo = useCallback((level: number) => dispatch({ type: 'zoomTo', level }), [dispatch]);
