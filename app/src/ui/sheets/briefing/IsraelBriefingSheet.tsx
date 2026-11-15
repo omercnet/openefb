@@ -374,12 +374,21 @@ function NotamRow({
 }
 
 /** The NOTAM briefing sheet's content: navigation bar, status, filters, the sections of rows and the weather pointer. */
-export function IsraelBriefingSheet({ model, actions }: { model: IsraelBriefingViewModel; actions: BriefingActions }) {
+export function IsraelBriefingSheet({
+  model,
+  actions,
+  highlightActive: highlightOnMap = false,
+}: {
+  model: IsraelBriefingViewModel;
+  actions: BriefingActions;
+  /** The map already shows a highlight when the sheet opens (set by an earlier "Show on map"). */
+  highlightActive?: boolean;
+}) {
   const t = useTheme();
   const colors = grouped(t);
   const state = useStore(model.store);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
-  const [highlightActive, setHighlightActive] = useState(false);
+  const [highlightActive, setHighlightActive] = useState(highlightOnMap);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {

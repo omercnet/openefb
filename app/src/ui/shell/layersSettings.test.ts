@@ -54,4 +54,41 @@ describe('layer settings', () => {
     await settle();
     expect(storage.data['Preferences/displayMode']).toBe('night');
   });
+
+  it('reports a failed display-mode read and still launches on the default', async () => {
+    const log = jest.fn();
+    const failing = {
+      read: async () => Promise.reject(new Error('io')),
+      write: async () => undefined,
+      remove: async () => undefined,
+    };
+    expect(await loadLayerSettings(await freshDb(), failing, log)).toEqual(DEFAULT_LAYER_SETTINGS);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('io'));
+  });
+
+  it('saves rapid display-mode changes one after the other, in order', async () => {
+    const order: string[] = [];
+    let active = 0;
+    let overlapped = false;
+    const storage = {
+      read: async () => null,
+      remove: async () => undefined,
+      write: async (_k: string, v: string) => {
+        active += 1;
+        overlapped ||= active > 1;
+        await new Promise((r) => setTimeout(r, 5));
+        order.push(v);
+        active -= 1;
+      },
+    };
+    const store = layers.make();
+    const stop = persistLayerSettings(store, await freshDb(), storage);
+    store.setState({ displayMode: 'night' });
+    store.setState({ displayMode: 'day' });
+    store.setState({ displayMode: 'auto' });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(order).toEqual(['night', 'day', 'auto']);
+    expect(overlapped).toBe(false);
+    stop();
+  });
 });

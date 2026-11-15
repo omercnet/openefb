@@ -23,6 +23,8 @@ export interface LiveBriefingProps {
   ownship: Coordinate | null;
   pointLookup: (code: string) => Coordinate | null;
   presented: boolean;
+  /** The map still shows a highlight from an earlier "Show on map": the sheet offers to clear it. */
+  highlightActive?: boolean;
   onDismiss: () => void;
   /** IsraelBriefingMapHighlight: draw and frame the NOTAM; false when there is nothing to draw. */
   onShow: (highlight: Highlight) => void;
@@ -40,6 +42,7 @@ export function LiveBriefing({
   ownship,
   pointLookup,
   presented,
+  highlightActive,
   onDismiss,
   onShow,
   onClear,
@@ -76,7 +79,9 @@ export function LiveBriefing({
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
       <BriefingPresentation presented={presented} onDismiss={onDismiss}>
-        {model && (fontsLoaded || fontError != null) ? <IsraelBriefingSheet model={model} actions={actions} /> : null}
+        {model && (fontsLoaded || fontError != null) ? (
+          <IsraelBriefingSheet model={model} actions={actions} highlightActive={highlightActive ?? false} />
+        ) : null}
       </BriefingPresentation>
     </View>
   );

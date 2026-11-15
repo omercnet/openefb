@@ -14,6 +14,7 @@ import { RuntimeContext } from '../state/runtimeContext';
 import { airportQueriesFor } from '../shell/airportQueries';
 import { startLiveData } from '../shell/liveData';
 import type { AppRuntime } from '../shell/runtime';
+import { Day, Night } from '../tokens';
 import { MapScreen } from './MapScreen';
 
 jest.mock(
@@ -46,9 +47,16 @@ let briefingProps: {
   onShow: (h: { source: unknown; bounds: unknown }) => void;
   onDismiss: () => void;
 } | null = null;
+let briefingTheme: unknown = null;
 jest.mock('../shell/LiveBriefing', () => ({
   LiveBriefing: (props: NonNullable<typeof briefingProps>) => {
-    briefingProps = props;
+    const { useEffect: effect } = jest.requireActual('react');
+    const { useTheme } = jest.requireActual('../Primitives');
+    const theme = useTheme();
+    effect(() => {
+      briefingProps = props;
+      briefingTheme = theme;
+    });
     return null;
   },
 }));
@@ -214,5 +222,45 @@ describe('live MapScreen (MapContainerView)', () => {
       }),
     );
     expect(lastSurface!.sources['il-brief-highlight']?.features).toHaveLength(1);
+  });
+
+  it('Show on map draws the highlight even when the Israel data did not load', async () => {
+    const { runtime } = fakeRuntime({ region: 'israel' }); // started.israel is null
+    await mountLive(runtime);
+    await act(async () =>
+      briefingProps!.onShow({
+        source: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { color: '#FF9500' } }] },
+        bounds: { south: 32, west: 34.8, north: 32.2, east: 35 },
+      }),
+    );
+    expect(lastSurface!.sources['il-brief-highlight']?.features).toHaveLength(1);
+  });
+
+  it('the briefing follows the night palette of the map', async () => {
+    const { runtime } = fakeRuntime();
+    layers.store.setState({ displayMode: 'night' });
+    await mountLive(runtime);
+    expect(briefingTheme).toBe(Night);
+    await act(async () => layers.store.setState({ displayMode: 'day' }));
+    expect(briefingTheme).toBe(Day);
+  });
+
+  it('the offline status is judged again on each clock tick (a pack expires at the cycle boundary)', async () => {
+    const { runtime } = fakeRuntime();
+    const status = jest.spyOn(runtime.offline, 'status');
+    await mountLive(runtime);
+    await act(async () =>
+      lastSurface!.onViewChange({
+        center: { lat: 37, lon: -122 },
+        zoom: 10,
+        bearing: 0,
+        northEast: { lat: 37.1, lon: -121.9 },
+        southWest: { lat: 36.9, lon: -122.1 },
+        userInteraction: false,
+      }),
+    );
+    const before = status.mock.calls.length;
+    await act(async () => layers.store.setState({ now: Date.now() + 60_000 }));
+    expect(status.mock.calls.length).toBeGreaterThan(before);
   });
 });

@@ -78,4 +78,22 @@ describe('useIsraelChart', () => {
     expect(lookup?.('LLHZ')).toEqual({ lat: 32.18, lon: 34.83 });
     expect(lookup?.('NOPE')).toBeNull();
   });
+
+  it('draws the chart before a slow relay answers, and a scheduled refresh bypasses the cached feed', async () => {
+    const gate = Promise.withResolvers<never>();
+    const fetchFeed = jest.fn((_force?: boolean) => gate.promise);
+    await render(<Probe db={db} notam={{ fetchFeed }} enabled />);
+    await flush();
+    await flush();
+    expect(Object.keys(seen ?? {})).toContain('il-routes'); // the relay is still pending
+    expect(fetchFeed).toHaveBeenCalledWith(false);
+    gate.reject(new Error('timeout'));
+    await flush();
+    await flush();
+    await act(async () => {
+      jest.advanceTimersByTime(ISRAEL_CLOSURE_REFRESH_MS);
+    });
+    await flush();
+    expect(fetchFeed).toHaveBeenLastCalledWith(true);
+  });
 });

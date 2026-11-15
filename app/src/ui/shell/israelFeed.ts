@@ -57,10 +57,13 @@ export const loadIsraelChart = (db: IsraelChartDb): Promise<IsraelChartInput> =>
   loadIsraelChartInput(db as IsraelAviationDatabase);
 
 /** The feed read for the chart: a failed fetch with nothing cached is "no feed", never an error on the map. */
-export async function currentReport(service: IsraelNotamServiceLike | null): Promise<IsraelNotamReport | null> {
+export async function currentReport(
+  service: IsraelNotamServiceLike | null,
+  forceRefresh = false,
+): Promise<IsraelNotamReport | null> {
   if (!service) return null;
   try {
-    return await service.fetchFeed();
+    return await service.fetchFeed(forceRefresh);
   } catch {
     return null;
   }

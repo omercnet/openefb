@@ -65,7 +65,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     log,
   });
   const notamReadStore = await NotamReadStateStore.open(fileTextStorage, log);
-  const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage);
+  const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage, log);
   return {
     started,
     layerSettings,

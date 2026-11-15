@@ -24,11 +24,40 @@ export function useMapController(deps: MapDataDeps): MapDataController {
 export const useMapData = (controller: MapDataController): MapDataSnapshot =>
   useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
 
-/** The centre and web-mercator zoom that fit `box` in a map about 500 pt across (Swift padded the box by 100 pt a side). */
-export function frameFor(box: { south: number; west: number; north: number; east: number }): { center: Coordinate; zoom: number } {
-  const span = Math.max(box.north - box.south, box.east - box.west, 0.01);
-  const zoom = Math.min(14, Math.max(4, Math.log2((360 * 600) / (512 * span))));
-  return { center: { lat: (box.south + box.north) / 2, lon: (box.west + box.east) / 2 }, zoom };
+/** The map's size in points. */
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
+/** The viewport the camera's last report implies: pixels = degrees * 512 * 2^zoom / 360 (web mercator, 512 pt tiles). */
+export function viewportOf(view: { zoom: number; northEast: Coordinate; southWest: Coordinate }): Viewport {
+  const pxPerDegree = (512 * 2 ** view.zoom) / 360;
+  const midLat = (view.northEast.lat + view.southWest.lat) / 2;
+  return {
+    width: Math.abs(view.northEast.lon - view.southWest.lon) * pxPerDegree,
+    height: Math.abs(view.northEast.lat - view.southWest.lat) * pxPerDegree * Math.cos((midLat * Math.PI) / 180),
+  };
+}
+
+/** Swift framed the box with 100 pt of padding on each side (setVisibleCoordinateBounds edgePadding). */
+export const FRAME_PADDING_PT = 100;
+
+/**
+ * The centre and web-mercator zoom that fit `box` in `viewport` with the padding on every side. Without a viewport (the map
+ * has not reported yet) a 600 pt square is assumed.
+ */
+export function frameFor(
+  box: { south: number; west: number; north: number; east: number },
+  viewport: Viewport = { width: 600, height: 600 },
+): { center: Coordinate; zoom: number } {
+  const midLat = (box.south + box.north) / 2;
+  const lonSpan = Math.max(box.east - box.west, 0.01);
+  const latSpan = Math.max((box.north - box.south) * Math.cos((midLat * Math.PI) / 180), 0.01);
+  const usable = (px: number) => Math.max(px - 2 * FRAME_PADDING_PT, 100);
+  const fit = (px: number, span: number) => Math.log2((usable(px) * 360) / (512 * span));
+  const zoom = Math.min(14, Math.max(4, Math.min(fit(viewport.width, lonSpan), fit(viewport.height, latSpan))));
+  return { center: { lat: midLat, lon: (box.west + box.east) / 2 }, zoom };
 }
 
 export interface CameraModel {
@@ -113,6 +142,7 @@ export function useMapModel(input: MapModelInput) {
   const cam = useCameraModel(input.initialMode ?? 'northUp');
   const { dispatch } = cam;
   const lastView = useRef<ViewSample | null>(null);
+  const viewport = useRef<Viewport | null>(null);
 
   // Every new fix goes through the reducer: first-fix jump, follow, duplicates ignored.
   useEffect(() => {
@@ -129,6 +159,7 @@ export function useMapModel(input: MapModelInput) {
       };
       if (gestureSuspendsFollow(lastView.current, sample, c.userInteraction)) dispatch({ type: 'userMoved' });
       lastView.current = sample;
+      viewport.current = viewportOf(c);
       dispatch({ type: 'directionChanged', direction: c.bearing });
       controller.onRegionChanged(c.center, c.zoom, c.northEast, c.southWest);
     },
@@ -140,7 +171,8 @@ export function useMapModel(input: MapModelInput) {
     [dispatch, ownship.position, ownship.trackDeg],
   );
   const frame = useCallback(
-    (box: { south: number; west: number; north: number; east: number }) => dispatch({ type: 'frame', ...frameFor(box) }),
+    (box: { south: number; west: number; north: number; east: number }) =>
+      dispatch({ type: 'frame', ...frameFor(box, viewport.current ?? undefined) }),
     [dispatch],
   );
   const zoomTo = useCallback((level: number) => dispatch({ type: 'zoomTo', level }), [dispatch]);
