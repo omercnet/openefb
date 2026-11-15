@@ -1,6 +1,7 @@
 import { act } from 'react';
-import { render } from '../../../tests/support/ui';
+import { press, render } from '../../../tests/support/ui';
 import { createFakeNetworkStatus } from '../../adapters/network';
+import { FakePreferences } from '../../domain/ports/preferences';
 import { FakeLocationSource } from '../../domain/ports/location';
 import type { RemoteNotice } from '../../services/remoteConfig';
 import { UPDATE_BANNER_ID } from '../../services/remoteConfigStore';
@@ -21,6 +22,14 @@ import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
 
 // The map is a native view and the screen is covered by its own tests; here it only marks that it is mounted.
+jest.mock('../sheets/israelPlan/IsraelFlightPlanSheet', () => ({
+  IsraelFlightPlanSheet: () => null,
+}));
+jest.mock(
+  'react-native-safe-area-context',
+  () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
+);
+jest.mock('../screens/LogScreen', () => ({ LogScreen: () => null }));
 jest.mock('../map/ChartPdfView', () => ({ ChartPdfView: () => null }));
 jest.mock('../screens/MapScreen', () => ({ MapScreen: () => null }));
 
@@ -255,6 +264,42 @@ describe('LiveApp (ContentView)', () => {
       await settle();
       expect(flightLog.store.getState()).toMatchObject({ recording: null, recordingUnavailable: true });
       warn.mockRestore();
+    });
+  });
+
+  describe('planner', () => {
+    const plannerRuntime = (region: 'us' | 'israel') => {
+      const { rt } = runtime({ region });
+      Object.assign(rt, {
+        preferences: new FakePreferences(),
+        profiles: {
+          aircraft: { getState: () => ({ profiles: [{ id: 'a1' }] }) },
+          pilot: { getState: () => ({ profiles: [] }) },
+          load: async () => undefined,
+          activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }),
+        },
+        telemetry: { signal: jest.fn() },
+      });
+      return rt;
+    };
+    const has = (view: Awaited<ReturnType<typeof render>>, id: string) =>
+      view.all((n) => n.props?.testID === id).length > 0;
+    const settle = () => act(async () => new Promise((r) => setTimeout(r, 20)));
+
+    it('Plan a flight opens the Israel planner over the Log in the Israel region, and Back closes it', async () => {
+      const view = await render(<LiveApp runtime={plannerRuntime('israel')} />);
+      await act(async () => appStore.setState({ selectedScreen: 'log', overlay: { kind: 'planner' } }));
+      await settle();
+      expect(has(view, 'live-israel-planner')).toBe(true);
+      await press(view.byTestId('planner-back'));
+      expect(appStore.getState().overlay).toBeNull();
+    });
+
+    it('the US planner is not mounted here (U4c): no Israel planner outside Israel', async () => {
+      const view = await render(<LiveApp runtime={plannerRuntime('us')} />);
+      await act(async () => appStore.setState({ selectedScreen: 'log', overlay: { kind: 'planner' } }));
+      await settle();
+      expect(has(view, 'live-israel-planner')).toBe(false);
     });
   });
 });

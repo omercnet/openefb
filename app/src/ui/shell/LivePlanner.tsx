@@ -1,0 +1,60 @@
+import { useEffect, useState } from 'react';
+import { SafeAreaView, Text, View } from 'react-native';
+import { Pressy, ThemeContext } from '../Primitives';
+import { IsraelFlightPlanSheet } from '../sheets/israelPlan/IsraelFlightPlanSheet';
+import { IsraelPlanProvider, type IsraelPlanState } from '../sheets/israelPlan/store';
+import { useLiveTheme } from '../state/night';
+import { Space, Type } from '../tokens';
+import type { StoreApi } from 'zustand';
+import { createLiveIsraelPlanStore, type createPlannerNetworkStore, type LivePlannerDeps } from './israelPlanner';
+
+/**
+ * The flight planner pushed from the Log (LogRoute.planner): FlightPlanView shows IsraelFlightPlanView in the Israel
+ * region. The US planner is a separate screen (U4c).
+ */
+export function LiveIsraelPlanner({ store, onClose }: { store: StoreApi<IsraelPlanState>; onClose: () => void }) {
+  const theme = useLiveTheme();
+  return (
+    <ThemeContext.Provider value={theme}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.paper }} testID="live-israel-planner">
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: Space.m, gap: Space.m }}>
+          <Pressy accessibilityRole="button" accessibilityLabel="Back" onPress={onClose} testID="planner-back">
+            <Text style={[Type.title, { color: theme.accent }]}>Back</Text>
+          </Pressy>
+          <Text style={[Type.title, { color: theme.ink }]}>Plan a flight</Text>
+        </View>
+        <IsraelPlanProvider store={store}>
+          <IsraelFlightPlanSheet />
+        </IsraelPlanProvider>
+      </SafeAreaView>
+    </ThemeContext.Provider>
+  );
+}
+
+/**
+ * Opens the planner: the stored route-network choices of the aircraft are read first (the planner reads them
+ * synchronously), then one fresh plan store lives as long as the screen does.
+ */
+export function PlannerHost({
+  deps,
+  networkStore,
+  onClose,
+}: {
+  deps: Omit<LivePlannerDeps, 'networkPreferences'>;
+  networkStore: ReturnType<typeof createPlannerNetworkStore>;
+  onClose: () => void;
+}) {
+  const [store, setStore] = useState<StoreApi<IsraelPlanState> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    networkStore.warm(deps.profiles().aircraft.map((a) => a.id)).then(() => {
+      if (!cancelled) setStore(createLiveIsraelPlanStore({ ...deps, networkPreferences: networkStore }));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // The deps are fixed for the life of the runtime; a new plan store is made each time the screen opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return store ? <LiveIsraelPlanner store={store} onClose={onClose} /> : null;
+}

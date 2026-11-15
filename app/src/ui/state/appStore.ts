@@ -1,5 +1,6 @@
 import { createStore, useStore } from 'zustand';
 import type { TerminalChart } from '../columns/airport/logic';
+import type { BriefingRoute } from '../../domain/israel/briefingFilter';
 import type { AppError } from '../../domain/errors';
 import { NO_NAVIGATION, type ActiveNavigation } from '../../domain/route/navigation';
 import type { StripColumnKind } from '../../domain/types';
@@ -31,6 +32,9 @@ export interface AppState {
   /** The Israel NOTAM briefing sheet is up (AppState.isPresentingIsraelBriefing). */
   isPresentingBriefing: boolean;
   setPresentingBriefing: (presenting: boolean) => void;
+  /** The planned route the briefing filters to (the planner's Brief button); null: the whole feed around ownship. */
+  briefingRoute: BriefingRoute | null;
+  openBriefing: (route: BriefingRoute | null) => void;
   /** The terminal chart open full screen (ChartPDFView), if any. */
   chartViewer: TerminalChart | null;
   openChartViewer: (chart: TerminalChart | null) => void;
@@ -50,9 +54,12 @@ export const createAppStore = () =>
     databaseError: null,
     navigation: NO_NAVIGATION,
     isPresentingBriefing: false,
+    briefingRoute: null,
+    openBriefing: (briefingRoute) => set({ briefingRoute, isPresentingBriefing: true }),
     chartViewer: null,
     openChartViewer: (chartViewer) => set({ chartViewer }),
-    setPresentingBriefing: (isPresentingBriefing) => set({ isPresentingBriefing }),
+    setPresentingBriefing: (isPresentingBriefing) =>
+      set(isPresentingBriefing ? { isPresentingBriefing } : { isPresentingBriefing, briefingRoute: null }),
     setStripColumn: (stripColumn) => set({ stripColumn }),
     showAirport: (icao) => set({ selectedAirportId: icao, stripColumn: 'airport' }),
     reportDatabaseError: (databaseError) => set({ databaseError }),

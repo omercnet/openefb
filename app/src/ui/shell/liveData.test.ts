@@ -1,3 +1,4 @@
+import { NO_NAVIGATION } from '../../domain/route/navigation';
 import { createFakeNetworkStatus } from '../../adapters/network';
 import type { Airport } from '../../domain/core';
 import { FakeLocationSource } from '../../domain/ports/location';
@@ -144,6 +145,26 @@ describe('live data', () => {
     const { stores, stop } = setup();
     stores.flightLog.getState().actions.openBriefing();
     expect(stores.app.getState().isPresentingBriefing).toBe(true);
+    stop();
+  });
+
+  it('a navigation written to the app store (an activated plan) shows on the strip', () => {
+    const { stores, stop } = setup();
+    stores.app.getState().setNavigation({
+      ...NO_NAVIGATION,
+      activeFlightPlan: true,
+      planDeparture: 'LLHZ',
+      planDestination: 'LLIB',
+      distanceToNext: 12,
+      estimatedTimeEnroute: 400,
+      bearingToNext: 45,
+    });
+    expect(stores.flightLog.getState()).toMatchObject({
+      activeFlightPlan: true,
+      planDeparture: 'LLHZ',
+      planDestination: 'LLIB',
+      distanceToNext: 12,
+    });
     stop();
   });
 });

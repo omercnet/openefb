@@ -28,6 +28,7 @@ import { loadLayerSettings, type LayerSettings } from './layersSettings';
 import { asCoordinatorAudio } from '../../adapters/coordinatorAudio';
 import { createAudioRecorder } from '../../adapters/audioRecorder';
 import { createMicrophonePermission } from '../../adapters/microphonePermission';
+import type { Preferences } from '../../domain/ports/preferences';
 import { createPreferences } from '../../adapters/preferences';
 import { createRecordingFiles } from '../../adapters/recordingFiles';
 import { createTelemetry, startTelemetry } from '../../adapters/telemetry';
@@ -50,6 +51,7 @@ export interface AppRuntime {
   notamReadStore: NotamReadStateStore;
   terminal: TerminalProcedureService;
   profiles: Profiles;
+  preferences: Preferences;
   telemetry: Telemetry;
   notamConfigured: () => Promise<boolean>;
   offline: OfflineMapService;
@@ -80,13 +82,15 @@ export async function startRuntime(): Promise<AppRuntime> {
   });
   const notamReadStore = await NotamReadStateStore.open(fileTextStorage, log);
   const layerSettings = await loadLayerSettings(started.userDb, fileTextStorage, log);
+  const preferences = createPreferences();
   const telemetry = createTelemetry({ region: () => regionSlice.store.getState().region });
   startTelemetry(telemetry); // counts the launch; nothing is sent unless EXPO_PUBLIC_TELEMETRY_URL is set
   return {
     started,
     layerSettings,
     notamReadStore,
-    profiles: createProfiles(started.userDb, createPreferences()),
+    preferences,
+    profiles: createProfiles(started.userDb, preferences),
     telemetry,
     terminal: new TerminalProcedureService({
       fetch: fetchLike,

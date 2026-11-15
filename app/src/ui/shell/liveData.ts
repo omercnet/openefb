@@ -89,6 +89,10 @@ export function startLiveData(deps: LiveDataDeps): () => void {
   };
   // The app store outlives a remount and the flight log was just reset: show the active Direct-To or route at once.
   projectNavigation(navigation());
+  // A plan activated from the planner writes the app store directly: the strip follows it.
+  const stopNavigation = stores.app.subscribe((state, previous) => {
+    if (state.navigation !== previous.navigation) projectNavigation(state.navigation);
+  });
 
   /** Status and the map's ownship, evaluated at `now`: the same inputs as every update, so the tick can re-run it. */
   const publishPosition = (state: OwnshipState, now: number): void => {
@@ -153,6 +157,7 @@ export function startLiveData(deps: LiveDataDeps): () => void {
 
   return () => {
     clearInterval(tick);
+    stopNavigation();
     stopNetwork();
     locationService.stop();
   };

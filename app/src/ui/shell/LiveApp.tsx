@@ -20,6 +20,8 @@ import { userDataFromDb } from '../../domain/userData';
 import { log, logActions } from '../log/store';
 import { createLogbookEntryStore } from '../state/logbookEntryStore';
 import { createLogFeed } from './logFeed';
+import { createPlannerNetworkStore } from './israelPlanner';
+import { PlannerHost } from './LivePlanner';
 import { LiveScreens } from './LiveScreens';
 import { ChartViewer } from './ChartViewer';
 import { startAirportColumnLoader } from './airportColumnLoader';
@@ -96,6 +98,24 @@ export function LiveApp({
   const { started } = runtime;
   const databaseError = useAppStore((s) => s.databaseError);
   // The restored region goes in before the first render (the Nearest hook reads the slice).
+  // The Israel flight plan (Swift: FlightPlanView shows IsraelFlightPlanView in the Israel region). One store per opening.
+  const [networkStore] = useState(() => createPlannerNetworkStore(runtime.preferences));
+  const renderPlanner = (close: () => void) => (
+    <PlannerHost
+      deps={{
+        israel: started.israel,
+        notam: runtime.israelNotam,
+        profiles: () => ({
+          aircraft: runtime.profiles.aircraft.getState().profiles,
+          pilots: runtime.profiles.pilot.getState().profiles,
+        }),
+        app: appStore,
+        signal: (name, parameters) => (runtime.telemetry.signal as (n: string, p?: unknown) => void)(name, parameters),
+      }}
+      networkStore={networkStore}
+      onClose={close}
+    />
+  );
   const queries = useMemo(() => airportQueriesFor(runtime), [runtime]);
 
   useEffect(() => {
@@ -177,7 +197,11 @@ export function LiveApp({
             <View style={{ flex: 1 }}>
               <MapScreen />
             </View>
-            <LiveScreens logbookEntry={logbookEntry} onOverlayClosed={() => void feed?.refresh()} />
+            <LiveScreens
+              logbookEntry={logbookEntry}
+              onOverlayClosed={() => void feed?.refresh()}
+              {...(started.region === 'israel' ? { renderPlanner } : {})}
+            />
             <ChartViewer terminal={runtime.terminal} />
             {recording ? <StopRecordingDialog store={recording.store} /> : null}
           </View>

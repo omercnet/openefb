@@ -158,6 +158,7 @@ export function MapScreen() {
   }));
 
   const presentingBriefing = useAppStore((s) => s.isPresentingBriefing);
+  const briefingRoute = useAppStore((s) => s.briefingRoute);
   const dismissBriefing = useCallback(() => appStore.getState().setPresentingBriefing(false), []);
   const { frame } = model;
   const showHighlight = useCallback(
@@ -186,6 +187,7 @@ export function MapScreen() {
           fetcher={fetchFeed}
           readStore={runtime.notamReadStore}
           ownship={ownship.position}
+          route={briefingRoute}
           pointLookup={israelChart.pointLookup}
           presented={presentingBriefing}
           onDismiss={dismissBriefing}
