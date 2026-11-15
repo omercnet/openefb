@@ -10,6 +10,7 @@ import { EMPTY_FLIGHT_LOG, flightLog } from '../flightLog/store';
 import { appStore } from '../state/appStore';
 import { gps } from '../state/gps';
 import { regionSlice } from '../state/region';
+import { applyCaptureSeeds } from '../capture/seeds';
 import { resetLiveSlices } from './resetSlices';
 import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
@@ -164,9 +165,19 @@ describe('LiveApp (ContentView)', () => {
 
   it('the reset clears the strip column, the selected airport and the display mode too', () => {
     appStore.setState({ stripColumn: 'airport', selectedAirportId: 'KSQL' });
-    layers.store.setState({ displayMode: 'day' });
+    applyCaptureSeeds(); // a capture route's fixtures, display mode 'day'
     resetLiveSlices('us');
     expect(appStore.getState()).toMatchObject({ stripColumn: 'log', selectedAirportId: null });
+    expect(layers.store.getState().displayMode).toBe('auto');
+  });
+
+  it("a remount keeps the pilot's Layers choices; only capture fixtures bring the reset back", () => {
+    resetLiveSlices('us');
+    layers.store.setState({ displayMode: 'night', sectionalOpacity: 0.3 });
+    resetLiveSlices('us'); // the root route remounted
+    expect(layers.store.getState()).toMatchObject({ displayMode: 'night', sectionalOpacity: 0.3 });
+    applyCaptureSeeds();
+    resetLiveSlices('us');
     expect(layers.store.getState().displayMode).toBe('auto');
   });
 });

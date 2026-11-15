@@ -9,6 +9,14 @@ import { appStore } from '../state/appStore';
 import { gps } from '../state/gps';
 import { regionSlice } from '../state/region';
 
+/** The Layers slice holds the pilot's choices for the life of the process: it is reset only when fixtures were put in. */
+let layersAreLive = false;
+
+/** A capture route wrote its fixtures into the slices (ui/capture/seeds.ts): the next live start resets all of them. */
+export function noteCaptureSeeded(): void {
+  layersAreLive = false;
+}
+
 export function resetLiveSlices(region: Region): void {
   appStore.setState({ stripColumn: 'log', selectedAirportId: null, databaseError: null });
   // The restored region is in place before the first render (the strip's Israel branch reads it).
@@ -17,5 +25,6 @@ export function resetLiveSlices(region: Region): void {
   gps.store.setState(gps.make().getState());
   nearest.store.setState({ entries: [], ownship: null, loading: false, error: null });
   airport.store.setState({ columns: {}, rawMetarExpandedFor: null });
-  layers.store.setState(layers.make().getState());
+  if (!layersAreLive) layers.store.setState(layers.make().getState());
+  layersAreLive = true;
 }
