@@ -20,7 +20,7 @@ function NotamRow({ notam, expanded, onToggle }: { notam: Notam; expanded: boole
   const closure = notamClosure(notam);
   return (
     <Pressy
-      accessibilityLabel={`NOTAM ${notam.number}`}
+      accessibilityLabel={`${closure !== null ? `${closureLabel(closure)}. ` : ''}NOTAM ${notam.number}. ${effectiveWindowDescription(notam)}. ${expanded && notam.fullText ? notam.fullText : notam.text}`}
       accessibilityHint={expanded ? 'Collapse NOTAM' : 'Expand NOTAM'}
       accessibilityState={{ expanded }}
       onPress={onToggle}

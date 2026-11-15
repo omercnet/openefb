@@ -42,6 +42,8 @@ export function createDebriefStore(deps: DebriefViewDeps): DebriefViewStore {
   /** A prompt is being built or a debrief generated: a second tap must not start another (Swift would stream twice). */
   let busy = false;
   let unsubscribe = () => {};
+  /** The screen is gone: a prompt still being built must not reach the engine, which the next flight shares. */
+  let disposed = false;
 
   const mirror = () => ({
     isGenerating: engine.state.isGenerating,
@@ -70,7 +72,9 @@ export function createDebriefStore(deps: DebriefViewDeps): DebriefViewStore {
         let prompt: string;
         try {
           prompt = await deps.buildPrompt();
+          if (disposed) return;
         } catch (error) {
+          if (disposed) return;
           // The engine never sees the prompt in that case: surface it so the pilot can retry instead of seeing nothing.
           set({ promptError: debriefFailure(error) });
           return;
@@ -91,7 +95,10 @@ export function createDebriefStore(deps: DebriefViewDeps): DebriefViewStore {
       await get().generate();
     },
 
-    dispose: () => unsubscribe(),
+    dispose: () => {
+      disposed = true;
+      unsubscribe();
+    },
   }));
 
   unsubscribe = engine.subscribe(() => store.setState(mirror()));

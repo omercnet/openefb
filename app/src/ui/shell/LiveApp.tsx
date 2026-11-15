@@ -184,6 +184,11 @@ export function LiveApp({
     };
   }, [runtime, started]);
 
+  // The planners and the profile screens read the profiles, whether or not the recording database opened.
+  useEffect(() => {
+    void runtime.profiles.load().catch((error) => console.warn('The profiles did not load', error));
+  }, [runtime]);
+
   useEffect(() => {
     if (!startRecording) return;
     let cancelled = false;

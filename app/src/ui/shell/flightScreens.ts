@@ -94,6 +94,8 @@ export function createFlightScreenStores(deps: FlightScreenDeps): FlightScreenSt
     dispose() {
       detail.getState().dispose();
       debrief?.getState().dispose();
+      // The engine is the app's one model session: let go of it and of this flight's debrief state for the next flight.
+      engine?.discard();
     },
   };
 }

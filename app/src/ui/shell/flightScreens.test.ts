@@ -65,6 +65,14 @@ describe('flight screen stores', () => {
     stores.dispose();
   });
 
+  it('closing the flight lets go of the shared model session', async () => {
+    const engine = new DebriefEngine({ model: availableModel });
+    const discard = jest.spyOn(engine, 'discard');
+    const { stores } = await setup(engine);
+    stores.dispose();
+    expect(discard).toHaveBeenCalledTimes(1);
+  });
+
   it('without a debrief engine (Android) the flight has no AI debrief and no debrief screen', async () => {
     const { stores } = await setup(null);
     expect(stores.detail.getState().hasEngine).toBe(false);

@@ -3,7 +3,7 @@
 import type { StoreApi } from 'zustand';
 import type { FlightRecord } from '../../data/models';
 import type { Repository } from '../../data/repositories/table';
-import { addManualEntry, deleteLogbookEntry } from '../../domain/logbook/logbookData';
+import { addManualEntry } from '../../domain/logbook/logbookData';
 import type { UserData } from '../../domain/userData';
 import type { LogActions, LogData } from '../log/store';
 import type { AppState } from '../state/appStore';
@@ -55,9 +55,8 @@ export function createLogFeed(deps: LogFeedDeps): LogFeed {
       void (async () => {
         try {
           // LogStackView.delete(_:): a signed entry is locked, whatever the caller says.
-          const entry = await deps.userData.logbook.get(id);
-          if (!entry || entry.isConfirmed) return;
-          await deleteLogbookEntry(deps.userData, id);
+          // The signed check and the delete are one statement, so a confirm that lands in between keeps the entry.
+          await deps.userData.logbook.removeUnconfirmed(id);
         } catch (error) {
           log(`Could not delete the entry: ${String(error)}`);
         }

@@ -89,6 +89,19 @@ describe('recording runtime', () => {
     runtime.dispose();
   });
 
+  it('recovery also leaves an auto-started recording alone (the store never saw its flight id)', async () => {
+    const { runtime, location } = await setup();
+    await runtime.coordinator.startRecording(); // what the auto-start monitor does: not through the store
+    expect(runtime.store.getState().activeFlightId).toBeNull();
+    location.emitFix(makeFix({ timestampMs: 1_000 }));
+    await settle();
+    const serial = runtime.store.getState().persistenceSerial;
+    expect(await runtime.recoverOrphans({ aircraftProfileID: null, pilotProfileID: null })).toEqual([]);
+    expect(runtime.store.getState().persistenceSerial).toBe(serial);
+    await runtime.store.getState().confirmStop();
+    runtime.dispose();
+  });
+
   it('route legs keep the from and to codes', () => {
     expect(routeLegsOf([{ fromCode: 'A', toCode: 'B' }] as never)).toEqual([{ from: 'A', to: 'B' }]);
   });

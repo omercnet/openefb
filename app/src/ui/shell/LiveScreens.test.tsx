@@ -1,6 +1,9 @@
-import { act } from 'react';
+import { act, useEffect } from 'react';
 import { press, render } from '../../../tests/support/ui';
 import { appStore } from '../state/appStore';
+import { LogScreen } from '../screens/LogScreen';
+import { layers } from '../columns/layers/store';
+import { Night } from '../tokens';
 import { LogbookEntryScreen } from '../screens/LogbookEntryScreen';
 import { LiveScreens } from './LiveScreens';
 
@@ -8,19 +11,40 @@ jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
-jest.mock('../screens/LogScreen', () => ({ LogScreen: () => null }));
+jest.mock('../screens/LogScreen', () => ({ LogScreen: jest.fn(() => null) }));
 jest.mock('../screens/LogbookEntryScreen', () => ({ LogbookEntryScreen: jest.fn(() => null) }));
 const entryScreen = jest.mocked(LogbookEntryScreen);
+const logScreen = jest.mocked(LogScreen);
 
 const has = (view: Awaited<ReturnType<typeof render>>, id: string) =>
   view.all((n) => n.props?.testID === id).length > 0;
 
 beforeEach(() => {
+  layers.store.setState({ displayMode: 'day' });
   entryScreen.mockClear();
   appStore.setState({ selectedScreen: 'map', overlay: null });
 });
 
 describe('LiveScreens', () => {
+  it('the Log follows the live display mode: night passes the night theme', async () => {
+    appStore.setState({ selectedScreen: 'log', overlay: null });
+    layers.store.setState({ displayMode: 'night' });
+    await render(<LiveScreens logbookEntry={{} as never} />);
+    expect(logScreen.mock.calls.at(-1)![0].theme).toBe(Night);
+  });
+
+  it('an entry editor is remounted for another entry id (no draft carried over)', async () => {
+    let mounts = 0;
+    entryScreen.mockImplementation(() => {
+      useEffect(() => void (mounts += 1), []);
+      return null as never;
+    });
+    await render(<LiveScreens logbookEntry={{} as never} />);
+    await act(async () => appStore.setState({ selectedScreen: 'log', overlay: { kind: 'entry', id: 'a' } }));
+    await act(async () => appStore.setState({ overlay: { kind: 'entry', id: 'b' } }));
+    expect(mounts).toBe(2);
+  });
+
   it('shows only the map until the log is opened, and the map again after', async () => {
     const view = await render(<LiveScreens logbookEntry={{} as never} />);
     expect(has(view, 'live-log')).toBe(false);

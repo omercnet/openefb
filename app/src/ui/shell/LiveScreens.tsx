@@ -39,6 +39,7 @@ export function LiveScreens({
 }) {
   const screen = useAppStore((s) => s.selectedScreen);
   const overlay = useAppStore((s) => s.overlay);
+  const liveTheme = useLiveTheme();
   const close = () => {
     appStore.getState().openOverlay(null);
     onOverlayClosed?.();
@@ -47,12 +48,12 @@ export function LiveScreens({
     <>
       {screen === 'log' ? (
         <Layer testID="live-log">
-          <LogScreen />
+          <LogScreen theme={liveTheme} />
         </Layer>
       ) : null}
       {screen === 'log' && overlay?.kind === 'entry' ? (
         <Layer testID="live-entry">
-          <LogbookEntryScreen store={logbookEntry} entryId={overlay.id} onClose={close} />
+          <LogbookEntryScreen key={overlay.id} store={logbookEntry} entryId={overlay.id} onClose={close} />
         </Layer>
       ) : null}
       {screen === 'log' && overlay?.kind === 'planner' && renderPlanner ? (

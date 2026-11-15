@@ -227,3 +227,15 @@ describe('following the engine', () => {
     expect(store.getState().completed).toBeNull();
   });
 });
+
+describe('a debrief screen that is gone', () => {
+  it('does not hand a prompt it was still building to the engine the next flight shares', async () => {
+    let finish: (prompt: string) => void = () => undefined;
+    const { engine, store } = setup({ buildPrompt: () => new Promise<string>((resolve) => (finish = resolve)) });
+    const generating = store.getState().generate();
+    store.getState().dispose();
+    finish('late prompt');
+    await generating;
+    expect(engine.generated).toEqual([]);
+  });
+});

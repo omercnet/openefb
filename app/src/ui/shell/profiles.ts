@@ -41,8 +41,9 @@ export function createProfiles(
     activeIds: () => ({ aircraftProfileID: aircraftId, pilotProfileID: pilotId }),
     async load() {
       await Promise.all([aircraft.getState().load(), pilot.getState().load()]);
-      // The stores report a failed read as state, not a rejection: surface it, the active ids are not known then.
-      const failed = [aircraft.getState(), pilot.getState()].find((s) => !s.loaded);
+      // The stores report this read's outcome as state (`error`), not as a rejection, and `loaded` stays true after an
+      // earlier success: only `error` says whether the ids just read are current.
+      const failed = [aircraft.getState(), pilot.getState()].find((s) => s.error !== null);
       if (failed) throw new Error(failed.error ?? 'The profiles could not be loaded');
     },
   };

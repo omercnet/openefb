@@ -1,3 +1,4 @@
+import { addManualEntry } from '../../domain/logbook/logbookData';
 import { migrate } from '../../data/migrate';
 import { flightRecordRepository } from '../../data/repositories';
 import { userDataFromDb } from '../../domain/userData';
@@ -16,6 +17,8 @@ async function setup() {
   return { db, userData, store, app, feed };
 }
 const settle = () => new Promise((r) => setTimeout(r, 20));
+
+const addManualEntryForTest = (userData: Parameters<typeof addManualEntry>[0]) => addManualEntry(userData);
 
 describe('log feed', () => {
   it('starts empty and reads the logbook entries after a refresh', async () => {
@@ -63,6 +66,17 @@ describe('log feed', () => {
     const left = await userData.logbook.list();
     expect(left.map((e) => e.id)).toEqual([b!.id]);
     expect(store.getState().entries.map((e) => e.id)).toEqual([b!.id]);
+  });
+
+  it('the signed check is part of the delete: an entry confirmed after the check is kept', async () => {
+    const { userData } = await setup();
+    const entry = await addManualEntryForTest(userData);
+    const confirm = userData.logbook.update(entry.id, { isConfirmed: true });
+    const removed = userData.logbook.removeUnconfirmed(entry.id);
+    await confirm;
+    await removed;
+    expect(await userData.logbook.get(entry.id)).not.toBeNull();
+    expect(await userData.logbook.removeUnconfirmed(entry.id)).toBe(false);
   });
 
   it('a failed read keeps the list that was shown', async () => {

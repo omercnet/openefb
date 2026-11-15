@@ -53,6 +53,12 @@ export function OtaScreen() {
             return;
           }
           await writeResult(OTA_RELOAD_FILE, { at: Date.now() });
+          // A recording can start during that write: look again right before the swap.
+          if (!otaReloadAllowed(flightLog.store.getState().recording?.status)) {
+            clearResult(OTA_RELOAD_FILE);
+            await publish({ phase: 'settled', running, check, error: 'reload deferred: a recording is active' });
+            return;
+          }
           await Updates.reloadAsync();
           return;
         }

@@ -77,6 +77,7 @@ function runtime(over: Partial<AppRuntime['started']> = {}) {
     layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
     location,
     network,
+    profiles: { load: async () => undefined, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) },
   } as unknown as AppRuntime;
   return { rt, network, location, remote };
 }
@@ -286,6 +287,24 @@ describe('LiveApp (ContentView)', () => {
       await settle();
       expect(recover).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('Crash recovery postponed'), expect.anything());
+      warn.mockRestore();
+    });
+
+    it('the profiles load even when the recording database cannot open', async () => {
+      const { rt } = runtime();
+      const load = jest.fn(async () => undefined);
+      Object.assign(rt, { profiles: { load, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) } });
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      await render(
+        <LiveApp
+          runtime={rt}
+          startRecording={async () => {
+            throw new Error('cannot open');
+          }}
+        />,
+      );
+      await settle();
+      expect(load).toHaveBeenCalled();
       warn.mockRestore();
     });
 

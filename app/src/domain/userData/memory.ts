@@ -100,7 +100,14 @@ export function createMemoryUserData(seed: MemoryUserDataSeed = {}): UserData {
     settings,
     aircraft: repository(aircraft),
     pilots: repository(pilots),
-    logbook: { ...logbookBase, byFlightId: (flightID) => logbookBase.listWhere('flight_id', flightID) },
+    logbook: {
+      ...logbookBase,
+      byFlightId: (flightID) => logbookBase.listWhere('flight_id', flightID),
+      removeUnconfirmed: async (id) => {
+        const entry = await logbookBase.get(id);
+        return entry !== null && !entry.isConfirmed && (await logbookBase.remove(id));
+      },
+    },
   };
 
   // Like the expo adapter's exclusive transaction, atomically calls run one after the other: a second waits for the first, so

@@ -115,12 +115,17 @@ export async function createRecordingRuntime(deps: RecordingRuntimeDeps): Promis
     database,
     persistence,
     recovery,
-    recoverOrphans: (profiles) =>
-      recovery.recoverOrphans({
-        activeFlightID: store.getState().activeFlightId,
+    recoverOrphans: async (profiles) => {
+      const recovered = await recovery.recoverOrphans({
+        // The coordinator knows auto-started flights too; the store's id is only set by a manual start.
+        activeFlightID: coordinator.activeFlightID ?? store.getState().activeFlightId,
         aircraftProfileID: profiles.aircraftProfileID,
         pilotProfileID: profiles.pilotProfileID,
-      }),
+      });
+      // The Log follows saves through this counter: flights saved by recovery are saves too.
+      if (recovered.length > 0) store.setState((s) => ({ persistenceSerial: s.persistenceSerial + 1 }));
+      return recovered;
+    },
     dispose: () => store.getState().dispose(),
   };
 }

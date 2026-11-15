@@ -84,6 +84,16 @@ describe('NotamsSection', () => {
     expect(view.text()).not.toContain('FULL OBST TOWER LGT OUT');
   });
 
+  it('the accessible row carries the closure and the text, and the full text once expanded', async () => {
+    const view = await render(<NotamsSection model={model({ kind: 'loaded', report: report() })} />);
+    const label = () => view.byTestId('notam-1').props.accessibilityLabel as string;
+    expect(label()).toContain('RWY CLSD');
+    expect(label()).toContain('RWY 12/30 CLSD');
+    expect(label()).not.toContain('FULL RWY 12/30 CLSD');
+    await press(view.byTestId('notam-1'));
+    expect(label()).toContain('FULL RWY 12/30 CLSD');
+  });
+
   it('warns when the refresh failed (with Retry) and when the list is incomplete', async () => {
     const retry = jest.fn();
     const view = await render(
