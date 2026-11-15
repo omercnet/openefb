@@ -46,6 +46,8 @@ describe('log feed', () => {
     expect(app.getState().overlay).toEqual({ kind: 'planner' });
     feed.actions.openEntry('e1');
     expect(app.getState().overlay).toEqual({ kind: 'entry', id: 'e1' });
+    feed.actions.openFlight('f1');
+    expect(app.getState().overlay).toEqual({ kind: 'flight', id: 'f1' });
   });
 
   it('deletes a draft entry but never a signed one', async () => {

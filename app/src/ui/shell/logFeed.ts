@@ -49,7 +49,7 @@ export function createLogFeed(deps: LogFeedDeps): LogFeed {
         (error) => log(`Could not add the entry: ${String(error)}`),
       );
     },
-    openFlight: () => undefined,
+    openFlight: (id) => app().openOverlay({ kind: 'flight', id }),
     openEntry: (id) => app().openOverlay({ kind: 'entry', id }),
     deleteEntry: (id) => {
       void (async () => {

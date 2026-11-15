@@ -12,7 +12,7 @@ import type { StripColumnKind } from '../../domain/types';
 export type LiveScreen = 'map' | 'log';
 
 /** A screen pushed over the log stack (LogRoute); more kinds arrive as their screens are wired live. */
-export type LiveOverlay = { kind: 'entry'; id: string } | { kind: 'planner' };
+export type LiveOverlay = { kind: 'entry'; id: string } | { kind: 'planner' } | { kind: 'flight'; id: string };
 
 export interface AppState {
   selectedScreen: LiveScreen;

@@ -27,10 +27,13 @@ function Layer({ children, testID }: { children: ReactNode; testID: string }) {
 export function LiveScreens({
   logbookEntry,
   renderPlanner,
+  renderFlight,
   onOverlayClosed,
 }: {
   logbookEntry: LogbookEntryStore;
   renderPlanner?: (close: () => void) => ReactNode;
+  /** A recorded flight and the screens pushed from it; absent while the recording database is not open. */
+  renderFlight?: (flightId: string, close: () => void) => ReactNode;
   /** The pushed screen went away (Back, saved, signed): the log lists are read again. */
   onOverlayClosed?: () => void;
 }) {
@@ -54,6 +57,9 @@ export function LiveScreens({
       ) : null}
       {screen === 'log' && overlay?.kind === 'planner' && renderPlanner ? (
         <Layer testID="live-planner">{renderPlanner(close)}</Layer>
+      ) : null}
+      {screen === 'log' && overlay?.kind === 'flight' && renderFlight ? (
+        <Layer testID="live-flight">{renderFlight(overlay.id, close)}</Layer>
       ) : null}
     </>
   );

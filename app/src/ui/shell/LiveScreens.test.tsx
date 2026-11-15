@@ -51,4 +51,22 @@ describe('LiveScreens', () => {
     await withoutRenderer.update(<LiveScreens logbookEntry={{} as never} renderPlanner={() => null} />);
     expect(has(withoutRenderer, 'live-planner')).toBe(true);
   });
+
+  it('a flight shows when the recording database is open, with the renderer; nothing without it', async () => {
+    const view = await render(<LiveScreens logbookEntry={{} as never} />);
+    await act(async () => appStore.setState({ selectedScreen: 'log', overlay: { kind: 'flight', id: 'f1' } }));
+    expect(has(view, 'live-flight')).toBe(false);
+    const seen: string[] = [];
+    await view.update(
+      <LiveScreens
+        logbookEntry={{} as never}
+        renderFlight={(id) => {
+          seen.push(id);
+          return null;
+        }}
+      />,
+    );
+    expect(has(view, 'live-flight')).toBe(true);
+    expect(seen).toContain('f1');
+  });
 });

@@ -29,6 +29,7 @@ jest.mock(
   'react-native-safe-area-context',
   () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
 );
+jest.mock('./LiveFlight', () => ({ LiveFlight: () => null }));
 jest.mock('../screens/LogScreen', () => ({ LogScreen: () => null }));
 jest.mock('../map/ChartPdfView', () => ({ ChartPdfView: () => null }));
 jest.mock('../screens/MapScreen', () => ({ MapScreen: () => null }));

@@ -29,6 +29,10 @@ import { asCoordinatorAudio } from '../../adapters/coordinatorAudio';
 import { createAudioRecorder } from '../../adapters/audioRecorder';
 import { createMicrophonePermission } from '../../adapters/microphonePermission';
 import type { Preferences } from '../../domain/ports/preferences';
+import { createDebriefModel } from '../../adapters/debriefModel';
+import { createReplayAudioPlayer } from '../../adapters/replayAudioPlayer';
+import { DebriefEngine as DomainDebriefEngine } from '../../domain/debriefEngine';
+import type { ReplayAudioPlayer } from '../../domain/replay/types';
 import { createPreferences } from '../../adapters/preferences';
 import { createRecordingFiles } from '../../adapters/recordingFiles';
 import { createTelemetry, startTelemetry } from '../../adapters/telemetry';
@@ -50,6 +54,10 @@ export interface AppRuntime {
   israelNotam: IsraelNotamService;
   notamReadStore: NotamReadStateStore;
   terminal: TerminalProcedureService;
+  /** The AI debrief; null where the platform has none (Android, owner decision Q8). */
+  debrief: DomainDebriefEngine | null;
+  /** The player for a flight's saved audio (a path relative to Application Support), or null without the file. */
+  openReplayAudio: (relativePath: string) => ReplayAudioPlayer | null;
   profiles: Profiles;
   preferences: Preferences;
   telemetry: Telemetry;
@@ -85,6 +93,8 @@ export async function startRuntime(): Promise<AppRuntime> {
   const preferences = createPreferences();
   const telemetry = createTelemetry({ region: () => regionSlice.store.getState().region });
   startTelemetry(telemetry); // counts the launch; nothing is sent unless EXPO_PUBLIC_TELEMETRY_URL is set
+  const debriefModel = createDebriefModel();
+  const debrief = debriefModel.offered ? new DomainDebriefEngine({ model: debriefModel, telemetry }) : null;
   return {
     started,
     layerSettings,
@@ -92,6 +102,8 @@ export async function startRuntime(): Promise<AppRuntime> {
     preferences,
     profiles: createProfiles(started.userDb, preferences),
     telemetry,
+    debrief,
+    openReplayAudio: (path) => createReplayAudioPlayer(path),
     terminal: new TerminalProcedureService({
       fetch: fetchLike,
       downloader: fileDownloader,

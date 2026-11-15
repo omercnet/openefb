@@ -22,6 +22,8 @@ import { createLogbookEntryStore } from '../state/logbookEntryStore';
 import { createLogFeed } from './logFeed';
 import { createPlannerNetworkStore } from './israelPlanner';
 import { PlannerHost } from './LivePlanner';
+import { createFlightScreenStores } from './flightScreens';
+import { LiveFlight } from './LiveFlight';
 import { LiveScreens } from './LiveScreens';
 import { ChartViewer } from './ChartViewer';
 import { startAirportColumnLoader } from './airportColumnLoader';
@@ -99,6 +101,25 @@ export function LiveApp({
   const databaseError = useAppStore((s) => s.databaseError);
   // The restored region goes in before the first render (the Nearest hook reads the slice).
   // The Israel flight plan (Swift: FlightPlanView shows IsraelFlightPlanView in the Israel region). One store per opening.
+  const renderFlight = (flightId: string, close: () => void) =>
+    recording ? (
+      <LiveFlight
+        flightId={flightId}
+        load={(id) => flightRecordRepository(started.userDb).get(id)}
+        build={(flight) =>
+          createFlightScreenStores({
+            flight,
+            database: recording.database,
+            israel: started.region === 'israel' ? started.israel : null,
+            debrief: runtime.debrief,
+            openAudio: runtime.openReplayAudio,
+          })
+        }
+        recording={recording.store}
+        databaseOpened
+        onClose={close}
+      />
+    ) : null;
   const [networkStore] = useState(() => createPlannerNetworkStore(runtime.preferences));
   const renderPlanner = (close: () => void) => (
     <PlannerHost
@@ -201,6 +222,7 @@ export function LiveApp({
               logbookEntry={logbookEntry}
               onOverlayClosed={() => void feed?.refresh()}
               {...(started.region === 'israel' ? { renderPlanner } : {})}
+              {...(recording ? { renderFlight } : {})}
             />
             <ChartViewer terminal={runtime.terminal} />
             {recording ? <StopRecordingDialog store={recording.store} /> : null}
