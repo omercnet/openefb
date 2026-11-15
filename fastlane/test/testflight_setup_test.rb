@@ -203,6 +203,8 @@ class TestflightSetupTest < Minitest::Test
       "The specified resource does not exist - There is no resource of type 'betaGroups' with id 'x'",
       "Unknown error",
       "Temporary App Store Connect error: {\"statusCode\"=>\"ERROR\"}",
+      "Temporary App Store Connect error: {\"statusCode\"=>\"ERROR\", \"detail\"=>\"beta tester service unavailable, state of another resource\"}",
+      "  temporary app store connect error: tester",
       "This request is forbidden for security reasons", nil, ""
     ].each { |text| refute TestflightSetup.refusal_text?(text), text.inspect }
   end

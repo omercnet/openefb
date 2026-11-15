@@ -31,8 +31,14 @@ module TestflightSetup
   # error are failures of the run, so a deleted group or a systematic fault cannot print as success.
   REFUSAL_TEXT = /state of another resource|relationship with an invalid value|attribute with an invalid value|\btester\b/i
 
+  # Spaceship's own prefix for a server fault; its message carries the whole response body, which may say "tester".
+  TEMPORARY_ERROR = /\A\s*Temporary App Store Connect error/i
+
   def self.refusal_text?(message)
-    message.to_s.match?(REFUSAL_TEXT)
+    text = message.to_s
+    return false if text.match?(TEMPORARY_ERROR)
+
+    text.match?(REFUSAL_TEXT)
   end
 
   # Runs the block; any error that escapes is re-raised as RunFailed with its text masked and cut to 500 characters, and
