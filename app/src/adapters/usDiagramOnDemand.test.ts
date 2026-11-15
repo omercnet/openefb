@@ -68,7 +68,7 @@ interface Edition {
 
 function makeEdition(
   edition = '2611',
-  opts: { badSha?: string; brokenGeoreference?: string; published?: boolean } = {},
+  opts: { badSha?: string; brokenGeoreference?: string; published?: boolean; declared?: Record<string, number> } = {},
 ): Edition {
   const files: Record<string, Uint8Array> = {};
   for (const icao of ['KPAO', 'KBOS']) {
@@ -90,7 +90,7 @@ function makeEdition(
   );
   const list = Object.entries(files).map(([name, data]) => ({
     name,
-    bytes: data.length,
+    bytes: opts.declared?.[name] ?? data.length,
     sha256: name === opts.badSha ? '0'.repeat(64) : nodeSha256(data),
   }));
   const manifest = JSON.stringify({
@@ -113,7 +113,13 @@ interface Host {
 
 function setup(
   host: Host,
-  opts: { fs?: MemoryFileSystem; pack?: IsraelDiagramPack | null; now?: () => number; whole?: boolean } = {},
+  opts: {
+    fs?: MemoryFileSystem;
+    pack?: IsraelDiagramPack | null;
+    loadPack?: () => Promise<IsraelDiagramPack | null>;
+    allowUnpublished?: boolean;
+    now?: () => number;
+  } = {},
 ) {
   const fs = opts.fs ?? new MemoryFileSystem();
   const fetchedDocs: string[] = [];
@@ -163,7 +169,8 @@ function setup(
     service,
     fs,
     cacheDir: CACHE,
-    loadPack: async () => opts.pack ?? null,
+    loadPack: opts.loadPack ?? (async () => opts.pack ?? null),
+    allowUnpublished: () => opts.allowUnpublished ?? false,
     aviation,
     now: opts.now ?? (() => clock),
     retryAfterMs: 300_000,
@@ -274,6 +281,7 @@ describe('US diagrams on demand', () => {
       kind: 'unavailable',
       reason: 'georeference unreadable',
     });
+    expect(broken.downloaded.some((u) => u.endsWith('KPAO.png'))).toBe(false); // no image for a diagram that cannot be placed
   });
 
   it('offers the airports in view that the edition placed, nothing without the index', async () => {
@@ -284,5 +292,55 @@ describe('US diagrams on demand', () => {
     expect(await source.candidates('israel', { lat: 37.5, lon: -122.2 }, 30)).toEqual([]);
     const offline = setup({ latest: makeEdition(), online: false });
     expect(await offline.source.candidates('us', { lat: 37.5, lon: -122.2 }, 30)).toEqual([]);
+  });
+
+  it('serves a cached cycle with no signal only if it passes the published-edition gate', async () => {
+    const host: Host = { latest: makeEdition(), online: true };
+    const first = setup(host);
+    await first.source.diagramFor('us', 'KPAO');
+    // The cached manifest is now one that was never published (as after a developer build with the gate lifted).
+    const path = `${CACHE}/current.json`;
+    const stored = JSON.parse(new TextDecoder().decode(first.fs.files.get(path)!));
+    first.fs.put(path, bytesOf(JSON.stringify({ ...stored, published: false })));
+    host.online = false;
+    const strict = setup(host, { fs: first.fs });
+    await expect(strict.source.diagramFor('us', 'KPAO')).rejects.toBeInstanceOf(AppFailure);
+    const lifted = setup(host, { fs: first.fs, allowUnpublished: true });
+    expect((await lifted.source.diagramFor('us', 'KPAO')).kind).toBe('ready');
+  });
+
+  it('refuses files that declare an absurd size, before downloading or reading them', async () => {
+    const GiB = 1024 ** 3;
+    const bigIndex = setup({ latest: makeEdition('2611', { declared: { 'index.json': GiB } }), online: true });
+    await expect(bigIndex.source.diagramFor('us', 'KPAO')).rejects.toThrow(/index.json/);
+    expect(bigIndex.downloaded).toEqual([]);
+    const bigGeo = setup({ latest: makeEdition('2611', { declared: { 'KPAO.json': GiB } }), online: true });
+    expect(await bigGeo.source.diagramFor('us', 'KPAO')).toMatchObject({ kind: 'unavailable' });
+    expect(bigGeo.downloaded.some((u) => u.endsWith('KPAO.json') || u.endsWith('KPAO.png'))).toBe(false);
+  });
+
+  it('reads the installed pack once per call, so a pack removed in between does not hide the diagram', async () => {
+    const pack = new IsraelDiagramPack(
+      {
+        product: 'us-diagrams',
+        edition: '2611',
+        editionLabel: 'd-TPP cycle 2611 (29 OCT 2026)',
+        aipDate: '2026-10-29',
+        accuracyFeet: 50,
+        aerodromes: { KPAO: rec('KPAO', true) },
+      },
+      (name) => `/pack/${name}`,
+    );
+    let reads = 0;
+    const { source, fs } = setup(
+      { latest: makeEdition(), online: false },
+      { loadPack: async () => (++reads === 1 ? pack : null) },
+    );
+    fs.put('/pack/KPAO.json', bytesOf(JSON.stringify(geo(37.4611, -122.115))));
+    fs.put('/pack/KPAO.png', new Uint8Array([1]));
+    expect((await source.diagramFor('us', 'KPAO')).kind).toBe('ready');
+    reads = 0;
+    expect((await source.candidates('us', { lat: 37.5, lon: -122.2 }, 30)).map((c) => c.icao)).toEqual(['KPAO']);
+    expect(reads).toBe(1);
   });
 });

@@ -30,13 +30,18 @@ import {
   type DiagramIndex,
   type IsraelDiagramPack,
 } from '../services/charts/diagramPack';
-import type { ChartManifest } from '../services/charts/manifest';
+import { isServable, type ChartManifest } from '../services/charts/manifest';
 import type { ChartFileSystem } from '../services/charts/ports';
 import { fileUri } from './terminalPdfSource';
 import { createUsDiagramSource } from './usDiagramSource';
 
 const CURRENT_FILE = 'current.json';
 const INDEX_FILE = 'index.json';
+// Declared sizes are the host's word: refuse anything beyond what these files can honestly be before downloading or reading
+// them into memory (the whole-cycle index is about 150 KiB, a georeference about 1 KiB, a diagram image under 1 MiB).
+const INDEX_MAX_BYTES = 4 * 1024 * 1024;
+const GEOREFERENCE_MAX_BYTES = 256 * 1024;
+const IMAGE_MAX_BYTES = 16 * 1024 * 1024;
 
 export interface OnDemandUsDiagramDeps {
   /** The `us-diagrams` product service: latest edition and per-file downloads. */
@@ -72,7 +77,9 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
   const { service, fs, cacheDir } = deps;
   const now = deps.now ?? Date.now;
   const retryAfterMs = deps.retryAfterMs ?? DIAGRAM_RETRY_AFTER_MS;
-  const fromPack = createUsDiagramSource({ loadPack: deps.loadPack, fs, aviation: deps.aviation, log: deps.log });
+  // One read of the installed pack per call, so a pack removed in between cannot leave a call with neither source.
+  const fromPack = (pack: IsraelDiagramPack) =>
+    createUsDiagramSource({ loadPack: async () => pack, fs, aviation: deps.aviation, log: deps.log });
 
   let edition: Promise<Edition | null> | null = null; // null result: nothing published
   let failedAt: number | null = null;
@@ -94,8 +101,9 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
     try {
       latest = await service.latestServable(deps.allowUnpublished?.() ?? false);
     } catch (error) {
-      const cached = await storedManifest();
-      if (cached) return cached;
+      // Without a signal the cached cycle serves, but only under the same published-edition gate as the online path.
+      const stored = await storedManifest();
+      if (stored && isServable(stored, deps.allowUnpublished?.() ?? false)) return stored;
       throw error;
     }
     if (!latest) return null;
@@ -110,9 +118,9 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
   }
 
   /** A file of the edition in the cache: reused when its size matches, else downloaded and verified. */
-  async function cached(manifest: ChartManifest, name: string): Promise<string | null> {
+  async function cached(manifest: ChartManifest, name: string, maxBytes: number): Promise<string | null> {
     const file = manifest.files.find((f) => f.name === name);
-    if (!file) return null;
+    if (!file || file.bytes > maxBytes) return null;
     const dir = fs.join(cacheDir, manifest.edition);
     const path = fs.join(dir, name);
     if (fs.size(path) === file.bytes) return path;
@@ -122,8 +130,8 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
   async function load(): Promise<Edition | null> {
     const manifest = await currentManifest();
     if (!manifest) return null;
-    const path = await cached(manifest, INDEX_FILE);
-    if (!path) throw new Error(`edition ${manifest.edition} has no ${INDEX_FILE}`);
+    const path = await cached(manifest, INDEX_FILE, INDEX_MAX_BYTES);
+    if (!path) throw new Error(`edition ${manifest.edition} has no usable ${INDEX_FILE}`);
     const text = await fs.readText(path);
     if (text === null) throw new Error(`${INDEX_FILE} is unreadable`);
     const index = decodeDiagramIndex(text);
@@ -150,7 +158,8 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
   return {
     async candidates(region: Region, center: Coordinate, radiusNM: number): Promise<DiagramCandidate[]> {
       if (region !== 'us') return [];
-      if (await deps.loadPack()) return fromPack.candidates(region, center, radiusNM);
+      const pack = await deps.loadPack();
+      if (pack) return fromPack(pack).candidates(region, center, radiusNM);
       let resolved: Edition | null;
       try {
         resolved = await resolve();
@@ -172,7 +181,8 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
 
     async diagramFor(region: Region, icao: string): Promise<DiagramLookup> {
       if (region !== 'us') return { kind: 'unavailable', reason: 'not a US diagram' };
-      if (await deps.loadPack()) return fromPack.diagramFor(region, icao);
+      const pack = await deps.loadPack();
+      if (pack) return fromPack(pack).diagramFor(region, icao);
       const resolved = await resolve(); // rejects on a network failure: the controller retries later
       if (!resolved) return { kind: 'unavailable', reason: 'no US diagram pack published' };
       const key = icao.toUpperCase();
@@ -182,9 +192,9 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
       if (!record || !record.georeferenced || record.image === null || record.georeference === null) {
         return { kind: 'unavailable', reason: 'not georeferenced' };
       }
-      const jsonPath = await cached(resolved.manifest, record.georeference);
-      const imagePath = await cached(resolved.manifest, record.image);
-      if (!jsonPath || !imagePath) return { kind: 'unavailable', reason: 'not in the edition' };
+      // The georeference first: a malformed one costs no image download.
+      const jsonPath = await cached(resolved.manifest, record.georeference, GEOREFERENCE_MAX_BYTES);
+      if (!jsonPath) return { kind: 'unavailable', reason: 'not in the edition' };
       let georeference;
       try {
         const text = await fs.readText(jsonPath);
@@ -199,6 +209,8 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
       if (coordinates.length !== 4 || !coordinates.every((c) => c.length === 2 && c.every(Number.isFinite))) {
         return { kind: 'unavailable', reason: 'invalid corners' };
       }
+      const imagePath = await cached(resolved.manifest, record.image, IMAGE_MAX_BYTES);
+      if (!imagePath) return { kind: 'unavailable', reason: 'not in the edition' };
       return { kind: 'ready', image: { icao: key, imageUri: fileUri(imagePath), coordinates } };
     },
   };
