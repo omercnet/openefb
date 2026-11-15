@@ -85,6 +85,15 @@ web/charts/publish.sh --product us-diagrams --edition <cycle> "${packs[@]}" --ma
 
 The app shows the cycle on the map badge and in settings, so a stale pack is visible. The FAA diagrams are US government works; no permission is needed.
 
+## Workflow: `.github/workflows/testflight-setup.yml`
+
+Manual (`workflow_dispatch`), environment `testflight` (the same `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` as the release lane), on `ubuntu-latest` (Spaceship needs no Xcode). Runs `fastlane ios testflight_setup` for `io.omer.efb`. Run it from Actions, "TestFlight setup", Run workflow:
+
+- `action` = `status` (default): prints every beta group (name, internal or external, automatic distribution, tester count; the people of internal groups, masked) and the newest builds (version, build number, processing state, groups).
+- `action` = `ensure-internal-group`, `group` = `RN beta` (default): makes sure an internal group of that name exists with automatic distribution (creates it, or turns the setting on), then adds every tester who is in another internal group. A tester the API refuses is skipped and the reason printed. Safe to run again: the second run prints "Nothing to change." If an external group already has that name it stops without touching anything.
+
+It never uploads, touches an external group, submits for Beta App Review, deletes anything or changes a build, and masks emails (`a***@example.com`). Pull requests that change `fastlane/**` run only a check job (Ruby syntax, the lane's decisions against fake groups and testers in `fastlane/test/testflight_setup_test.rb`, and that the Spaceship calls it uses exist in the locked fastlane), with no key.
+
 ## Workflow: `.github/workflows/testflight-crashes.yml`
 
 Manual. Fetches the newest TestFlight crash submissions of the app (`GET /v1/apps/6829641724/betaFeedbackCrashSubmissions`, then each `crashLog`) with the `testflight` environment's App Store Connect key. The repository and its artifacts are public and a crash log carries tester and device details, so the job prints only counts and uploads a one-day artifact encrypted (CMS, AES-256) to a certificate you pass in. `tools/testflight-crashes.sh [limit]` does all of it from a shell: creates a key and certificate in `~/.config/kanaf` once, dispatches the workflow on `main`, waits, downloads and decrypts into `build/testflight-crashes/` (`<id>.crash` plus `<id>.json` with the tester's comment, device and build). The same fetch runs on a Mac with `tools/testflight-crashes.py` when the key is in `~/.appstoreconnect/`.
