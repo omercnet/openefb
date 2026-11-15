@@ -74,19 +74,19 @@ saved plans (Save Plan and Delete); those are what the sheet tests cover.
   latest writes (Swift searched synchronously on each keystroke). `loadPlan` takes a generation; a pick, a clear or a
   newer load makes it stale, so a slow lookup cannot overwrite what the pilot did meanwhile. A pick also drops a search
   still in flight for either field.
-- The dropdown after a pick: Swift's `.onChange(of: departureQuery)` also fires when `selectDeparture` / `loadPlan` write
-  the ICAO into the field, so the list reopens with the airport just picked (and with the restored plan's airports when the
-  planner opens). React Native's `onChangeText` fires on typing only, so the list stays closed. Not reproduced on purpose.
+- The dropdown after a pick: reproduced, see "Swift-parity bugs kept" below.
 - `configure()` is the ModelContext handover: before it the store reads no aircraft and touches no repository, like Swift
   with a nil `modelContext`. It runs once per store (Swift's `guard viewModel == nil`).
 - `activeAircraft` is Swift's `isActive == true` fetch: a single inactive profile is not used (the Israel planner's
   `activeProfile` falls back to a lone profile; this one does not, `inactiveAircraftIsIgnored`).
-- Swipe to delete: React Native has no List swipe. Each saved row has a visible Delete button
-  (`Delete KPAO to KSQL`) and the row offers `delete` as an accessibility action (the swipe for VoiceOver and TalkBack),
-  as the log rows do. No confirmation, as in Swift.
-- `Text(date, style: .relative)` is `relativeText`: the two largest units in full words ("2 hours, 5 minutes", "3 days"),
-  the second only when not zero, re-read every second while there are saved plans. Days are the largest unit (SwiftUI
-  goes on to weeks, months and years).
+- Swipe to delete: SwiftUI's `.onDelete` (swipe plus VoiceOver's built-in delete action). `react-native-gesture-handler` is only a
+  transitive dependency (not in `app/package.json`) and no package may be added for this, so each saved row has a visible
+  Delete button plus an `accessibilityActions` delete action. A platform adaptation; swap in a swipe row if gesture-handler
+  becomes a direct dependency.
+- `Text(date, style: .relative)` is `relativeText`: the two largest units in full words ("2 hours, 5 minutes", "3 days",
+  "1 week, 3 days", "1 month, 2 weeks", "1 year, 1 month"), the second only when not zero, re-read every second while there
+  are saved plans. The ladder continues past days to weeks, months and years like SwiftUI; a month is 30 days and a year
+  365 (SwiftUI uses the calendar, which only shows in the second unit of a very old plan).
 - `isCreating` and `lastError` are not ported: Swift never sets them and no view reads them.
 - A failed repository write is silent (`try? context.save()`): `savePlan` then marks nothing active; a failed list reads
   as no saved plans; a failed delete or last-used update changes nothing.
@@ -96,6 +96,15 @@ saved plans (Save Plan and Delete); those are what the sheet tests cover.
 Kept as in Swift: loading a plan whose airport left the database selects what it finds, shows no summary and does not
 touch navigation, so an earlier plan stays published; the distance numbers of the previous plan stay in the store
 (hidden, since the card needs both ends).
+
+### Swift-parity bugs kept (fixed after cutover, owner rule)
+
+- **The search list reopens after a pick.** `selectDeparture` / `selectDestination` write the ICAO into the query and
+  `.onChange(of: departureQuery)` searches again, so the dropdown reopens listing the airport just picked; loading a saved
+  plan (including the plan restored when the planner opens) does the same for both fields, and Clear searches for the empty
+  query. The sheet repeats Swift's `onChange` for every change of a field that did not come from typing (typing searches
+  through `setDepartureQuery`). Pinned by `FlightPlanSheet.test.tsx` ("picking a result ... reopens the list" and the
+  restore case). Not a view-model behaviour: the 24 Swift view-model cases are unchanged.
 
 ### Not ported
 

@@ -233,7 +233,12 @@ export const routeLabel = (departure: string, destination: string): string => `R
 export const savedPlanDistanceText = (record: Pick<FlightPlanRecord, 'totalDistanceNM'>): string =>
   `${oneDecimal(record.totalDistanceNM)} nm`;
 
+// SwiftUI's ladder: years, months, weeks, days, hours, minutes, seconds. A month is 30 days and a year 365 (SwiftUI uses the
+// calendar; the difference only shows in the second unit of a very old plan).
 const RELATIVE_UNITS: readonly { seconds: number; one: string; many: string }[] = [
+  { seconds: 365 * 86_400, one: 'year', many: 'years' },
+  { seconds: 30 * 86_400, one: 'month', many: 'months' },
+  { seconds: 7 * 86_400, one: 'week', many: 'weeks' },
   { seconds: 86_400, one: 'day', many: 'days' },
   { seconds: 3600, one: 'hour', many: 'hours' },
   { seconds: 60, one: 'minute', many: 'minutes' },
@@ -242,7 +247,7 @@ const RELATIVE_UNITS: readonly { seconds: number; one: string; many: string }[] 
 
 /**
  * `Text(date, style: .relative)`: the time between the date and now in its two largest units, without "ago"
- * ("2 hours, 5 minutes", "45 seconds"). Days are the largest unit here (SwiftUI moves on to weeks, months and years).
+ * ("2 hours, 5 minutes", "45 seconds"), continuing past days to weeks, months and years like SwiftUI.
  */
 export function relativeText(dateMs: number, nowMs: number): string {
   let remaining = Math.floor(Math.abs(nowMs - dateMs) / 1000);

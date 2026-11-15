@@ -230,6 +230,11 @@ describe('display text', () => {
     expect(relativeText(now - 2 * 3600_000, now)).toBe('2 hours');
     expect(relativeText(now - (3600_000 + 60_000 + 1000), now)).toBe('1 hour, 1 minute');
     expect(relativeText(now - (3 * 86_400_000 + 5 * 3600_000), now)).toBe('3 days, 5 hours');
+    expect(relativeText(now - 6 * 86_400_000, now)).toBe('6 days'); // under a week
+    expect(relativeText(now - 10 * 86_400_000, now)).toBe('1 week, 3 days');
+    expect(relativeText(now - 14 * 86_400_000, now)).toBe('2 weeks');
+    expect(relativeText(now - 45 * 86_400_000, now)).toBe('1 month, 2 weeks');
+    expect(relativeText(now - 400 * 86_400_000, now)).toBe('1 year, 1 month');
     expect(relativeText(now + 90_000, now)).toBe('1 minute, 30 seconds'); // future: same text, no "in"
   });
 

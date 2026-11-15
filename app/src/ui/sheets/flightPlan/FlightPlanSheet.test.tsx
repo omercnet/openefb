@@ -111,12 +111,15 @@ describe('FlightPlanSheet', () => {
     expect(view.byLabel('KOAK, Oakland Intl')).toHaveLength(1);
   });
 
-  test('picking a result fills the field with the ICAO and closes the list; one end shows no summary', async () => {
+  test('picking a result fills the field with the ICAO and, as in Swift, reopens the list with that airport; one end shows no summary', async () => {
+    // Swift bug kept (U4c.md): selectDeparture writes the query and `.onChange(of: departureQuery)` searches again.
     const { view, navigation } = await mount();
     await type(view, 'departure', 'Palo');
     await press(result(view, 'KPAO, Palo Alto'));
+    await settle();
     expect(field(view, 'departure').props.value).toBe('KPAO');
-    expect(has(view, 'fp-departure-results')).toBe(false);
+    expect(view.byTestId('fp-departure-results')).toBeTruthy();
+    expect(result(view, 'KPAO, Palo Alto')).toBeTruthy();
     expect(has(view, 'fp-summary')).toBe(false);
     expect(navigation.state.activeFlightPlan).toBe(false);
   });
@@ -174,6 +177,9 @@ describe('FlightPlanSheet', () => {
     expect(field(view, 'departure').props.value).toBe('KPAO');
     expect(field(view, 'destination').props.value).toBe('KSQL');
     expect(view.text()).toContain('KPAO KSQL 7.1 nm 0:03 ETE 0.5 gal');
+    // Swift bug kept: writing the restored plan's ICAOs into the fields also reopens both lists.
+    expect(view.byTestId('fp-departure-results')).toBeTruthy();
+    expect(view.byTestId('fp-destination-results')).toBeTruthy();
 
     const rows = view.all((n) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('fp-saved-plan-'));
     expect(rows.map((r) => r.props.testID)).toEqual(['fp-saved-plan-kpao-ksql', 'fp-saved-plan-ksql-kmod']);

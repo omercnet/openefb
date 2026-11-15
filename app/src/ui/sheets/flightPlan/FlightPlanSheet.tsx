@@ -13,7 +13,7 @@
 //
 // On mount the US planner calls `configure()` (Swift onAppear): saved plans load and the most recent one is restored
 // without cancelling an active Direct-To.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Keyboard, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from 'react-native';
 import type { Region } from '../../../domain/core/region';
 import type { Airport } from '../../../domain/core';
@@ -120,7 +120,20 @@ function AirportField({ field }: { field: 'departure' | 'destination' }) {
   const query = useFlightPlan((s) => (field === 'departure' ? s.departureQuery : s.destinationQuery));
   const results = useFlightPlan((s) => (field === 'departure' ? s.departureResults : s.destinationResults));
   const { title, label } = FIELDS[field];
+  // Swift's `.onChange(of: viewModel.departureQuery) { searchDeparture() }` fires for EVERY change of the field, also when
+  // selectDeparture / loadPlan / clear write it, so a pick (and a restored plan) reopens the list with that airport. A Swift
+  // bug kept for parity (fixed after cutover). Typing already searches through setDepartureQuery, so skip those writes.
+  const typed = useRef<string | null>(null);
+  const previous = useRef(query);
+  useEffect(() => {
+    if (previous.current === query) return;
+    previous.current = query;
+    if (typed.current === query) return;
+    const s = store.getState();
+    void (field === 'departure' ? s.searchDeparture() : s.searchDestination());
+  }, [field, query, store]);
   const onChange = (text: string) => {
+    typed.current = text;
     const s = store.getState();
     void (field === 'departure' ? s.setDepartureQuery(text) : s.setDestinationQuery(text));
   };
