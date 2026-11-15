@@ -98,7 +98,7 @@ function fakeRuntime(
       getSnapshot: () => offlineSnapshot,
       refresh: async () => undefined,
     },
-    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7 },
+    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
     location,
     network,
   } as unknown as AppRuntime;
