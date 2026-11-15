@@ -3,6 +3,13 @@
 # The setup logic against fake groups, testers and builds: what it creates, patches and adds, and what it must never do.
 require "minitest/autorun"
 require "timeout"
+
+# Without Spaceship (plain ruby in CI) the one class the refusal check looks at is stood in, with the same superclass.
+unless defined?(Spaceship::UnexpectedResponse)
+  module Spaceship
+    class UnexpectedResponse < StandardError; end
+  end
+end
 require_relative "../testflight_setup"
 
 Group = Struct.new(:id, :name, :is_internal_group, :has_access_to_all_builds)
@@ -190,6 +197,23 @@ class TestflightSetupTest < Minitest::Test
     refute TestflightSetup.refusal?(Timeout::Error.new("no"))
   end
 
+  # Spaceship keeps only the title and detail of an API error; these are the shapes the lane sees.
+  def test_only_a_tester_refusal_from_the_api_is_skipped_other_api_errors_fail_the_run
+    unexpected = ->(text) { Spaceship::UnexpectedResponse.new(text) }
+    [
+      "The request cannot be fulfilled because of the state of another resource. - Tester already invited",
+      "The provided entity includes a relationship with an invalid value - /data/relationships/betaTesters",
+      "The provided entity includes an attribute with an invalid value",
+      "Beta tester is not an App Store Connect user"
+    ].each { |text| assert TestflightSetup.refusal?(unexpected.call(text)), text }
+    [
+      "The specified resource does not exist - There is no resource of type 'betaGroups' with id 'x'",
+      "Unknown error",
+      "Temporary App Store Connect error: {\"statusCode\"=>\"ERROR\"}",
+      "This request is forbidden for security reasons"
+    ].each { |text| refute TestflightSetup.refusal?(unexpected.call(text)), text }
+  end
+
   def test_inputs_are_validated_before_use_and_never_echoed_in_full
     assert_equal ["status", "RN beta"], TestflightSetup.validate_inputs("status", "")
     assert_equal ["ensure-internal-group", "G"], TestflightSetup.validate_inputs("ensure-internal-group", " G ")
@@ -197,11 +221,11 @@ class TestflightSetupTest < Minitest::Test
     error = assert_raises(TestflightSetup::InvalidInput) { TestflightSetup.validate_inputs("status", "a" * 65) }
     assert_includes error.message, "65 characters"
     secret = "SECRET-" + "x" * 5000
-    [["bogus", ""], [secret, ""], ["status", secret], ["status", "bad\nname"], ["status", "alice@example.com" + "y" * 80]].each do |action, group|
+    [["bogus", ""], [secret, ""], ["status", secret], ["status", "bad\nname"], ["status", "alice@example.com" + "y" * 80], ["status", "hunter2-" + "z" * 80]].each do |action, group|
       e = assert_raises(TestflightSetup::InvalidInput) { TestflightSetup.validate_inputs(action, group) }
       assert_operator e.message.length, :<, 200
       refute_includes e.message, "x" * 30
-      refute_match(/alice@example/, e.message)
+      refute_match(/alice@example|hunter2|SECRET|bogus/, e.message) # nothing of the value, not even a prefix
     end
   end
 

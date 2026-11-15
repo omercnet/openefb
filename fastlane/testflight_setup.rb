@@ -15,20 +15,27 @@ module TestflightSetup
   GROUP_NAME_MAX = 64
   PAGE = 200 # testers read per group; more than this is shown as "200+"
 
-  # The inputs are user typed: bounded, printable, and never echoed in full.
+  # The inputs are user typed: bounded, printable, and never echoed.
   class InvalidInput < StandardError; end
 
   # The API turned a tester down (a person who is not an App Store Connect user, already invited, ...): skip and say why.
   # Anything else (no network, a bad key, a server error, rate limit) is a failed run, never a skipped tester.
   class TesterRefused < StandardError; end
 
+  # What Spaceship keeps of an API error is only the title and detail text (no status), so a refusal is recognised by that
+  # text: the API's "state of another resource" (409) and "invalid relationship/attribute value" (entity) answers, or a
+  # message that names the tester. A missing group or build (404), "Unknown error", a temporary server error and every
+  # non-Spaceship error are failures of the run, so a deleted group or a systematic fault cannot print as success.
+  REFUSAL_TEXT = /state of another resource|relationship with an invalid value|attribute with an invalid value|\btester\b/i
+
   def self.refusal?(error)
     return true if error.is_a?(TesterRefused)
+    return false unless defined?(Spaceship::UnexpectedResponse) && error.is_a?(Spaceship::UnexpectedResponse)
 
-    defined?(Spaceship::UnexpectedResponse) && error.is_a?(Spaceship::UnexpectedResponse)
+    error.message.to_s.match?(REFUSAL_TEXT)
   end
 
-  # Returns [action, group]. A bad value is reported by its type, its length and at most 24 masked characters.
+  # Returns [action, group]. A bad value is reported by its type and length only.
   def self.validate_inputs(action, group)
     action = action.to_s
     raise InvalidInput, "action must be one of #{ACTIONS.join(', ')}, got #{brief(action)}" unless ACTIONS.include?(action)
@@ -42,10 +49,9 @@ module TestflightSetup
     [action, group]
   end
 
+  # A rejected input is reported by its type and length only: it may be a secret or an address, so none of it is echoed.
   def self.brief(value)
-    text = value.to_s
-    shown = mask_text(text[0, 24]).gsub(/[[:cntrl:]]/, "?")
-    "#{value.class} of #{text.length} characters #{shown.inspect}#{text.length > 24 ? '...' : ''}"
+    "#{value.class} of #{value.to_s.length} characters"
   end
 
   # An external group has the requested name: it is not ours to reuse or change.
