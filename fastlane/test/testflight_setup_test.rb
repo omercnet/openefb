@@ -69,6 +69,10 @@ class TestflightSetupTest < Minitest::Test
     assert_equal "(no email)", TestflightSetup.mask_email(nil)
     assert_equal "x***", TestflightSetup.mask_email("xyz")
     assert_equal "a***@example.com is refused", TestflightSetup.mask_text("alice@example.com is refused")
+    assert_equal "a***@example.com", TestflightSetup.mask_text("alice!@example.com") # ! is valid in a local part
+    assert_equal "x***@example.com", TestflightSetup.mask_text("x#$%&'*+/=?^_`{|}~-y@example.com")
+    assert_equal "t***@a.co and u***@b.org", TestflightSetup.mask_text("t.s@a.co and u+v@b.org")
+    assert_equal "refused: (a***@example.com).", TestflightSetup.mask_text("refused: (alice!@example.com).")
   end
 
   def test_status_prints_groups_kind_automatic_distribution_testers_and_builds
@@ -140,6 +144,26 @@ class TestflightSetupTest < Minitest::Test
     a = api(groups: [team, clash], members: { "g-team" => [ALICE] })
     assert_raises(TestflightSetup::Refused) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
     assert_empty a.calls
+  end
+
+  def test_a_group_named_like_an_email_is_masked_on_every_output_path
+    named = "alice@example.com"
+    status = api(groups: [Group.new("g1", named, true, true)], builds: [Build.new("b1", "1", "VALID", Train.new("1.0"))], build_groups: { "g1" => ["b1"] })
+    assert_equal [], TestflightSetup.status_lines(status, APP).grep(/alice/)
+    assert_includes TestflightSetup.status_lines(status, APP).join("\n"), "a***@example.com | internal"
+
+    created = TestflightSetup.ensure_internal_group(api(groups: [team], members: { "g-team" => [ALICE] }), APP, named)
+    assert_empty created[:lines].grep(/alice/)
+    assert_includes created[:lines].first, "a***@example.com"
+
+    existing = Group.new("g2", named, true, false)
+    patched = TestflightSetup.ensure_internal_group(api(groups: [existing]), APP, named)
+    assert_empty patched[:lines].grep(/alice/)
+
+    clash = api(groups: [Group.new("g3", named, false, nil)])
+    error = assert_raises(TestflightSetup::Refused) { TestflightSetup.ensure_internal_group(clash, APP, named) }
+    refute_match(/alice/, error.message)
+    assert_empty clash.calls
   end
 
   def test_ensure_skips_a_tester_the_api_refuses_and_says_why_without_the_address

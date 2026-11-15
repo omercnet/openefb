@@ -9,7 +9,8 @@
 module TestflightSetup
   DEFAULT_GROUP = "RN beta".freeze
   ACTIONS = %w[status ensure-internal-group].freeze
-  EMAIL = /[\w.+'-]+@[\w.-]+/
+  # Any run of address characters before an @ (RFC 5322 allows ! # $ % & * / = ? ^ ` { | } ~ too), up to the domain.
+  EMAIL = /[^\s@<>()\[\]",;:\\]+@[\w.-]+/
 
   # An external group has the requested name: it is not ours to reuse or change.
   class Refused < StandardError; end
@@ -74,13 +75,13 @@ module TestflightSetup
       testers = api.group_testers(group)
       kind = group.is_internal_group ? "internal" : "external"
       automatic = group.is_internal_group ? yes_no(group.has_access_to_all_builds) : "n/a (external)"
-      lines << "  #{group.name} | #{kind} | automatic distribution: #{automatic} | testers: #{testers.size}"
+      lines << "  #{mask_text(group.name)} | #{kind} | automatic distribution: #{automatic} | testers: #{testers.size}"
       # The people of an internal group are the team; an external group can hold thousands, so only its count is printed.
       lines << "    #{testers.map { |t| mask_email(t.email) }.join(', ')}" if group.is_internal_group && !testers.empty?
     end
 
     names_by_build = Hash.new { |hash, id| hash[id] = [] }
-    groups.each { |group| api.group_builds(group).each { |build| names_by_build[build.id] << group.name } }
+    groups.each { |group| api.group_builds(group).each { |build| names_by_build[build.id] << mask_text(group.name) } }
     builds = api.latest_builds(app, build_count)
     lines << "Newest builds (#{builds.size}):"
     builds.each do |build|
@@ -97,20 +98,20 @@ module TestflightSetup
     same_name = groups.select { |g| g.name == group_name }
     target = same_name.find(&:is_internal_group)
     if target.nil? && !same_name.empty?
-      raise Refused, "'#{group_name}' is an external group; the setup never touches external groups. Pick another name."
+      raise Refused, "'#{mask_text(group_name)}' is an external group; the setup never touches external groups. Pick another name."
     end
 
     result = { created: false, enabled_all_builds: false, added: [], skipped: [], lines: [] }
     if target.nil?
       target = api.create_internal_group(app, group_name)
       result[:created] = true
-      result[:lines] << "Created internal group '#{group_name}' with automatic distribution."
+      result[:lines] << "Created internal group '#{mask_text(group_name)}' with automatic distribution."
     elsif target.has_access_to_all_builds != true
       api.enable_all_builds(target)
       result[:enabled_all_builds] = true
-      result[:lines] << "Turned on automatic distribution for '#{group_name}'."
+      result[:lines] << "Turned on automatic distribution for '#{mask_text(group_name)}'."
     else
-      result[:lines] << "Internal group '#{group_name}' exists with automatic distribution."
+      result[:lines] << "Internal group '#{mask_text(group_name)}' exists with automatic distribution."
     end
 
     present = result[:created] ? [] : api.group_testers(target).map { |t| t.email.to_s.downcase }
