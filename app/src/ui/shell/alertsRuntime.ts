@@ -160,7 +160,11 @@ export function createAlertsRuntime(deps: AlertsRuntimeDeps): AlertsRuntime {
       if (started) return;
       started = true;
       knownProximity = new Set(proximity.activeAlerts.map((a) => a.id));
-      israel.onRaised = () => haptics.warning(); // IsraelAlertService.onRaised = { _ in Haptics.warning() }
+      // IsraelAlertService.onRaised = { _ in Haptics.warning() }. JS-only guard: an evaluation that was already running when the
+      // alerts were suspended can still raise; the pilot must not feel a warning for alerts the snapshot hides.
+      israel.onRaised = () => {
+        if (!suspended()) haptics.warning();
+      };
       unsubscribe = [proximity.subscribe(changed), israel.subscribe(changed)];
       changed();
     },
@@ -193,7 +197,11 @@ export function createAlertsRuntime(deps: AlertsRuntimeDeps): AlertsRuntime {
       if (!started) return;
       // Proximity: the airspace check, then the TFR check when the TFR layer is on (it merges into a lookup still running).
       const check = proximity.checkProximity(fix.position, fix.altitudeFeet, fix.nowMs);
-      if (tfrLayerVisible) proximity.checkTFRProximity(fix.position, tfrs, fix.nowMs);
+      if (tfrLayerVisible) {
+        proximity.checkTFRProximity(fix.position, tfrs, fix.nowMs);
+        // The TFR alert is published at once: warn for it now, not after an unrelated airspace lookup settles.
+        hapticForNewProximityAlerts();
+      }
       // Israel: closed legs ahead, P/R/D and CTR, border buffers, squawk (the service resets outside Israel).
       const israelFix: IsraelFix = {
         region: fix.region,
@@ -225,14 +233,15 @@ export function createAlertsRuntime(deps: AlertsRuntimeDeps): AlertsRuntime {
 
     getSnapshot() {
       if (!started) return EMPTY_SNAPSHOT;
-      const key = version * 2 + (suspended() ? 1 : 0);
+      const key = version * 4 + (suspended() ? 1 : 0) + (context.region === 'israel' ? 2 : 0);
       if (cached?.version === key) return cached.snapshot;
       const snapshot: AlertsSnapshot = {
         proximityAlerts: [...proximity.activeAlerts],
         isInAirspace: proximity.isInAirspace,
         nearestAirspaceDistance: proximity.nearestAirspaceDistance,
         airspaceCheckUnavailable: proximity.checkUnavailable,
-        israelAlerts: suspended() ? [] : [...israel.alerts],
+        // Israel only: the service clears itself at the next fix outside Israel, the snapshot does not wait for it.
+        israelAlerts: context.region === 'israel' && !suspended() ? [...israel.alerts] : [],
         israelAlertsSuspended: suspended(),
       };
       cached = { version: key, snapshot };

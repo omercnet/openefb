@@ -50,6 +50,13 @@ Track A mounts both (I1d); no existing file is edited.
 - `stop()` suspends the Israel service and clears `onRaised`; the snapshot of a stopped runtime is empty. Swift has no stop:
   the services live as long as the map view.
 
+- Guards for what Swift's synchronous views cannot do: no Israel haptic while the alerts are suspended (an evaluation that
+  was already running can still raise), no Israel alerts in the snapshot once the region is not Israel (the service only
+  resets at the next fix), and the TFR alert's haptic is decided as soon as the TFR check publishes it, not after the
+  airspace lookup settles.
+- The banner announces nothing to screen readers, as in Swift (VoiceOver reads the rows by their labels); live-region or
+  announcement semantics belong to the accessibility sweep after cutover.
+
 ## For Track A (I1d)
 
 - Build the services: `new ProximityAlertService({ source: <aviation db airspaces(near, radiusNM)> })`,
@@ -64,7 +71,7 @@ Track A mounts both (I1d); no existing file is edited.
 
 ## Tests
 
-`alertsRuntime.test.ts` (15): fix and altitude routing, haptic once per new alert and not for a persisting one, TFR check
+`alertsRuntime.test.ts` (18): fix and altitude routing, haptic once per new alert and not for a persisting one, TFR check
 only with the layer on, check-unavailable state, Israel routing and haptic, suspend only on the change to stale and only in
 Israel, stop/start/idempotence/unsubscribe, snapshot stability and listener isolation, and two runs over the real
 `ProximityAlertService` (entering airspace, database failure). `IsraelAlertBanner.test.tsx` (6): empty, full top alert,

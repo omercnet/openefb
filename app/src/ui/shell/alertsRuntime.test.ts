@@ -237,6 +237,55 @@ describe('Israel alerts', () => {
   });
 });
 
+describe('guards found in review', () => {
+  it('no Israel haptic while the alerts are suspended, even if a running evaluation raises one', () => {
+    const { runtime, israel, haptics } = setup();
+    runtime.setContext({ region: 'israel', gpsStale: true });
+    israel.raise([israelAlert('gaza')]); // an evaluation that started before the suspension finishes now
+    expect(haptics).toEqual([]);
+    expect(runtime.getSnapshot().israelAlerts).toEqual([]);
+    runtime.setContext({ region: 'israel', gpsStale: false });
+    israel.raise([israelAlert('gaza'), israelAlert('ctr')]);
+    expect(haptics).toEqual(['warning']);
+  });
+
+  it('shows no Israel alerts once the region is not Israel, before the next fix resets the service', () => {
+    const { runtime, israel } = setup();
+    runtime.setContext({ region: 'israel', gpsStale: false });
+    israel.raise([israelAlert('gaza')]);
+    expect(runtime.getSnapshot().israelAlerts).toHaveLength(1);
+    runtime.setContext({ region: 'us', gpsStale: false });
+    expect(runtime.getSnapshot().israelAlerts).toEqual([]);
+    runtime.setContext({ region: 'israel', gpsStale: false });
+    expect(runtime.getSnapshot().israelAlerts).toHaveLength(1);
+  });
+
+  it('warns for a TFR alert as soon as it is published, not after a slow airspace lookup', async () => {
+    const proximity = new FakeProximity();
+    let release!: () => void;
+    const slow = new Promise<void>((resolve) => (release = resolve));
+    proximity.checkProximity = async () => {
+      await slow;
+    };
+    proximity.checkTFRProximity = () => {
+      proximity.activeAlerts = [alert('TFR 1', 'tfr')];
+    };
+    const haptics: string[] = [];
+    const runtime = createAlertsRuntime({
+      proximity,
+      israel: new FakeIsraelAlerts(),
+      haptics: { warning: () => haptics.push('warning') },
+    });
+    runtime.start();
+    runtime.setTfrs([{ id: 'T1' } as unknown as Tfr], true);
+    const updating = runtime.update(fix());
+    expect(haptics).toEqual(['warning']); // before the lookup has settled
+    release();
+    await updating;
+    expect(haptics).toEqual(['warning']); // and not twice for the same alert
+  });
+});
+
 describe('lifecycle and subscription', () => {
   it('a stopped runtime ignores fixes, shows nothing and has let go of the services; start works again', async () => {
     const { runtime, proximity, israel, haptics } = setup();
