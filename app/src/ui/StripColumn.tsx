@@ -1,3 +1,4 @@
+import { useContext } from 'react';
 // The 400pt leading column of the iPad map screen (efb-212/Views/Map/MapContainerView.swift regularLayout): the strip
 // column the pilot has open (flight log, airport, nearest, layers or search) over the footer, in the day or night palette.
 // Like SwiftUI, the column shrinks above the software keyboard (Search types into it), so the footer stays visible and
@@ -16,6 +17,7 @@ import { FlightLogFooter } from './flightLog/FlightLogFooter';
 import { FlightLogStrip } from './flightLog/FlightLogStrip';
 import { ThemeContext } from './Primitives';
 import { useAppStore } from './state/appStore';
+import { NightContext } from './state/night';
 import { ThemedStatusBar } from './SystemBars';
 import { Day, FontFiles, Night, type Theme } from './tokens';
 import { useKeyboardVisible } from './useKeyboardVisible';
@@ -51,10 +53,11 @@ export function chromeInsets(insets: EdgeInsets): { top: number; bottom: number 
  * layouts show bare paper, no text in a fallback face) and the top and bottom safe-area insets (points).
  */
 export function useStripChrome(screen?: StripScreen): { theme: Theme; ready: boolean; top: number; bottom: number } {
+  const forcedNight = useContext(NightContext);
   const [fontsLoaded, fontError] = useFonts(FontFiles);
   const { top, bottom } = chromeInsets(useSafeAreaInsets());
   return {
-    theme: screen === 'night' ? Night : Day,
+    theme: (forcedNight ?? screen === 'night') ? Night : Day,
     ready: fontsLoaded || fontError != null,
     top,
     bottom,

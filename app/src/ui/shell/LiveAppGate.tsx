@@ -17,7 +17,7 @@ export function LiveAppGate() {
     getRuntime().then(
       (runtime) => {
         if (cancelled) return;
-        resetLiveSlices(runtime.started.region);
+        resetLiveSlices(runtime.started.region, runtime.layerSettings);
         setState({ runtime });
       },
       (error) => !cancelled && setState({ error: describeError(error) }),

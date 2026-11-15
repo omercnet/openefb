@@ -24,6 +24,62 @@ export function useMapController(deps: MapDataDeps): MapDataController {
 export const useMapData = (controller: MapDataController): MapDataSnapshot =>
   useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
 
+/** The map's size in points. */
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
+/** Web mercator y of a latitude, in radians of the world circumference (the vertical scale grows as 1/cos(lat)). */
+const mercatorY = (latDeg: number): number => Math.log(Math.tan(Math.PI / 4 + (latDeg * Math.PI) / 360));
+
+/** Points per radian of the world at `zoom` (512 pt tiles: the world is 512 * 2^zoom points around). */
+const pointsPerRadian = (zoom: number): number => (512 * 2 ** zoom) / (2 * Math.PI);
+
+/** The viewport the camera's last report implies, from the projected corners of the reported bounds. */
+export function viewportOf(view: { zoom: number; northEast: Coordinate; southWest: Coordinate }): Viewport {
+  const scale = pointsPerRadian(view.zoom);
+  return {
+    width: Math.abs(view.northEast.lon - view.southWest.lon) * (Math.PI / 180) * scale,
+    height: Math.abs(mercatorY(view.northEast.lat) - mercatorY(view.southWest.lat)) * scale,
+  };
+}
+
+/** Swift framed the box with 100 pt of padding on each side (setVisibleCoordinateBounds edgePadding). */
+export const FRAME_PADDING_PT = 100;
+
+/**
+ * The centre and web-mercator zoom that fit `box` in `viewport` with the padding on every side, for a map rotated by
+ * `bearingDeg` (the screen shows the box turned the other way, so its extent on screen is that of the rotated corners).
+ * Without a viewport (the map has not reported yet) a 600 pt square is assumed.
+ */
+export function frameFor(
+  box: { south: number; west: number; north: number; east: number },
+  viewport: Viewport = { width: 600, height: 600 },
+  bearingDeg = 0,
+): { center: Coordinate; zoom: number } {
+  const center = { lat: (box.south + box.north) / 2, lon: (box.west + box.east) / 2 };
+  const cy = mercatorY(center.lat);
+  const turn = (bearingDeg * Math.PI) / 180;
+  let halfX = 0;
+  let halfY = 0;
+  for (const lat of [box.south, box.north]) {
+    for (const lon of [box.west, box.east]) {
+      const x = ((lon - center.lon) * Math.PI) / 180;
+      const y = mercatorY(lat) - cy;
+      // Rotating the map by `bearing` turns the north-up box by -bearing on screen.
+      halfX = Math.max(halfX, Math.abs(x * Math.cos(turn) - y * Math.sin(turn)));
+      halfY = Math.max(halfY, Math.abs(x * Math.sin(turn) + y * Math.cos(turn)));
+    }
+  }
+  const extentX = Math.max(2 * halfX, 0.0002);
+  const extentY = Math.max(2 * halfY, 0.0002);
+  const usable = (px: number) => Math.max(px - 2 * FRAME_PADDING_PT, 100);
+  const fit = (px: number, extent: number) => Math.log2((usable(px) * 2 * Math.PI) / (512 * extent));
+  const zoom = Math.min(14, Math.max(4, Math.min(fit(viewport.width, extentX), fit(viewport.height, extentY))));
+  return { center, zoom };
+}
+
 export interface CameraModel {
   state: CameraState;
   camera: { seq: number; command: CameraCommand | null };
@@ -106,6 +162,10 @@ export function useMapModel(input: MapModelInput) {
   const cam = useCameraModel(input.initialMode ?? 'northUp');
   const { dispatch } = cam;
   const lastView = useRef<ViewSample | null>(null);
+  // The map's size from its layout. The camera's bounds are the axis-aligned box of a rotated screen, larger than the
+  // screen, so they only give the size while the map points north.
+  const measured = useRef<Viewport | null>(null);
+  const viewport = useRef<Viewport | null>(null);
 
   // Every new fix goes through the reducer: first-fix jump, follow, duplicates ignored.
   useEffect(() => {
@@ -122,6 +182,7 @@ export function useMapModel(input: MapModelInput) {
       };
       if (gestureSuspendsFollow(lastView.current, sample, c.userInteraction)) dispatch({ type: 'userMoved' });
       lastView.current = sample;
+      viewport.current = viewportOf(c);
       dispatch({ type: 'directionChanged', direction: c.bearing });
       controller.onRegionChanged(c.center, c.zoom, c.northEast, c.southWest);
     },
@@ -131,6 +192,18 @@ export function useMapModel(input: MapModelInput) {
   const recenter = useCallback(
     () => dispatch({ type: 'recenter', position: ownship.position, trackDeg: ownship.trackDeg }),
     [dispatch, ownship.position, ownship.trackDeg],
+  );
+  const bearing = () => lastView.current?.bearing ?? 0;
+  const onMapLayout = useCallback((size: Viewport) => {
+    measured.current = size;
+  }, []);
+  const frame = useCallback(
+    (box: { south: number; west: number; north: number; east: number }) =>
+      dispatch({
+        type: 'frame',
+        ...frameFor(box, measured.current ?? (bearing() === 0 ? (viewport.current ?? undefined) : undefined), bearing()),
+      }),
+    [dispatch],
   );
   const zoomTo = useCallback((level: number) => dispatch({ type: 'zoomTo', level }), [dispatch]);
   const setMode = useCallback(
@@ -159,5 +232,7 @@ export function useMapModel(input: MapModelInput) {
     recenter,
     setMode,
     zoomTo,
+    frame,
+    onMapLayout,
   };
 }

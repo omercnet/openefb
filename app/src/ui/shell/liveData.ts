@@ -141,6 +141,7 @@ export function startLiveData(deps: LiveDataDeps): () => void {
     actions: {
       ...stores.flightLog.getState().actions,
       clear: () => publishNavigation(NO_NAVIGATION),
+      openBriefing: () => stores.app.getState().setPresentingBriefing(true),
       sequenceRoute: (forward) =>
         publishNavigation(sequenceActiveRoute(navigation(), forward, navigationFix(latest), clock())),
     },

@@ -34,16 +34,9 @@ const SAMPLE_DATA = [
   '**/capture/*',
   '**/capture*',
 ];
-// Files that still import sample data and leave with their tickets: I1b (sheets, briefing, Israel plan) and I1c (the
-// Log reference). Remove each entry in the PR that wires its screen; an entry here is a to-do, not a permission.
-const SAMPLE_DATA_UNTIL_I1B_I1C = [
-  'src/app/israel-plan.tsx',
-  'src/ui/log/LogReference.tsx',
-  'src/ui/log/fixtures.ts',
-  'src/ui/screens/SheetScreen.tsx',
-  'src/ui/sheets/briefing/BriefingOverMap.tsx',
-  'src/ui/sheets/briefing/store.ts',
-];
+// Files that still import sample data and leave with their ticket: the Log reference (I1c). Remove each entry in the PR
+// that wires its screen; an entry here is a to-do, not a permission.
+const SAMPLE_DATA_UNTIL_I1B_I1C = ['src/ui/log/LogReference.tsx', 'src/ui/log/fixtures.ts'];
 // What may import sample data: tests, the capture routes and their seeds, and the files that build capture screens.
 const SAMPLE_DATA_ALLOWED = [
   '**/*.test.{ts,tsx}',

@@ -5,6 +5,7 @@ import { createFakeNetworkStatus } from '../../adapters/network';
 import { FakeLocationSource, makeFix } from '../../domain/ports/location';
 import { AirportQueriesContext } from '../columns/nearest/sources';
 import { FIXTURE_AIRPORTS } from '../columns/nearest/fixture';
+import { layers } from '../columns/layers/store';
 import { nearest } from '../columns/nearest/store';
 import { footer } from '../flightLog/footerStore';
 import { EMPTY_FLIGHT_LOG, flightLog } from '../flightLog/store';
@@ -13,6 +14,7 @@ import { RuntimeContext } from '../state/runtimeContext';
 import { airportQueriesFor } from '../shell/airportQueries';
 import { startLiveData } from '../shell/liveData';
 import type { AppRuntime } from '../shell/runtime';
+import { Day, Night } from '../tokens';
 import { MapScreen } from './MapScreen';
 
 jest.mock(
@@ -23,6 +25,10 @@ let lastSurface: {
   region: string;
   initialView: { center: { lat: number } };
   onViewChange: (c: unknown) => void;
+  night: boolean;
+  sectional: boolean;
+  sectionalOpacity?: number;
+  sources: Record<string, { features: unknown[] }>;
 } | null = null;
 jest.mock('../map/MapSurface', () => ({
   MapSurface: (props: NonNullable<typeof lastSurface>) => <MockSurface {...props} />,
@@ -36,9 +42,29 @@ const MockSurface = (props: NonNullable<typeof lastSurface>) => {
 jest.mock('../../adapters/glyphInstall', () => ({
   useLocalGlyphs: () => ({ status: 'ready', url: 'file:///g/{fontstack}/{range}.pbf' }),
 }));
+let briefingProps: {
+  presented: boolean;
+  onShow: (h: { source: unknown; bounds: unknown }) => void;
+  onDismiss: () => void;
+} | null = null;
+let briefingTheme: unknown = null;
+jest.mock('../shell/LiveBriefing', () => ({
+  LiveBriefing: (props: NonNullable<typeof briefingProps>) => {
+    const { useEffect: effect } = jest.requireActual('react');
+    const { useTheme } = jest.requireActual('../Primitives');
+    const theme = useTheme();
+    effect(() => {
+      briefingProps = props;
+      briefingTheme = theme;
+    });
+    return null;
+  },
+}));
 jest.mock('../map/mapStatus', () => ({ getCurrentMapStatus: () => null }));
 
 const KPAO = FIXTURE_AIRPORTS.find((a) => a.icao === 'KPAO')!;
+
+const offlineSnapshot = { packs: [], storageUsedBytes: 0, lastError: null };
 
 function fakeRuntime(
   over: { aviation?: Partial<AppRuntime['started']['aviation'] & object> | null; region?: 'us' | 'israel' } = {},
@@ -66,6 +92,13 @@ function fakeRuntime(
     weather: { fetchWeatherForStations: async () => [] },
     tfr: { currentTFRs: async () => ({ tfrs: [], fetchedAt: Date.now() }) },
     advisories: { currentAdvisories: async () => ({ advisories: [], fetchedAt: Date.now() }) },
+    offline: {
+      status: () => 'notDownloaded',
+      subscribe: () => () => undefined,
+      getSnapshot: () => offlineSnapshot,
+      refresh: async () => undefined,
+    },
+    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7 },
     location,
     network,
   } as unknown as AppRuntime;
@@ -142,10 +175,92 @@ describe('live MapScreen (MapContainerView)', () => {
     expect(view.byTestId('map-surface')).toBeTruthy();
   });
 
+  it('the Layers column drives the map: display mode, sectional opacity and switch', async () => {
+    const { runtime } = fakeRuntime();
+    layers.store.setState({ displayMode: 'day', sectionalOpacity: 0.7 });
+    await mountLive(runtime);
+    expect(lastSurface!.night).toBe(false);
+    await act(async () => layers.store.setState({ displayMode: 'night', sectionalOpacity: 0.4 }));
+    expect(lastSurface!.night).toBe(true);
+    expect(lastSurface!.sectionalOpacity).toBe(0.4);
+    await act(async () => layers.store.setState({ visibleLayers: ['ownship'] }));
+    expect(lastSurface!.sectional).toBe(false);
+  });
+
   it('opens on the restored region, not the default: Israel home view, layers and controller', async () => {
     const { runtime } = fakeRuntime({ region: 'israel' });
     await mountLive(runtime);
     expect(lastSurface!.region).toBe('israel');
     expect(lastSurface!.initialView.center.lat).toBeLessThan(34); // Israel, not the US centre
+  });
+
+  it('the briefing sheet follows the app store, and Done closes it', async () => {
+    const { runtime } = fakeRuntime();
+    await mountLive(runtime);
+    expect(briefingProps!.presented).toBe(false);
+    await act(async () => appStore.getState().setPresentingBriefing(true));
+    expect(briefingProps!.presented).toBe(true);
+    await act(async () => briefingProps!.onDismiss());
+    expect(appStore.getState().isPresentingBriefing).toBe(false);
+  });
+
+  it('Show on map draws the highlight on the Israel chart sources', async () => {
+    const { runtime } = fakeRuntime({ region: 'israel' });
+    (runtime.started as { israel: unknown }).israel = {
+      reportingPoints: async () => [],
+      routeSegments: async () => [],
+      airspacesOfKind: async () => [],
+      runwaysIn: async () => [],
+      aerodromesIn: async () => [],
+    };
+    await mountLive(runtime);
+    await act(async () => undefined);
+    await act(async () =>
+      briefingProps!.onShow({
+        source: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { color: '#FF3B30' } }] },
+        bounds: { south: 32, west: 34.8, north: 32.2, east: 35 },
+      }),
+    );
+    expect(lastSurface!.sources['il-brief-highlight']?.features).toHaveLength(1);
+  });
+
+  it('Show on map draws the highlight even when the Israel data did not load', async () => {
+    const { runtime } = fakeRuntime({ region: 'israel' }); // started.israel is null
+    await mountLive(runtime);
+    await act(async () =>
+      briefingProps!.onShow({
+        source: { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { color: '#FF9500' } }] },
+        bounds: { south: 32, west: 34.8, north: 32.2, east: 35 },
+      }),
+    );
+    expect(lastSurface!.sources['il-brief-highlight']?.features).toHaveLength(1);
+  });
+
+  it('the briefing follows the night palette of the map', async () => {
+    const { runtime } = fakeRuntime();
+    layers.store.setState({ displayMode: 'night' });
+    await mountLive(runtime);
+    expect(briefingTheme).toBe(Night);
+    await act(async () => layers.store.setState({ displayMode: 'day' }));
+    expect(briefingTheme).toBe(Day);
+  });
+
+  it('the offline status is judged again on each clock tick (a pack expires at the cycle boundary)', async () => {
+    const { runtime } = fakeRuntime();
+    const status = jest.spyOn(runtime.offline, 'status');
+    await mountLive(runtime);
+    await act(async () =>
+      lastSurface!.onViewChange({
+        center: { lat: 37, lon: -122 },
+        zoom: 10,
+        bearing: 0,
+        northEast: { lat: 37.1, lon: -121.9 },
+        southWest: { lat: 36.9, lon: -122.1 },
+        userInteraction: false,
+      }),
+    );
+    const before = status.mock.calls.length;
+    await act(async () => layers.store.setState({ now: Date.now() + 60_000 }));
+    expect(status.mock.calls.length).toBeGreaterThan(before);
   });
 });

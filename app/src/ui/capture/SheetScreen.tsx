@@ -24,8 +24,17 @@ const PAGE_SHEET: ModifierConfig = { $type: 'presentationSizing', sizing: 'page'
 function Section({ title, note }: { title: string; note?: string }) {
   return (
     <Row spacing={8} style={{ paddingTop: 14 }}>
-      <Text textStyle={{ fontFamily: SECTION, fontSize: 12, letterSpacing: 1.2, color: Day.inkSecondary }}>{title}</Text>
-      {note ? <Text style={{ backgroundColor: Day.paperSecondary, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 }} textStyle={{ fontFamily: MONO, fontSize: 12, color: Day.inkSecondary }}>{note}</Text> : null}
+      <Text textStyle={{ fontFamily: SECTION, fontSize: 12, letterSpacing: 1.2, color: Day.inkSecondary }}>
+        {title}
+      </Text>
+      {note ? (
+        <Text
+          style={{ backgroundColor: Day.paperSecondary, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 2 }}
+          textStyle={{ fontFamily: MONO, fontSize: 12, color: Day.inkSecondary }}
+        >
+          {note}
+        </Text>
+      ) : null}
     </Row>
   );
 }
@@ -33,7 +42,9 @@ function Section({ title, note }: { title: string; note?: string }) {
 function Pair({ label, value }: { label: string; value: string }) {
   return (
     <Row spacing={0}>
-      <Text style={{ width: LABEL_WIDTH }} textStyle={{ fontFamily: LABEL, fontSize: 14, color: Day.inkSecondary }}>{label}</Text>
+      <Text style={{ width: LABEL_WIDTH }} textStyle={{ fontFamily: LABEL, fontSize: 14, color: Day.inkSecondary }}>
+        {label}
+      </Text>
       <Text textStyle={{ fontFamily: MONO, fontSize: 16, color: Day.ink }}>{value}</Text>
     </Row>
   );
@@ -41,7 +52,12 @@ function Pair({ label, value }: { label: string; value: string }) {
 
 function Chip({ text }: { text: string }) {
   return (
-    <Text style={{ backgroundColor: Day.paperSecondary, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 }} textStyle={{ fontFamily: MONO, fontSize: 15, color: Day.ink }}>{text}</Text>
+    <Text
+      style={{ backgroundColor: Day.paperSecondary, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6 }}
+      textStyle={{ fontFamily: MONO, fontSize: 15, color: Day.ink }}
+    >
+      {text}
+    </Text>
   );
 }
 
@@ -50,7 +66,10 @@ export function SheetScreen() {
   const [presented, setPresented] = useState(true);
   return (
     <View style={{ flex: 1, backgroundColor: '#B9C7A8', alignItems: 'center', justifyContent: 'center' }}>
-      <Pressable onPress={() => setPresented(true)} style={{ padding: 16, backgroundColor: '#FFFFFF', borderRadius: 10 }}>
+      <Pressable
+        onPress={() => setPresented(true)}
+        style={{ padding: 16, backgroundColor: '#FFFFFF', borderRadius: 10 }}
+      >
         <RNText style={{ fontSize: 18 }}>Show {apt.ident}</RNText>
       </Pressable>
       <BottomSheet
@@ -66,7 +85,9 @@ export function SheetScreen() {
           <Column spacing={8} alignment="start">
             <Row spacing={8}>
               <Text textStyle={{ fontFamily: TITLE, fontSize: 30, color: Day.accent }}>{apt.ident}</Text>
-              <Text textStyle={{ fontFamily: LABEL, fontSize: 16, color: Day.categoryMVFR }}>{`\u25CF ${apt.flightCategory}`}</Text>
+              <Text
+                textStyle={{ fontFamily: LABEL, fontSize: 16, color: Day.categoryMVFR }}
+              >{`\u25CF ${apt.flightCategory}`}</Text>
             </Row>
             <Text textStyle={{ fontFamily: LABEL, fontSize: 15, color: Day.inkSecondary }}>{apt.name}</Text>
             {/* Elevation and traffic pattern altitude in feet MSL */}
@@ -89,7 +110,11 @@ export function SheetScreen() {
             <Section title="RUNWAYS" />
             {/* Length x width in feet */}
             {apt.runways.map((r) => (
-              <Pair key={r.ident} label={r.ident} value={`${r.lengthFt.toLocaleString('en-US')}' x ${r.widthFt}'  ${r.surface}`} />
+              <Pair
+                key={r.ident}
+                label={r.ident}
+                value={`${r.lengthFt.toLocaleString('en-US')}' x ${r.widthFt}'  ${r.surface}`}
+              />
             ))}
           </Column>
         </ScrollView>

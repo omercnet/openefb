@@ -31,6 +31,8 @@ export interface MapSurfaceProps {
   night: boolean;
   /** Runtime visibility of the FAA sectional (MapService.setMapStyle sectional flag). */
   sectional: boolean;
+  /** 0...1; omitted keeps the style's default. */
+  sectionalOpacity?: number;
   region: Region;
   /** Local glyph URL template (see adapters/glyphInstall.ts); labels render with no network. */
   glyphsUrl: string;
@@ -74,6 +76,7 @@ const LayerFromSpec = memo(function LayerFromSpec({
 export function MapSurface({
   night,
   sectional,
+  sectionalOpacity,
   region,
   glyphsUrl,
   visibleLayers,
@@ -89,7 +92,10 @@ export function MapSurface({
 }: MapSurfaceProps) {
   const mapRef = useRef<MapRef>(null);
   const cameraRef = useRef<CameraRef>(null);
-  const mapStyle = useMemo(() => styleFor(night, sectional, glyphsUrl), [night, sectional, glyphsUrl]);
+  const mapStyle = useMemo(
+    () => styleFor(night, sectional, glyphsUrl, sectionalOpacity),
+    [night, sectional, glyphsUrl, sectionalOpacity],
+  );
   const groups = useMemo(() => groupBySource(layers), [layers]);
   const onNativeLog = useCallback(
     (level: string, message: string) => {

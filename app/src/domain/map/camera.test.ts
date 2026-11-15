@@ -1,6 +1,7 @@
 // Camera reducer: ports the follow/first-fix/recenter/map-mode rules of MapViewModel (onOwnshipUpdated, recenter,
 // setMapMode, onUserMovedMap, onMapDirectionChanged). No Swift test covers them directly (MapViewModelTests exercise
 // the view model against MapService), so these cases are written from the Swift control flow.
+import { isFollowing } from './followMode';
 import {
   cameraReducer,
   FIRST_FIX_ZOOM,
@@ -147,5 +148,25 @@ describe('zoomTo (the footer ZOOM buttons)', () => {
     const { state, command } = run(before, { type: 'zoomTo', level: 12 });
     expect(command).toEqual({ center: null, zoom: 12, direction: 40, animated: true });
     expect(state).toBe(before);
+  });
+});
+
+describe('frame (show a box on the map)', () => {
+  it('animates to the box and stops following ownship', () => {
+    const { state, command } = run(initialCameraState(), { type: 'frame', center: { lat: 32, lon: 35 }, zoom: 9 });
+    expect(command).toEqual({ center: { lat: 32, lon: 35 }, zoom: 9, direction: 0, animated: true });
+    expect(isFollowing(state.follow)).toBe(false);
+  });
+
+  it('the first GPS fix after an explicit frame does not pull the camera back to ownship', () => {
+    const framed = run(initialCameraState(), { type: 'frame', center: { lat: 32, lon: 35 }, zoom: 9 }).state;
+    const { command } = run(framed, {
+      type: 'fix',
+      timestamp: 1,
+      position: { lat: 33, lon: 36 },
+      trackDeg: 0,
+      inRegion: true,
+    });
+    expect(command).toBeNull();
   });
 });

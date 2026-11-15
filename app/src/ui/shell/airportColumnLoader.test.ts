@@ -283,4 +283,78 @@ describe('airport column loader', () => {
     expect(calls).toBe(lookups);
     stop();
   });
+
+  describe('charts and the NOTAM key', () => {
+    const CYCLE = { code: '2611', effectiveMs: 1, expirationMs: 2 };
+    const chart = {
+      chartCode: 'APD',
+      name: 'AIRPORT DIAGRAM',
+      pdfName: '00375AD.PDF',
+      cycle: '2611',
+      category: 'diagram',
+    };
+    const charts = (over: Partial<NonNullable<AirportColumnLoaderDeps['charts']>> = {}) => ({
+      charts: jest.fn(async () => [chart] as never),
+      currentCycle: jest.fn(async () => CYCLE),
+      ...over,
+    });
+
+    it('loads the FAA charts and their cycle for a US airport', async () => {
+      const service = charts();
+      const { app, column, settle, stop } = setup({ charts: service });
+      app.getState().showAirport('KSQL');
+      expect(column.getState().columns.KSQL!.charts).toEqual({ state: 'loading' });
+      await settle();
+      expect(column.getState().columns.KSQL!.charts).toEqual({
+        state: 'loaded',
+        cycle: { code: '2611', effective: 1, expires: 2 },
+        charts: [expect.objectContaining({ pdfName: '00375AD.PDF' })],
+      });
+      expect(service.charts).toHaveBeenCalledWith(expect.objectContaining({ icao: 'KSQL' }));
+      stop();
+    });
+
+    it('a chart failure shows its message and Retry loads again', async () => {
+      let failing = true;
+      const service = charts({
+        charts: jest.fn(async () => {
+          if (failing) throw new Error('offline');
+          return [chart] as never;
+        }),
+      });
+      const { app, column, settle, stop } = setup({ charts: service, log: () => undefined });
+      app.getState().showAirport('KSQL');
+      await settle();
+      expect(column.getState().columns.KSQL!.charts).toMatchObject({ state: 'failed' });
+      failing = false;
+      column.getState().retryCharts('KSQL');
+      await settle();
+      expect(column.getState().columns.KSQL!.charts).toMatchObject({ state: 'loaded' });
+      stop();
+    });
+
+    it('Israel has no FAA charts: nothing is requested', async () => {
+      const service = charts();
+      const { app, settle, stop } = setup({
+        charts: service,
+        region: () => 'israel',
+        israel: { aerodrome: async () => null },
+      });
+      app.getState().showAirport('LLHZ');
+      await settle();
+      expect(service.charts).not.toHaveBeenCalled();
+      stop();
+    });
+
+    it('opening a chart goes to the viewer; the NOTAM hint follows the stored key', async () => {
+      const openChart = jest.fn();
+      const { app, column, settle, stop } = setup({ openChart, notamConfigured: async () => true });
+      app.getState().showAirport('KSQL');
+      await settle();
+      column.getState().openChart(chart as never);
+      expect(openChart).toHaveBeenCalledWith(chart);
+      expect(column.getState().columns.KSQL!.notamKeyConfigured).toBe(true);
+      stop();
+    });
+  });
 });

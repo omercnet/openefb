@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { AppState as NativeAppState, View } from 'react-native';
+import { fileTextStorage } from '../../adapters/fileTextStorage';
 import { airport } from '../columns/airport/store';
+import { layers } from '../columns/layers/store';
 import { AirportQueriesContext } from '../columns/nearest/sources';
 import { nearest } from '../columns/nearest/store';
 import { DatabaseUnavailableBanner, RemoteConfigBanner } from '../components/Components';
@@ -9,9 +11,11 @@ import { MapScreen } from '../screens/MapScreen';
 import { appStore, useAppStore } from '../state/appStore';
 import { useRegion } from '../state/region';
 import { RuntimeContext } from '../state/runtimeContext';
+import { ChartViewer } from './ChartViewer';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';
 import { bannerItems } from './banners';
+import { persistLayerSettings } from './layersSettings';
 import { startLiveData } from './liveData';
 import { startRemoteConfigChecks } from './remoteConfigChecks';
 import type { AppRuntime } from './runtime';
@@ -65,6 +69,9 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
       region: () => started.region,
       clock: Date.now,
       directTo: (a) => nearest.store.getState().directTo(a),
+      charts: runtime.terminal,
+      notamConfigured: runtime.notamConfigured,
+      openChart: (chart) => appStore.getState().openChartViewer(chart),
     });
     const stopChecks = started.remoteConfig
       ? startRemoteConfigChecks({
@@ -78,7 +85,9 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
           },
         })
       : () => undefined;
+    const stopSettings = persistLayerSettings(layers.store, started.userDb, fileTextStorage, console.warn);
     return () => {
+      stopSettings();
       stopData();
       stopAirport();
       stopChecks();
@@ -94,6 +103,7 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
           <View style={{ flex: 1 }}>
             <MapScreen />
           </View>
+          <ChartViewer terminal={runtime.terminal} />
         </View>
       </AirportQueriesContext.Provider>
     </RuntimeContext.Provider>
