@@ -1,14 +1,17 @@
 // The "End recording?" confirmation (confirmationDialog on the record button in Views/Map/RecordingOverlayView.swift). Stopping
 // is asked first because it ends the GPS track, the audio and the transcript; the flight is then saved to Flights.
-import { useEffect } from 'react';
-import { ActionSheetIOS, Modal, Platform, Text, View, findNodeHandle } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { ActionSheetIOS, Modal, Platform, Text, View } from 'react-native';
 import { useStore } from 'zustand';
 import { STOP_CONFIRMATION } from '../../domain/recording/recordingNotices';
 import { FormType } from '../form/formStyle';
 import { Pressy, useTheme } from '../Primitives';
 import type { RecordingViewStore } from '../state/recordingStore';
-import { recordButtonAnchor } from './stopAnchor';
+import { useRecordButtonHandle } from './stopAnchor';
 import { Radius, Space, StripMetrics } from '../tokens';
+
+/** How long the sheet waits for the record button's tag before it opens unanchored. */
+const ANCHOR_WAIT_MS = 1000;
 
 export function StopRecordingDialog({ store }: { store: RecordingViewStore }) {
   const t = useTheme();
@@ -16,21 +19,30 @@ export function StopRecordingDialog({ store }: { store: RecordingViewStore }) {
   // iOS (Swift: confirmationDialog on the record button): the system sheet, a popover under the button on iPad, with no
   // Cancel row there; tapping outside is the cancel. Android keeps the dialog below.
   const native = Platform.OS === 'ios';
+  const anchor = useRecordButtonHandle();
+  const shown = useRef(false);
   useEffect(() => {
-    if (!native || !visible) return;
-    const node = recordButtonAnchor();
-    ActionSheetIOS.showActionSheetWithOptions(
-      {
-        title: STOP_CONFIRMATION.title,
-        message: STOP_CONFIRMATION.message,
-        options: [STOP_CONFIRMATION.confirm, STOP_CONFIRMATION.cancel],
-        destructiveButtonIndex: 0,
-        cancelButtonIndex: 1,
-        anchor: (node && findNodeHandle(node)) || undefined,
-      },
-      (index) => (index === 0 ? void store.getState().confirmStop() : store.getState().cancelStop()),
-    );
-  }, [native, visible, store]);
+    if (!visible) shown.current = false;
+    if (!native || !visible || shown.current) return;
+    const show = (tag: number | undefined) => {
+      shown.current = true;
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: STOP_CONFIRMATION.title,
+          message: STOP_CONFIRMATION.message,
+          options: [STOP_CONFIRMATION.confirm, STOP_CONFIRMATION.cancel],
+          destructiveButtonIndex: 0,
+          cancelButtonIndex: 1,
+          anchor: tag,
+        },
+        (index) => (index === 0 ? void store.getState().confirmStop() : store.getState().cancelStop()),
+      );
+    };
+    if (anchor !== null) return show(anchor);
+    // The button is not on screen yet: wait for it, but never leave the pilot without the question.
+    const timer = setTimeout(() => show(undefined), ANCHOR_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [native, visible, store, anchor]);
   if (native) return null;
   const choice = (title: string, onPress: () => void, color: string, testID: string, bold?: boolean) => (
     <Pressy
