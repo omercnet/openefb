@@ -92,7 +92,7 @@ Manual (`workflow_dispatch`), environment `testflight` (the same `ASC_KEY_ID`, `
 - `action` = `status` (default): prints every beta group (name, internal or external, automatic distribution, tester count; the people of internal groups, masked) and the newest builds (version, build number, processing state, groups).
 - `action` = `ensure-internal-group`, `group` = `RN beta` (default): makes sure an internal group of that name exists with automatic distribution (creates it, or turns the setting on), then adds every tester who is in another internal group. A tester the API refuses is skipped and the reason printed. Safe to run again: the second run prints "Nothing to change." If an external group already has that name it stops without touching anything.
 
-It never uploads, touches an external group, submits for Beta App Review, deletes anything or changes a build, and masks emails (`a***@example.com`). Pull requests that change `fastlane/**` run only a check job (Ruby syntax, the lane's decisions against fake groups and testers in `fastlane/test/testflight_setup_test.rb`, and that the Spaceship calls it uses exist in the locked fastlane), with no key.
+It never uploads, touches an external group, submits for Beta App Review, deletes anything or changes a build, and masks emails (`a***@example.com`). Pull requests that change `fastlane/**` run only a check job (Ruby syntax, the lane's decisions against fake groups and testers in `fastlane/test/testflight_setup_test.rb`, and `fastlane/test/spaceship_names_check.rb`, which checks that the Spaceship calls it uses exist in the locked fastlane), with no key.
 
 ## Workflow: `.github/workflows/testflight-crashes.yml`
 

@@ -48,8 +48,10 @@ jobs:
           bundler-cache: true
       - name: Syntax
         run: ruby -c fastlane/Fastfile && ruby -c fastlane/testflight_setup.rb
-      - name: Logic against fake groups, testers and builds, and the Spaceship call names
-        run: bundle exec ruby fastlane/test/testflight_setup_test.rb
+      - name: Logic against fake groups, testers and builds
+        run: ruby fastlane/test/testflight_setup_test.rb
+      - name: The Spaceship calls the adapter makes exist in the locked fastlane
+        run: bundle exec ruby fastlane/test/spaceship_names_check.rb
       - name: The lane refuses an unknown action before it needs a key
         run: |
           if out=$(bundle exec fastlane ios testflight_setup action:bogus 2>&1); then echo "$out"; exit 1; fi

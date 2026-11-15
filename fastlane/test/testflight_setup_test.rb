@@ -1,4 +1,5 @@
-# ruby fastlane/test/testflight_setup_test.rb   (with `bundle exec` the last test also checks the Spaceship names)
+# ruby fastlane/test/testflight_setup_test.rb   (minitest only; no Spaceship, no key). The Spaceship call names are checked by
+# spaceship_names_check.rb under `bundle exec`.
 # The setup logic against fake groups, testers and builds: what it creates, patches and adds, and what it must never do.
 require "minitest/autorun"
 require_relative "../testflight_setup"
@@ -156,24 +157,5 @@ class TestflightSetupTest < Minitest::Test
   def test_the_real_adapter_can_only_list_create_one_internal_group_enable_and_add
     allowed = %i[groups group_testers group_builds latest_builds create_internal_group enable_all_builds add_tester]
     assert_equal allowed.sort, TestflightSetup::ConnectApi.public_instance_methods(false).sort
-  end
-
-  def test_spaceship_has_the_calls_the_adapter_makes
-    begin
-      require "spaceship"
-    rescue LoadError
-      skip "spaceship is not installed (run with bundle exec)"
-    end
-    api = Spaceship::ConnectAPI
-    %i[get_beta_testers get_builds create_beta_group].each { |m| assert_respond_to api, m }
-    testflight = Spaceship::ConnectAPI::TestFlight::API # ConnectAPI forwards to it
-    assert_includes testflight.instance_method(:create_beta_group).parameters.map(&:last), :has_access_to_all_builds
-    assert_includes testflight.instance_method(:get_beta_testers).parameters.map(&:last), :filter
-    group = Spaceship::ConnectAPI::BetaGroup
-    %i[update add_beta_testers fetch_builds].each { |m| assert group.method_defined?(m), "BetaGroup##{m}" }
-    assert Spaceship::ConnectAPI::App.method_defined?(:get_beta_groups)
-    assert_includes group.instance_method(:update).parameters.map(&:last), :attributes
-    assert Spaceship::ConnectAPI::BetaTester.method_defined?(:email)
-    assert Spaceship::ConnectAPI::Build.method_defined?(:pre_release_version)
   end
 end
