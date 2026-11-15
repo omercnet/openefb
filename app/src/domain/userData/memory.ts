@@ -103,9 +103,12 @@ export function createMemoryUserData(seed: MemoryUserDataSeed = {}): UserData {
     logbook: {
       ...logbookBase,
       byFlightId: (flightID) => logbookBase.listWhere('flight_id', flightID),
-      removeUnconfirmed: async (id) => {
-        const entry = await logbookBase.get(id);
-        return entry !== null && !entry.isConfirmed && (await logbookBase.remove(id));
+      // Check and delete in one synchronous step on the rows, like the single SQL statement: no confirm can land between.
+      removeUnconfirmed: (id) => {
+        const entry = logbook.rows.get(id);
+        if (!entry || entry.isConfirmed) return Promise.resolve(false);
+        logbook.rows.delete(id);
+        return Promise.resolve(true);
       },
     },
   };

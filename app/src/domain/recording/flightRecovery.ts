@@ -46,11 +46,21 @@ export class FlightRecoveryService {
 
   /**
    * Recover every orphaned recording. Returns the flight ids that got a FlightRecord.
-   * activeFlightID: a recording in progress right now; never touched.
+   * activeFlightID: a recording in progress right now; never touched. A function is read again before every candidate,
+   * because a recording can start while the scans are awaited.
    */
   async recoverOrphans(
-    options: { activeFlightID?: string | null; aircraftProfileID?: string | null; pilotProfileID?: string | null } = {},
+    options: {
+      activeFlightID?: string | null | (() => string | null);
+      aircraftProfileID?: string | null;
+      pilotProfileID?: string | null;
+    } = {},
   ): Promise<string[]> {
+    const activeID = (): string | null =>
+      (typeof options.activeFlightID === 'function'
+        ? options.activeFlightID()
+        : options.activeFlightID
+      )?.toLowerCase() ?? null;
     let existing: Set<string>;
     try {
       existing = new Set((await this.deps.flights.list()).map((f) => f.id.toLowerCase()));
@@ -74,13 +84,16 @@ export class FlightRecoveryService {
       if (candidates.get(key) == null) candidates.set(key, id);
     }
     existing.forEach((id) => candidates.delete(id));
-    if (options.activeFlightID) candidates.delete(options.activeFlightID.toLowerCase());
+    const activeNow = activeID();
+    if (activeNow) candidates.delete(activeNow);
 
     const recovered: string[] = [];
     for (const flightID of [...candidates.keys()].sort()) {
+      if (flightID === activeID()) continue; // started since the scan
       try {
         const summary = await this.summaryFor(flightID, candidates.get(flightID) ?? flightID);
         if (!summary) continue;
+        if (flightID === activeID()) continue; // started while its data was read
         const result = await this.deps.persistence.store(
           summary,
           options.aircraftProfileID ?? null,

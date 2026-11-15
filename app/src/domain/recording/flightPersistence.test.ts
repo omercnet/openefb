@@ -423,6 +423,25 @@ describe('FlightRecovery Tests', () => {
     expect(isRecovered(flights.find((x) => x.id === saved)!)).toBe(false);
   });
 
+  test('aRecordingThatStartsDuringTheScanIsNeverRecovered', async () => {
+    const f = await makeFixture();
+    const late = uuid();
+    await insertTrack(f, late, 3);
+    let current: string | null = null; // nothing recording when the scan begins
+    let reads = 0;
+    const result = await (
+      await recovery(f)
+    ).recoverOrphans({
+      activeFlightID: () => {
+        reads += 1;
+        if (reads >= 2) current = late; // it starts while the candidates are being read
+        return current;
+      },
+    });
+    expect(result).toEqual([]);
+    expect(await f.flightsRepo.list()).toHaveLength(0);
+  });
+
   test('aRecordingInProgressIsNeverRecovered', async () => {
     const f = await makeFixture();
     const active = uuid();

@@ -118,7 +118,7 @@ export async function createRecordingRuntime(deps: RecordingRuntimeDeps): Promis
     recoverOrphans: async (profiles) => {
       const recovered = await recovery.recoverOrphans({
         // The coordinator knows auto-started flights too; the store's id is only set by a manual start.
-        activeFlightID: coordinator.activeFlightID ?? store.getState().activeFlightId,
+        activeFlightID: () => coordinator.activeFlightID ?? store.getState().activeFlightId,
         aircraftProfileID: profiles.aircraftProfileID,
         pilotProfileID: profiles.pilotProfileID,
       });

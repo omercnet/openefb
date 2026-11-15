@@ -92,6 +92,7 @@ describe('NotamsSection', () => {
     expect(label()).not.toContain('FULL RWY 12/30 CLSD');
     await press(view.byTestId('notam-1'));
     expect(label()).toContain('FULL RWY 12/30 CLSD');
+    expect(label()).toContain('RWY 12/30 CLSD. FULL'); // the summary stays, the full text is added
   });
 
   it('warns when the refresh failed (with Retry) and when the list is incomplete', async () => {
