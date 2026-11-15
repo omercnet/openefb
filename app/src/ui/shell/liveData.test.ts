@@ -122,4 +122,21 @@ describe('live data', () => {
     expect(stores.app.getState().navigation.directTo).toBeNull();
     stop();
   });
+
+  it('a restart shows the navigation the app store still holds, before any fix', () => {
+    const first = setup();
+    first.stores.nearest.getState().directTo(KSQL);
+    first.stop();
+    const location = new FakeLocationSource();
+    const stores: LiveDataStores = { ...first.stores, flightLog: flightLog.make(EMPTY_FLIGHT_LOG) };
+    const stop = startLiveData({
+      location,
+      network: createFakeNetworkStatus(false),
+      region: 'us',
+      clock: () => NOW,
+      stores,
+    });
+    expect(stores.flightLog.getState()).toMatchObject({ directTo: 'KSQL', activeFlightPlan: true });
+    stop();
+  });
 });
