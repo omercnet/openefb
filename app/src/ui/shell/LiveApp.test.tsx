@@ -4,11 +4,13 @@ import { createFakeNetworkStatus } from '../../adapters/network';
 import { FakeLocationSource } from '../../domain/ports/location';
 import type { RemoteNotice } from '../../services/remoteConfig';
 import { UPDATE_BANNER_ID } from '../../services/remoteConfigStore';
+import { layers } from '../columns/layers/store';
 import { nearest } from '../columns/nearest/store';
 import { EMPTY_FLIGHT_LOG, flightLog } from '../flightLog/store';
 import { appStore } from '../state/appStore';
 import { gps } from '../state/gps';
 import { regionSlice } from '../state/region';
+import { resetLiveSlices } from './resetSlices';
 import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
 
@@ -67,6 +69,8 @@ beforeEach(() => {
 });
 
 describe('LiveApp (ContentView)', () => {
+  afterEach(() => jest.useRealTimers());
+
   it('shows no banner when everything opened', async () => {
     const { rt } = runtime();
     const view = await render(<LiveApp runtime={rt} />);
@@ -120,12 +124,15 @@ describe('LiveApp (ContentView)', () => {
   });
 
   it('starts from launch state even if a capture route left fixtures in the slices', async () => {
-    const { rt, remote } = runtime();
+    const { rt, remote } = runtime({ region: 'israel' });
     flightLog.store.setState({
       recording: { status: { kind: 'recording' }, elapsedSeconds: 6, levelDBFS: -20, microphoneDenied: false },
     });
+    resetLiveSlices('israel');
+    expect(flightLog.store.getState().region).toBe('israel'); // from the first render, not after an effect
     await render(<LiveApp runtime={rt} />);
     expect(flightLog.store.getState().recording).toBeNull();
+    expect(flightLog.store.getState().region).toBe('israel');
     expect(remote.refreshIfDue).toHaveBeenCalledWith(false);
   });
 
@@ -153,6 +160,13 @@ describe('LiveApp (ContentView)', () => {
       jest.advanceTimersByTime(120_000);
     });
     expect(view.text()).not.toContain('Soon gone');
-    jest.useRealTimers();
+  });
+
+  it('the reset clears the strip column, the selected airport and the display mode too', () => {
+    appStore.setState({ stripColumn: 'airport', selectedAirportId: 'KSQL' });
+    layers.store.setState({ displayMode: 'day' });
+    resetLiveSlices('us');
+    expect(appStore.getState()).toMatchObject({ stripColumn: 'log', selectedAirportId: null });
+    expect(layers.store.getState().displayMode).toBe('auto');
   });
 });

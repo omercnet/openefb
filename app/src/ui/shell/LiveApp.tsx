@@ -4,11 +4,10 @@ import { airport } from '../columns/airport/store';
 import { AirportQueriesContext } from '../columns/nearest/sources';
 import { nearest } from '../columns/nearest/store';
 import { DatabaseUnavailableBanner, RemoteConfigBanner } from '../components/Components';
-import { EMPTY_FLIGHT_LOG, flightLog } from '../flightLog/store';
+import { flightLog } from '../flightLog/store';
 import { MapScreen } from '../screens/MapScreen';
 import { appStore, useAppStore } from '../state/appStore';
-import { gps } from '../state/gps';
-import { regionSlice, useRegion } from '../state/region';
+import { useRegion } from '../state/region';
 import { RuntimeContext } from '../state/runtimeContext';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';
@@ -48,13 +47,6 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
   const { started } = runtime;
   const databaseError = useAppStore((s) => s.databaseError);
   // The restored region goes in before the first render (the Nearest hook reads the slice).
-  useState(() => {
-    // A capture route opened earlier in this process leaves fixtures in the shared slices: start from launch state.
-    flightLog.store.setState(EMPTY_FLIGHT_LOG);
-    gps.store.setState(gps.make().getState());
-    nearest.store.setState({ entries: [], ownship: null, loading: false, error: null });
-    regionSlice.store.setState({ region: started.region });
-  });
   const queries = useMemo(() => airportQueriesFor(runtime), [runtime]);
 
   useEffect(() => {
