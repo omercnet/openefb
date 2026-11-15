@@ -2,6 +2,7 @@
 # spaceship_names_check.rb under `bundle exec`.
 # The setup logic against fake groups, testers and builds: what it creates, patches and adds, and what it must never do.
 require "minitest/autorun"
+require "timeout"
 require_relative "../testflight_setup"
 
 Group = Struct.new(:id, :name, :is_internal_group, :has_access_to_all_builds)
@@ -26,7 +27,7 @@ class FakeApi
 
   def groups(_app) = @groups_list
   def group_testers(group) = @members.fetch(group.id, [])
-  def group_builds(group) = (@build_groups[group.id] || []).map { |id| Build.new(id) }
+  def group_builds(group, count) = (@build_groups[group.id] || []).first(count).map { |id| Build.new(id) }
   def latest_builds(_app, count) = @builds.first(count)
 
   def create_internal_group(_app, name)
@@ -42,7 +43,7 @@ class FakeApi
   end
 
   def add_tester(group, tester)
-    raise @fail_for[tester.id] if @fail_for.key?(tester.id)
+    raise @fail_for[tester.id] if @fail_for.key?(tester.id) # an exception to raise
 
     @calls << [:add_tester, group.id, tester.id]
     (@members[group.id] ||= []) << tester
@@ -170,12 +171,55 @@ class TestflightSetupTest < Minitest::Test
     a = api(
       groups: [team],
       members: { "g-team" => [ALICE, BOB] },
-      fail_for: { "t1" => "alice@example.com is not an App Store Connect user\nsecond line" }
+      fail_for: { "t1" => TestflightSetup::TesterRefused.new("alice@example.com is not an App Store Connect user\nsecond line") }
     )
     r = TestflightSetup.ensure_internal_group(a, APP, "RN beta")
     assert_equal ["B***@Example.org"], r[:added]
     assert_equal [["a***@example.com", "a***@example.com is not an App Store Connect user"]], r[:skipped]
     refute_match(/alice@/, r[:lines].join(" "))
+  end
+
+  def test_an_api_failure_that_is_not_a_refusal_fails_the_run_instead_of_being_skipped
+    a = api(groups: [team], members: { "g-team" => [ALICE, BOB] }, fail_for: { "t1" => RuntimeError.new("connection reset by alice@example.com") })
+    assert_raises(RuntimeError) { TestflightSetup.ensure_internal_group(a, APP, "RN beta") }
+  end
+
+  def test_a_refusal_is_recognized_by_class
+    assert TestflightSetup.refusal?(TestflightSetup::TesterRefused.new("no"))
+    refute TestflightSetup.refusal?(RuntimeError.new("no"))
+    refute TestflightSetup.refusal?(Timeout::Error.new("no"))
+  end
+
+  def test_inputs_are_validated_before_use_and_never_echoed_in_full
+    assert_equal ["status", "RN beta"], TestflightSetup.validate_inputs("status", "")
+    assert_equal ["ensure-internal-group", "G"], TestflightSetup.validate_inputs("ensure-internal-group", " G ")
+    assert_equal 64, TestflightSetup.validate_inputs("status", "a" * 64).last.length
+    error = assert_raises(TestflightSetup::InvalidInput) { TestflightSetup.validate_inputs("status", "a" * 65) }
+    assert_includes error.message, "65 characters"
+    secret = "SECRET-" + "x" * 5000
+    [["bogus", ""], [secret, ""], ["status", secret], ["status", "bad\nname"], ["status", "alice@example.com" + "y" * 80]].each do |action, group|
+      e = assert_raises(TestflightSetup::InvalidInput) { TestflightSetup.validate_inputs(action, group) }
+      assert_operator e.message.length, :<, 200
+      refute_includes e.message, "x" * 30
+      refute_match(/alice@example/, e.message)
+    end
+  end
+
+  def test_status_counts_testers_up_to_a_page
+    many = Array.new(TestflightSetup::PAGE) { |i| Tester.new("t#{i}", "p#{i}@example.com") }
+    a = api(groups: [beta], members: { "g-beta" => many })
+    assert_includes TestflightSetup.status_lines(a, APP).join("\n"), "testers: #{TestflightSetup::PAGE}+"
+  end
+
+  def test_status_asks_for_only_as_many_builds_per_group_as_it_prints
+    counts = []
+    a = api(groups: [team], build_groups: { "g-team" => %w[b1 b2 b3] })
+    a.define_singleton_method(:group_builds) do |group, count|
+      counts << count
+      super(group, count)
+    end
+    TestflightSetup.status_lines(a, APP, build_count: 2)
+    assert_equal [2], counts
   end
 
   def test_the_real_adapter_can_only_list_create_one_internal_group_enable_and_add

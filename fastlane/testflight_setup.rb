@@ -12,6 +12,42 @@ module TestflightSetup
   # Any run of address characters before an @ (RFC 5322 allows ! # $ % & * / = ? ^ ` { | } ~ too), up to the domain.
   EMAIL = /[^\s@<>()\[\]",;:\\]+@[\w.-]+/
 
+  GROUP_NAME_MAX = 64
+  PAGE = 200 # testers read per group; more than this is shown as "200+"
+
+  # The inputs are user typed: bounded, printable, and never echoed in full.
+  class InvalidInput < StandardError; end
+
+  # The API turned a tester down (a person who is not an App Store Connect user, already invited, ...): skip and say why.
+  # Anything else (no network, a bad key, a server error, rate limit) is a failed run, never a skipped tester.
+  class TesterRefused < StandardError; end
+
+  def self.refusal?(error)
+    return true if error.is_a?(TesterRefused)
+
+    defined?(Spaceship::UnexpectedResponse) && error.is_a?(Spaceship::UnexpectedResponse)
+  end
+
+  # Returns [action, group]. A bad value is reported by its type, its length and at most 24 masked characters.
+  def self.validate_inputs(action, group)
+    action = action.to_s
+    raise InvalidInput, "action must be one of #{ACTIONS.join(', ')}, got #{brief(action)}" unless ACTIONS.include?(action)
+
+    group = group.to_s.strip
+    group = DEFAULT_GROUP if group.empty?
+    if group.length > GROUP_NAME_MAX || group.match?(/[[:cntrl:]]/)
+      raise InvalidInput, "group must be 1 to #{GROUP_NAME_MAX} printable characters, got #{brief(group)}"
+    end
+
+    [action, group]
+  end
+
+  def self.brief(value)
+    text = value.to_s
+    shown = mask_text(text[0, 24]).gsub(/[[:cntrl:]]/, "?")
+    "#{value.class} of #{text.length} characters #{shown.inspect}#{text.length > 24 ? '...' : ''}"
+  end
+
   # An external group has the requested name: it is not ours to reuse or change.
   class Refused < StandardError; end
 
@@ -38,12 +74,15 @@ module TestflightSetup
       app.get_beta_groups
     end
 
+    # One page only (PAGE): a count of PAGE means "PAGE or more". ensure-internal-group needs the whole internal group, which
+    # is the team (a handful of people), so it uses the same page.
     def group_testers(group)
-      Spaceship::ConnectAPI.get_beta_testers(filter: { betaGroups: group.id }, limit: 200).all_pages.flat_map(&:to_models)
+      Spaceship::ConnectAPI.get_beta_testers(filter: { betaGroups: group.id }, limit: PAGE).to_models
     end
 
-    def group_builds(group)
-      group.fetch_builds
+    # The newest builds of the group, as many as status prints: never the whole history.
+    def group_builds(group, count)
+      Spaceship::ConnectAPI.get_builds(filter: { betaGroups: group.id }, sort: "-uploadedDate", limit: count).to_models
     end
 
     def latest_builds(app, count)
@@ -75,13 +114,14 @@ module TestflightSetup
       testers = api.group_testers(group)
       kind = group.is_internal_group ? "internal" : "external"
       automatic = group.is_internal_group ? yes_no(group.has_access_to_all_builds) : "n/a (external)"
-      lines << "  #{mask_text(group.name)} | #{kind} | automatic distribution: #{automatic} | testers: #{testers.size}"
+      count = testers.size >= PAGE ? "#{PAGE}+" : testers.size.to_s
+      lines << "  #{mask_text(group.name)} | #{kind} | automatic distribution: #{automatic} | testers: #{count}"
       # The people of an internal group are the team; an external group can hold thousands, so only its count is printed.
       lines << "    #{testers.map { |t| mask_email(t.email) }.join(', ')}" if group.is_internal_group && !testers.empty?
     end
 
     names_by_build = Hash.new { |hash, id| hash[id] = [] }
-    groups.each { |group| api.group_builds(group).each { |build| names_by_build[build.id] << mask_text(group.name) } }
+    groups.each { |group| api.group_builds(group, build_count).each { |build| names_by_build[build.id] << mask_text(group.name) } }
     builds = api.latest_builds(app, build_count)
     lines << "Newest builds (#{builds.size}):"
     builds.each do |build|
@@ -123,6 +163,8 @@ module TestflightSetup
       result[:added] << mask_email(tester.email)
       result[:lines] << "Added #{mask_email(tester.email)}."
     rescue StandardError => e
+      raise unless refusal?(e) # a failed run, not a refused tester
+
       reason = mask_text(e.message).lines.first.to_s.strip[0, 200]
       result[:skipped] << [mask_email(tester.email), reason]
       result[:lines] << "Skipped #{mask_email(tester.email)}: #{reason}"

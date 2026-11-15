@@ -62,13 +62,15 @@ jobs:
 
   setup:
     name: TestFlight setup (${{ inputs.action }})
-    if: github.event_name == 'workflow_dispatch'
+    # Only from main: a run from another branch would hand the App Store Connect key to unreviewed Fastlane code.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest # Spaceship needs no Xcode; use macos-26 if this ever fails on Linux
     timeout-minutes: 20
     environment: testflight
     steps:
       - uses: actions/checkout@v7
         with:
+          ref: main
           persist-credentials: false
       - uses: ruby/setup-ruby@v1
         with:

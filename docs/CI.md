@@ -87,12 +87,17 @@ The app shows the cycle on the map badge and in settings, so a stale pack is vis
 
 ## Workflow: `.github/workflows/testflight-setup.yml`
 
-Manual (`workflow_dispatch`), environment `testflight` (the same `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` as the release lane), on `ubuntu-latest` (Spaceship needs no Xcode). Runs `fastlane ios testflight_setup` for `io.omer.efb`. Run it from Actions, "TestFlight setup", Run workflow:
+Looks at, and sets up, the TestFlight beta groups of `io.omer.efb` with the App Store Connect API key (`fastlane ios testflight_setup`, on `ubuntu-latest`: Spaceship needs no Xcode). It never uploads, touches an external group, submits for Beta App Review, deletes anything or changes a build, and masks emails (`a***@example.com`) everywhere it prints.
 
-- `action` = `status` (default): prints every beta group (name, internal or external, automatic distribution, tester count; the people of internal groups, masked) and the newest builds (version, build number, processing state, groups).
-- `action` = `ensure-internal-group`, `group` = `RN beta` (default): makes sure an internal group of that name exists with automatic distribution (creates it, or turns the setting on), then adds every tester who is in another internal group. A tester the API refuses is skipped and the reason printed. Safe to run again: the second run prints "Nothing to change." If an external group already has that name it stops without touching anything.
+Prerequisites: the `testflight` environment holds `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8` (the same as the release lane, see above). The run step only runs from `main`, so unreviewed Fastlane code never sees the key.
 
-It never uploads, touches an external group, submits for Beta App Review, deletes anything or changes a build, and masks emails (`a***@example.com`). Pull requests that change `fastlane/**` run only a check job (Ruby syntax, the lane's decisions against fake groups and testers in `fastlane/test/testflight_setup_test.rb`, and `fastlane/test/spaceship_names_check.rb`, which checks that the Spaceship calls it uses exist in the locked fastlane), with no key.
+1. Open Actions, "TestFlight setup", Run workflow, branch `main`.
+2. To look first: leave `action` = `status` and run it. It prints every beta group (name, internal or external, automatic distribution, tester count, `200+` for a bigger group; the people of internal groups, masked) and the newest builds with their groups.
+3. To set up the internal group: choose `action` = `ensure-internal-group` and `group` (default `RN beta`, 1 to 64 printable characters), then run it. It creates the internal group or turns on automatic distribution, then adds every tester who is in another internal group.
+4. Read the log. "Added ..." lines are testers added; "Skipped ..." lines are people the API turned down (for example, not an App Store Connect user) with the reason: fix them in App Store Connect and run again. Running again is safe: with nothing left to do it prints "Nothing to change."
+5. If the run fails, it stops with the cause: an `action` or `group` that is not valid, an external group that already has that name (rename it or pick another name), or an API error (key, network, rate limit; the lane does not report those as skipped testers). Nothing is half-reported as done; run again after fixing.
+
+Pull requests that change `fastlane/**` run only a check job with no key: Ruby syntax, the lane's decisions against fake groups, testers and builds (`fastlane/test/testflight_setup_test.rb`), and `fastlane/test/spaceship_names_check.rb`, which checks that the Spaceship calls it uses exist in the locked fastlane.
 
 ## Workflow: `.github/workflows/testflight-crashes.yml`
 
