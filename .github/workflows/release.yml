@@ -62,6 +62,10 @@ jobs:
   testflight:
     name: TestFlight upload
     needs: release-please
+    # Only from main: this job holds the App Store Connect key and the signing identity. A workflow file is read from the ref it
+    # runs on, so the durable guard is the `testflight` environment's deployment branches rule (main only, an owner setting):
+    # GitHub then rejects a run from another branch before this job starts. The first step below is the fallback without that
+    # rule: it FAILS instead of skipping, so a run from a branch is never a silent green (docs/CI.md).
     if: ${{ !cancelled() && !failure() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     timeout-minutes: 90
@@ -71,8 +75,23 @@ jobs:
       FASTLANE_SKIP_UPDATE_CHECK: "1"
       FASTLANE_OPT_OUT_USAGE: "1"
     steps:
-      # An upload builds a release tag: the one release-please just created, or the `tag` input of a manual run.
-      # A manual sign-only run (upload off, no tag) builds the commit it was dispatched at.
+      - name: Only from main
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          [ "$REF" = refs/heads/main ] || { echo "::error::the TestFlight job runs only from main, not from '$REF': dispatch it on main"; exit 1; }
+      # What to build is decided by tools/ci/resolve-testflight-target.sh (its table of cases is tools/ci/resolve-testflight-target.test.sh):
+      # an upload builds a release tag (the one release-please just created, or the `tag` input of a manual run); a manual
+      # sign-only run builds the commit it was dispatched at; and a manual run with app=rn, upload on and no tag, from main, is the
+      # RN preview: it builds that commit for the internal TestFlight group. Any other untagged upload fails.
+      # The selector always comes from main, in its own folder (the build checkout below replaces the workspace): a branch
+      # cannot swap in its own selector to pick its own commit.
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          path: select
+          sparse-checkout: tools/ci
+          persist-credentials: false
       - name: Resolve what to build
         id: target
         env:
@@ -80,21 +99,8 @@ jobs:
           RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
           INPUT_TAG: ${{ inputs.tag }}
           INPUT_UPLOAD: ${{ inputs.upload }}
-        run: |
-          upload=true
-          [ "$EVENT" = workflow_dispatch ] && [ "$INPUT_UPLOAD" = false ] && upload=false
-          tag=${RELEASE_TAG:-$INPUT_TAG}
-          if [ -n "$tag" ]; then
-            [[ $tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::tag '$tag' is not vX.Y.Z"; exit 1; }
-            git ls-remote --exit-code --tags "https://github.com/$GITHUB_REPOSITORY" "refs/tags/$tag" >/dev/null \
-              || { echo "::error::tag $tag does not exist"; exit 1; }
-            { echo "ref=refs/tags/$tag"; echo "version=${tag#v}"; } >> "$GITHUB_OUTPUT"
-          elif [ "$upload" = false ]; then
-            { echo "ref=$GITHUB_SHA"; echo "version="; } >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::an upload needs a release tag: set the tag input (vX.Y.Z), or turn upload off"; exit 1
-          fi
-          echo "upload=$upload" >> "$GITHUB_OUTPUT"
+          INPUT_APP: ${{ inputs.app }}
+        run: select/tools/ci/resolve-testflight-target.sh
       - uses: actions/checkout@v7
         with:
           ref: ${{ steps.target.outputs.ref }}
@@ -133,7 +139,8 @@ jobs:
           DIST_CERT_P12_PASSWORD: ${{ secrets.DIST_CERT_P12_PASSWORD }}
           VERSION: ${{ steps.target.outputs.version }}
           TESTFLIGHT_GROUPS: ${{ vars.TESTFLIGHT_GROUPS }}
-          TESTFLIGHT_CHANGELOG: ${{ needs.release-please.outputs.body }}
+          # An untagged RN preview carries its own one-line note ("RN preview from <sha>"); a release uses the release notes.
+          TESTFLIGHT_CHANGELOG: ${{ steps.target.outputs.preview_note || needs.release-please.outputs.body }}
           BUILD_NUMBER: ${{ inputs.build_number }}
           UPLOAD: ${{ steps.target.outputs.upload }}
           LANE: ${{ steps.app.outputs.lane }}

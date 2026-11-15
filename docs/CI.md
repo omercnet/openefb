@@ -29,7 +29,7 @@ Only the simulator jobs need macOS. Building the app on Linux (xtool) was ruled 
 |Job|Runner|What it does|
 |---|---|---|
 |Release pull request|ubuntu-latest|On every push to `main`, release-please (`release-please-config.json`, `.release-please-manifest.json`) keeps a pull request open that bumps `version.txt` and `CHANGELOG.md` from the Conventional Commits since the last release. Merging it tags `vX.Y.Z` and publishes the GitHub release.|
-|TestFlight upload|macos-26, environment `testflight`|Runs when a release was just created, or by hand. Checks out the release tag (`refs/tags/vX.Y.Z`), installs the `Gemfile.lock` fastlane, and runs `bundle exec fastlane ios beta`: Release archive signed with the Apple Distribution identity (with the profile name sigh installed), version from the tag, build number = commit count, upload with symbols. With `TESTFLIGHT_GROUPS` set it checks each name against the app's external groups before building, waits for processing, adds the build to those groups and submits it for Beta App Review, with the release notes as What to Test, converted to plain text (TestFlight shows no markdown) without links, PR numbers, commit hashes or developer-only scopes (`TOOLING_SCOPES` in the Fastfile). By hand (`workflow_dispatch`): an upload needs the `tag` input (an existing `vX.Y.Z`); with `upload: false` and no tag it archives and signs the commit it was dispatched at; `build_number` overrides the commit count, which a retry needs once Apple has accepted an upload of that number. Runs of the workflow queue in order (`concurrency.queue: max`), so a manual run never cancels the push run that tags a release. gym logs are uploaded when it fails.|
+|TestFlight upload|macos-26, environment `testflight`|Runs when a release was just created, or by hand (an RN preview from `main` needs no tag, see "RN preview upload"). Checks out the release tag (`refs/tags/vX.Y.Z`), installs the `Gemfile.lock` fastlane, and runs `bundle exec fastlane ios beta`: Release archive signed with the Apple Distribution identity (with the profile name sigh installed), version from the tag, build number = commit count, upload with symbols. With `TESTFLIGHT_GROUPS` set it checks each name against the app's external groups before building, waits for processing, adds the build to those groups and submits it for Beta App Review, with the release notes as What to Test, converted to plain text (TestFlight shows no markdown) without links, PR numbers, commit hashes or developer-only scopes (`TOOLING_SCOPES` in the Fastfile). By hand (`workflow_dispatch`): an upload needs the `tag` input (an existing `vX.Y.Z`); with `upload: false` and no tag it archives and signs the commit it was dispatched at; `build_number` overrides the commit count, which a retry needs once Apple has accepted an upload of that number. Runs of the workflow queue in order (`concurrency.queue: max`), so a manual run never cancels the push run that tags a release. gym logs are uploaded when it fails.|
 
 Secrets, in the `testflight` environment (only that job sees them):
 
@@ -53,6 +53,25 @@ What the RN lane does differently:
 - `app/assets/aviation.sqlite` (not committed) is copied from `efb-212/Resources` before the prebuild, as `app.yml` does.
 
 PR-time proof, no secrets: the `iOS release lane (prebuild + unsigned archive)` job in `app.yml` (macOS, runs when `app/**` or `fastlane/**` change) runs `bundle exec fastlane ios beta_rn unsigned:true`, which does the same prebuild, pod install and Release archive with `CODE_SIGNING_ALLOWED=NO`, then checks the archive's bundle id is `io.omer.efb` and its version is `version.txt`. It uploads nothing and needs no credentials.
+
+### RN preview upload (before cutover)
+
+Puts an RN build into the owner's INTERNAL TestFlight group without cutting over. It does not need `TESTFLIGHT_APP` and does not change it.
+
+Prerequisites: the `testflight` environment holds `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `DIST_CERT_P12_BASE64` and `DIST_CERT_P12_PASSWORD` (see above). The owner's setting, recommended: limit the environment's deployment branches to `main`.
+
+1. Open Actions, Release, Run workflow, and choose branch `main`.
+2. Set `app` = `rn`, leave `upload` on, and leave `tag` empty. (`build_number` stays empty: the lane reads the next number from App Store Connect.)
+3. Run it. It builds the current commit of `main`, with the marketing version from `version.txt`, and uploads to the internal group only. The What to Test notes are "RN preview from <short sha>".
+4. Check the result: the run is green, the log ends with the upload, and the build shows in App Store Connect under TestFlight, internal group, after Apple's processing.
+5. Next: to ship the next preview, run it again (the build number rises by itself). To check signing without uploading, run it with `upload` off. Cutover is separate: set `TESTFLIGHT_APP` = `rn` (steps below).
+
+What else fails, on purpose:
+
+- Any other untagged upload: `app` = `swift` or `variable` with upload on and no tag, and push runs (they build only the release-please tag).
+- A manual run from a branch other than `main`. With the environment rule above, GitHub rejects the run before the job starts (the environment's own message, and none of the job's steps run). Without that rule, the job's first step fails with "the TestFlight job runs only from main". Either way the run is red, never a silent green. It applies to every manual run: tagged uploads and sign-only checks too.
+
+How it is chosen: `tools/ci/resolve-testflight-target.sh` decides what to build and always comes from `main`. A workflow file is read from the branch a run is dispatched on, so the environment's deployment branches rule is the durable guard. `tools/ci/resolve-testflight-target.test.sh` holds the table of cases (push or dispatch, app, tag, upload) and runs in the `lint` job of `ci.yml`, so the required CI gate enforces it on every pull request.
 
 Owner steps at cutover (nobody else sets these):
 

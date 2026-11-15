@@ -105,6 +105,10 @@ jobs:
       - name: Conventional Commits (pull requests)
         if: github.event_name == 'pull_request'
         run: tools/hooks/commit-msg.sh --range "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+      - name: TestFlight target selection table
+        # What release.yml builds, including the RN preview rules (tools/ci/resolve-testflight-target.sh). In the lint job so
+        # the required gate enforces it on every pull request; it takes a second and needs no secrets.
+        run: tools/ci/resolve-testflight-target.test.sh
       - name: Pre-commit checks over the whole tree, full-history secret scan
         # The web jobs cover web/*, the app job covers app/; swift-format is report-only (about 4,400 known findings).
         env:
