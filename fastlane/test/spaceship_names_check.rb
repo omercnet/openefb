@@ -30,6 +30,28 @@ check.call(Spaceship::ConnectAPI::BetaTester.method_defined?(:email), "BetaTeste
 check.call(Spaceship::ConnectAPI::Build.method_defined?(:pre_release_version), "Build#pre_release_version")
 check.call(Spaceship::ConnectAPI::Build.method_defined?(:processing_state), "Build#processing_state")
 
+# The build uploads read: Spaceship has the call and the model with the fields status prints.
+check.call(testflight.method_defined?(:get_build_uploads), "ConnectAPI.get_build_uploads")
+if testflight.method_defined?(:get_build_uploads)
+  check.call(testflight.instance_method(:get_build_uploads).parameters.map(&:last).include?(:app_id), "get_build_uploads(app_id:)")
+end
+upload = Spaceship::ConnectAPI::BuildUpload
+%i[cf_build_version cf_build_short_version_string platform uploaded_date created_date state].each do |name|
+  check.call(upload.method_defined?(name), "BuildUpload##{name}")
+end
+uploads_seen = []
+Spaceship::ConnectAPI.singleton_class.send(:alias_method, :real_get_build_uploads, :get_build_uploads)
+Spaceship::ConnectAPI.define_singleton_method(:get_build_uploads) do |**args|
+  uploads_seen << args
+  Struct.new(:to_models).new([])
+end
+begin
+  TestflightSetup::ConnectApi.new.build_uploads(Struct.new(:id).new("app1"), 5)
+ensure
+  Spaceship::ConnectAPI.singleton_class.send(:alias_method, :get_build_uploads, :real_get_build_uploads)
+end
+check.call(uploads_seen.size == 1 && uploads_seen[0][:app_id] == "app1", "build_uploads calls get_build_uploads(app_id:)")
+
 # The adapter turns a tester refusal of the API into TesterRefused and lets every other API error through.
 group_fake = Object.new
 tester = Struct.new(:id).new("t1")
@@ -67,6 +89,10 @@ seen.each_with_index do |args, i|
   check.call(!args[:includes].to_s.include?("betaBuildMetrics"), "#{name} must not include betaBuildMetrics")
 end
 check.call(TestflightSetup::ConnectApi::BUILD_INCLUDES == "preReleaseVersion", "BUILD_INCLUDES is preReleaseVersion")
+# The newest builds are asked for in every processing state, so a build still PROCESSING or turned down (FAILED, INVALID) shows.
+states = seen[1][:filter].to_h[:processingState].to_s.split(",").sort
+check.call(states == %w[FAILED INVALID PROCESSING VALID], "latest_builds filters processingState to all four states, got #{states}")
+check.call(seen[1][:filter].to_h[:app] == "app1", "latest_builds filters by app")
 
 if missing.empty?
   puts "Spaceship #{Gem.loaded_specs['fastlane']&.version}: all calls present"

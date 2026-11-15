@@ -62,8 +62,8 @@ Prerequisites: the `testflight` environment holds `ASC_KEY_ID`, `ASC_ISSUER_ID`,
 
 1. Open Actions, Release, Run workflow, and choose branch `main`.
 2. Set `app` = `rn`, leave `upload` on, and leave `tag` empty. (`build_number` stays empty: the lane reads the next number from App Store Connect.)
-3. Run it. It builds the current commit of `main`, with the marketing version from `version.txt`, and uploads to the internal group only. The What to Test notes are "RN preview from <short sha>".
-4. Check the result: the run is green, the log ends with the upload, and the build shows in App Store Connect under TestFlight, internal group, after Apple's processing.
+3. Run it. It builds the current commit of `main` and uploads to the internal group only. The marketing version is the NEXT MINOR of `version.txt` (1.3.0 gives 1.4.0, owner decision Q3: the RN app ships as the next minor): the current version is the Swift app's train, which App Store Connect may have closed to new builds, and a build on a closed train is rejected after processing without any error in the run. The What to Test notes are "RN preview from <short sha>".
+4. Check the result: the run is green and the log ends with the upload. The lane waits up to 30 minutes for the build to appear in App Store Connect; if it does not, the run fails and says Apple most likely rejected it (the Account Holder gets an email with the ITMS reason). Then run "TestFlight setup" with `action` = `status`: it lists the newest builds in every processing state (PROCESSING, FAILED, INVALID, VALID) and the app's recent build uploads with their state and Apple's errors and warnings. After Apple's processing the build shows under TestFlight, internal group.
 5. Next: to ship the next preview, run it again (the build number rises by itself). To check signing without uploading, run it with `upload` off. Cutover is separate: set `TESTFLIGHT_APP` = `rn` (steps below).
 
 What else fails, on purpose:
@@ -111,7 +111,7 @@ Looks at, and sets up, the TestFlight beta groups of `io.omer.efb` with the App 
 Prerequisites: the `testflight` environment holds `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_P8` (the same as the release lane, see above). The run step only runs from `main`, so unreviewed Fastlane code never sees the key.
 
 1. Open Actions, "TestFlight setup", Run workflow, branch `main`.
-2. To look first: leave `action` = `status` and run it. It prints every beta group (name, internal or external, automatic distribution, tester count, `200+` for a bigger group; the people of internal groups, masked) and the newest builds with their groups.
+2. To look first: leave `action` = `status` and run it. It prints every beta group (name, internal or external, automatic distribution, tester count, `200+` for a bigger group; the people of internal groups, masked) and the newest builds with their groups, in every processing state (a build still processing, or turned down, shows), then the app's recent build uploads with their state and what Apple said (errors and warnings).
 3. To set up the internal group: choose `action` = `ensure-internal-group` and `group` (default `RN beta`, 1 to 64 printable characters), then run it. It creates the internal group or turns on automatic distribution, then adds every tester who is in another internal group.
 4. Read the log. "Added ..." lines are testers added; "Skipped ..." lines are people the API turned down (for example, not an App Store Connect user) with the reason: fix them in App Store Connect and run again. Running again is safe: with nothing left to do it prints "Nothing to change."
 5. If the run fails, it stops with the cause: an `action` or `group` that is not valid, an external group that already has that name (rename it or pick another name), or an API error (key, network, rate limit; the lane does not report those as skipped testers). Nothing is half-reported as done; run again after fixing.

@@ -15,6 +15,10 @@ G
 chmod +x "$work/bin/git"
 
 SHA=0123456789abcdef0123456789abcdef01234567
+printf '1.3.0\n' > "$work/v130"
+printf '2.9.5\n' > "$work/v295"
+printf 'soon\n' > "$work/vbad"
+V=VERSION_FILE="$work/v130"
 fails=0
 total=0
 
@@ -54,13 +58,18 @@ run "dispatch, no tag, upload off, app rn"       "ok $SHA  false []"            
 run "dispatch, no tag, upload off, app swift"    "ok $SHA  false []"                  EVENT=workflow_dispatch INPUT_UPLOAD=false INPUT_APP=swift $MAIN
 run "dispatch, no tag, upload off, variable"     "ok $SHA  false []"                  EVENT=workflow_dispatch INPUT_UPLOAD=false INPUT_APP=variable $MAIN
 # dispatch, no tag, upload on: only app=rn from main (the RN preview)
-run "dispatch, no tag, upload, app rn, main"     "ok $SHA  true [RN preview from 0123456]" EVENT=workflow_dispatch INPUT_UPLOAD=true INPUT_APP=rn $MAIN
+run "dispatch, no tag, upload, app rn, main"     "ok $SHA 1.4.0 true [RN preview from 0123456]" EVENT=workflow_dispatch INPUT_UPLOAD=true INPUT_APP=rn $MAIN "$V"
 run "dispatch, no tag, upload, app rn, branch"    fail                                 EVENT=workflow_dispatch INPUT_UPLOAD=true INPUT_APP=rn GITHUB_REF=refs/heads/feature
 run "dispatch, no tag, upload, app rn, tag ref"   fail                                 EVENT=workflow_dispatch INPUT_UPLOAD=true INPUT_APP=rn GITHUB_REF=refs/tags/v1.3.0
 run "dispatch, no tag, upload, app swift"         fail                                 EVENT=workflow_dispatch INPUT_UPLOAD=true INPUT_APP=swift $MAIN
 run "dispatch, no tag, upload, app variable"      fail                                 EVENT=workflow_dispatch INPUT_UPLOAD=true INPUT_APP=variable $MAIN
 run "dispatch, no tag, upload, app empty"         fail                                 EVENT=workflow_dispatch INPUT_UPLOAD=true $MAIN
-run "dispatch, no tag, upload unset, app rn"     "ok $SHA  true [RN preview from 0123456]" EVENT=workflow_dispatch INPUT_APP=rn $MAIN
+run "dispatch, no tag, upload unset, app rn"     "ok $SHA 1.4.0 true [RN preview from 0123456]" EVENT=workflow_dispatch INPUT_APP=rn $MAIN "$V"
+# the preview version is the next minor of version.txt (the current one is the Swift app train)
+run "preview version from 2.9.5 is 2.10.0"       "ok $SHA 2.10.0 true [RN preview from 0123456]" EVENT=workflow_dispatch INPUT_APP=rn $MAIN VERSION_FILE="$work/v295"
+run "preview with a bad version.txt"              fail                                 EVENT=workflow_dispatch INPUT_APP=rn $MAIN VERSION_FILE="$work/vbad"
+run "preview with no version.txt"                 fail                                 EVENT=workflow_dispatch INPUT_APP=rn $MAIN VERSION_FILE="$work/missing"
+run "preview from a branch still fails first"     fail                                 EVENT=workflow_dispatch INPUT_APP=rn GITHUB_REF=refs/heads/x "$V"
 # a push can never be a preview, whatever the inputs look like
 run "push with app=rn in the environment"         fail                                 EVENT=push INPUT_APP=rn INPUT_UPLOAD=true $MAIN
 

@@ -68,7 +68,7 @@ jobs:
     # rule: it FAILS instead of skipping, so a run from a branch is never a silent green (docs/CI.md).
     if: ${{ !cancelled() && !failure() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 120 # was 90: the 2026-11-15 preview run spent all 90 minutes waiting for a build that never appeared (now bounded in the lane); a slow runner needs about 25 minutes to archive and upload
     environment: testflight
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer # same pin as ci.yml
@@ -90,7 +90,9 @@ jobs:
         with:
           ref: main
           path: select
-          sparse-checkout: tools/ci
+          sparse-checkout: |
+            tools/ci
+            version.txt
           persist-credentials: false
       - name: Resolve what to build
         id: target

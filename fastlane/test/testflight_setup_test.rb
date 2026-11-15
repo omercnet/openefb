@@ -8,13 +8,14 @@ require_relative "../testflight_setup"
 Group = Struct.new(:id, :name, :is_internal_group, :has_access_to_all_builds)
 Tester = Struct.new(:id, :email)
 Build = Struct.new(:id, :version, :processing_state, :pre_release_version)
+Upload = Struct.new(:cf_build_version, :cf_build_short_version_string, :platform, :uploaded_date, :created_date, :state)
 Train = Struct.new(:version)
 App = Struct.new(:id)
 
 # Records every call. `fail_for` makes add_tester refuse those tester ids.
 class FakeApi
   attr_reader :calls, :groups_list
-  attr_writer :builds
+  attr_writer :builds, :uploads
 
   def initialize(groups:, members:, builds: [], build_groups: {}, fail_for: {})
     @groups_list = groups
@@ -29,6 +30,7 @@ class FakeApi
   def group_testers(group) = @members.fetch(group.id, [])
   def group_builds(group, count) = (@build_groups[group.id] || []).first(count).map { |id| Build.new(id) }
   def latest_builds(_app, count) = @builds.first(count)
+  def build_uploads(_app, count) = (@uploads || []).first(count)
 
   def create_internal_group(_app, name)
     @calls << [:create_internal_group, name]
@@ -286,6 +288,49 @@ class TestflightSetupTest < Minitest::Test
     end
   end
 
+  def test_status_lists_build_uploads_with_their_state_and_what_apple_said
+    a = api(groups: [team])
+    a.uploads = [
+      Upload.new("158", "1.3.0", "IOS", "2026-11-15T20:57:00Z", nil,
+                 { "state" => "FAILED", "errors" => [{ "code" => "90683", "description" => "Missing purpose string for alice@example.com" }],
+                   "warnings" => [{ "code" => "90078", "description" => "Missing push notification entitlement" }] }),
+      Upload.new("105", "1.3.0", "IOS", "2026-11-10T10:00:00Z", nil, { "state" => "COMPLETE" }),
+      Upload.new("104", "1.2.0", "IOS", nil, "2026-11-01T10:00:00Z", "COMPLETE")
+    ]
+    text = TestflightSetup.status_lines(a, APP).join("\n")
+    assert_includes text, "Recent build uploads (3):"
+    assert_includes text, "1.3.0 (158) | IOS | uploaded 2026-11-15T20:57:00Z | FAILED"
+    assert_includes text, "    error: 90683 - Missing purpose string for a***@example.com"
+    assert_includes text, "    warning: 90078 - Missing push notification entitlement"
+    assert_includes text, "1.3.0 (105) | IOS | uploaded 2026-11-10T10:00:00Z | COMPLETE"
+    assert_includes text, "1.2.0 (104) | IOS | uploaded 2026-11-01T10:00:00Z | COMPLETE" # falls back to the created date
+    refute_match(/alice/, text)
+  end
+
+  def test_a_failed_build_upload_read_does_not_fail_status_and_says_why
+    a = api(groups: [team], builds: [Build.new("b1", "5", "VALID", Train.new("1.0"))])
+    a.define_singleton_method(:build_uploads) { |_app, _count| raise "endpoint says no" }
+    text = TestflightSetup.status_lines(a, APP).join("\n")
+    assert_includes text, "Recent build uploads: not available (while reading the build uploads: RuntimeError: endpoint says no)"
+    assert_includes text, "1.0 (5) | VALID" # the rest of status is intact
+  end
+
+  def test_status_shows_builds_that_are_still_processing_or_were_turned_down
+    a = api(groups: [team], builds: [Build.new("b3", "158", "INVALID", Train.new("1.3.0")), Build.new("b2", "157", "PROCESSING", Train.new("1.3.0"))])
+    text = TestflightSetup.status_lines(a, APP).join("\n")
+    assert_includes text, "1.3.0 (158) | INVALID | groups: none"
+    assert_includes text, "1.3.0 (157) | PROCESSING | groups: none"
+  end
+
+  def test_the_message_for_a_build_that_never_appears_says_what_it_means_and_where_to_look
+    text = TestflightSetup.not_appeared_message("1.4.0", "158", 30, "exceeded 1800 seconds for alice@example.com")
+    assert_includes text, "Kanaf RN 1.4.0 (158) was uploaded but did not appear"
+    assert_includes text, "within 30 minutes"
+    assert_includes text, "action=status"
+    assert_includes text, "ITMS"
+    refute_match(/alice@/, text)
+  end
+
   def test_status_counts_testers_up_to_a_page
     many = Array.new(TestflightSetup::PAGE) { |i| Tester.new("t#{i}", "p#{i}@example.com") }
     a = api(groups: [beta], members: { "g-beta" => many })
@@ -304,7 +349,7 @@ class TestflightSetupTest < Minitest::Test
   end
 
   def test_the_real_adapter_can_only_list_create_one_internal_group_enable_and_add
-    allowed = %i[groups group_testers group_builds latest_builds create_internal_group enable_all_builds add_tester]
+    allowed = %i[groups group_testers group_builds latest_builds build_uploads create_internal_group enable_all_builds add_tester]
     assert_equal allowed.sort, TestflightSetup::ConnectApi.public_instance_methods(false).sort
   end
 end
