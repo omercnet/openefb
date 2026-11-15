@@ -32,6 +32,7 @@ import {
 } from '../services/charts/diagramPack';
 import { isServable, type ChartManifest } from '../services/charts/manifest';
 import type { ChartFileSystem } from '../services/charts/ports';
+import { Sha256 } from '../services/charts/sha256';
 import { fileUri } from './terminalPdfSource';
 import { createUsDiagramSource } from './usDiagramSource';
 
@@ -117,14 +118,36 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
     return latest;
   }
 
+  const verified = new Set<string>();
+
+  async function sha256Of(path: string): Promise<string | null> {
+    try {
+      const hasher = new Sha256();
+      await fs.hashFile(path, hasher);
+      return hasher.digestHex();
+    } catch {
+      return null;
+    }
+  }
+
   /** A file of the edition in the cache: reused when its size matches, else downloaded and verified. */
   async function cached(manifest: ChartManifest, name: string, maxBytes: number): Promise<string | null> {
     const file = manifest.files.find((f) => f.name === name);
     if (!file || file.bytes > maxBytes) return null;
     const dir = fs.join(cacheDir, manifest.edition);
     const path = fs.join(dir, name);
-    if (fs.size(path) === file.bytes) return path;
-    return service.downloadFile(manifest, name, dir);
+    if (fs.size(path) === file.bytes) {
+      // The size is only a pre-check: a file is trusted once per launch, after its SHA-256 matches the manifest.
+      if (verified.has(path)) return path;
+      if ((await sha256Of(path)) === file.sha256.toLowerCase()) {
+        verified.add(path);
+        return path;
+      }
+      await fs.remove(path).catch(() => undefined); // altered or damaged: fetch it again
+    }
+    const fresh = await service.downloadFile(manifest, name, dir);
+    verified.add(fresh);
+    return fresh;
   }
 
   async function load(): Promise<Edition | null> {
@@ -195,10 +218,11 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
       // The georeference first: a malformed one costs no image download.
       const jsonPath = await cached(resolved.manifest, record.georeference, GEOREFERENCE_MAX_BYTES);
       if (!jsonPath) return { kind: 'unavailable', reason: 'not in the edition' };
+      // A failed read rejects (the controller retries); only content that does not decode is final.
+      const text = await fs.readText(jsonPath);
+      if (text === null) throw new Error(`${record.georeference} could not be read`);
       let georeference;
       try {
-        const text = await fs.readText(jsonPath);
-        if (text === null) return { kind: 'unavailable', reason: 'georeference unreadable' };
         georeference = decodeGeoreference(text);
       } catch (error) {
         deps.log?.(`Unreadable georeference for ${key}: ${error instanceof Error ? error.message : String(error)}`);

@@ -343,4 +343,35 @@ describe('US diagrams on demand', () => {
     expect((await source.candidates('us', { lat: 37.5, lon: -122.2 }, 30)).map((c) => c.icao)).toEqual(['KPAO']);
     expect(reads).toBe(1);
   });
+
+  it('never reuses a cached file whose contents changed, even at the same size', async () => {
+    const host: Host = { latest: makeEdition(), online: true };
+    const first = setup(host);
+    await first.source.diagramFor('us', 'KPAO');
+    const path = `${CACHE}/2611/KPAO.json`;
+    const good = first.fs.files.get(path)!;
+    const altered = good.slice();
+    altered[altered.length - 3] = altered[altered.length - 3]! ^ 1; // same length, different bytes
+    first.fs.files.set(path, altered);
+    const next = setup(host, { fs: first.fs });
+    expect((await next.source.diagramFor('us', 'KPAO')).kind).toBe('ready');
+    expect(first.fs.files.get(path)).toEqual(good); // fetched again and verified
+    expect(next.downloaded.some((u) => u.endsWith('KPAO.json'))).toBe(true);
+  });
+
+  it('rejects, to be retried, when a cached georeference cannot be read right now', async () => {
+    const host: Host = { latest: makeEdition(), online: true };
+    const first = setup(host);
+    await first.source.diagramFor('us', 'KPAO');
+    const next = setup(host, { fs: first.fs });
+    const read = first.fs.readText.bind(first.fs);
+    let fail = true;
+    first.fs.readText = async (p: string) => {
+      if (fail && p.endsWith('KPAO.json')) throw new Error('disk busy');
+      return read(p);
+    };
+    await expect(next.source.diagramFor('us', 'KPAO')).rejects.toThrow('disk busy');
+    fail = false;
+    expect((await next.source.diagramFor('us', 'KPAO')).kind).toBe('ready');
+  });
 });
