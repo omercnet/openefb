@@ -130,3 +130,12 @@ test('messages never echo a long or hostile value from the pack', () => {
   assert.ok(errors.length > 0);
   assert.ok(errors.every((e) => e.length < 200 && !e.includes('x'.repeat(30))), errors.join('\n').slice(0, 300));
 });
+
+test('a non-string edition object reports errors instead of crashing the checker', () => {
+  const dir = pack(({ files, index, manifest }) => {
+    index.edition = { toString: null, valueOf: null };
+    files['index.json'] = Buffer.from(JSON.stringify(index));
+    manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+  });
+  assert.ok(checkPack(dir).errors.some((e) => /index.edition/.test(e)));
+});
