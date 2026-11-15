@@ -10,7 +10,7 @@ import { OfflineMapService } from '../../domain/offline/offlineMapService';
 import { chartFileSystem, chartRoot } from '../../adapters/chartFileSystem';
 import { fileDownloader } from '../../adapters/fileDownloader';
 import { createSecretStore } from '../../adapters/secretStore';
-import { loadNotamCredentials } from '../../services/notamService';
+import { NotamService, loadNotamCredentials } from '../../services/notamService';
 import { TerminalProcedureService } from '../../services/terminal/terminalProcedureService';
 import { openAviationDatabase, openIsraelDatabase } from '../../adapters/aviationDb';
 import { fileTextStorage } from '../../adapters/fileTextStorage';
@@ -65,6 +65,8 @@ export interface AppRuntime {
   lowPower: LowPowerSource;
   telemetry: Telemetry;
   notamConfigured: () => Promise<boolean>;
+  /** The FAA NOTAM service (free key from Settings); the airport column's NOTAM list. */
+  notams: NotamService;
   offline: OfflineMapService;
   advisories: AirSigmetService;
   layerSettings: LayerSettings;
@@ -116,6 +118,11 @@ export async function startRuntime(): Promise<AppRuntime> {
       log,
     }),
     // NotamService.isConfigured: a complete FAA key pair is in the keychain.
+    notams: new NotamService({
+      fetch: fetchLike,
+      credentials: () => loadNotamCredentials(createSecretStore()),
+      log,
+    }),
     notamConfigured: async () => (await loadNotamCredentials(createSecretStore())) !== null,
     weather: new WeatherService({ fetch: fetchLike, log }),
     tfr: new TfrService({ fetch: fetchLike, log }),

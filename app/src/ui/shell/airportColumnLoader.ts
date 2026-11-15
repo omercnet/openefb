@@ -9,7 +9,8 @@ import { describeError } from '../../domain/describeError';
 import { isLayerAvailable } from '../../domain/core';
 import type { TerminalProcedureServiceLike } from '../../services/terminal/terminalProcedureService';
 import type { WeatherServiceLike } from '../../services/weatherService';
-import type { AirportColumnData, AirportColumnState } from '../columns/airport/store';
+import { NotamError, type NotamServiceLike } from '../../services/notamService';
+import type { AirportColumnData, AirportColumnState, NotamState } from '../columns/airport/store';
 import type { AirportWeather, TerminalChart } from '../columns/airport/logic';
 import { israelAirport } from '../columns/nearest/israelAerodromeAdapter';
 import type { AppState } from '../state/appStore';
@@ -28,6 +29,8 @@ export interface AirportColumnLoaderDeps {
   directTo: (airport: Airport) => void;
   /** The FAA d-TPP charts (US only); null: no chart service. */
   charts?: Pick<TerminalProcedureServiceLike, 'charts' | 'currentCycle'> | null;
+  /** The FAA NOTAM list; null: none (the column then shows only the key hint). */
+  notams?: Pick<NotamServiceLike, 'fetchNotams'> | null;
   /** NotamService.isConfigured: a free FAA key is stored. */
   notamConfigured?: () => Promise<boolean>;
   /** Open the chart viewer (ChartPDFView). */
@@ -154,6 +157,30 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     patchColumn(icao, (d) => ({ ...d, ...found }));
   }
 
+  const notamRequest = new Map<string, number>();
+  /** NotamSection.load: the report, or why there is none; only the newest request for an airport may write. */
+  async function loadNotams(icao: string): Promise<void> {
+    const service = deps.notams;
+    if (!service || !isLayerAvailable(deps.region(), 'notams')) return;
+    const request = (notamRequest.get(icao) ?? 0) + 1;
+    notamRequest.set(icao, request);
+    patchColumn(icao, (d) => ({ ...d, notams: { kind: 'loading' } }));
+    let notams: NotamState;
+    try {
+      const airport = column.getState().columns[icao]?.airport;
+      notams = { kind: 'loaded', report: await service.fetchNotams({ icao, faaID: airport?.faaID ?? null }) };
+    } catch (error) {
+      if (error instanceof NotamError && error.code === 'notConfigured') notams = { kind: 'notConfigured' };
+      else if (error instanceof NotamError) notams = { kind: 'credentialsRejected', message: error.message };
+      else {
+        (deps.log ?? console.warn)(`NOTAMs for ${icao} failed: ${describeError(error)}`);
+        notams = { kind: 'failed', message: describeError(error) };
+      }
+    }
+    if (stopped || notamRequest.get(icao) !== request) return;
+    patchColumn(icao, (d) => ({ ...d, notams }));
+  }
+
   const chartRequest = new Map<string, number>();
   /** AirportChartsSection.loadCharts: the index and the cycle; only the newest request for an airport may write. */
   async function loadCharts(icao: string): Promise<void> {
@@ -193,11 +220,13 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
               ? { state: 'loading' as const }
               : CHARTS_PENDING,
           notamKeyConfigured: false,
+          ...(deps.notams && isLayerAvailable(deps.region(), 'notams') ? { notams: { kind: 'loading' as const } } : {}),
         },
       },
     });
     await resolveAirport(icao);
     void loadCharts(icao);
+    void loadNotams(icao);
     void deps.notamConfigured?.().then(
       (notamKeyConfigured) => patchColumn(icao, (d) => ({ ...d, notamKeyConfigured })),
       () => undefined,
@@ -211,6 +240,7 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     directTo: deps.directTo,
     openChart: (chart) => deps.openChart?.(chart),
     retryCharts: (icao) => void loadCharts(icao),
+    retryNotams: (icao) => void loadNotams(icao),
     refreshWeather: (icao) => {
       // The cache is cleared so the fetch goes to the network; the report on screen stays the fallback if it fails.
       const shown = column.getState().columns[icao]?.weather.metar ?? weather.cachedWeather(icao);

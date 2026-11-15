@@ -157,6 +157,7 @@ export function LiveApp({
       clock: Date.now,
       directTo: (a) => nearest.store.getState().directTo(a),
       charts: runtime.terminal,
+      notams: runtime.notams,
       notamConfigured: runtime.notamConfigured,
       openChart: (chart) => appStore.getState().openChartViewer(chart),
     });
