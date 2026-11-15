@@ -42,6 +42,10 @@ export function MapLayout({
 
   const chart =
     glyphs.status === 'loading' ? null : (
+      <View
+        style={{ flex: 1 }}
+        onLayout={(e) => model.onMapLayout({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+      >
       <MapSurface
         night={night}
         glyphsUrl={glyphs.status === 'ready' ? glyphs.url : REMOTE_GLYPHS_URL}
@@ -57,6 +61,7 @@ export function MapLayout({
         onStyleLoaded={model.onStyleLoaded}
         onTileHealth={model.onTileHealth}
       />
+      </View>
     );
   return (
     <NightContext.Provider value={liveNight ?? null}>

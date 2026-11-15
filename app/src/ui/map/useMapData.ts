@@ -162,6 +162,9 @@ export function useMapModel(input: MapModelInput) {
   const cam = useCameraModel(input.initialMode ?? 'northUp');
   const { dispatch } = cam;
   const lastView = useRef<ViewSample | null>(null);
+  // The map's size from its layout. The camera's bounds are the axis-aligned box of a rotated screen, larger than the
+  // screen, so they only give the size while the map points north.
+  const measured = useRef<Viewport | null>(null);
   const viewport = useRef<Viewport | null>(null);
 
   // Every new fix goes through the reducer: first-fix jump, follow, duplicates ignored.
@@ -190,9 +193,16 @@ export function useMapModel(input: MapModelInput) {
     () => dispatch({ type: 'recenter', position: ownship.position, trackDeg: ownship.trackDeg }),
     [dispatch, ownship.position, ownship.trackDeg],
   );
+  const bearing = () => lastView.current?.bearing ?? 0;
+  const onMapLayout = useCallback((size: Viewport) => {
+    measured.current = size;
+  }, []);
   const frame = useCallback(
     (box: { south: number; west: number; north: number; east: number }) =>
-      dispatch({ type: 'frame', ...frameFor(box, viewport.current ?? undefined, lastView.current?.bearing ?? 0) }),
+      dispatch({
+        type: 'frame',
+        ...frameFor(box, measured.current ?? (bearing() === 0 ? (viewport.current ?? undefined) : undefined), bearing()),
+      }),
     [dispatch],
   );
   const zoomTo = useCallback((level: number) => dispatch({ type: 'zoomTo', level }), [dispatch]);
@@ -223,5 +233,6 @@ export function useMapModel(input: MapModelInput) {
     setMode,
     zoomTo,
     frame,
+    onMapLayout,
   };
 }
