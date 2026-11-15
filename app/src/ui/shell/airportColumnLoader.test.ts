@@ -235,4 +235,47 @@ describe('airport column loader', () => {
     await settle();
     expect(column.getState().columns.KSQL!.airport).toBeNull();
   });
+
+  it('logs a failed lookup with its ICAO', async () => {
+    const log = jest.fn();
+    const { app, settle, stop } = setup({
+      log,
+      aviation: {
+        airport: async () => {
+          throw new Error('db closed');
+        },
+      },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('KSQL'));
+    expect(log.mock.calls[0]![0]).toContain('db closed');
+    stop();
+  });
+
+  it('a lookup that fails after a newer one succeeded does not blank the airport', async () => {
+    const slow = Promise.withResolvers<DataAirport | null>();
+    let calls = 0;
+    const { app, column, settle, stop } = setup({
+      log: () => undefined,
+      aviation: {
+        airport: () => {
+          calls += 1;
+          if (calls === 1) return Promise.reject(new Error('db closed')); // the initial lookup fails
+          if (calls === 2) return slow.promise; // the first retry hangs
+          return Promise.resolve(KSQL); // the second retry succeeds
+        },
+      },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    column.getState().refreshWeather('KSQL');
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    expect(column.getState().columns.KSQL!.airport).toBe(KSQL);
+    slow.reject(new Error('late'));
+    await settle();
+    expect(column.getState().columns.KSQL!.airport).toBe(KSQL);
+    stop();
+  });
 });

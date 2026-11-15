@@ -24,6 +24,8 @@ export interface AirportColumnLoaderDeps {
   /** Epoch ms. */
   clock: () => number;
   directTo: (airport: Airport) => void;
+  /** Diagnostics; defaults to the console. */
+  log?: (message: string) => void;
 }
 
 /** The ages and the chart cycle are judged against this clock; a minute tick is enough. */
@@ -49,6 +51,7 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
   const lookupFailed = new Set<string>();
   /** Per station, the newest weather load: an older one that finishes later must not overwrite it. */
   const weatherRequest = new Map<string, number>();
+  const lookupRequest = new Map<string, number>();
   let stopped = false;
   const patchColumn = (icao: string, change: (data: AirportColumnData) => AirportColumnData) => {
     const state = column.getState();
@@ -111,27 +114,32 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     }));
   }
 
-  async function lookup(
-    icao: string,
-  ): Promise<{ airport: Airport | null; elevationPublished: boolean; failed?: boolean }> {
-    try {
-      if (deps.region() === 'israel') {
-        const aerodrome = (await deps.israel?.aerodrome(icao)) ?? null;
-        return aerodrome
-          ? { airport: israelAirport(aerodrome), elevationPublished: aerodrome.elevationFeet != null }
-          : { airport: null, elevationPublished: true };
-      }
-      return { airport: (await deps.aviation?.airport(icao)) ?? null, elevationPublished: true };
-    } catch {
-      return { airport: null, elevationPublished: true, failed: true };
+  /** Rejects when the database cannot answer; "no such airport" is a null airport. */
+  async function lookup(icao: string): Promise<{ airport: Airport | null; elevationPublished: boolean }> {
+    if (deps.region() === 'israel') {
+      const aerodrome = (await deps.israel?.aerodrome(icao)) ?? null;
+      return aerodrome
+        ? { airport: israelAirport(aerodrome), elevationPublished: aerodrome.elevationFeet != null }
+        : { airport: null, elevationPublished: true };
     }
+    return { airport: (await deps.aviation?.airport(icao)) ?? null, elevationPublished: true };
   }
 
   /** Finds the airport record; a failed lookup is remembered so the refresh buttons retry it. */
   async function resolveAirport(icao: string): Promise<void> {
-    const { failed, ...found } = await lookup(icao);
-    if (failed) lookupFailed.add(icao);
-    else lookupFailed.delete(icao);
+    const request = (lookupRequest.get(icao) ?? 0) + 1;
+    lookupRequest.set(icao, request);
+    let found: { airport: Airport | null; elevationPublished: boolean };
+    try {
+      found = await lookup(icao);
+      lookupFailed.delete(icao);
+    } catch (error) {
+      lookupFailed.add(icao);
+      (deps.log ?? console.warn)(`Airport lookup for ${icao} failed: ${describeError(error)}`);
+      found = { airport: null, elevationPublished: true };
+    }
+    // Overlapping lookups (two refresh taps): only the newest may write, so a late failure never blanks a result.
+    if (lookupRequest.get(icao) !== request) return;
     patchColumn(icao, (d) => ({ ...d, ...found }));
   }
 

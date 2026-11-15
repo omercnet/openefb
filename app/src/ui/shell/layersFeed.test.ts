@@ -85,4 +85,14 @@ describe('bindLayers', () => {
     store.setState({ visibleLayers: ['sectional'] });
     expect(toggled).toEqual([]);
   });
+
+  it('starts with the chart cycle of the clock, not the launch default', () => {
+    const store = layers.make();
+    const { controller } = fakeController(['tfrs']);
+    const at = Date.UTC(2027, 5, 1);
+    const stop = bindLayers(controller, store, () => at);
+    expect(store.getState().chartExpiration).toBe(currentSectionalCycle(at).expires);
+    expect(store.getState().sectionalCycleExpires).toBe(currentSectionalCycle(at).expires);
+    stop();
+  });
 });
