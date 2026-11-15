@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { checkPack } from './check-pack.mjs';
 
 const rect = { x: 0, y: 0, width: 100, height: 100 };
-const geo = { a: 1, b: 0, c: 0, d: 1, tx: -50, ty: -50, reference: rect, referenceLatitude: 37.4, referenceLongitude: -122.1, pageBox: rect, clipBox: rect, masks: [], diagnostics: {} };
+const geo = { a: 1, b: 0, c: 0, d: 1, tx: -50, ty: -50, reference: rect, referenceLatitude: 37.4, referenceLongitude: -122.1, pageBox: rect, clipBox: rect, masks: [], diagnostics: { method: 'gridRunwayChecked', labelSource: 'text', latitudeLabels: 2, longitudeLabels: 2, rotationDegrees: 0, feetPerPoint: 6.5, scaleRatio: 1, runwaysMatched: 2, runwayResidualFeet: 20, maskedInsets: 0 } };
 const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.from('x')]);
 
 function pack(mutate = () => {}) {
@@ -56,5 +56,22 @@ test('a singular transform, a non-PNG image and a wrong product fail', () => {
 test('too few airports fails the minimum', () => {
   const dir = pack();
   assert.ok(checkPack(dir, { min: 3 }).errors.some((e) => /expected at least 3/.test(e)));
+  rmSync(dir, { recursive: true });
+});
+
+test('empty diagnostics, which the app refuses to decode, fail', () => {
+  const dir = pack(({ files, manifest }) => {
+    files['KPAO.json'] = Buffer.from(JSON.stringify({ ...geo, diagnostics: {} }));
+    manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+  });
+  assert.match(checkPack(dir).errors.join('\n'), /diagnostics\.method/);
+  rmSync(dir, { recursive: true });
+});
+
+test('a manifest name that is a path or traversal is rejected, not read', () => {
+  const dir = pack(({ manifest }) => { manifest.files.push({ name: '../../etc/passwd', bytes: 1, sha256: 'x' }, { name: '/etc/hosts', bytes: 1, sha256: 'x' }); });
+  const errors = checkPack(dir).errors;
+  assert.equal(errors.filter((e) => /unsafe or missing name/.test(e)).length, 2);
+  assert.ok(!errors.some((e) => /passwd|hosts/.test(e)));
   rmSync(dir, { recursive: true });
 });

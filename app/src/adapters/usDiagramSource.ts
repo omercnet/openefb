@@ -2,7 +2,7 @@
 // tools/apd-georef --pack, owner decision Q6: georeferenced offline, never on the device). Same pack format as the Israel
 // one, so the image and corners come from the same S1c code. Only airports the pack placed are drawn; the rest of the
 // 925 FAA diagrams failed the 50 ft gate and are not in the pack.
-import type { Coordinate, Region } from '../domain/core';
+import { distanceNm, type Coordinate, type Region } from '../domain/core';
 import type { DiagramCandidate, DiagramLookup, DiagramPackSource } from '../domain/diagram/overlayController';
 import type { AviationDatabase } from '../data/aviation';
 import { clipCornersForImageSource } from '../services/charts/diagramGeoreference';
@@ -20,7 +20,7 @@ export interface UsDiagramSourceDeps {
 
 export function createUsDiagramSource(deps: UsDiagramSourceDeps): DiagramPackSource {
   return {
-    /** Database airports within the radius that have a drawable diagram in the pack. A database error rejects (retried later). */
+    /** Database airports within the radius (great circle) that have a drawable diagram in the pack. A database error rejects (retried later). */
     async candidates(region: Region, center: Coordinate, radiusNM: number): Promise<DiagramCandidate[]> {
       if (region !== 'us') return [];
       const pack = await deps.loadPack();
@@ -28,9 +28,12 @@ export function createUsDiagramSource(deps: UsDiagramSourceDeps): DiagramPackSou
       const drawable = new Set(pack.georeferencedICAOs);
       if (drawable.size === 0) return [];
       const airports = await deps.aviation.airportsNear(center, radiusNM);
-      return airports
-        .filter((a) => drawable.has(a.icao))
-        .map((a) => ({ icao: a.icao, position: { lat: a.latitude, lon: a.longitude } }));
+      return (
+        airports
+          // airportsNear returns a bounding box (its corners are farther than the radius): cut it to the circle.
+          .filter((a) => drawable.has(a.icao) && distanceNm(center, { lat: a.latitude, lon: a.longitude }) <= radiusNM)
+          .map((a) => ({ icao: a.icao, position: { lat: a.latitude, lon: a.longitude } }))
+      );
     },
 
     async diagramFor(region: Region, icao: string): Promise<DiagramLookup> {

@@ -57,7 +57,9 @@ const AIRPORTS: Record<string, { icao: string; latitude: number; longitude: numb
   KXXX: { icao: 'KXXX', latitude: 37.47, longitude: -122.12 }, // in the database, not in the pack
 };
 
-function setup(opts: { missingPng?: string; badJson?: string; noPack?: boolean; failNear?: boolean } = {}) {
+function setup(
+  opts: { wholeDatabase?: boolean; missingPng?: string; badJson?: string; noPack?: boolean; failNear?: boolean } = {},
+) {
   const pack = new IsraelDiagramPack(
     {
       product: 'us-diagrams',
@@ -83,6 +85,7 @@ function setup(opts: { missingPng?: string; badJson?: string; noPack?: boolean; 
     airportsNear: async (center, radius) => {
       calls.push({ ...center, radius });
       if (opts.failNear) throw new Error('db down');
+      if (opts.wholeDatabase) return Object.values(AIRPORTS) as never; // a box can return airports beyond the circle
       const dLat = radius / 60;
       return Object.values(AIRPORTS).filter(
         (a) => Math.abs(a.latitude - center.lat) <= dLat && Math.abs(a.longitude - center.lon) <= dLat * 1.5,
@@ -100,6 +103,12 @@ describe('US diagram source', () => {
     expect(near.map((c) => c.icao).sort()).toEqual(['KPAO', 'KSFO']); // KXXX is in the database but not in the pack
     expect(near.find((c) => c.icao === 'KPAO')?.position).toEqual({ lat: 37.4611, lon: -122.115 });
     expect(calls).toEqual([{ lat: 37.5, lon: -122.2, radius: 30 }]);
+  });
+
+  it('cuts the database box to the requested radius', async () => {
+    const { source } = setup({ wholeDatabase: true });
+    const near = await source.candidates('us', { lat: 37.5, lon: -122.2 }, 5);
+    expect(near.map((c) => c.icao)).toEqual(['KPAO']); // KSFO is about 11 NM away, KBOS across the country
   });
 
   it('offers nothing for another region, without the pack, or when the database fails', async () => {

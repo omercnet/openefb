@@ -73,7 +73,7 @@ Builds the `us-diagrams` chart pack (M5): the FAA airport diagrams of one d-TPP 
 
 Owner steps to publish a cycle (one edition per d-TPP cycle, only when you choose; nothing is scheduled):
 
-1. Actions, "US diagrams pack", Run workflow (leave `cycle` empty for the current one). Download the `us-diagrams-pack` artifact and unzip it to `<dir>/<cycle>/`.
+1. Actions, "US diagrams pack", Run workflow (leave `cycle` empty for the current one). Download the `us-diagrams-pack` artifact and unzip it into `<dir>`; it contains the folder `<cycle>/`, so the pack is `<dir>/<cycle>/`.
 2. Upload as unpublished, then approve (`web/charts/README.md` has the one-time bucket setup):
 
 ```

@@ -60,6 +60,8 @@ jobs:
           AIRPORTS: ${{ inputs.airports }}
         run: |
           set -euo pipefail
+          # The cycle becomes a folder name under the cache: digits only.
+          if [ -n "$CYCLE" ] && ! [[ "$CYCLE" =~ ^[0-9]{4}$ ]]; then echo "::error::cycle must be four digits (YYNN)"; exit 1; fi
           args=(--cache "$WORK/cache" --report "$WORK/report.md" --json "$WORK/results.json" --pack "$WORK/pack")
           [ -n "$CYCLE" ] && args+=(--cycle "$CYCLE")
           if [ "$EVENT" = pull_request ]; then args+=(--only "$SAMPLE")

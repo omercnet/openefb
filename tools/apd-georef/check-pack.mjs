@@ -3,11 +3,12 @@
 // app/src/services/charts/diagramPack.ts (index.json), diagramGeoreference.ts (<ICAO>.json) and the web/charts
 // manifest (bytes + sha256 of every file). No dependencies. Usage: node check-pack.mjs <pack dir> [--min N]
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const SAFE_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const isObj = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 const rect = (v) => isObj(v) && ['x', 'y', 'width', 'height'].every((k) => num(v[k]));
@@ -28,7 +29,21 @@ function checkGeoreference(g, name, errors) {
   }
   for (const k of ['reference', 'pageBox', 'clipBox']) if (!rect(g[k])) errors.push(`${name}: ${k} is not a rect`);
   if (!Array.isArray(g.masks)) errors.push(`${name}: masks is not an array`);
-  if (!isObj(g.diagnostics)) errors.push(`${name}: diagnostics missing`);
+  const d = g.diagnostics;
+  if (!isObj(d)) errors.push(`${name}: diagnostics missing`);
+  else {
+    // What decodeGeoreference requires: without these the app drops the airport's overlay.
+    if (!['grid', 'gridRunwayChecked', 'runway'].includes(d.method)) errors.push(`${name}: diagnostics.method is ${d.method}`);
+    if (!['text', 'ocr', 'none'].includes(d.labelSource)) errors.push(`${name}: diagnostics.labelSource is ${d.labelSource}`);
+    for (const k of ['latitudeLabels', 'longitudeLabels', 'rotationDegrees', 'runwaysMatched', 'maskedInsets']) {
+      if (!Number.isInteger(d[k])) errors.push(`${name}: diagnostics.${k} is not an integer`);
+    }
+    if (!num(d.feetPerPoint)) errors.push(`${name}: diagnostics.feetPerPoint is not a number`);
+    for (const k of ['scaleRatio', 'runwayResidualFeet', 'runwayMidpointFeet', 'runwayEndFeet', 'runwayBestMidpointFeet', 'runwayMedianMidpointFeet']) {
+      if (d[k] !== undefined && d[k] !== null && !num(d[k])) errors.push(`${name}: diagnostics.${k} is not a number`);
+    }
+  }
+  if (Array.isArray(g.masks) && !g.masks.every((m) => isObj(m) && ['centerX', 'centerY', 'radius'].every((k) => num(m[k])))) errors.push(`${name}: a mask is malformed`);
   if (num(g.a) && num(g.b) && num(g.c) && num(g.d) && g.a * g.d - g.b * g.c === 0) errors.push(`${name}: singular transform`);
   if (num(g.referenceLatitude) && Math.abs(g.referenceLatitude) > 90) errors.push(`${name}: latitude out of range`);
   if (num(g.referenceLongitude) && Math.abs(g.referenceLongitude) > 180) errors.push(`${name}: longitude out of range`);
@@ -80,10 +95,16 @@ export function checkPack(dir, { min = 1 } = {}) {
     if (manifest.published !== false) errors.push('manifest.published must be false');
     if (!Array.isArray(manifest.files)) errors.push('manifest.files is not an array');
     const listed = new Set();
-    for (const f of Array.isArray(manifest.files) ? manifest.files : []) {
+    for (const [n, f] of (Array.isArray(manifest.files) ? manifest.files : []).entries()) {
+      // Names are untrusted: plain file names inside the pack only, never a path or a link out of it.
+      if (!isObj(f) || typeof f.name !== 'string' || !SAFE_NAME.test(f.name) || f.name.includes('..')) {
+        errors.push(`manifest.files[${n}] has an unsafe or missing name`);
+        continue;
+      }
       listed.add(f.name);
-      const p = join(dir, String(f.name));
+      const p = join(dir, f.name);
       if (!existsSync(p)) { errors.push(`manifest lists missing file ${f.name}`); continue; }
+      if (!lstatSync(p).isFile()) { errors.push(`${f.name}: not a regular file`); continue; }
       const data = readFileSync(p);
       bytes += data.length;
       if (data.length !== f.bytes) errors.push(`${f.name}: ${data.length} bytes, manifest says ${f.bytes}`);
