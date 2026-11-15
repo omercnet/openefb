@@ -94,3 +94,24 @@ test('JSON roots that are not objects, and a numeric edition, are rejected', () 
   });
   assert.ok(checkPack(dir).errors.some((e) => /index.edition/.test(e)));
 });
+
+test('impossible cycles such as 0000 and 2699 are rejected, real ones pass', () => {
+  for (const edition of ['0000', '2699', '2615']) {
+    const dir = pack(({ files, index, manifest }) => {
+      index.edition = edition;
+      manifest.edition = edition;
+      files['index.json'] = Buffer.from(JSON.stringify(index));
+      manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+    });
+    assert.ok(checkPack(dir).errors.some((e) => /not a d-TPP cycle/.test(e)), edition);
+  }
+  for (const edition of ['2601', '2613', '2614']) {
+    const dir = pack(({ files, index, manifest }) => {
+      index.edition = edition;
+      manifest.edition = edition;
+      files['index.json'] = Buffer.from(JSON.stringify(index));
+      manifest.files = Object.entries(files).map(([name, d]) => ({ name, bytes: d.length, sha256: createHash('sha256').update(d).digest('hex') }));
+    });
+    assert.deepEqual(checkPack(dir).errors.filter((e) => /not a d-TPP cycle/.test(e)), [], edition);
+  }
+});

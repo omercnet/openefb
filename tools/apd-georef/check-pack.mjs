@@ -67,7 +67,7 @@ export function checkPack(dir, { min = 1 } = {}) {
   if (!index) return { errors, airports: 0, bytes: 0 };
 
   if (index.product !== 'us-diagrams') errors.push(`index.product is ${index.product}`);
-  if (typeof index.edition !== 'string' || !/^\d{4}$/.test(index.edition)) errors.push(`index.edition '${index.edition}' is not a d-TPP cycle (YYNN)`);
+  if (typeof index.edition !== 'string' || !/^\d{2}(0[1-9]|1[0-4])$/.test(index.edition)) errors.push(`index.edition '${index.edition}' is not a d-TPP cycle (YYNN, NN from 01 to 14)`);
   if (typeof index.editionLabel === 'string' && !index.editionLabel.startsWith(`d-TPP cycle ${index.edition}`)) errors.push(`index.editionLabel '${index.editionLabel}' does not name the cycle`);
   for (const k of ['editionLabel', 'aipDate']) if (typeof index[k] !== 'string' || !index[k]) errors.push(`index.${k} missing`);
   if (typeof index.aipDate === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(index.aipDate)) errors.push('index.aipDate is not yyyy-MM-dd');
