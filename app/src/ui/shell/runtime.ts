@@ -7,6 +7,11 @@ import { createNetworkStatusSource, type NetworkStatusSource } from '../../adapt
 import baseStyle from '../../../assets/base-style.json';
 import { createMapLibreOfflineEngine } from '../../adapters/maplibreOffline';
 import { OfflineMapService } from '../../domain/offline/offlineMapService';
+import { chartFileSystem, chartRoot } from '../../adapters/chartFileSystem';
+import { fileDownloader } from '../../adapters/fileDownloader';
+import { createSecretStore } from '../../adapters/secretStore';
+import { loadNotamCredentials } from '../../services/notamService';
+import { TerminalProcedureService } from '../../services/terminal/terminalProcedureService';
 import { openAviationDatabase, openIsraelDatabase } from '../../adapters/aviationDb';
 import { fileTextStorage } from '../../adapters/fileTextStorage';
 import { openExpoSqliteDb } from '../../adapters/expoSqliteDb';
@@ -31,6 +36,8 @@ export interface AppRuntime {
   tfr: TfrService;
   israelNotam: IsraelNotamService;
   notamReadStore: NotamReadStateStore;
+  terminal: TerminalProcedureService;
+  notamConfigured: () => Promise<boolean>;
   offline: OfflineMapService;
   advisories: AirSigmetService;
   layerSettings: LayerSettings;
@@ -63,6 +70,15 @@ export async function startRuntime(): Promise<AppRuntime> {
     started,
     layerSettings,
     notamReadStore,
+    terminal: new TerminalProcedureService({
+      fetch: fetchLike,
+      downloader: fileDownloader,
+      fs: chartFileSystem,
+      baseDir: `${chartRoot('dtpp')}`,
+      log,
+    }),
+    // NotamService.isConfigured: a complete FAA key pair is in the keychain.
+    notamConfigured: async () => (await loadNotamCredentials(createSecretStore())) !== null,
     weather: new WeatherService({ fetch: fetchLike, log }),
     tfr: new TfrService({ fetch: fetchLike, log }),
     offline: new OfflineMapService({

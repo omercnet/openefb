@@ -6,9 +6,11 @@ import type { IsraelAviationDatabase } from '../../data/aviation/israelDatabase'
 import type { AviationDatabase } from '../../data/aviation/aviationDatabase';
 import { weatherStation, type Airport, type Region } from '../../domain/core';
 import { describeError } from '../../domain/describeError';
+import { isLayerAvailable } from '../../domain/core';
+import type { TerminalProcedureServiceLike } from '../../services/terminal/terminalProcedureService';
 import type { WeatherServiceLike } from '../../services/weatherService';
 import type { AirportColumnData, AirportColumnState } from '../columns/airport/store';
-import type { AirportWeather } from '../columns/airport/logic';
+import type { AirportWeather, TerminalChart } from '../columns/airport/logic';
 import { israelAirport } from '../columns/nearest/israelAerodromeAdapter';
 import type { AppState } from '../state/appStore';
 
@@ -24,6 +26,12 @@ export interface AirportColumnLoaderDeps {
   /** Epoch ms. */
   clock: () => number;
   directTo: (airport: Airport) => void;
+  /** The FAA d-TPP charts (US only); null: no chart service. */
+  charts?: Pick<TerminalProcedureServiceLike, 'charts' | 'currentCycle'> | null;
+  /** NotamService.isConfigured: a free FAA key is stored. */
+  notamConfigured?: () => Promise<boolean>;
+  /** Open the chart viewer (ChartPDFView). */
+  openChart?: (chart: TerminalChart) => void;
   /** Diagnostics; defaults to the console. */
   log?: (message: string) => void;
 }
@@ -146,6 +154,32 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     patchColumn(icao, (d) => ({ ...d, ...found }));
   }
 
+  const chartRequest = new Map<string, number>();
+  /** AirportChartsSection.loadCharts: the index and the cycle; only the newest request for an airport may write. */
+  async function loadCharts(icao: string): Promise<void> {
+    const service = deps.charts;
+    if (!service || !isLayerAvailable(deps.region(), 'airportCharts')) return;
+    const request = (chartRequest.get(icao) ?? 0) + 1;
+    chartRequest.set(icao, request);
+    patchColumn(icao, (d) => ({ ...d, charts: { state: 'loading' } }));
+    let charts: AirportColumnData['charts'];
+    try {
+      const airport = column.getState().columns[icao]?.airport;
+      const list = await service.charts({ icao, faaID: airport?.faaID ?? null });
+      const cycle = await service.currentCycle();
+      charts = {
+        state: 'loaded',
+        cycle: { code: cycle.code, effective: cycle.effectiveMs, expires: cycle.expirationMs },
+        charts: list.map(({ chartCode, name, pdfName, cycle: code }) => ({ chartCode, name, pdfName, cycle: code })),
+      };
+    } catch (error) {
+      (deps.log ?? console.warn)(`Charts for ${icao} failed: ${describeError(error)}`);
+      charts = { state: 'failed', message: describeError(error) };
+    }
+    if (stopped || chartRequest.get(icao) !== request) return;
+    patchColumn(icao, (d) => ({ ...d, charts }));
+  }
+
   async function load(icao: string): Promise<void> {
     column.setState({
       columns: {
@@ -154,12 +188,20 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
           airport: null,
           elevationPublished: true,
           weather: EMPTY_WEATHER,
-          charts: CHARTS_PENDING,
+          charts:
+            deps.charts && isLayerAvailable(deps.region(), 'airportCharts')
+              ? { state: 'loading' as const }
+              : CHARTS_PENDING,
           notamKeyConfigured: false,
         },
       },
     });
     await resolveAirport(icao);
+    void loadCharts(icao);
+    void deps.notamConfigured?.().then(
+      (notamKeyConfigured) => patchColumn(icao, (d) => ({ ...d, notamKeyConfigured })),
+      () => undefined,
+    );
     await loadWeather(icao);
   }
 
@@ -167,6 +209,8 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     region: deps.region(),
     now: deps.clock(),
     directTo: deps.directTo,
+    openChart: (chart) => deps.openChart?.(chart),
+    retryCharts: (icao) => void loadCharts(icao),
     refreshWeather: (icao) => {
       // The cache is cleared so the fetch goes to the network; the report on screen stays the fallback if it fails.
       const shown = column.getState().columns[icao]?.weather.metar ?? weather.cachedWeather(icao);

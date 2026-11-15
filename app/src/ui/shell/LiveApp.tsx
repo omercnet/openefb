@@ -11,6 +11,7 @@ import { MapScreen } from '../screens/MapScreen';
 import { appStore, useAppStore } from '../state/appStore';
 import { useRegion } from '../state/region';
 import { RuntimeContext } from '../state/runtimeContext';
+import { ChartViewer } from './ChartViewer';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';
 import { bannerItems } from './banners';
@@ -68,6 +69,9 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
       region: () => started.region,
       clock: Date.now,
       directTo: (a) => nearest.store.getState().directTo(a),
+      charts: runtime.terminal,
+      notamConfigured: runtime.notamConfigured,
+      openChart: (chart) => appStore.getState().openChartViewer(chart),
     });
     const stopChecks = started.remoteConfig
       ? startRemoteConfigChecks({
@@ -99,6 +103,7 @@ export function LiveApp({ runtime }: { runtime: AppRuntime }) {
           <View style={{ flex: 1 }}>
             <MapScreen />
           </View>
+          <ChartViewer terminal={runtime.terminal} />
         </View>
       </AirportQueriesContext.Provider>
     </RuntimeContext.Provider>

@@ -19,7 +19,13 @@ export function noteCaptureSeeded(): void {
 
 /** @param saved the saved Layers choices (display mode), applied when the Layers slice is reset. */
 export function resetLiveSlices(region: Region, saved?: Partial<LayersData>): void {
-  appStore.setState({ stripColumn: 'log', selectedAirportId: null, databaseError: null, isPresentingBriefing: false });
+  appStore.setState({
+    stripColumn: 'log',
+    selectedAirportId: null,
+    databaseError: null,
+    isPresentingBriefing: false,
+    chartViewer: null,
+  });
   // The restored region is in place before the first render (the strip's Israel branch reads it).
   regionSlice.store.setState({ region });
   flightLog.store.setState({ ...EMPTY_FLIGHT_LOG, region });

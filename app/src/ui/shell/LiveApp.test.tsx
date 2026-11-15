@@ -16,6 +16,7 @@ import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
 
 // The map is a native view and the screen is covered by its own tests; here it only marks that it is mounted.
+jest.mock('../map/ChartPdfView', () => ({ ChartPdfView: () => null }));
 jest.mock('../screens/MapScreen', () => ({ MapScreen: () => null }));
 
 function fakeRemoteConfig(over: Record<string, unknown> = {}) {

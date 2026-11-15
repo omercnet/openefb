@@ -1,4 +1,5 @@
 import { createStore, useStore } from 'zustand';
+import type { TerminalChart } from '../columns/airport/logic';
 import type { AppError } from '../../domain/errors';
 import { NO_NAVIGATION, type ActiveNavigation } from '../../domain/route/navigation';
 import type { StripColumnKind } from '../../domain/types';
@@ -20,6 +21,9 @@ export interface AppState {
   /** The Israel NOTAM briefing sheet is up (AppState.isPresentingIsraelBriefing). */
   isPresentingBriefing: boolean;
   setPresentingBriefing: (presenting: boolean) => void;
+  /** The terminal chart open full screen (ChartPDFView), if any. */
+  chartViewer: TerminalChart | null;
+  openChartViewer: (chart: TerminalChart | null) => void;
   clearDatabaseError: () => void;
   setNavigation: (navigation: ActiveNavigation) => void;
 }
@@ -32,6 +36,8 @@ export const createAppStore = () =>
     databaseError: null,
     navigation: NO_NAVIGATION,
     isPresentingBriefing: false,
+    chartViewer: null,
+    openChartViewer: (chartViewer) => set({ chartViewer }),
     setPresentingBriefing: (isPresentingBriefing) => set({ isPresentingBriefing }),
     setStripColumn: (stripColumn) => set({ stripColumn }),
     showAirport: (icao) => set({ selectedAirportId: icao, stripColumn: 'airport' }),
