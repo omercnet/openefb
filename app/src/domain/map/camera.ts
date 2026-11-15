@@ -29,7 +29,9 @@ export type CameraAction =
   | { type: 'userMoved' }
   | { type: 'recenter'; position: Coordinate | null; trackDeg: number }
   | { type: 'setMode'; mode: MapMode; position: Coordinate | null; trackDeg: number }
-  | { type: 'directionChanged'; direction: number };
+  | { type: 'directionChanged'; direction: number }
+  /** The footer's ZOOM buttons (MapViewModel.setZoomLevel): zoom only, centre and rotation stay. */
+  | { type: 'zoomTo'; level: number };
 
 export const initialCameraState = (mode: MapMode = 'northUp'): CameraState => ({
   follow: followModeState(),
@@ -91,6 +93,8 @@ export function cameraReducer(
           animated: true,
         },
       };
+    case 'zoomTo':
+      return { state, command: { center: null, zoom: action.level, direction: state.mapDirection, animated: true } };
     case 'directionChanged':
       if (!(Math.abs(action.direction - state.mapDirection) > 0.1)) return { state, command: null };
       return { state: { ...state, mapDirection: action.direction }, command: null };

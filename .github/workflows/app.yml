@@ -73,8 +73,10 @@ jobs:
       KEYDIR: /tmp/ota-keys
     steps:
       - uses: actions/checkout@v7
-      - name: Use the app's bundled aviation database (not committed)
-        run: cp ../efb-212/Resources/aviation.sqlite assets/aviation.sqlite
+      - name: Use the app's bundled aviation databases (not committed)
+        run: |
+          cp ../efb-212/Resources/aviation.sqlite assets/aviation.sqlite
+          cp ../efb-212/Resources/israel-aviation.sqlite assets/israel-aviation.sqlite
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -225,8 +227,10 @@ jobs:
       KEYDIR: /tmp/ota-keys
     steps:
       - uses: actions/checkout@v7
-      - name: Use the app's bundled aviation database (not committed)
-        run: cp ../efb-212/Resources/aviation.sqlite assets/aviation.sqlite
+      - name: Use the app's bundled aviation databases (not committed)
+        run: |
+          cp ../efb-212/Resources/aviation.sqlite assets/aviation.sqlite
+          cp ../efb-212/Resources/israel-aviation.sqlite assets/israel-aviation.sqlite
       - uses: actions/setup-node@v7
         with:
           node-version: 24

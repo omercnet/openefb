@@ -1,5 +1,6 @@
 // Render tests for NearestColumn: the reference rows and their accessibility, Direct and row taps, the empty, loading,
 // error and no-data states, long and Hebrew names, and the refresh hook driving the list.
+import { applyCaptureSeeds, captureAirportQueries } from '../../capture/seeds';
 import { Text } from 'react-native';
 import { act, type ReactElement } from 'react';
 import { callHandler, press, render, type Rendered } from '../../../../tests/support/ui';
@@ -8,9 +9,12 @@ import { appStore } from '../../state/appStore';
 import { regionSlice } from '../../state/region';
 import { NearestColumn } from '../NearestColumn';
 import { FIXTURE_OWNSHIP, createFakeAviationDatabase } from './fixture';
-import { AirportQueriesContext, defaultAirportQueries, type AirportQueries } from './sources';
+import { AirportQueriesContext, type AirportQueries } from './sources';
 import { nearest, useNearestEntry, type NearestData } from './store';
 import { rwy } from './__fixtures__/swiftAirports';
+
+const defaultAirportQueries = captureAirportQueries();
+beforeEach(applyCaptureSeeds);
 
 const layout = (width: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width, height: 20 } } });
 

@@ -11,7 +11,7 @@ import { Pressy, useTheme } from '../Primitives';
 import { StopRecordingDialog } from '../recording/StopRecordingDialog';
 import { RecordingStoreContext } from '../recording/RecordingStoreContext';
 import { Space } from '../tokens';
-import { MapScreen } from './MapScreen';
+import { MapCaptureScreen } from '../capture/MapCaptureScreen';
 import {
   captureRecordingLab,
   enterScene,
@@ -86,7 +86,7 @@ function RecordingLabScreen({ scene }: { scene: RecordingScene }) {
   return (
     <RecordingStoreContext.Provider value={lab.store}>
       <flightLog.Provider store={flightLogStore}>
-        <MapScreen screen="map" />
+        <MapCaptureScreen screen="map" />
         <StopRecordingDialog store={lab.store} />
         {Platform.OS === 'web' ? (
           <View style={{ position: 'absolute', right: 0, bottom: 0, width: 400 }}>

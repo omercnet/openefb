@@ -1,12 +1,11 @@
 // The airport column's data (AirportColumnView.swift's @State plus WeatherViewModel and the chart / NOTAM services'
 // results) as a plain-data slice, and the hook the column reads it through, keyed by AppState.selectedAirportId.
-// The default store holds the FAKE KSQL column (fixture.ts) until I1 feeds the database, weather, chart and NOTAM
-// services in (`airport.store.setState`) and wires the action callbacks.
+// The app shell's loader (ui/shell/airportColumnLoader.ts) feeds the selected airport and its weather in
+// (`airport.store.setState`) and wires the action callbacks; capture routes provide the KSQL fixture store.
 import { useMemo } from 'react';
 import { weatherStation, type Airport, type Region, type WeatherStation } from '../../../domain/core';
 import { useAppStore } from '../../state/appStore';
 import { createStoreContext } from '../../state/storeContext';
-import { KSQL_COLUMN, KSQL_NOW } from './fixture';
 import type { AirportWeather, ChartCycle, TerminalChart } from './logic';
 
 /** AirportChartsSection's load state. */
@@ -49,8 +48,8 @@ const noop = () => {};
 
 export const airport = createStoreContext<AirportColumnState>({
   region: 'us',
-  now: KSQL_NOW,
-  columns: { KSQL: KSQL_COLUMN },
+  now: Date.now(),
+  columns: {},
   rawMetarExpandedFor: null,
   directTo: noop,
   refreshWeather: noop,

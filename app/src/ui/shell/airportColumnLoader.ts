@@ -1,0 +1,194 @@
+// Feeds the airport column (AirportColumnView's load plus WeatherViewModel.loadWeather / refreshWeather): when an airport
+// is selected, its record comes from the aviation database (the curated aerodromes in Israel) and its METAR and TAF from
+// the weather service. Charts and the NOTAM list are I1b (the airport sheet); until then the column says so.
+import type { StoreApi } from 'zustand';
+import type { IsraelAviationDatabase } from '../../data/aviation/israelDatabase';
+import type { AviationDatabase } from '../../data/aviation/aviationDatabase';
+import { weatherStation, type Airport, type Region } from '../../domain/core';
+import { describeError } from '../../domain/describeError';
+import type { WeatherServiceLike } from '../../services/weatherService';
+import type { AirportColumnData, AirportColumnState } from '../columns/airport/store';
+import type { AirportWeather } from '../columns/airport/logic';
+import { israelAirport } from '../columns/nearest/israelAerodromeAdapter';
+import type { AppState } from '../state/appStore';
+
+export interface AirportColumnLoaderDeps {
+  app: StoreApi<AppState>;
+  column: StoreApi<AirportColumnState>;
+  aviation: Pick<AviationDatabase, 'airport'> | null;
+  israel: Pick<IsraelAviationDatabase, 'aerodrome'> | null;
+  weather: Pick<WeatherServiceLike, 'fetchMETAR' | 'fetchTAF' | 'cachedWeather'> & {
+    clearCache(stationID: string): void;
+  };
+  region: () => Region;
+  /** Epoch ms. */
+  clock: () => number;
+  directTo: (airport: Airport) => void;
+  /** Diagnostics; defaults to the console. */
+  log?: (message: string) => void;
+}
+
+/** The ages and the chart cycle are judged against this clock; a minute tick is enough. */
+const NOW_TICK_MS = 60_000;
+
+const CHARTS_PENDING = { state: 'failed', message: 'Airport charts are not available in this build yet.' } as const;
+
+const EMPTY_WEATHER: AirportWeather = {
+  metar: null,
+  isLoading: true,
+  errorMessage: null,
+  metarPublished: true,
+  tafPublished: true,
+  taf: null,
+  tafFetchedAt: null,
+  tafFailed: false,
+};
+
+export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => void {
+  const { app, column, weather } = deps;
+  const requested = new Set<string>();
+  /** Lookups that failed (not "no such airport"): the refresh buttons retry them. */
+  const lookupFailed = new Set<string>();
+  /** Per station, the newest weather load: an older one that finishes later must not overwrite it. */
+  const weatherRequest = new Map<string, number>();
+  const lookupRequest = new Map<string, number>();
+  let stopped = false;
+  const patchColumn = (icao: string, change: (data: AirportColumnData) => AirportColumnData) => {
+    const state = column.getState();
+    const current = state.columns[icao];
+    if (stopped || !current) return;
+    column.setState({ columns: { ...state.columns, [icao]: change(current) } });
+  };
+
+  /** WeatherViewModel.loadWeather for one station. */
+  async function loadWeather(icao: string, fallback: AirportWeather['metar'] = null): Promise<void> {
+    const request = (weatherRequest.get(icao) ?? 0) + 1;
+    weatherRequest.set(icao, request);
+    const isLatest = () => !stopped && weatherRequest.get(icao) === request;
+    const region = deps.region();
+    const station = weatherStation(region, icao);
+    const metarPublished = region === 'israel' ? (station?.hasMetar ?? false) : true;
+    const tafPublished = region === 'israel' ? (station?.hasTaf ?? false) : true;
+    patchColumn(icao, (d) => ({
+      ...d,
+      weather: { ...d.weather, isLoading: true, errorMessage: null, tafFailed: false, metarPublished, tafPublished },
+    }));
+
+    let metar = null as AirportWeather['metar'];
+    let errorMessage: string | null = null;
+    if (metarPublished) {
+      try {
+        metar = await weather.fetchMETAR(icao);
+      } catch (error) {
+        errorMessage = describeError(error);
+        // Keep the report that was shown (or the cache); the error says the refresh failed.
+        metar = fallback ?? weather.cachedWeather(icao);
+      }
+    }
+    let taf: string | null | undefined;
+    let tafFetchedAt: number | null | undefined;
+    let tafFailed = false;
+    if (tafPublished) {
+      try {
+        taf = await weather.fetchTAF(icao);
+        tafFetchedAt = deps.clock();
+      } catch {
+        tafFailed = true; // METAR is primary: no banner, the previous TAF stays with its true age
+      }
+    } else {
+      taf = null;
+      tafFetchedAt = null;
+    }
+    if (!isLatest()) return;
+    patchColumn(icao, (d) => ({
+      ...d,
+      weather: {
+        ...d.weather,
+        metar,
+        isLoading: false,
+        errorMessage,
+        taf: taf === undefined ? d.weather.taf : taf,
+        tafFetchedAt: tafFetchedAt === undefined ? d.weather.tafFetchedAt : tafFetchedAt,
+        tafFailed,
+      },
+    }));
+  }
+
+  /** Rejects when the database cannot answer; "no such airport" is a null airport. */
+  async function lookup(icao: string): Promise<{ airport: Airport | null; elevationPublished: boolean }> {
+    if (deps.region() === 'israel') {
+      const aerodrome = (await deps.israel?.aerodrome(icao)) ?? null;
+      return aerodrome
+        ? { airport: israelAirport(aerodrome), elevationPublished: aerodrome.elevationFeet != null }
+        : { airport: null, elevationPublished: true };
+    }
+    return { airport: (await deps.aviation?.airport(icao)) ?? null, elevationPublished: true };
+  }
+
+  /** Finds the airport record; a failed lookup is remembered so the refresh buttons retry it. */
+  async function resolveAirport(icao: string): Promise<void> {
+    const request = (lookupRequest.get(icao) ?? 0) + 1;
+    lookupRequest.set(icao, request);
+    let found: { airport: Airport | null; elevationPublished: boolean };
+    let failed = false;
+    try {
+      found = await lookup(icao);
+    } catch (error) {
+      failed = true;
+      (deps.log ?? console.warn)(`Airport lookup for ${icao} failed: ${describeError(error)}`);
+      found = { airport: null, elevationPublished: true };
+    }
+    // Overlapping lookups (two refresh taps): only the newest may write, the retry marker included, so a late failure
+    // neither blanks a newer result nor makes a good airport look retryable.
+    if (lookupRequest.get(icao) !== request) return;
+    if (failed) lookupFailed.add(icao);
+    else lookupFailed.delete(icao);
+    patchColumn(icao, (d) => ({ ...d, ...found }));
+  }
+
+  async function load(icao: string): Promise<void> {
+    column.setState({
+      columns: {
+        ...column.getState().columns,
+        [icao]: {
+          airport: null,
+          elevationPublished: true,
+          weather: EMPTY_WEATHER,
+          charts: CHARTS_PENDING,
+          notamKeyConfigured: false,
+        },
+      },
+    });
+    await resolveAirport(icao);
+    await loadWeather(icao);
+  }
+
+  column.setState({
+    region: deps.region(),
+    now: deps.clock(),
+    directTo: deps.directTo,
+    refreshWeather: (icao) => {
+      // The cache is cleared so the fetch goes to the network; the report on screen stays the fallback if it fails.
+      const shown = column.getState().columns[icao]?.weather.metar ?? weather.cachedWeather(icao);
+      weather.clearCache(icao);
+      if (lookupFailed.has(icao)) void resolveAirport(icao);
+      void loadWeather(icao, shown);
+    },
+  });
+
+  const select = (icao: string | null) => {
+    if (icao === null || requested.has(icao)) return;
+    requested.add(icao);
+    void load(icao);
+  };
+  select(app.getState().selectedAirportId);
+  const unsubscribe = app.subscribe((state, previous) => {
+    if (state.selectedAirportId !== previous.selectedAirportId) select(state.selectedAirportId);
+  });
+  const tick = setInterval(() => column.setState({ now: deps.clock() }), NOW_TICK_MS);
+  return () => {
+    stopped = true;
+    unsubscribe();
+    clearInterval(tick);
+  };
+}

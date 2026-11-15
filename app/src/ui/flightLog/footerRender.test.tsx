@@ -1,3 +1,5 @@
+import { AirportQueriesContext } from '../columns/nearest/sources';
+import { applyCaptureSeeds, captureAirportQueries } from '../capture/seeds';
 import { act, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import type { TestInstance } from 'test-renderer';
@@ -11,6 +13,8 @@ import { regionSlice } from '../state/region';
 import { Day } from '../tokens';
 import { FlightLogFooter } from './FlightLogFooter';
 import { footer, type FooterData } from './footerStore';
+
+beforeEach(applyCaptureSeeds);
 
 const KPAO: NearestAirportEntry = {
   airport: makeAirport({
@@ -43,11 +47,14 @@ async function renderFooter(
     ownship: opts.ownship ?? null,
   });
   const footerStore = footer.make({ ...footer.store.getState(), ...opts.footerState });
+  const queries = captureAirportQueries();
   const wrap = (children: ReactNode) => (
     <gps.Provider store={gpsStore}>
       <nearest.Provider store={nearestStore}>
         <regionSlice.Provider store={regionSlice.make({ region: 'us' })}>
-          <footer.Provider store={footerStore}>{children}</footer.Provider>
+          <AirportQueriesContext.Provider value={queries}>
+            <footer.Provider store={footerStore}>{children}</footer.Provider>
+          </AirportQueriesContext.Provider>
         </regionSlice.Provider>
       </nearest.Provider>
     </gps.Provider>

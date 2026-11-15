@@ -1,5 +1,6 @@
 import { createStore, useStore } from 'zustand';
 import type { AppError } from '../../domain/errors';
+import { NO_NAVIGATION, type ActiveNavigation } from '../../domain/route/navigation';
 import type { StripColumnKind } from '../../domain/types';
 
 // App-wide state, the port of the navigation and error parts of AppState.swift. UI-only state stays in components.
@@ -8,13 +9,16 @@ import type { StripColumnKind } from '../../domain/types';
 export interface AppState {
   stripColumn: StripColumnKind;
   selectedAirportId: string | null;
-  /** Set when the user database failed to open; the app then runs on an in-memory fallback and shows a banner. */
+  /** Why the aviation database could not be opened (AppState.databaseError): drives the red banner. */
   databaseError: AppError | null;
+  /** Direct-To, route or plan being flown and its live progress (AppState+Navigation.swift). */
+  navigation: ActiveNavigation;
   setStripColumn: (column: StripColumnKind) => void;
   /** Select an airport and show its column (the SwiftUI app always does both together). */
   showAirport: (icao: string) => void;
   reportDatabaseError: (error: AppError) => void;
   clearDatabaseError: () => void;
+  setNavigation: (navigation: ActiveNavigation) => void;
 }
 
 /** A fresh store; tests create their own so state never leaks between them. */
@@ -23,10 +27,12 @@ export const createAppStore = () =>
     stripColumn: 'log',
     selectedAirportId: null,
     databaseError: null,
+    navigation: NO_NAVIGATION,
     setStripColumn: (stripColumn) => set({ stripColumn }),
     showAirport: (icao) => set({ selectedAirportId: icao, stripColumn: 'airport' }),
     reportDatabaseError: (databaseError) => set({ databaseError }),
     clearDatabaseError: () => set({ databaseError: null }),
+    setNavigation: (navigation) => set({ navigation }),
   }));
 
 export const appStore = createAppStore();

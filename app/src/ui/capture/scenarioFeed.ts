@@ -7,9 +7,9 @@ import { Platform, Settings } from 'react-native';
 import { ANIMATION_FILE, writeResult } from '../../adapters/resultFile';
 import { makeWeatherCache, type Coordinate, type WeatherCache } from '../../domain/core';
 import { scenario } from '../../fixtures/scenario';
-import { destination, pacing } from './geo';
-import { getCurrentMapStatus } from './mapStatus';
-import type { OwnshipInput } from './useMapData';
+import { destination, pacing } from '../map/geo';
+import { getCurrentMapStatus } from '../map/mapStatus';
+import type { OwnshipInput } from '../map/useMapData';
 
 const { ownship } = scenario;
 const ORIGIN: [number, number] = [ownship.lon, ownship.lat];

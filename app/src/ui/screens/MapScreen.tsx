@@ -1,148 +1,96 @@
-import { useLayoutEffect, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { openAviationDatabase } from '../../adapters/aviationDb';
-import type { MapLayer } from '../../domain/core';
-import { layerSpecsFor } from '../../domain/map/registry';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AppFailure } from '../../domain/errors';
+import { regionContains, regionDefaultCenter, regionDefaultZoom } from '../../domain/core';
 import type { MapDataSource } from '../../domain/map/mapDataController';
-import { fixtureAdvisory, fixtureTfr } from '../../fixtures/mapLayers';
-import { scenario } from '../../fixtures/scenario';
-import { useLocalGlyphs } from '../../adapters/glyphInstall';
-import { CompactMapLayout } from '../CompactMapLayout';
-import { useWidthClass, usesCompactLayout } from '../layout';
-import { MapSurface } from '../map/MapSurface';
-import { REMOTE_GLYPHS_URL } from '../map/surfaceModel';
-import { scenarioWeather, useAnimateFlag, useScenarioOwnship } from '../map/scenarioFeed';
+import { initialVisibleLayers } from '../../domain/map/initialLayers';
+import { useNearestAirports } from '../columns/nearest/refresh';
+import { footer } from '../flightLog/footerStore';
+import { MapLayout } from '../map/MapLayout';
+import { navigationRoute } from '../map/navigationRoute';
+import { refreshableMapFor, useDataRefresh } from '../map/refreshDue';
 import { useMapController, useMapModel } from '../map/useMapData';
-import type { StripColumnKind } from '../../domain/types';
-import { appStore } from '../state/appStore';
-import { panels } from '../state/panels';
-import { StripColumn, type StripScreen } from '../StripColumn';
-import { StripMetrics } from '../tokens';
+import { useAppStore } from '../state/appStore';
+import { flightLog } from '../flightLog/store';
+import { useOwnship } from '../state/ownship';
+import { useRuntime } from '../state/runtimeContext';
+import { layers } from '../columns/layers/store';
+import { bindLayers } from '../shell/layersFeed';
+import { advisorySource } from '../shell/mapSources';
 
-/** Aviation database opened in the background: the screen mounts without waiting for the copy-on-first-launch. */
-const lazyDb = (): MapDataSource => {
-  const open = openAviationDatabase();
-  open.catch(() => undefined); // each query awaits `open` itself and the controller reports the failure; this only avoids an unhandled rejection
-  return {
-    airportsNear: async (c, r) => (await open).airportsNear(c, r),
-    toweredAirportsNear: async (c, r) => (await open).toweredAirportsNear(c, r),
-    airspacesNear: async (c, r) => (await open).airspacesNear(c, r),
-    navaidsNear: async (c, r) => (await open).navaidsNear(c, r),
-  };
+/** With the aviation database closed every query fails; the controller reports it and the red banner explains. */
+const closedDb: MapDataSource = {
+  airportsNear: async () => failClosed(),
+  toweredAirportsNear: async () => failClosed(),
+  airspacesNear: async () => failClosed(),
+  navaidsNear: async () => failClosed(),
 };
-
-const SCENARIO_LAYERS: ReadonlySet<MapLayer> = new Set<MapLayer>(['sectional', 'airports', 'ownship', 'weatherDots']);
-/** The `map-layers` capture state: every data layer on, with a fixture TFR and AIRMET. */
-const ALL_LAYERS: ReadonlySet<MapLayer> = new Set<MapLayer>([
-  ...SCENARIO_LAYERS,
-  'navaids',
-  'airspace',
-  'tfrs',
-  'advisories',
-  'route',
-]);
-const SCENARIO_ROUTE = {
-  kind: 'greatCircle' as const,
-  points: [
-    { lat: 37.4611, lon: -122.115 }, // KPAO
-    { lat: scenario.next.lat, lon: scenario.next.lon }, // KOAK
-  ],
-};
-const INITIAL_VIEW = { center: { lat: scenario.map.center[1], lon: scenario.map.center[0] }, zoom: scenario.map.zoom };
-
-/** The strip column and selected airport each capture route opens with (the fidelity gate's screens). */
-const OPENS_WITH: Record<StripScreen, { stripColumn: StripColumnKind; selectedAirportId: string | null }> = {
-  map: { stripColumn: 'log', selectedAirportId: null },
-  night: { stripColumn: 'log', selectedAirportId: null },
-  airport: { stripColumn: 'airport', selectedAirportId: 'KSQL' },
-  layers: { stripColumn: 'layers', selectedAirportId: null },
-  nearest: { stripColumn: 'nearest', selectedAirportId: null },
-  search: { stripColumn: 'search', selectedAirportId: null },
-};
+function failClosed(): never {
+  throw new AppFailure({ kind: 'databaseCorrupted' });
+}
 
 /**
- * The map-first layout (MapContainerView.swift): on a regular window the 400pt strip column beside the chart; on a
- * compact window (iPhone, narrow Split View) or with the flight log hidden, the compact layout with the 104pt NEXT rail
- * and NOW and the footer under the chart. A capture route passes `screen`, which decides what the strip opens with and
- * whether it is night; without it the strip just follows the app store.
+ * The live map screen (MapContainerView.swift): the chart and the strip on the aviation database, the weather, TFR and
+ * AIRMET/SIGMET services, the location service and the active navigation. The capture routes render the same layout
+ * from fixtures (ui/capture/MapCaptureScreen).
  */
-export function MapScreen({ screen, allLayers = false }: { screen?: StripScreen; allLayers?: boolean }) {
-  // After the first commit but before paint (a layout effect): writing the store during render would update the strip of
-  // a route that is still mounted, which React flags in development. After that the strip follows the store, so the Log
-  // back button and the footer toggles work in a dev build.
-  useLayoutEffect(() => {
-    if (screen) appStore.setState(OPENS_WITH[screen]);
-  }, [screen]);
-  const { widthClass, width } = useWidthClass();
-  const showsFlightLog = panels.useData((s) => s.showsFlightLog);
-  const night = screen === 'night';
-  const glyphs = useLocalGlyphs();
-  if (glyphs.status === 'failed') console.warn('local glyph install failed; labels need a network', glyphs.error);
-  const animate = useAnimateFlag();
-
-  const appState = useMemo(
-    () => ({
-      region: 'us' as const,
-      visibleLayers: new Set(allLayers ? ALL_LAYERS : SCENARIO_LAYERS),
-      mapCenter: INITIAL_VIEW.center,
-      mapZoom: INITIAL_VIEW.zoom,
-      mapVisibleBounds: null,
-    }),
-    [allLayers],
-  );
-  const [db] = useState(lazyDb);
+export function MapScreen() {
+  const runtime = useRuntime();
+  // The region the launch sequence restored, not the slice: LiveApp writes the slice in an effect, after this first render.
+  const region = runtime.started.region;
+  const [initial] = useState(() => ({ center: regionDefaultCenter(region), zoom: regionDefaultZoom(region) }));
+  const [appState] = useState(() => ({
+    region,
+    visibleLayers: initialVisibleLayers(region),
+    mapCenter: initial.center,
+    mapZoom: initial.zoom,
+    mapVisibleBounds: null,
+  }));
   const controller = useMapController({
     appState,
-    db,
-    weather: scenarioWeather,
-    ...(allLayers && {
-      tfr: { currentTFRs: async () => ({ tfrs: [fixtureTfr], fetchedAt: Date.now() }) },
-      advisories: { currentAdvisories: async () => ({ advisories: [fixtureAdvisory], fetchedAt: Date.now() }) },
-    }),
+    db: runtime.started.aviation ?? closedDb,
+    weather: runtime.weather,
+    tfr: runtime.tfr,
+    advisories: advisorySource(runtime.advisories),
   });
-  const ownship = useScenarioOwnship(animate);
+
+  const ownship = useOwnship();
+  const navigation = useAppStore((s) => s.navigation);
+  const route = useMemo(() => navigationRoute(navigation, ownship.position), [navigation, ownship.position]);
   const model = useMapModel({
     controller,
     ownship,
-    // Fixture captures hold the camera on the scenario view (as the SwiftUI reference does); I1 passes the real flag.
-    ownshipInRegion: false,
-    rulerMinutes: scenario.trackRulerMinutes,
-    route: allLayers ? SCENARIO_ROUTE : null,
+    ownshipInRegion: ownship.position !== null && regionContains(region, ownship.position),
+    route,
   });
 
-  const chart =
-    glyphs.status === 'loading' ? null : (
-      <MapSurface
-        night={night}
-        glyphsUrl={glyphs.status === 'ready' ? glyphs.url : REMOTE_GLYPHS_URL}
-        sectional
-        region={model.snapshot.region}
-        visibleLayers={model.snapshot.visibleLayers}
-        layers={layerSpecsFor(model.snapshot.region)}
-        sources={model.sources}
-        initialView={INITIAL_VIEW}
-        camera={model.camera}
-        onViewChange={model.onViewChange}
-        onStyleLoaded={model.onStyleLoaded}
-        onTileHealth={model.onTileHealth}
-      />
-    );
-  return (
-    <SafeAreaProvider>
-      {usesCompactLayout(widthClass, showsFlightLog) ? (
-        <CompactMapLayout screen={screen} width={width} compact={widthClass === 'compact'} chart={chart} />
-      ) : (
-        <View style={styles.row}>
-          <StripColumn screen={screen} width={StripMetrics.width} />
-          <View style={styles.map}>{chart}</View>
-        </View>
-      )}
-    </SafeAreaProvider>
+  // The Layers column and the controller follow each other; the footer's zoom cells follow the camera.
+  const layersStore = layers.useStoreApi();
+  useEffect(() => bindLayers(controller, layersStore, Date.now), [controller, layersStore]);
+  const footerStore = footer.useStoreApi();
+  const { zoomTo, recenter } = model;
+  useEffect(() => {
+    footerStore.setState({ zoomTo, recenter });
+  }, [footerStore, zoomTo, recenter]);
+  useEffect(() => {
+    footerStore.setState({ following: model.isFollowing });
+  }, [footerStore, model.isFollowing]);
+  const { onViewChange } = model;
+  const trackedViewChange = useCallback(
+    (change: Parameters<typeof onViewChange>[0]) => {
+      footerStore.setState({ zoom: change.zoom });
+      onViewChange(change);
+    },
+    [footerStore, onViewChange],
   );
-}
+  const modelWithZoom = useMemo(() => ({ ...model, onViewChange: trackedViewChange }), [model, trackedViewChange]);
 
-const styles = StyleSheet.create({
-  row: { flex: 1, flexDirection: 'row' },
-  map: { flex: 1 },
-});
+  // The NRST cell refreshes on every fix while another column is open (MapContainerView's onChange(ownshipPosition)).
+  useNearestAirports();
+  useDataRefresh(() => ({
+    map: refreshableMapFor(controller),
+    lowPower: false,
+    networkAvailable: !flightLog.store.getState().isOffline,
+  }));
+
+  return <MapLayout model={modelWithZoom} initialView={initial} />;
+}

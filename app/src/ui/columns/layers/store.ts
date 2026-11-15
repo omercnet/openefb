@@ -5,6 +5,7 @@
 // must tick (a minute tick is enough) or the data ages never advance.
 import type { FreshnessLevel } from '../../../domain/core/freshness';
 import type { MapLayer, MapMode } from '../../../domain/core/types';
+import { currentSectionalCycle } from '../../../domain/offline/layers';
 import type { DisplayMode } from '../../../domain/displayMode';
 import { createStoreContext } from '../../state/storeContext';
 import type { OfflineStatus } from './logic';
@@ -40,22 +41,23 @@ export interface LayersData {
   retryAdvisories: () => void;
 }
 
-const NOW = Date.UTC(2026, 10, 12, 0, 35); // 4:35 PM PST, 11 Nov 2026
+const NOW = Date.now();
 
+/** Launch state: the US default layers, no data fetched yet. The app shell feeds the rest (ui/shell/layersFeed.ts). */
 export const layers = createStoreContext<LayersData>({
-  displayMode: 'day',
+  displayMode: 'auto',
   mapMode: 'northUp',
-  visibleLayers: ['sectional', 'tfrs', 'weatherDots', 'route', 'ownship'],
+  visibleLayers: ['sectional', 'airports', 'ownship', 'tfrs'],
   airportDiagrams: true,
   sectionalOpacity: 0.7,
   offlineStatus: 'notDownloaded',
-  sectionalCycleExpires: Date.UTC(2026, 11, 24, 9, 1),
-  chartExpiration: Date.UTC(2026, 11, 24, 9, 1),
-  tfrFetchedAt: NOW - 20_000,
+  sectionalCycleExpires: currentSectionalCycle(NOW).expires,
+  chartExpiration: currentSectionalCycle(NOW).expires,
+  tfrFetchedAt: null,
   tfrLoadFailed: false,
   advisoriesFetchedAt: null,
   advisoriesLoadFailed: false,
-  oldestWeatherObservation: NOW - 48 * 60_000,
+  oldestWeatherObservation: null,
   closureStatus: { kind: 'noFeed' },
   now: NOW,
   retryTfrs: () => {},

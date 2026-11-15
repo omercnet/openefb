@@ -6,7 +6,7 @@
 import { useFonts } from 'expo-font';
 import { useState } from 'react';
 import { Platform, View } from 'react-native';
-import { MapScreen } from '../../screens/MapScreen';
+import { MapCaptureScreen } from '../../capture/MapCaptureScreen';
 import { FontFiles } from '../../tokens';
 import { BriefingPresentation } from './BriefingPresentation';
 import { FIXTURE_NOW, MemoryNotamReadStore, captureBriefingData, fixtureReport } from './fixture';
@@ -44,7 +44,7 @@ export function BriefingOverMap() {
         style={{ flex: 1 }}
         {...(Platform.OS === 'android' && presented ? HIDDEN_FROM_ASSISTIVE_TECH : null)}
       >
-        <MapScreen screen="map" />
+        <MapCaptureScreen screen="map" />
       </View>
       <BriefingPresentation presented={presented} onDismiss={dismiss}>
         {ready ? <IsraelBriefingSheet model={model} actions={actions} /> : null}
