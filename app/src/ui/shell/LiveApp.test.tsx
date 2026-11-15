@@ -70,6 +70,7 @@ function runtime(over: Partial<AppRuntime['started']> = {}) {
       remoteConfig: remote,
       ...over,
     },
+    telemetry: { signal: () => undefined },
     weather: {},
     tfr: {},
     advisories: {},

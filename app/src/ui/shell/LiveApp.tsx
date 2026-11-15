@@ -29,6 +29,7 @@ import { ChartViewer } from './ChartViewer';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';
 import { bannerItems } from './banners';
+import { bindNavigationTelemetry } from './navigationTelemetry';
 import { persistLayerSettings } from './layersSettings';
 import { startLiveData } from './liveData';
 import { startRemoteConfigChecks } from './remoteConfigChecks';
@@ -171,8 +172,10 @@ export function LiveApp({
           },
         })
       : () => undefined;
+    const stopTelemetry = bindNavigationTelemetry(appStore, runtime.telemetry);
     const stopSettings = persistLayerSettings(layers.store, started.userDb, fileTextStorage, console.warn);
     return () => {
+      stopTelemetry();
       stopSettings();
       stopData();
       stopAirport();
