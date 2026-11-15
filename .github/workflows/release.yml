@@ -62,7 +62,9 @@ jobs:
   testflight:
     name: TestFlight upload
     needs: release-please
-    if: ${{ !cancelled() && !failure() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
+    # Only on main: this job holds the App Store Connect key and the signing identity. (A workflow file is read from the ref it
+    # runs on, so the durable guard is the `testflight` environment's deployment branches rule, set to main only: docs/CI.md.)
+    if: ${{ !cancelled() && !failure() && github.ref == 'refs/heads/main' && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     timeout-minutes: 90
     environment: testflight
@@ -75,9 +77,11 @@ jobs:
       # an upload builds a release tag (the one release-please just created, or the `tag` input of a manual run); a manual
       # sign-only run builds the commit it was dispatched at; and a manual run with app=rn, upload on and no tag, from main, is the
       # RN preview: it builds that commit for the internal TestFlight group. Any other untagged upload fails.
-      # The script comes from the dispatched commit, in its own folder (the build checkout below replaces the workspace).
+      # The selector always comes from main, in its own folder (the build checkout below replaces the workspace): a branch
+      # cannot swap in its own selector to pick its own commit.
       - uses: actions/checkout@v7
         with:
+          ref: main
           path: select
           sparse-checkout: tools/ci
           persist-credentials: false
