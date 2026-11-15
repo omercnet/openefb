@@ -423,22 +423,52 @@ describe('FlightRecovery Tests', () => {
     expect(isRecovered(flights.find((x) => x.id === saved)!)).toBe(false);
   });
 
-  test('aRecordingThatStartsDuringTheScanIsNeverRecovered', async () => {
+  test('aRecordingThatStartsWhileItsDataIsReadIsNeverRecovered', async () => {
     const f = await makeFixture();
     const late = uuid();
     await insertTrack(f, late, 3);
     let current: string | null = null; // nothing recording when the scan begins
-    let reads = 0;
-    const result = await (
-      await recovery(f)
-    ).recoverOrphans({
-      activeFlightID: () => {
-        reads += 1;
-        if (reads >= 2) current = late; // it starts while the candidates are being read
-        return current;
-      },
+    const service = new FlightRecoveryService({
+      // The recording starts exactly while the candidate's track is being read (after the pre-check, before the save).
+      recordingStore: new Proxy(f.recording, {
+        get: (target, key) =>
+          key === 'trackPoints'
+            ? async (id: string) => {
+                current = late;
+                return target.trackPoints(id);
+              }
+            : Reflect.get(target, key),
+      }),
+      persistence: f.service(null),
+      flights: f.flightsRepo,
+      audio: f.files,
+      now: () => start,
     });
-    expect(result).toEqual([]);
+    expect(await service.recoverOrphans({ activeFlightID: () => current })).toEqual([]);
+    expect(await f.flightsRepo.list()).toHaveLength(0);
+  });
+
+  test('aRecordingThatStopsDuringTheScanIsNeverRecovered', async () => {
+    const f = await makeFixture();
+    const stopping = uuid();
+    await insertTrack(f, stopping, 3);
+    let current: string | null = stopping; // recording at entry, stopped (its own save is under way) by the time we look again
+    const service = new FlightRecoveryService({
+      recordingStore: new Proxy(f.recording, {
+        get: (target, key) =>
+          key === 'flightIDsWithRecordedData'
+            ? async () => {
+                current = null;
+                return target.flightIDsWithRecordedData();
+              }
+            : Reflect.get(target, key),
+      }),
+      persistence: f.service(null),
+      flights: f.flightsRepo,
+      audio: f.files,
+      now: () => start,
+    });
+    expect(await service.recoverOrphans({ activeFlightID: () => current })).toEqual([]);
     expect(await f.flightsRepo.list()).toHaveLength(0);
   });
 

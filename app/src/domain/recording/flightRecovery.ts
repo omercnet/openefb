@@ -56,11 +56,20 @@ export class FlightRecoveryService {
       pilotProfileID?: string | null;
     } = {},
   ): Promise<string[]> {
-    const activeID = (): string | null =>
-      (typeof options.activeFlightID === 'function'
-        ? options.activeFlightID()
-        : options.activeFlightID
-      )?.toLowerCase() ?? null;
+    // Every flight that was active at any point of this run stays excluded: one that stops while the scans are awaited
+    // has its data in the recording database and is about to be saved by its own stop, so it must not be saved here too.
+    const everActive = new Set<string>();
+    const activeID = (): string | null => {
+      const raw = typeof options.activeFlightID === 'function' ? options.activeFlightID() : options.activeFlightID;
+      const id = raw ? raw.toLowerCase() : null;
+      if (id) everActive.add(id);
+      return id;
+    };
+    const excluded = (flightID: string): boolean => {
+      activeID();
+      return everActive.has(flightID);
+    };
+    activeID(); // at entry, before anything is awaited
     let existing: Set<string>;
     try {
       existing = new Set((await this.deps.flights.list()).map((f) => f.id.toLowerCase()));
@@ -89,11 +98,11 @@ export class FlightRecoveryService {
 
     const recovered: string[] = [];
     for (const flightID of [...candidates.keys()].sort()) {
-      if (flightID === activeID()) continue; // started since the scan
+      if (excluded(flightID)) continue; // active at some point since the scan began
       try {
         const summary = await this.summaryFor(flightID, candidates.get(flightID) ?? flightID);
         if (!summary) continue;
-        if (flightID === activeID()) continue; // started while its data was read
+        if (excluded(flightID)) continue; // started or stopped while its data was read
         const result = await this.deps.persistence.store(
           summary,
           options.aircraftProfileID ?? null,
