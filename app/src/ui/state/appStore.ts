@@ -7,7 +7,17 @@ import type { StripColumnKind } from '../../domain/types';
 // App-wide state, the port of the navigation and error parts of AppState.swift. UI-only state stays in components.
 // High-rate streams (GPS at about 1 Hz, map follow mode) must not go through here per tick: they feed a domain reducer
 // and only the resulting camera props reach the map (plan section 3.2). Add slices here as tracks need them.
+/** AppState.selectedScreen: the map, or the log stack over it (the map stays mounted underneath). */
+export type LiveScreen = 'map' | 'log';
+
+/** A screen pushed over the log stack (LogRoute); more kinds arrive as their screens are wired live. */
+export type LiveOverlay = { kind: 'entry'; id: string } | { kind: 'planner' };
+
 export interface AppState {
+  selectedScreen: LiveScreen;
+  setScreen: (screen: LiveScreen) => void;
+  overlay: LiveOverlay | null;
+  openOverlay: (overlay: LiveOverlay | null) => void;
   stripColumn: StripColumnKind;
   selectedAirportId: string | null;
   /** Why the aviation database could not be opened (AppState.databaseError): drives the red banner. */
@@ -31,6 +41,10 @@ export interface AppState {
 /** A fresh store; tests create their own so state never leaks between them. */
 export const createAppStore = () =>
   createStore<AppState>()((set) => ({
+    selectedScreen: 'map',
+    setScreen: (selectedScreen) => set({ selectedScreen }),
+    overlay: null,
+    openOverlay: (overlay) => set({ overlay }),
     stripColumn: 'log',
     selectedAirportId: null,
     databaseError: null,

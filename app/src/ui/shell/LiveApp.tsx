@@ -15,6 +15,12 @@ import { RecordingStoreContext } from '../recording/RecordingStoreContext';
 import { StopRecordingDialog } from '../recording/StopRecordingDialog';
 import { bindRecording, markRecordingUnavailable } from './recordingBinding';
 import type { RecordingRuntime } from './recordingRuntime';
+import { flightRecordRepository } from '../../data/repositories';
+import { userDataFromDb } from '../../domain/userData';
+import { log, logActions } from '../log/store';
+import { createLogbookEntryStore } from '../state/logbookEntryStore';
+import { createLogFeed } from './logFeed';
+import { LiveScreens } from './LiveScreens';
 import { ChartViewer } from './ChartViewer';
 import { startAirportColumnLoader } from './airportColumnLoader';
 import { airportQueriesFor } from './airportQueries';
@@ -60,6 +66,33 @@ export function LiveApp({
   startRecording?: (runtime: AppRuntime) => Promise<RecordingRuntime>;
 }) {
   const [recording, setRecording] = useState<RecordingRuntime | null>(null);
+  // The Log (LogStackView): flights and entries from the user database, entry editor, and the actions the Log raises.
+  const [logbookEntry] = useState(() => createLogbookEntryStore({ userData: userDataFromDb(runtime.started.userDb) }));
+  const [feed] = useState(() =>
+    createLogFeed({
+      userData: userDataFromDb(runtime.started.userDb),
+      flights: flightRecordRepository(runtime.started.userDb),
+      store: log.store,
+      app: appStore,
+    }),
+  );
+  useEffect(() => {
+    logActions.store.setState(feed.actions);
+    flightLog.store.setState({
+      actions: { ...flightLog.store.getState().actions, openLog: () => appStore.getState().setScreen('log') },
+    });
+    void feed.refresh();
+    // The Log reads again whenever it opens, and when a recording has been saved.
+    return appStore.subscribe((state, previous) => {
+      if (state.selectedScreen === 'log' && previous.selectedScreen !== 'log') void feed.refresh();
+    });
+  }, [feed]);
+  useEffect(() => {
+    if (!recording) return;
+    return recording.store.subscribe((state, previous) => {
+      if (state.lastPersistenceResult !== previous.lastPersistenceResult) void feed.refresh();
+    });
+  }, [recording, feed]);
   const { started } = runtime;
   const databaseError = useAppStore((s) => s.databaseError);
   // The restored region goes in before the first render (the Nearest hook reads the slice).
@@ -144,6 +177,7 @@ export function LiveApp({
             <View style={{ flex: 1 }}>
               <MapScreen />
             </View>
+            <LiveScreens logbookEntry={logbookEntry} onOverlayClosed={() => void feed?.refresh()} />
             <ChartViewer terminal={runtime.terminal} />
             {recording ? <StopRecordingDialog store={recording.store} /> : null}
           </View>
