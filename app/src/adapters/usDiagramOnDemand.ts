@@ -22,7 +22,8 @@ import {
   type DiagramPackSource,
 } from '../domain/diagram/overlayController';
 import type { AviationDatabase } from '../data/aviation';
-import type { ChartPackServiceLike } from '../services/charts/chartPackService';
+import { AppFailure } from '../domain/errors';
+import { regionName, type ChartPackServiceLike } from '../services/charts/chartPackService';
 import { clipCornersForImageSource, decodeGeoreference } from '../services/charts/diagramGeoreference';
 import {
   decodeDiagramIndex,
@@ -119,15 +120,14 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
   }
 
   const verified = new Set<string>();
+  // Anything the edition or the disk cannot give is a failed load (machine-readable like the chart service's), retried later.
+  const failed = () => new AppFailure({ kind: 'chartDownloadFailed', region: regionName(US_DIAGRAM_PRODUCT) });
 
-  async function sha256Of(path: string): Promise<string | null> {
-    try {
-      const hasher = new Sha256();
-      await fs.hashFile(path, hasher);
-      return hasher.digestHex();
-    } catch {
-      return null;
-    }
+  /** Rejects when the file cannot be read: only a confirmed mismatch may delete a cached file. */
+  async function sha256Of(path: string): Promise<string> {
+    const hasher = new Sha256();
+    await fs.hashFile(path, hasher);
+    return hasher.digestHex();
   }
 
   /** A file of the edition in the cache: reused when its size matches, else downloaded and verified. */
@@ -154,12 +154,12 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
     const manifest = await currentManifest();
     if (!manifest) return null;
     const path = await cached(manifest, INDEX_FILE, INDEX_MAX_BYTES);
-    if (!path) throw new Error(`edition ${manifest.edition} has no usable ${INDEX_FILE}`);
+    if (!path) throw failed();
     const text = await fs.readText(path);
-    if (text === null) throw new Error(`${INDEX_FILE} is unreadable`);
+    if (text === null) throw failed();
     const index = decodeDiagramIndex(text);
     if (index.product !== US_DIAGRAM_PRODUCT || index.edition !== manifest.edition) {
-      throw new Error(`${INDEX_FILE} does not belong to edition ${manifest.edition}`);
+      throw failed();
     }
     return { manifest, index };
   }
@@ -220,7 +220,7 @@ export function createOnDemandUsDiagramSource(deps: OnDemandUsDiagramDeps): Diag
       if (!jsonPath) return { kind: 'unavailable', reason: 'not in the edition' };
       // A failed read rejects (the controller retries); only content that does not decode is final.
       const text = await fs.readText(jsonPath);
-      if (text === null) throw new Error(`${record.georeference} could not be read`);
+      if (text === null) throw failed();
       let georeference;
       try {
         georeference = decodeGeoreference(text);

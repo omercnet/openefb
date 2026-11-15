@@ -312,7 +312,9 @@ describe('US diagrams on demand', () => {
   it('refuses files that declare an absurd size, before downloading or reading them', async () => {
     const GiB = 1024 ** 3;
     const bigIndex = setup({ latest: makeEdition('2611', { declared: { 'index.json': GiB } }), online: true });
-    await expect(bigIndex.source.diagramFor('us', 'KPAO')).rejects.toThrow(/index.json/);
+    await expect(bigIndex.source.diagramFor('us', 'KPAO')).rejects.toMatchObject({
+      error: { kind: 'chartDownloadFailed' },
+    });
     expect(bigIndex.downloaded).toEqual([]);
     const bigGeo = setup({ latest: makeEdition('2611', { declared: { 'KPAO.json': GiB } }), online: true });
     expect(await bigGeo.source.diagramFor('us', 'KPAO')).toMatchObject({ kind: 'unavailable' });
@@ -373,5 +375,34 @@ describe('US diagrams on demand', () => {
     await expect(next.source.diagramFor('us', 'KPAO')).rejects.toThrow('disk busy');
     fail = false;
     expect((await next.source.diagramFor('us', 'KPAO')).kind).toBe('ready');
+  });
+
+  it('keeps a cached file when it cannot be hashed right now, and rejects instead of deleting it', async () => {
+    const host: Host = { latest: makeEdition(), online: true };
+    const first = setup(host);
+    await first.source.diagramFor('us', 'KPAO');
+    const next = setup(host, { fs: first.fs });
+    const hash = first.fs.hashFile.bind(first.fs);
+    let fail = true;
+    first.fs.hashFile = async (p, h) => {
+      if (fail && p.endsWith('KPAO.json')) throw new Error('disk busy');
+      return hash(p, h);
+    };
+    await expect(next.source.diagramFor('us', 'KPAO')).rejects.toThrow('disk busy');
+    expect(first.fs.exists(`${CACHE}/2611/KPAO.json`)).toBe(true); // not deleted for a read error
+    fail = false;
+    expect((await next.source.diagramFor('us', 'KPAO')).kind).toBe('ready');
+  });
+
+  it('fails a missing cached georeference read with a machine-readable error', async () => {
+    const host: Host = { latest: makeEdition(), online: true };
+    const first = setup(host);
+    await first.source.diagramFor('us', 'KPAO');
+    const next = setup(host, { fs: first.fs });
+    first.fs.readText = async (p: string) =>
+      p.endsWith('KPAO.json') ? null : new TextDecoder().decode(first.fs.files.get(p));
+    await expect(next.source.diagramFor('us', 'KPAO')).rejects.toMatchObject({
+      error: { kind: 'chartDownloadFailed' },
+    });
   });
 });
