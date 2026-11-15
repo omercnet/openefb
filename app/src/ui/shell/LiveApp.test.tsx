@@ -118,4 +118,41 @@ describe('LiveApp (ContentView)', () => {
     expect(nearest.store.getState().ownship).toEqual({ lat: 32, lon: 34.8 });
     expect(gps.store.getState().status).toEqual({ kind: 'ok' });
   });
+
+  it('starts from launch state even if a capture route left fixtures in the slices', async () => {
+    const { rt, remote } = runtime();
+    flightLog.store.setState({
+      recording: { status: { kind: 'recording' }, elapsedSeconds: 6, levelDBFS: -20, microphoneDenied: false },
+    });
+    await render(<LiveApp runtime={rt} />);
+    expect(flightLog.store.getState().recording).toBeNull();
+    expect(remote.refreshIfDue).toHaveBeenCalledWith(false);
+  });
+
+  it('drops a notice when its deadline passes while the app is open', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(1_000_000);
+    const { rt, remote } = runtime();
+    let now = 1_000_000;
+    remote.notices = () =>
+      now < 1_000_000 + 90_000
+        ? [
+            {
+              id: 'n',
+              severity: 'info',
+              regions: new Set(),
+              untilMs: null,
+              text: { english: 'Soon gone', hebrew: null },
+            },
+          ]
+        : [];
+    const view = await render(<LiveApp runtime={rt} />);
+    expect(view.text()).toContain('Soon gone');
+    now += 120_000;
+    await act(async () => {
+      jest.advanceTimersByTime(120_000);
+    });
+    expect(view.text()).not.toContain('Soon gone');
+    jest.useRealTimers();
+  });
 });
