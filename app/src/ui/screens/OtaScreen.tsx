@@ -6,7 +6,7 @@ import * as Updates from 'expo-updates';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { OTA_FILE, OTA_RELOAD_FILE, clearResult, readResult, writeResult } from '../../adapters/resultFile';
-import { otaReloadAllowed } from '../../domain/ota/reloadGuard';
+import { otaReloadAllowed } from '../../domain/updates/reloadGuard';
 import { flightLog } from '../flightLog/store';
 
 type Phase = 'launch' | 'fetched' | 'settled';
