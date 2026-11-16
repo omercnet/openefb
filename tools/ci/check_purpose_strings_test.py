@@ -98,6 +98,13 @@ class PurposeStrings(unittest.TestCase):
         _, quiet = run(dev, OBJC + "_OBJC_CLASS_$_EXDevLauncherController\n", production=False)
         self.assertEqual(quiet, [])  # only a production build is held to it
 
+    def test_react_native_core_dev_menu_is_not_the_development_client(self):
+        # RN links RCTDevMenu and RCTDevSettings in every build; the first CI run matched a bare "DevMenu" and failed on them.
+        _, problems = run(BASE, OBJC + "_OBJC_CLASS_$_RCTDevMenu\n_OBJC_CLASS_$_RCTDevSettings\n_OBJC_CLASS_$_RCTDevLoadingView\n", production=True)
+        self.assertEqual(problems, [])
+        _, problems = run(BASE, OBJC + "_OBJC_CLASS_$_EXDevMenuManager\n", production=True)
+        self.assertIn("EXDevMenu", problems[0])
+
     def test_a_clean_production_app_passes(self):
         info = {**BASE, "CFBundleURLTypes": [{"CFBundleURLSchemes": ["kanaf", "io.omer.efb"]}]}
         _, problems = run(info, OBJC, production=True)

@@ -55,7 +55,9 @@ SENSITIVE = {
     "Motion": (re.compile(r"CMMotionActivityManager|CMPedometer|CMAltimeter"), ("NSMotionUsageDescription",)),
 }
 
-DEV_CLIENT_SYMBOLS = re.compile(r"EXDevLauncher|EXDevMenu|DevLauncher|DevMenu")
+# Expo's development client only. React Native core links its own RCTDevMenu / RCTDevSettings in every build, so a bare "DevMenu"
+# would match that (the first run of this check did).
+DEV_CLIENT_SYMBOLS = re.compile(r"EXDevLauncher|EXDevMenu|ExpoDevLauncher|ExpoDevMenu|expo_dev_launcher|expo_dev_menu|DevLauncherController")
 
 
 def load_plist(path: Path) -> dict:
@@ -107,8 +109,9 @@ def check(info: dict, symbols_by_binary: dict[str, str], production: bool) -> tu
 
     if production:
         for name, symbols in symbols_by_binary.items():
-            if DEV_CLIENT_SYMBOLS.search(symbols):
-                problems.append(f"{name} contains development client code (EXDevLauncher / EXDevMenu)")
+            hits = sorted(set(DEV_CLIENT_SYMBOLS.findall(symbols)))
+            if hits:
+                problems.append(f"{name} contains development client code ({', '.join(hits)})")
         if info.get("NSBonjourServices"):
             problems.append(f"Info.plist has NSBonjourServices {info['NSBonjourServices']!r} (the Dev Launcher's)")
         for entry in info.get("CFBundleURLTypes", []):
