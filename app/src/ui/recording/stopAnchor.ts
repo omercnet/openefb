@@ -14,6 +14,21 @@ export const registerRecordButtonAnchor = (next: HostInstance | null): void => {
   listeners.forEach((listener) => listener());
 };
 
+/** A ref callback owned by one record button: its unmount clears the registration only while it is still the registered one. */
+export const createRecordButtonAnchorRef = () => {
+  let mine: HostInstance | null = null;
+  return (next: HostInstance | null): void => {
+    if (next) {
+      mine = next;
+      registerRecordButtonAnchor(next);
+    } else {
+      const gone = mine;
+      mine = null;
+      if (gone !== null && gone === view) registerRecordButtonAnchor(null);
+    }
+  };
+};
+
 export const recordButtonView = (): HostInstance | null => view;
 
 const subscribe = (listener: () => void) => {

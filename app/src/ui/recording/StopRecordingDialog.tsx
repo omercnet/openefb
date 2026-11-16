@@ -7,7 +7,7 @@
 // Cancel row), so iPad draws that popover itself under the measured record button. iPhone uses the system sheet; Android
 // keeps an in-app dialog.
 import { useEffect, useRef, useState } from 'react';
-import { ActionSheetIOS, Modal, Platform, Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { ActionSheetIOS, Modal, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useStore } from 'zustand';
 import { STOP_CONFIRMATION } from '../../domain/recording/recordingNotices';
 import { FormType } from '../form/formStyle';
@@ -86,22 +86,24 @@ function PadPopoverBody({ store }: { store: RecordingViewStore }) {
     // The button is not on screen yet: wait for it, but never leave the pilot without the question.
     const timer = setTimeout(() => setFrame({ value: null }), ANCHOR_WAIT_MS);
     return () => clearTimeout(timer);
-  }, [button]);
+  }, [button, window.width, window.height]); // the button moves when the window does
   if (!frame) return null;
   const { left, top } = popoverPosition(frame.value, window);
   return (
     <Modal transparent animationType="fade" visible onRequestClose={() => store.getState().cancelStop()}>
-      {/* No dim: a popover leaves the screen as it is, and a tap outside is the cancel. */}
-      <Pressable
-        accessibilityLabel={STOP_CONFIRMATION.cancel}
-        accessibilityRole="button"
-        onPress={() => store.getState().cancelStop()}
-        style={{ flex: 1 }}
-        testID="stop-recording-backdrop"
-      >
+      {/* No dim: a popover leaves the screen as it is, and a tap outside is the cancel. The backdrop is a sibling of the
+          popover (a tap on the card must not cancel) and is not a VoiceOver element: the card carries the escape gesture. */}
+      <View style={{ flex: 1 }}>
+        <Pressable
+          accessible={false}
+          onPress={() => store.getState().cancelStop()}
+          style={StyleSheet.absoluteFill}
+          testID="stop-recording-backdrop"
+        />
         <View
           accessibilityViewIsModal
           accessibilityLabel={STOP_CONFIRMATION.title}
+          onAccessibilityEscape={() => store.getState().cancelStop()}
           testID="stop-recording-popover"
           style={{
             position: 'absolute',
@@ -137,7 +139,7 @@ function PadPopoverBody({ store }: { store: RecordingViewStore }) {
             <Text style={[FormType.body, { color: t.warning }]}>{STOP_CONFIRMATION.confirm}</Text>
           </Pressy>
         </View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }

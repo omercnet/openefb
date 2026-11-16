@@ -4,7 +4,7 @@ import { press, render } from '../../../tests/support/ui';
 import { STOP_CONFIRMATION } from '../../domain/recording/recordingNotices';
 import { captureRecordingLab } from '../screens/captureRecordingFixtures';
 import { POPOVER_WIDTH, popoverPosition, StopRecordingDialog } from './StopRecordingDialog';
-import { recordButtonView, registerRecordButtonAnchor } from './stopAnchor';
+import { createRecordButtonAnchorRef, recordButtonView, registerRecordButtonAnchor } from './stopAnchor';
 
 const original = { os: Platform.OS, pad: (Platform as { isPad?: boolean }).isPad };
 const setPlatform = (os: 'ios' | 'android', isPad = false) => {
@@ -133,9 +133,49 @@ describe('StopRecordingDialog', () => {
   });
 
   it('a stale unmount does not clear a newer registration', () => {
+    const other = { measureInWindow: () => undefined } as never;
+    const refA = createRecordButtonAnchorRef();
+    const refB = createRecordButtonAnchorRef();
+    refA(button);
+    refB(other); // a second button takes over
+    refA(null); // the first one unmounts late
+    expect(recordButtonView()).toBe(other);
+    refB(null);
+    expect(recordButtonView()).toBeNull();
+  });
+
+  it('iPad: the backdrop has no dim and is not a VoiceOver element, and the card has the escape gesture', async () => {
+    setPlatform('ios', true);
     registerRecordButtonAnchor(button);
-    registerRecordButtonAnchor(null);
-    registerRecordButtonAnchor(button);
-    expect(recordButtonView()).toBe(button);
+    const lab = captureRecordingLab();
+    const view = await render(<StopRecordingDialog store={lab.store} />);
+    await act(async () => lab.store.getState().requestStop());
+    const backdrop = view.byTestId('stop-recording-backdrop');
+    expect(JSON.stringify(backdrop.props.style)).not.toContain('backgroundColor');
+    expect(backdrop.props.accessible).toBe(false);
+    expect(has(view, 'stop-recording-popover')).toBe(true);
+    // The backdrop is a self-closing sibling of the card, so a tap on the card never reaches its onPress.
+    const escape = view.byTestId('stop-recording-popover').props.onAccessibilityEscape;
+    await act(async () => escape());
+    expect(lab.store.getState().showStopConfirmation).toBe(false);
+  });
+
+  it('iPad: the popover follows the button when the window changes size', async () => {
+    setPlatform('ios', true);
+    let x = 300;
+    const moving = {
+      measureInWindow: (done: (x: number, y: number, w: number, h: number) => void) => done(x, 30, 76, 44),
+    } as never;
+    registerRecordButtonAnchor(moving);
+    const lab = captureRecordingLab();
+    const view = await render(<StopRecordingDialog store={lab.store} />);
+    await act(async () => lab.store.getState().requestStop());
+    expect(JSON.stringify(view.byTestId('stop-recording-popover').props.style)).toContain('"left":225');
+    x = 100;
+    const dims = require('react-native').Dimensions as typeof import('react-native').Dimensions; // eslint-disable-line @typescript-eslint/no-require-imports
+    await act(async () => {
+      dims.set({ window: { width: 800, height: 1000, scale: 2, fontScale: 1 } });
+    });
+    expect(JSON.stringify(view.byTestId('stop-recording-popover').props.style)).toContain('"left":25');
   });
 });
