@@ -34,6 +34,10 @@ let lastSurface: {
     query: (reach: number, layers: readonly string[]) => Promise<unknown[]>;
   }) => void;
   camera: { seq: number; command: unknown };
+  layers: { id: string }[];
+  rasterSources?: Record<string, { url: string }>;
+  visibleLayers: Set<string>;
+  overrides?: { visibility: Record<string, boolean> };
 } | null = null;
 jest.mock('../map/MapSurface', () => ({
   MapSurface: (props: NonNullable<typeof lastSurface>) => <MockSurface {...props} />,
@@ -105,13 +109,30 @@ function fakeRuntime(
       refresh: async () => undefined,
     },
     layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
-    chartPacks: { diagramSource },
+    chartPacks: { diagramSource, israelChart: official.store },
     location,
     network,
   } as unknown as AppRuntime;
   return { runtime, queries, location, network };
 }
 
+const official = (() => {
+  const listeners = new Set<() => void>();
+  let version = 0;
+  const store = {
+    packPath: null as string | null,
+    subscribe: (l: () => void) => (listeners.add(l), () => void listeners.delete(l)),
+    getVersion: () => version,
+  };
+  return {
+    store,
+    set(path: string | null) {
+      store.packPath = path;
+      version += 1;
+      listeners.forEach((l) => l());
+    },
+  };
+})();
 const diagramSource = { candidates: jest.fn(async () => []), diagramFor: jest.fn() };
 
 const mountLive = async (runtime: AppRuntime) =>
@@ -207,6 +228,51 @@ describe('live MapScreen (MapContainerView)', () => {
     await act(async () => appStore.getState().requestMapFrame({ south: 37, west: -123, north: 38, east: -122 }));
     expect(lastSurface!.camera.seq).toBeGreaterThan(before);
     expect(lastSurface!.camera.command).toBeTruthy();
+  });
+
+  describe('the official CAAI chart', () => {
+    afterEach(() => official.set(null));
+    const israelLayers = () => [...lastSurface!.visibleLayers].filter((l) => l.startsWith('cvfr')).sort();
+
+    it('without a pack the Israel map draws the whole vector CVFR chart and no raster', async () => {
+      official.set(null);
+      const { runtime } = fakeRuntime({ region: 'israel' });
+      await mountLive(runtime);
+      expect(israelLayers().length).toBeGreaterThan(2);
+      expect(lastSurface!.layers.some((l) => l.id === 'israel-official-chart')).toBe(false);
+      expect(lastSurface!.rasterSources).toBeUndefined();
+    });
+
+    it('with a pack it is the base raster, and the vector layers it duplicates are hidden (closures and tap targets stay)', async () => {
+      official.set('/Application Support/israel-cvfr.mbtiles');
+      const { runtime } = fakeRuntime({ region: 'israel' });
+      await mountLive(runtime);
+      expect(lastSurface!.layers[0]!.id).toBe('israel-official-chart');
+      expect(lastSurface!.rasterSources!['israel-official-chart-source']!.url).toBe(
+        'mbtiles:///Application%20Support/israel-cvfr.mbtiles',
+      );
+      expect(israelLayers()).toEqual(['cvfrClosures', 'cvfrPoints']);
+      expect(lastSurface!.overrides!.visibility['il-point-labels-compulsory']).toBe(false);
+    });
+
+    it('a pack that arrives (or goes) while the map is open switches the vector layers to match', async () => {
+      official.set(null);
+      const { runtime } = fakeRuntime({ region: 'israel' });
+      await mountLive(runtime);
+      await act(async () => official.set('/p/israel-cvfr.mbtiles'));
+      expect(israelLayers()).toEqual(['cvfrClosures', 'cvfrPoints']);
+      expect(lastSurface!.layers[0]!.id).toBe('israel-official-chart');
+      await act(async () => official.set(null));
+      expect(israelLayers().length).toBeGreaterThan(2);
+      expect(lastSurface!.layers.some((l) => l.id === 'israel-official-chart')).toBe(false);
+    });
+
+    it('outside Israel a pack changes nothing', async () => {
+      official.set('/p/israel-cvfr.mbtiles');
+      const { runtime } = fakeRuntime({ region: 'us' });
+      await mountLive(runtime);
+      expect(lastSurface!.layers.some((l) => l.id === 'israel-official-chart')).toBe(false);
+    });
   });
 
   it('the footer follows the camera: the zoom it reports, and ZOOM + / RECENTER actions', async () => {

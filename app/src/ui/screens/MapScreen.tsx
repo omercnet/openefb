@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppFailure } from '../../domain/errors';
+import type { MapLayer, Region } from '../../domain/core';
 import { regionContains, regionDefaultCenter, regionDefaultZoom } from '../../domain/core';
 import type { MapDataSource } from '../../domain/map/mapDataController';
 import type { IsraelClosureStatus } from '../../domain/map/israel';
@@ -10,6 +11,8 @@ import { MapLayout } from '../map/MapLayout';
 import { navigationRoute } from '../map/navigationRoute';
 import { resolveMapTap, type MapTap } from '../map/mapTap';
 import { IsraelChartSheetHost, type ChartSheetSelection } from '../shell/IsraelChartSheetHost';
+import { officialChartOf, useOfficialChart } from '../map/useOfficialChart';
+import { withOfficialChartDefaults } from '../../domain/map/israel/officialChart';
 import { useAirportDiagrams } from '../map/useAirportDiagrams';
 import { useIsraelChart } from '../map/useIsraelChart';
 import { offlineStatusFor } from '../map/offlineStatus';
@@ -51,13 +54,16 @@ export function MapScreen() {
   // The region the launch sequence restored, not the slice: LiveApp writes the slice in an effect, after this first render.
   const region = runtime.started.region;
   const [initial] = useState(() => ({ center: regionDefaultCenter(region), zoom: regionDefaultZoom(region) }));
+  // The official CAAI chart pack (Israel): installed or not is known before the first render (the store reads it at launch).
+  const officialSource = region === 'israel' ? runtime.chartPacks.israelChart : null;
   const [appState] = useState(() => ({
     region,
-    visibleLayers: initialVisibleLayers(region),
+    visibleLayers: initialLayersFor(region, officialChartOf(officialSource).present),
     mapCenter: initial.center,
     mapZoom: initial.zoom,
     mapVisibleBounds: null,
   }));
+  const official = useOfficialChart(officialSource, region === 'israel');
   const controller = useMapController({
     appState,
     db: runtime.started.aviation ?? closedDb,
@@ -74,6 +80,14 @@ export function MapScreen() {
   const navigation = useAppStore((s) => s.navigation);
   const route = useMemo(() => navigationRoute(navigation, ownship.position), [navigation, ownship.position]);
   const layersStore = layers.useStoreApi();
+  // A pack downloaded, updated into view or removed while the map is open: the CVFR vector layers take the defaults for it
+  // (IsraelChartOverlay.setOfficialChartPresent).
+  const officialWas = useRef(official.present);
+  useEffect(() => {
+    if (officialWas.current === official.present) return;
+    officialWas.current = official.present;
+    layersStore.setState((s) => ({ visibleLayers: withOfficialChartDefaults(s.visibleLayers, official.present) }));
+  }, [layersStore, official.present]);
   const onClosureStatus = useCallback(
     (status: IsraelClosureStatus) =>
       layersStore.setState({
@@ -227,6 +241,7 @@ export function MapScreen() {
         sectional={model.snapshot.visibleLayers.has('sectional')}
         sectionalOpacity={sectionalOpacity}
         diagrams={diagrams.sources}
+        official={official}
         onMapPress={onMapPress}
       />
       <ThemeContext.Provider value={night ? Night : Day}>
@@ -246,4 +261,10 @@ export function MapScreen() {
       </ThemeContext.Provider>
     </>
   );
+}
+
+/** The layers the map opens with: the region's defaults, with the CVFR chart layers set for an installed official chart. */
+function initialLayersFor(region: Region, officialPresent: boolean): Set<MapLayer> {
+  const layers = initialVisibleLayers(region);
+  return region === 'israel' && officialPresent ? new Set(withOfficialChartDefaults([...layers], true)) : layers;
 }
