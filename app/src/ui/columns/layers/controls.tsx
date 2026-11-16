@@ -1,6 +1,7 @@
 // The Layers column's rows (LayersColumnView.swift): segmentRow (equal-width 60pt buttons, drawn here: a platform
 // segmented picker is too small a target in flight), the toggle rows over RN Switch (UISwitch on iOS), the
 // "Age" data-age line and the unavailable row.
+import { haptic } from '../../haptics';
 import { useState } from 'react';
 import { Platform, Switch, Text, View, type TextStyle, type ViewStyle } from 'react-native';
 import {
@@ -53,7 +54,10 @@ export function SegmentRow<T extends string>({
             accessibilityState={{ selected: on }}
             // `selected` maps to aria-selected on web, which the button role does not support: add the pressed state too.
             aria-pressed={on}
-            onPress={() => onSelect(option)}
+            onPress={() => {
+              haptic.light();
+              onSelect(option);
+            }}
             style={{
               flex: 1,
               minHeight: StripMetrics.cell - 2, // inside the 1pt border: 60pt overall like the Swift frame
@@ -106,7 +110,10 @@ export function ToggleRow({
       </Text>
       <Switch
         value={value}
-        onValueChange={onChange}
+        onValueChange={(next) => {
+          haptic.light();
+          onChange(next);
+        }}
         trackColor={{ false: OFF_TRACK, true: tint }}
         accessibilityRole="switch"
         accessibilityLabel={label}

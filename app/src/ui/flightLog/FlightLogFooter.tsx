@@ -2,6 +2,7 @@
 // the dark NRST cell, LAYERS, ZOOM + (RECENTER after a pan) and ZOOM -. The paper and the NRST ink run into the
 // bottom safe area. `compact` (iPhone, iPad Split View, flight log hidden): the full-width footer of the compact layout,
 // where the GPS cell is at most 76pt and wraps onto two lines.
+import { haptic } from '../haptics';
 import { useEffect, useMemo, useRef } from 'react';
 import { Text, View } from 'react-native';
 import type { StripColumnKind } from '../../domain/types';
@@ -124,7 +125,10 @@ export function FlightLogFooter({
           label="Map layers"
           accessibilityValue={layersOpen ? 'Open' : 'Closed'}
           icon={<Layers color={t.ink} />}
-          onPress={() => toggle('layers')}
+          onPress={() => {
+            haptic.light();
+            toggle('layers');
+          }}
         />
         {divider}
         {following ? (
@@ -174,7 +178,10 @@ function NrstCell({ width, bottomInset }: { width: number; bottomInset: number }
       accessibilityLabel={nearestAccessibilityText(hasData, entry)}
       accessibilityHint="Opens the nearest airports list"
       testID="NRST"
-      onPress={() => toggle('nearest')}
+      onPress={() => {
+        haptic.light();
+        toggle('nearest');
+      }}
       style={{
         width,
         height: StripMetrics.cell + bottomInset,

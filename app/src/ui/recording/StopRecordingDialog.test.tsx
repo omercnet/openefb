@@ -122,6 +122,16 @@ describe('StopRecordingDialog', () => {
     expect(confirm).toHaveBeenCalled();
   });
 
+  it('End Recording plays the success haptic once the stop has finished (every platform form)', async () => {
+    setPlatform('android');
+    const lab = captureRecordingLab();
+    const done = jest.fn();
+    const view = await render(<StopRecordingDialog store={lab.store} onConfirmed={done} />);
+    await act(async () => lab.store.getState().requestStop());
+    await press(view.byTestId('stop-recording-confirm'));
+    expect(done).toHaveBeenCalledTimes(1);
+  });
+
   it('Android keeps the in-app dialog with Cancel', async () => {
     setPlatform('android');
     const sheet = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);

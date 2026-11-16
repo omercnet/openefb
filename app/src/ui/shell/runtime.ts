@@ -27,6 +27,7 @@ import { WeatherService } from '../../services/weatherService';
 import { loadLayerSettings, type LayerSettings } from './layersSettings';
 import { asCoordinatorAudio } from '../../adapters/coordinatorAudio';
 import { createAudioRecorder } from '../../adapters/audioRecorder';
+import { createHaptics, type Haptics } from '../../adapters/haptics';
 import { createLowPowerMode, type LowPowerSource } from '../../adapters/lowPower';
 import { createMicrophonePermission } from '../../adapters/microphonePermission';
 import type { Preferences } from '../../domain/ports/preferences';
@@ -64,6 +65,8 @@ export interface AppRuntime {
   preferences: Preferences;
   /** Low Power Mode doubles the data refresh intervals. */
   lowPower: LowPowerSource;
+  /** Haptics (Swift `Haptics`): alerts, recording start and stop, strip taps. */
+  haptics: Haptics;
   telemetry: Telemetry;
   notamConfigured: () => Promise<boolean>;
   /** The FAA NOTAM service (free key from Settings); the airport column's NOTAM list. */
@@ -109,6 +112,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     notamReadStore,
     preferences,
     lowPower: createLowPowerMode(),
+    haptics: createHaptics(),
     profiles: createProfiles(started.userDb, preferences),
     telemetry,
     debrief,

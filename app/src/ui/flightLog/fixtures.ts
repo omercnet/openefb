@@ -48,6 +48,7 @@ export const dayFixture: FlightLogData = {
   isOffline: false,
   airspaceCheckUnavailable: false,
   israelAlertsSuspended: false,
+  israelAlerts: [],
   actions: noActions,
 };
 

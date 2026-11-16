@@ -31,6 +31,9 @@ import { airportQueriesFor } from './airportQueries';
 import { bannerItems } from './banners';
 import { bindNavigationTelemetry } from './navigationTelemetry';
 import { persistLayerSettings } from './layersSettings';
+import { setHaptics } from '../haptics';
+import { ownship } from '../state/ownship';
+import { startAlerts } from './alertsBinding';
 import { startLiveData } from './liveData';
 import { startRemoteConfigChecks } from './remoteConfigChecks';
 import type { AppRuntime } from './runtime';
@@ -174,8 +177,22 @@ export function LiveApp({
         })
       : () => undefined;
     const stopTelemetry = bindNavigationTelemetry(appStore, runtime.telemetry);
+    // Swift's global Haptics: the views tap through it; installed for the life of the live app.
+    setHaptics(runtime.haptics);
+    // Proximity and Israel alerts (MapContainerView.initializeServices): notices, banner and the warning haptic.
+    const alertsBinding = startAlerts({
+      runtime,
+      haptics: runtime.haptics,
+      flightLog: flightLog.store,
+      ownship: ownship.store,
+      visibleLayers: () => layers.store.getState().visibleLayers,
+      subscribeLayers: (listener) => layers.store.subscribe(listener),
+      log: console.warn,
+    });
     const stopSettings = persistLayerSettings(layers.store, started.userDb, fileTextStorage, console.warn);
     return () => {
+      alertsBinding.stop();
+      setHaptics(null);
       stopTelemetry();
       stopSettings();
       stopData();
@@ -198,7 +215,7 @@ export function LiveApp({
         // The services are the process's (startRecordingServices): a recording in progress outlives this screen, and a
         // remount binds to the same coordinator instead of starting a second one.
         if (cancelled) return;
-        stop = bindRecording(services, flightLog.store, NativeAppState);
+        stop = bindRecording(services, flightLog.store, NativeAppState, runtime.haptics);
         setRecording(services);
         // Crash recovery (Swift: FlightRecoveryService at launch): the profiles settle the active ids first.
         try {
@@ -240,7 +257,7 @@ export function LiveApp({
               {...(recording ? { renderFlight } : {})}
             />
             <ChartViewer terminal={runtime.terminal} />
-            {recording ? <StopRecordingDialog store={recording.store} /> : null}
+            {recording ? <StopRecordingDialog store={recording.store} onConfirmed={runtime.haptics.success} /> : null}
           </View>
         </RecordingStoreContext.Provider>
       </AirportQueriesContext.Provider>

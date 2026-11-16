@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { haptic } from '../haptics';
 import { press, render } from '../../../tests/support/ui';
 import { createFakeNetworkStatus } from '../../adapters/network';
 import { FakePreferences } from '../../domain/ports/preferences';
@@ -72,11 +73,13 @@ function runtime(over: Partial<AppRuntime['started']> = {}) {
     },
     telemetry: { signal: () => undefined },
     weather: {},
-    tfr: {},
     advisories: {},
     layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
     location,
     network,
+    haptics: { warning: jest.fn(), success: jest.fn(), light: jest.fn() },
+    israelNotam: { fetchFeed: async () => Promise.reject(new Error('offline')) },
+    tfr: { currentTFRs: async () => ({ tfrs: [], fetchedAt: 0 }) },
     profiles: { load: async () => undefined, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) },
   } as unknown as AppRuntime;
   return { rt, network, location, remote };
@@ -198,6 +201,26 @@ describe('LiveApp (ContentView)', () => {
     applyCaptureSeeds();
     resetLiveSlices('us');
     expect(layers.store.getState().displayMode).toBe('auto');
+  });
+
+  describe('haptics and alerts', () => {
+    it('installs the haptics for the views while the app is live, and takes them away after', async () => {
+      const { rt } = runtime();
+      const view = await render(<LiveApp runtime={rt} />);
+      haptic.light();
+      expect(rt.haptics.light).toHaveBeenCalledTimes(1);
+      await view.unmount();
+      haptic.light();
+      expect(rt.haptics.light).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the Israel alerts banner and the suspended notice from the alerts runtime', async () => {
+      const { rt } = runtime({ region: 'israel' });
+      await render(<LiveApp runtime={rt} />);
+      // No fix yet in Israel: the position-based alerts are not running, and the strip says so.
+      await act(async () => new Promise((r) => setTimeout(r, 20)));
+      expect(flightLog.store.getState().israelAlertsSuspended).toBe(true);
+    });
   });
 
   describe('recording services', () => {
