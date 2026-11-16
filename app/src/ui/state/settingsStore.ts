@@ -227,6 +227,7 @@ export function createSettingsStore(deps: SettingsDeps) {
       return enqueue(async () =>
         persist(owner, write, await applyResult).finally(() => {
           pendingPrefWrites[owner] -= 1;
+          restartWhenPrefsSettle();
         }),
       );
     };
@@ -234,6 +235,20 @@ export function createSettingsStore(deps: SettingsDeps) {
     /** Saves the region (when `write`) and records what failed. `applyFailure` is what notifying the app threw, if anything. */
     /** Bumped by every region choice or retry: only the newest save may report back (A, then B, then A again, is three). */
     let regionGeneration = 0;
+    /** A saved region whose restart waits for the preference saves still pending (Settings stays open meanwhile). */
+    let restartAfter: { region: Region; generation: number } | null = null;
+    const restartWhenPrefsSettle = () => {
+      const due = restartAfter;
+      if (!due) return;
+      if (due.generation !== regionGeneration) {
+        restartAfter = null; // a newer choice owns the restart
+        return;
+      }
+      if (pendingPrefWrites.displayMode > 0 || pendingPrefWrites.shareUsageData > 0) return; // called again as they finish
+      restartAfter = null;
+      if (get().preferenceError !== null) return; // one failed: Settings keeps its error and Retry
+      notify(() => deps.onRegionSaved?.(due.region));
+    };
     const saveRegion = async (region: Region, applyFailure: string | null, write: boolean, generation: number) => {
       let saveFailure: string | null = null;
       if (write) {
@@ -257,7 +272,12 @@ export function createSettingsStore(deps: SettingsDeps) {
         dataAttribution,
         regionDataError,
       });
-      if (saveFailure === null && applyFailure === null) notify(() => deps.onRegionSaved?.(region));
+      if (saveFailure === null && applyFailure === null) {
+        // Restarting removes Settings. A preference saved behind this save is still pending: the restart waits for it
+        // (`restartWhenPrefsSettle`), so a failure of it keeps its error and Retry on screen.
+        restartAfter = { region, generation };
+        restartWhenPrefsSettle();
+      }
     };
 
     return {

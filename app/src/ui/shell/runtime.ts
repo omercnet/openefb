@@ -89,8 +89,6 @@ export interface AppRuntime {
 
 const log = (message: string) => console.warn(message);
 
-/** CFBundleVersion / versionCode as the remote config compares it; 0 when the build has none. */
-
 export async function startRuntime(): Promise<AppRuntime> {
   const fetchLike = globalThis.fetch as unknown as import('../../services/ports').FetchLike;
   const remote = createRemoteConfigService({ fetch: fetchLike, log });
@@ -101,6 +99,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     openAviation: openAviationDatabase,
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- a Metro asset module, as aviationDb.ts does
     openIsrael: () => openIsraelDatabase(require('../../../assets/israel-aviation.sqlite')),
+    // The build comes from expo-application; null (unreadable) means the update banner is never raised for it.
     openRemoteConfig: () =>
       RemoteConfigStore.open({ service: remote, storage: fileTextStorage, buildNumber: appBuildNumber(), log }),
     log,

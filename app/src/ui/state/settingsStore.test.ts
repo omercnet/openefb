@@ -116,6 +116,39 @@ describe('onRegionSaved while the data lookups are pending', () => {
   });
 });
 
+describe('onRegionSaved with a preference saved meanwhile', () => {
+  it('waits for the preference save, and stays out of the way when it failed (Settings keeps its error and Retry)', async () => {
+    const onRegionSaved = jest.fn();
+    const gate = Promise.withResolvers<void>();
+    const failing: Preferences = new FakePreferences();
+    jest
+      .spyOn(failing, 'set')
+      .mockImplementation(() => gate.promise.then(() => Promise.reject(new Error('disk full'))));
+    const { store } = setup({ onRegionSaved, prefs: failing });
+    await store.getState().load();
+    const region = store.getState().setRegion('us');
+    const pref = store.getState().setDisplayMode('night');
+    await region;
+    expect(onRegionSaved).not.toHaveBeenCalled(); // the preference save is still pending
+    gate.resolve();
+    await pref;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.getState().preferenceError).toContain('disk full');
+    expect(onRegionSaved).not.toHaveBeenCalled();
+  });
+
+  it('restarts after a preference that saved fine', async () => {
+    const onRegionSaved = jest.fn();
+    const { store } = setup({ onRegionSaved });
+    await store.getState().load();
+    const region = store.getState().setRegion('us');
+    const pref = store.getState().setDisplayMode('night');
+    await Promise.all([region, pref]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onRegionSaved).toHaveBeenCalledWith('us');
+  });
+});
+
 describe('load', () => {
   it('a fresh install reads the defaults', async () => {
     const { store } = setup();
