@@ -4,6 +4,7 @@
 // loop, so the React child count is fixed (one source per registry source, one layer per spec) whatever is on screen.
 // The surface is presentational: data comes from MapDataController (hooks in useMapData.ts), camera moves from the
 // camera reducer, and navigation is wired by I1.
+import type { MapTap } from './mapTap';
 import { Camera, GeoJSONSource, ImageSource, Images, Layer, Map, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Coordinate, MapLayer, Region } from '../../domain/core';
@@ -49,6 +50,8 @@ export interface MapSurfaceProps {
   /** Applied when `seq` changes; null means no pending move. */
   camera: { seq: number; command: CameraCommand | null };
   onViewChange?: (change: MapViewChange) => void;
+  /** A tap on the map: where, and a query for the rendered features near it (what opens an airport or a chart sheet). */
+  onMapPress?: (tap: MapTap) => void;
   onStyleLoaded?: () => void;
   /** Basemap tile health: 'error' for a native log line that looks like a failed request, 'ok' once the map is fully rendered. */
   onTileHealth?: (event: 'error' | 'ok') => void;
@@ -84,6 +87,7 @@ export function MapSurface({
   sources,
   overrides,
   imageSources,
+  onMapPress,
   initialView,
   camera,
   onViewChange,
@@ -146,6 +150,24 @@ export function MapSurface({
       style={{ flex: 1 }}
       mapStyle={mapStyle}
       compass={false}
+      onPress={(e) => {
+        if (!onMapPress) return;
+        const { lngLat, point } = e.nativeEvent;
+        const [x, y] = point;
+        onMapPress({
+          lngLat: { lng: lngLat[0], lat: lngLat[1] },
+          query: async (reach, layers) => {
+            const map = mapRef.current;
+            if (!map) return [];
+            const options = { layers: [...layers] };
+            return (
+              (await (reach === 0
+                ? map.queryRenderedFeatures([x, y], options)
+                : map.queryRenderedFeatures([[x - reach, y - reach], [x + reach, y + reach]], options))) ?? []
+            );
+          },
+        });
+      }}
       onWillStartLoadingMap={() => reporter.report('willStartLoadingMap')}
       onDidFinishLoadingStyle={() => reporter.report('didFinishLoadingStyle')}
       onDidFailLoadingMap={() => reporter.report('didFailLoadingMap')}

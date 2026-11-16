@@ -14,6 +14,7 @@ import {
   israelClosureSources,
   israelClosureStatus,
   segmentFeatures,
+  type IsraelChartClosureMark,
   type IsraelClosureStatus,
 } from '../../domain/map/israel';
 import { loadIsraelChartInput, type IsraelChartInput } from '../../domain/map/israel/layers';
@@ -31,9 +32,14 @@ export async function israelChartSources(
   input: IsraelChartInput,
   report: IsraelNotamReport | null,
   nowMs: number,
-): Promise<{ sources: Record<string, FeatureCollection>; status: IsraelClosureStatus }> {
+): Promise<{
+  sources: Record<string, FeatureCollection>;
+  status: IsraelClosureStatus;
+  /** The closures drawn, for the point sheet. */
+  marks: ReadonlyMap<number, IsraelChartClosureMark>;
+}> {
   const base = buildIsraelSources(input);
-  if (report === null) return { sources: base, status: { kind: 'noFeed' } };
+  if (report === null) return { sources: base, status: { kind: 'noFeed' }, marks: new Map() };
   // IsraelChartFeatureBuilder.closures(from:network:now:): the feed's closures placed on the CVFR network.
   const known = new IsraelNetworkLookup(input.points, input.segments);
   const network = {
@@ -50,6 +56,7 @@ export async function israelChartSources(
   return {
     sources: { ...base, ...israelClosureSources(segmentFeatures(input.segments), set.marks) },
     status: israelClosureStatus(set),
+    marks: set.marks,
   };
 }
 

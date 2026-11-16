@@ -8,6 +8,8 @@ import { useNearestAirports } from '../columns/nearest/refresh';
 import { footer } from '../flightLog/footerStore';
 import { MapLayout } from '../map/MapLayout';
 import { navigationRoute } from '../map/navigationRoute';
+import { resolveMapTap, type MapTap } from '../map/mapTap';
+import { IsraelChartSheetHost, type ChartSheetSelection } from '../shell/IsraelChartSheetHost';
 import { useAirportDiagrams } from '../map/useAirportDiagrams';
 import { useIsraelChart } from '../map/useIsraelChart';
 import { offlineStatusFor } from '../map/offlineStatus';
@@ -150,6 +152,22 @@ export function MapScreen() {
     },
     [footerStore, onViewChange],
   );
+  // A tap: the Israel chart sheet, or the airport column (MapView.handleMapTap).
+  const [chartSelection, setChartSelection] = useState<ChartSheetSelection | null>(null);
+  const tapData = israelChart.tapData;
+  const onMapPress = useCallback(
+    (tap: MapTap) => {
+      void resolveMapTap(tap, tapData).then(
+        (result) => {
+          if (!result) return;
+          if (result.kind === 'airport') appStore.getState().showAirport(result.icao);
+          else setChartSelection(result.selection);
+        },
+        (error) => console.warn('Map tap could not be resolved', error),
+      );
+    },
+    [tapData],
+  );
   const diagrams = useAirportDiagrams({
     source: runtime.chartPacks.diagramSource,
     region: model.snapshot.region,
@@ -182,8 +200,12 @@ export function MapScreen() {
   const { frame } = model;
   // The planner (and anything else off the map) asks the camera to fit a box.
   const frameRequest = useAppStore((s) => s.mapFrameRequest);
+  // A request left from before this mount (a remount on a region change) is not replayed.
+  const framed = useRef(appStore.getState().mapFrameRequest?.seq ?? 0);
   useEffect(() => {
-    if (frameRequest) frame(frameRequest.box);
+    if (!frameRequest || frameRequest.seq <= framed.current) return;
+    framed.current = frameRequest.seq;
+    frame(frameRequest.box);
   }, [frame, frameRequest]);
   const showHighlight = useCallback(
     (shown: Highlight) => {
@@ -205,8 +227,10 @@ export function MapScreen() {
         sectional={model.snapshot.visibleLayers.has('sectional')}
         sectionalOpacity={sectionalOpacity}
         diagrams={diagrams.sources}
+        onMapPress={onMapPress}
       />
       <ThemeContext.Provider value={night ? Night : Day}>
+        <IsraelChartSheetHost selection={chartSelection} onClose={() => setChartSelection(null)} />
         <LiveBriefing
           highlightActive={highlight !== null}
           fetcher={fetchFeed}

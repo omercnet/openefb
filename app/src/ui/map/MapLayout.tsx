@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import type { MapTap } from './mapTap';
 import type { DiagramSources } from '../../domain/diagram/layers';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { layerSpecsFor } from '../../domain/map/registry';
@@ -27,6 +28,7 @@ export function MapLayout({
   model,
   initialView,
   diagrams,
+  onMapPress,
 }: {
   screen?: StripScreen;
   night?: boolean;
@@ -38,6 +40,8 @@ export function MapLayout({
   initialView: { center: { lat: number; lon: number }; zoom: number };
   /** The airport diagram overlay's sources: backing polygons, images and forced layer visibility (live app only). */
   diagrams?: DiagramSources;
+  /** A tap on the map (live app only). */
+  onMapPress?: (tap: MapTap) => void;
 }) {
   const { widthClass, width } = useWidthClass();
   const showsFlightLog = panels.useData((s) => s.showsFlightLog);
@@ -64,6 +68,7 @@ export function MapLayout({
         initialView={initialView}
         camera={model.camera}
         onViewChange={model.onViewChange}
+        onMapPress={onMapPress}
         onStyleLoaded={model.onStyleLoaded}
         onTileHealth={model.onTileHealth}
       />

@@ -29,6 +29,11 @@ let lastSurface: {
   sectional: boolean;
   sectionalOpacity?: number;
   sources: Record<string, { features: unknown[] }>;
+  onMapPress: (tap: {
+    lngLat: { lng: number; lat: number };
+    query: (reach: number, layers: readonly string[]) => Promise<unknown[]>;
+  }) => void;
+  camera: { seq: number; command: unknown };
 } | null = null;
 jest.mock('../map/MapSurface', () => ({
   MapSurface: (props: NonNullable<typeof lastSurface>) => <MockSurface {...props} />,
@@ -166,6 +171,42 @@ describe('live MapScreen (MapContainerView)', () => {
     await act(async () => lastSurface!.onViewChange(view(16)));
     expect(diagramSource.candidates).not.toHaveBeenCalled();
     layers.store.setState({ airportDiagrams: true });
+  });
+
+  it('a tap on an airport dot opens that airport in the column (MapView.handleMapTap)', async () => {
+    const { runtime } = fakeRuntime();
+    appStore.getState().showAirport('KOAK');
+    appStore.setState({ selectedAirportId: null, stripColumn: 'log' });
+    await mountLive(runtime);
+    const query = jest.fn(async () => [
+      { properties: { icao: 'KSQL' }, geometry: { type: 'Point', coordinates: [-122.25, 37.5] } },
+    ]);
+    await act(async () => {
+      lastSurface!.onMapPress({ lngLat: { lng: -122.25, lat: 37.5 }, query });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(appStore.getState().selectedAirportId).toBe('KSQL');
+    expect(appStore.getState().stripColumn).toBe('airport');
+  });
+
+  it('a tap on empty map opens nothing', async () => {
+    const { runtime } = fakeRuntime();
+    appStore.setState({ selectedAirportId: null, stripColumn: 'log' });
+    await mountLive(runtime);
+    await act(async () => {
+      lastSurface!.onMapPress({ lngLat: { lng: 0, lat: 0 }, query: async () => [] });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(appStore.getState().selectedAirportId).toBeNull();
+  });
+
+  it('the planner asks the camera to fit its route: the map follows the frame request', async () => {
+    const { runtime } = fakeRuntime();
+    await mountLive(runtime);
+    const before = lastSurface!.camera.seq;
+    await act(async () => appStore.getState().requestMapFrame({ south: 37, west: -123, north: 38, east: -122 }));
+    expect(lastSurface!.camera.seq).toBeGreaterThan(before);
+    expect(lastSurface!.camera.command).toBeTruthy();
   });
 
   it('the footer follows the camera: the zoom it reports, and ZOOM + / RECENTER actions', async () => {

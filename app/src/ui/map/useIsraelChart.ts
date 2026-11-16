@@ -6,6 +6,7 @@ import type { FeatureCollection } from '../../domain/map/geojson';
 import type { IsraelClosureStatus } from '../../domain/map/israel';
 import type { IsraelChartInput } from '../../domain/map/israel/layers';
 import type { IsraelNotamServiceLike } from '../../services/israelNotamService';
+import type { IsraelTapData } from './mapTap';
 import { currentReport, israelChartSources, loadIsraelChart, type IsraelChartDb } from '../shell/israelFeed';
 
 export const ISRAEL_CLOSURE_REFRESH_MS = 300_000;
@@ -30,6 +31,7 @@ export function useIsraelChart({
 }: IsraelChartInputs): IsraelChart {
   const [sources, setSources] = useState<Readonly<Record<string, FeatureCollection>>>();
   const [points, setPoints] = useState<ReadonlyMap<string, Coordinate>>(NO_POINTS);
+  const [tap, setTap] = useState<IsraelTapData | null>(null);
   useEffect(() => {
     if (!enabled || !db) return;
     let cancelled = false;
@@ -45,6 +47,7 @@ export function useIsraelChart({
           const base = await israelChartSources(input, null, now());
           if (cancelled) return;
           setSources(base.sources);
+          setTap(tapData(input, base.marks));
           // The base chart has no closures yet: the Layers row must not keep the previous status for data that is gone.
           onClosureStatus?.({ kind: 'noFeed' });
         }
@@ -53,6 +56,7 @@ export function useIsraelChart({
         const built = await israelChartSources(input, report, now());
         if (cancelled) return;
         setSources(built.sources);
+        setTap(tapData(input, built.marks));
         onClosureStatus?.(built.status);
       } finally {
         running = false;
@@ -74,14 +78,21 @@ export function useIsraelChart({
     };
   }, [db, notam, enabled, onClosureStatus, now]);
   const pointLookup = useCallback((code: string) => points.get(code.toUpperCase()) ?? null, [points]);
-  return { sources: enabled ? sources : undefined, pointLookup };
+  return { sources: enabled ? sources : undefined, pointLookup, tapData: enabled ? tap : null };
 }
 
 export interface IsraelChart {
   sources: Readonly<Record<string, FeatureCollection>> | undefined;
   /** A reporting point or aerodrome by code (the briefing highlight's lookup); null when unknown or not loaded. */
   pointLookup: (code: string) => Coordinate | null;
+  /** What a tap on the chart needs (the loaded data and the closures drawn); null until loaded or outside Israel. */
+  tapData: IsraelTapData | null;
 }
+
+const tapData = (input: IsraelChartInput, closures: IsraelTapData['closures']): IsraelTapData => ({
+  data: { points: input.points, segments: input.segments, airspaces: input.airspaces, aerodromes: input.aerodromes },
+  closures,
+});
 
 const NO_POINTS: ReadonlyMap<string, Coordinate> = new Map();
 
