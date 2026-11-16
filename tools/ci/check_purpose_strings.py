@@ -107,7 +107,8 @@ def has_string(info: dict, key: str) -> bool:
 def check(
     info: dict,
     symbols_by_binary: dict[str, str],
-    production: bool,
+    *,
+    production: bool = False,
     defined_by_binary: dict[str, str] | None = None,
     audio_only_capture_device: tuple[str, ...] | list[str] = (),
 ) -> tuple[list[str], list[str]]:
@@ -184,7 +185,13 @@ def main(argv: list[str]) -> int:
 
     print(f"{info.get('CFBundleIdentifier')} {info.get('CFBundleShortVersionString')} ({info.get('CFBundleVersion')}): "
           f"{len(symbols)} binaries scanned")
-    report, problems = check(info, symbols, args.production, everything, args.audio_only_capture_device)
+    report, problems = check(
+        info,
+        symbols,
+        production=args.production,
+        defined_by_binary=everything,
+        audio_only_capture_device=args.audio_only_capture_device,
+    )
     for line in report:
         print(line)
     if not report:

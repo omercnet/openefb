@@ -25,7 +25,7 @@ SWIFT_PHOTOS = "_$sSo14PHPhotoLibraryC21authorizationStatusforSo0aB8StatusVSo0aB
 
 
 def run(info, symbols, production=False):
-    return c.check(info, {"KanafEFB": symbols}, production)
+    return c.check(info, {"KanafEFB": symbols}, production=production)
 
 
 class PurposeStrings(unittest.TestCase):
@@ -64,11 +64,11 @@ class PurposeStrings(unittest.TestCase):
         }
         self.assertEqual(set(cases), set(c.SENSITIVE))
         for framework, symbol in cases.items():
-            _, problems = c.check({"CFBundleExecutable": "x"}, {"x": symbol + "\n"}, False)
+            _, problems = c.check({"CFBundleExecutable": "x"}, {"x": symbol + "\n"})
             self.assertEqual(len(problems), 1, framework)
             self.assertIn(f"{framework} is linked", problems[0])
             keys = c.SENSITIVE[framework][1]
-            _, ok = c.check({"CFBundleExecutable": "x", keys[0]: "why"}, {"x": symbol + "\n"}, False)
+            _, ok = c.check({"CFBundleExecutable": "x", keys[0]: "why"}, {"x": symbol + "\n"})
             self.assertEqual(ok, [], framework)
 
     def test_raw_motion_sensors_need_no_string_but_activity_data_does(self):
@@ -81,7 +81,7 @@ class PurposeStrings(unittest.TestCase):
             self.assertIn("Motion is linked", problems[0])
 
     def test_the_message_names_the_binary_that_uses_the_class(self):
-        _, problems = c.check(BASE, {"KanafEFB": OBJC, "Pods.framework": SWIFT_PHOTOS}, False)
+        _, problems = c.check(BASE, {"KanafEFB": OBJC, "Pods.framework": SWIFT_PHOTOS})
         self.assertIn("Pods.framework: PHPhotoLibrary", problems[0])
 
     def test_production_refuses_a_development_client(self):
@@ -106,26 +106,26 @@ class PurposeStrings(unittest.TestCase):
         self.assertEqual(len(problems), 1)
         self.assertIn("Camera is linked", problems[0])
         self.assertIn("--audio-only-capture-device <its binary name>", problems[0])
-        _, allowed = c.check(BASE, {"KanafEFB": symbols}, False, None, ["KanafEFB"])
+        _, allowed = c.check(BASE, {"KanafEFB": symbols}, audio_only_capture_device=["KanafEFB"])
         self.assertEqual(allowed, [])  # the microphone string (BASE has it) covers the reclassified use
         # a different binary with the camera symbol is not excused by naming this one
-        _, other = c.check(BASE, {"KanafEFB": OBJC, "Other": symbols}, False, None, ["KanafEFB"])
+        _, other = c.check(BASE, {"KanafEFB": OBJC, "Other": symbols}, audio_only_capture_device=["KanafEFB"])
         self.assertEqual(len(other), 1)
         self.assertIn("Other: AVCaptureDevice", other[0])
 
     def test_the_allowance_turns_avcapturedevice_into_microphone_use_that_needs_its_string(self):
         symbols = "_OBJC_CLASS_$_AVCaptureDevice\n"
         info = {"CFBundleExecutable": "x"}
-        _, problems = c.check(info, {"x": symbols}, False, None, ["x"])
+        _, problems = c.check(info, {"x": symbols}, audio_only_capture_device=["x"])
         self.assertEqual(len(problems), 1)
         self.assertIn("Microphone is linked", problems[0])
         self.assertIn("NSMicrophoneUsageDescription", problems[0])
-        _, ok = c.check({**info, "NSMicrophoneUsageDescription": "why"}, {"x": symbols}, False, None, ["x"])
+        _, ok = c.check({**info, "NSMicrophoneUsageDescription": "why"}, {"x": symbols}, audio_only_capture_device=["x"])
         self.assertEqual(ok, [])
 
     def test_the_allowance_does_not_excuse_a_session_next_to_avcapturedevice(self):
         symbols = "_OBJC_CLASS_$_AVCaptureDevice\n_OBJC_CLASS_$_AVCaptureSession\n"
-        _, problems = c.check({"CFBundleExecutable": "x", "NSMicrophoneUsageDescription": "why"}, {"x": symbols}, False, None, ["x"])
+        _, problems = c.check({"CFBundleExecutable": "x", "NSMicrophoneUsageDescription": "why"}, {"x": symbols}, audio_only_capture_device=["x"])
         self.assertEqual(len(problems), 1)
         self.assertIn("Camera is linked", problems[0])
         self.assertIn("AVCaptureSession", problems[0])
@@ -133,11 +133,11 @@ class PurposeStrings(unittest.TestCase):
     def test_avcapturedeviceinput_is_not_avcapturedevice_in_either_symbol_form(self):
         # Objective-C and Swift-mangled references to the longer class must not read as the plain class, so the allowance cannot hide them.
         for symbol in ("_OBJC_CLASS_$_AVCaptureDeviceInput", "_$sSo22AVCaptureDeviceInputCMa"):
-            _, problems = c.check({"CFBundleExecutable": "x", "NSMicrophoneUsageDescription": "why"}, {"x": symbol + "\n"}, False, None, ["x"])
+            _, problems = c.check({"CFBundleExecutable": "x", "NSMicrophoneUsageDescription": "why"}, {"x": symbol + "\n"}, audio_only_capture_device=["x"])
             self.assertEqual(len(problems), 1, symbol)
             self.assertIn("Camera is linked", problems[0])
         for symbol in ("_OBJC_CLASS_$_AVCaptureDevice", "_$sSo15AVCaptureDeviceCMa"):
-            hit, _ = c.check({"CFBundleExecutable": "x"}, {"x": symbol + "\n"}, False)
+            hit, _ = c.check({"CFBundleExecutable": "x"}, {"x": symbol + "\n"})
             self.assertIn("AVCaptureDevice", hit[0], symbol)
             self.assertNotIn("AVCaptureDeviceInput", hit[0], symbol)
 
@@ -165,13 +165,20 @@ class PurposeStrings(unittest.TestCase):
             "KanafEFB": OBJC
             + "0000000100a1b2c0 S _OBJC_CLASS_$_EXDevLauncherController\n0000000100a1b2d0 T _$s16EXDevMenuManagerCMa\n"
         }
-        _, problems = c.check(BASE, undefined, True, defined)
+        _, problems = c.check(BASE, undefined, production=True, defined_by_binary=defined)
         self.assertEqual(len(problems), 1)
         self.assertIn("EXDevLauncher", problems[0])
-        _, clean = c.check(BASE, undefined, True, {"KanafEFB": OBJC + "0000000100a1b2c0 S _OBJC_CLASS_$_RCTDevMenu\n"})
+        _, clean = c.check(BASE, undefined, production=True, defined_by_binary={"KanafEFB": OBJC + "0000000100a1b2c0 S _OBJC_CLASS_$_RCTDevMenu\n"})
         self.assertEqual(clean, [])
-        _, development = c.check(BASE, undefined, False, defined)
+        _, development = c.check(BASE, undefined, defined_by_binary=defined)
         self.assertEqual(development, [])
+
+    def test_the_behaviour_selectors_are_keyword_only(self):
+        # A positional allowlist used to land in the wrong slot and be ignored (or crash); now it cannot be passed that way.
+        with self.assertRaises(TypeError):
+            c.check(BASE, {"KanafEFB": OBJC}, True)
+        with self.assertRaises(TypeError):
+            c.check(BASE, {"KanafEFB": OBJC}, False, None, ["KanafEFB"])
 
     def test_react_native_core_dev_menu_is_not_the_development_client(self):
         # RN links RCTDevMenu and RCTDevSettings in every build; the first CI run matched a bare "DevMenu" and failed on them.
