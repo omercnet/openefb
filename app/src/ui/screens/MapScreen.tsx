@@ -138,12 +138,14 @@ export function MapScreen() {
   const trackedViewChange = useCallback(
     (change: Parameters<typeof onViewChange>[0]) => {
       footerStore.setState({ zoom: change.zoom });
-      setBounds({
+      const visible = {
         south: change.southWest.lat,
         west: change.southWest.lon,
         north: change.northEast.lat,
         east: change.northEast.lon,
-      });
+      };
+      setBounds(visible);
+      appStore.getState().setMapBounds(visible);
       onViewChange(change);
     },
     [footerStore, onViewChange],

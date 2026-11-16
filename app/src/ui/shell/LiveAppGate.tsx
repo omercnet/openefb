@@ -1,4 +1,5 @@
 import { useFonts } from 'expo-font';
+import type { Region } from '../../domain/core';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { describeError } from '../../domain/describeError';
@@ -33,6 +34,14 @@ export function LiveAppGate() {
       cancelled = true;
     };
   }, []);
+  // Settings > Region: the live app starts again on the new region from the launch state (the map recentres, the sources
+  // reload, Settings closes). The databases are open already; only the region differs.
+  const changeRegion = (region: Region) => {
+    if (!state || !('runtime' in state) || state.runtime.started.region === region) return;
+    const runtime = { ...state.runtime, started: { ...state.runtime.started, region } };
+    resetLiveSlices(region, runtime.layerSettings);
+    setState({ runtime, onboarded: state.onboarded });
+  };
   if (state && 'runtime' in state) {
     if (!state.onboarded) {
       // Until the bundled faces are registered show the bare paper: no text in a fallback face.
@@ -49,7 +58,14 @@ export function LiveAppGate() {
         </ThemeContext.Provider>
       );
     }
-    return <LiveApp runtime={state.runtime} startRecording={startRecordingServices} />;
+    return (
+      <LiveApp
+        key={state.runtime.started.region}
+        runtime={state.runtime}
+        startRecording={startRecordingServices}
+        onRegionChange={changeRegion}
+      />
+    );
   }
   return (
     <View style={styles.paper} testID="launchScreen">

@@ -23,6 +23,8 @@ import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
 
 // The map is a native view and the screen is covered by its own tests; here it only marks that it is mounted.
+jest.mock('./LiveSettings', () => ({ LiveSettings: () => null })); // its screens are covered by LiveSettings.test
+jest.mock('../../adapters/secretStore', () => ({ createSecretStore: () => ({}) }));
 jest.mock('../sheets/israelPlan/IsraelFlightPlanSheet', () => ({
   IsraelFlightPlanSheet: () => null,
 }));
@@ -78,6 +80,11 @@ function runtime(over: Partial<AppRuntime['started']> = {}) {
     location,
     network,
     haptics: { warning: jest.fn(), success: jest.fn(), light: jest.fn() },
+    preferences: new FakePreferences(),
+    chartPacks: {
+      israelChart: { subscribe: () => () => undefined, getVersion: () => 0, status: { kind: 'notDownloaded' } },
+      israelDiagrams: { subscribe: () => () => undefined, getVersion: () => 0 },
+    },
     israelNotam: { fetchFeed: async () => Promise.reject(new Error('offline')) },
     tfr: { currentTFRs: async () => ({ tfrs: [], fetchedAt: 0 }) },
     profiles: { load: async () => undefined, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) },
@@ -201,6 +208,19 @@ describe('LiveApp (ContentView)', () => {
     applyCaptureSeeds();
     resetLiveSlices('us');
     expect(layers.store.getState().displayMode).toBe('auto');
+  });
+
+  describe('settings', () => {
+    it('the settings overlay shows Settings over the log, and closing it goes back to the log', async () => {
+      const { rt } = runtime();
+      const view = await render(<LiveApp runtime={rt} />);
+      await act(async () => appStore.getState().setScreen('log'));
+      await act(async () => appStore.getState().openOverlay({ kind: 'settings' }));
+      expect(view.all((n) => n.props?.testID === 'live-settings')).toHaveLength(1);
+      await act(async () => appStore.getState().openOverlay(null));
+      expect(view.all((n) => n.props?.testID === 'live-settings')).toHaveLength(0);
+      await act(async () => appStore.getState().setScreen('map'));
+    });
   });
 
   describe('haptics and alerts', () => {

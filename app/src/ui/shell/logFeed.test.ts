@@ -53,6 +53,12 @@ describe('log feed', () => {
     expect(app.getState().overlay).toEqual({ kind: 'flight', id: 'f1' });
   });
 
+  it('the settings button opens Settings over the log', async () => {
+    const { feed, app } = await setup();
+    feed.actions.openSettings();
+    expect(app.getState().overlay).toEqual({ kind: 'settings' });
+  });
+
   it('deletes a draft entry but never a signed one', async () => {
     const { feed, userData, store } = await setup();
     feed.actions.addEntry();

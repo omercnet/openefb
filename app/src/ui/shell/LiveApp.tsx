@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import type { Region } from '../../domain/core';
 import { AppState as NativeAppState, View } from 'react-native';
 import { fileTextStorage } from '../../adapters/fileTextStorage';
 import { airport } from '../columns/airport/store';
@@ -23,6 +24,8 @@ import { createLogFeed } from './logFeed';
 import { createPlannerNetworkStore } from './israelPlanner';
 import { PlannerHost } from './LivePlanner';
 import { createFlightScreenStores } from './flightScreens';
+import { LiveSettings } from './LiveSettings';
+import { createSettingsServices } from './settingsServices';
 import { LiveFlight } from './LiveFlight';
 import { LiveScreens } from './LiveScreens';
 import { ChartViewer } from './ChartViewer';
@@ -68,8 +71,11 @@ const zeroVersion = () => 0;
 export function LiveApp({
   runtime,
   startRecording,
+  onRegionChange,
 }: {
   runtime: AppRuntime;
+  /** Settings changed the region: the gate restarts the live app on it (the map, the data and the strip follow). */
+  onRegionChange?: (region: Region) => void;
   /** Builds the recording services (runtime.ts `startRecordingServices`); omitted: no recorder (tests). */
   startRecording?: (runtime: AppRuntime) => Promise<RecordingRuntime>;
 }) {
@@ -138,6 +144,27 @@ export function LiveApp({
         signal: (name, parameters) => (runtime.telemetry.signal as (n: string, p?: unknown) => void)(name, parameters),
       }}
       networkStore={networkStore}
+      onClose={close}
+    />
+  );
+  // Settings (Swift: SettingsView over the log). The services keep their identity while the screen is open.
+  const settingsServices = useMemo(
+    () =>
+      createSettingsServices({
+        runtime,
+        files: fileTextStorage,
+        onRegionChange: (region) => onRegionChange?.(region),
+        onDisplayModeChange: (mode) => layers.store.setState({ displayMode: mode }),
+      }),
+    [runtime, onRegionChange],
+  );
+  const renderSettings = (close: () => void) => (
+    <LiveSettings
+      services={settingsServices}
+      aircraft={runtime.profiles.aircraft}
+      pilot={runtime.profiles.pilot}
+      offline={runtime.offline}
+      mapBounds={() => appStore.getState().mapBounds}
       onClose={close}
     />
   );
@@ -255,6 +282,7 @@ export function LiveApp({
               onOverlayClosed={() => void feed?.refresh()}
               {...(started.region === 'israel' ? { renderPlanner } : {})}
               {...(recording ? { renderFlight } : {})}
+              renderSettings={renderSettings}
             />
             <ChartViewer terminal={runtime.terminal} />
             {recording ? <StopRecordingDialog store={recording.store} onConfirmed={runtime.haptics.success} /> : null}
