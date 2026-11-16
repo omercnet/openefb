@@ -12,6 +12,7 @@ import { WindsAloftSection } from '../columns/airport/sections/WindsAloftSection
 import { KDEN, PIREP_NOW, PIREPS, SFO_REPORT } from '../columns/airport/sections/fixture';
 import { dayFixture } from '../flightLog/fixtures';
 import { flightLog } from '../flightLog/store';
+import { UsPlannerHeader } from '../shell/LivePlanner';
 import { FlightPlanSheet } from '../sheets/flightPlan/FlightPlanSheet';
 import {
   FIXTURE_NOW,
@@ -27,14 +28,15 @@ import { FontFiles } from '../tokens';
 import { ScreenFrame } from './CaptureScreens';
 
 /** Below the status bar and above the home indicator, as the screens sit in the shell (they are not full-bleed). */
-function Insets({ children }: { children: ReactNode }) {
+function Insets({ children, header = false }: { children: ReactNode; header?: boolean }) {
   const insets = useSafeAreaInsets();
-  return <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>{children}</View>;
+  return <View style={{ flex: 1, paddingTop: header ? 0 : insets.top, paddingBottom: insets.bottom }}>{children}</View>;
 }
 
-function Framed({ children }: { children: ReactNode }) {
+/** `header`: the screen starts with a NavBar, which takes the top inset itself. */
+function Framed({ children, header = false }: { children: ReactNode; header?: boolean }) {
   const [loaded, error] = useFonts(FontFiles);
-  return <ScreenFrame>{loaded || error != null ? <Insets>{children}</Insets> : null}</ScreenFrame>;
+  return <ScreenFrame>{loaded || error != null ? <Insets header={header}>{children}</Insets> : null}</ScreenFrame>;
 }
 
 /** kanaf-dev://usplan: Flight Plans in the US, a KPAO to KSQL plan picked and the saved plans below. */
@@ -48,7 +50,8 @@ export function UsPlanCapture() {
     return made.store;
   });
   return (
-    <Framed>
+    <Framed header>
+      <UsPlannerHeader onBack={() => undefined} />
       <FlightPlanProvider store={store}>
         <FlightPlanSheet region="us" />
       </FlightPlanProvider>

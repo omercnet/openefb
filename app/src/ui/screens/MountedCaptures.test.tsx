@@ -21,6 +21,8 @@ describe('capture routes of the screens mounted in I1d', () => {
     const view = await render(<UsPlanCapture />);
     expect(has(view, 'KPAO')).toBe(true);
     expect(has(view, 'KSQL')).toBe(true);
+    expect(view.text()).toContain('Flight Plans'); // the pushed screen's large title
+    expect(view.byTestId('planner-back')).toBeTruthy(); // and the way back
   });
 
   it('chartsheet and chartairspace: the CVFR chart sheet for a point and for airspaces', async () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SafeAreaView, Text, View } from 'react-native';
+import { LargeTitle, NavBar } from '../form/Form';
 import { Pressy, ThemeContext } from '../Primitives';
 import { FlightPlanSheet } from '../sheets/flightPlan/FlightPlanSheet';
 import { FlightPlanProvider, type FlightPlanState } from '../sheets/flightPlan/store';
@@ -39,18 +40,23 @@ export function LiveUsPlanner({ store, onClose }: { store: StoreApi<FlightPlanSt
   const theme = useLiveTheme();
   return (
     <ThemeContext.Provider value={theme}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: theme.paper }} testID="live-us-planner">
-        <View style={{ flexDirection: 'row', alignItems: 'center', padding: Space.m, gap: Space.m }}>
-          <Pressy accessibilityRole="button" accessibilityLabel="Back" onPress={onClose} testID="planner-back">
-            <Text style={[Type.title, { color: theme.accent }]}>Back</Text>
-          </Pressy>
-          <Text style={[Type.title, { color: theme.ink }]}>Flight Plans</Text>
-        </View>
+      <View style={{ flex: 1, backgroundColor: theme.paper }} testID="live-us-planner">
+        <UsPlannerHeader onBack={onClose} />
         <FlightPlanProvider store={store}>
           <FlightPlanSheet region="us" />
         </FlightPlanProvider>
-      </SafeAreaView>
+      </View>
     </ThemeContext.Provider>
+  );
+}
+
+/** FlightPlanView.navigationTitle("Flight Plans") on the Log stack: the Back button, then the large title (as Settings). */
+export function UsPlannerHeader({ onBack }: { onBack: () => void }) {
+  return (
+    <>
+      <NavBar title="Flight Plans" onBack={onBack} backTestID="planner-back" largeTitle />
+      <LargeTitle title="Flight Plans" />
+    </>
   );
 }
 

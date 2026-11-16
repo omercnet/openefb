@@ -449,6 +449,7 @@ describe('LiveApp (ContentView)', () => {
       await settle();
       expect(has(view, 'live-us-planner')).toBe(true);
       expect(has(view, 'live-israel-planner')).toBe(false);
+      expect(view.text()).toContain('Flight Plans');
       expect(flightPlanSheet).toHaveBeenCalled();
       await press(view.byTestId('planner-back'));
       expect(appStore.getState().overlay).toBeNull();
