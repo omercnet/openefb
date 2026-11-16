@@ -43,6 +43,7 @@ import { createTranscriptionService } from '../../adapters/transcription';
 import type { Telemetry } from '../../domain/telemetry/telemetry';
 import { appStore } from '../state/appStore';
 import { regionSlice } from '../state/region';
+import { openChartPacks, type ChartPacks } from './chartPacks';
 import { createProfiles, type Profiles } from './profiles';
 import { createRecordingRuntime, type RecordingRuntime } from './recordingRuntime';
 import { runStartup, type StartedApp } from './startup';
@@ -67,6 +68,8 @@ export interface AppRuntime {
   lowPower: LowPowerSource;
   /** Haptics (Swift `Haptics`): alerts, recording start and stop, strip taps. */
   haptics: Haptics;
+  /** The chart packs: CAAI CVFR chart, CAAI and FAA airport diagrams. Settings drives them, the diagram overlay reads them. */
+  chartPacks: ChartPacks;
   telemetry: Telemetry;
   notamConfigured: () => Promise<boolean>;
   /** The FAA NOTAM service (free key from Settings); the airport column's NOTAM list. */
@@ -104,6 +107,17 @@ export async function startRuntime(): Promise<AppRuntime> {
   // iOS has no SFSpeechRecognizer fallback: fetch the on-device speech model now, so a flight can be transcribed.
   void prepareSpeechAssets().catch((e) => log(`Speech assets: ${String(e)}`));
   startTelemetry(telemetry); // counts the launch; nothing is sent unless EXPO_PUBLIC_TELEMETRY_URL is set
+  const chartPacks = await openChartPacks({
+    fetch: fetchLike,
+    fs: chartFileSystem,
+    downloader: fileDownloader,
+    storage: fileTextStorage,
+    root: chartRoot('charts'),
+    aviation: started.aviation,
+    israel: started.israel,
+    allowUnpublished: () => false, // the developer setting is not exposed in this build
+    log,
+  });
   const debriefModel = createDebriefModel();
   const debrief = debriefModel.offered ? new DomainDebriefEngine({ model: debriefModel, telemetry }) : null;
   return {
@@ -113,6 +127,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     preferences,
     lowPower: createLowPowerMode(),
     haptics: createHaptics(),
+    chartPacks,
     profiles: createProfiles(started.userDb, preferences),
     telemetry,
     debrief,
