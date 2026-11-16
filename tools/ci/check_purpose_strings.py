@@ -13,7 +13,8 @@ listed Info.plist keys, with a non-empty value. The check prints what it found e
 which class.
 
 --production also fails when the app carries what only a development client adds: the Dev Launcher's Bonjour service and its
-"exp+" URL scheme in Info.plist, and any EXDevLauncher / EXDevMenu symbol in a binary.
+"exp+" URL scheme in Info.plist, and any EXDevLauncher / EXDevMenu symbol, defined or undefined, in a binary (a statically linked
+class is DEFINED in the executable, so `nm -u` alone would never show it).
 
 --symbols-from FILE reads the symbol list from a file instead of running nm (tests).
 """
@@ -32,8 +33,10 @@ SENSITIVE = {
         re.compile(r"PHPhotoLibrary|PHAsset|ALAssetsLibrary"),
         ("NSPhotoLibraryUsageDescription", "NSPhotoLibraryAddUsageDescription"),
     ),
+    # A capture SESSION, its input or the picker: AVCaptureDevice alone is also how the microphone is asked for (media type audio), so it
+    # is no proof of camera use. (AVCaptureDeviceInput names the camera or microphone feeding a session: a session is there too.)
     "Camera": (
-        re.compile(r"AVCaptureDevice|AVCaptureSession|UIImagePickerController"),
+        re.compile(r"AVCaptureSession|AVCaptureDeviceInput|AVCaptureVideoDataOutput|AVCapturePhotoOutput|UIImagePickerController"),
         ("NSCameraUsageDescription",),
     ),
     "Contacts": (re.compile(r"CNContactStore|ABAddressBook"), ("NSContactsUsageDescription",)),
@@ -46,10 +49,8 @@ SENSITIVE = {
         re.compile(r"SFSpeechRecognizer|SFSpeechAudioBufferRecognitionRequest|SpeechTranscriber"),
         ("NSSpeechRecognitionUsageDescription",),
     ),
-    "Bluetooth": (
-        re.compile(r"CBCentralManager|CBPeripheralManager"),
-        ("NSBluetoothAlwaysUsageDescription", "NSBluetoothPeripheralUsageDescription"),
-    ),
+    # Apps linked for iOS 13 and later need the Always key; the legacy Peripheral key does not stand in for it.
+    "Bluetooth": (re.compile(r"CBCentralManager|CBPeripheralManager"), ("NSBluetoothAlwaysUsageDescription",)),
     # Motion & Fitness: activity, pedometer and altimeter data. NOT CMMotionManager (raw accelerometer and gyroscope), which needs
     # no permission: react-native-reanimated links it, and the build that Apple accepted before did too.
     "Motion": (re.compile(r"CMMotionActivityManager|CMPedometer|CMAltimeter"), ("NSMotionUsageDescription",)),
@@ -82,12 +83,23 @@ def undefined_symbols(binary: Path) -> str:
     return result.stdout
 
 
+def all_symbols(binary: Path) -> str:
+    """Every symbol of the binary, defined and undefined: Expo's dev client is linked statically, so its classes are DEFINED in the
+    main executable and never appear in `nm -u`."""
+    result = subprocess.run(["nm", str(binary)], capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise RuntimeError(f"nm {binary.name} failed: {result.stderr.strip()[:200]}")
+    return result.stdout
+
+
 def has_string(info: dict, key: str) -> bool:
     value = info.get(key)
     return isinstance(value, str) and value.strip() != ""
 
 
-def check(info: dict, symbols_by_binary: dict[str, str], production: bool) -> tuple[list[str], list[str]]:
+def check(
+    info: dict, symbols_by_binary: dict[str, str], production: bool, defined_by_binary: dict[str, str] | None = None
+) -> tuple[list[str], list[str]]:
     """Returns (report lines, problems)."""
     report: list[str] = []
     problems: list[str] = []
@@ -108,7 +120,9 @@ def check(info: dict, symbols_by_binary: dict[str, str], production: bool) -> tu
             problems.append(f"{framework} is linked ({where}) but Info.plist has none of {', '.join(keys)}")
 
     if production:
-        for name, symbols in symbols_by_binary.items():
+        # The dev client is in the binary that links it statically: look at every symbol, not only the undefined ones.
+        everything = defined_by_binary if defined_by_binary is not None else symbols_by_binary
+        for name, symbols in everything.items():
             hits = sorted(set(DEV_CLIENT_SYMBOLS.findall(symbols)))
             if hits:
                 problems.append(f"{name} contains development client code ({', '.join(hits)})")
@@ -131,12 +145,15 @@ def main(argv: list[str]) -> int:
     info = load_plist(args.app / "Info.plist")
     if args.symbols_from:
         symbols = {info.get("CFBundleExecutable", "app"): args.symbols_from.read_text()}
+        everything = None
     else:
-        symbols = {binary.name: undefined_symbols(binary) for binary in binaries(args.app, info)}
+        found = binaries(args.app, info)
+        symbols = {binary.name: undefined_symbols(binary) for binary in found}
+        everything = {binary.name: all_symbols(binary) for binary in found}
 
     print(f"{info.get('CFBundleIdentifier')} {info.get('CFBundleShortVersionString')} ({info.get('CFBundleVersion')}): "
           f"{len(symbols)} binaries scanned")
-    report, problems = check(info, symbols, args.production)
+    report, problems = check(info, symbols, args.production, everything)
     for line in report:
         print(line)
     if not report:

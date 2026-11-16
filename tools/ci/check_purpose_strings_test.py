@@ -98,6 +98,39 @@ class PurposeStrings(unittest.TestCase):
         _, quiet = run(dev, OBJC + "_OBJC_CLASS_$_EXDevLauncherController\n", production=False)
         self.assertEqual(quiet, [])  # only a production build is held to it
 
+    def test_avcapturedevice_alone_is_not_camera_use_but_a_session_is(self):
+        # AVCaptureDevice also asks for the microphone (requestAccess for audio); no camera string for that.
+        _, problems = run(BASE, OBJC + "_OBJC_CLASS_$_AVCaptureDevice\n")
+        self.assertEqual(problems, [])
+        for symbol in ("AVCaptureSession", "AVCaptureDeviceInput", "UIImagePickerController"):
+            _, problems = run(BASE, OBJC + f"_OBJC_CLASS_$_{symbol}\n")
+            self.assertEqual(len(problems), 1, symbol)
+            self.assertIn("Camera is linked", problems[0])
+
+    def test_bluetooth_needs_the_always_key_not_the_legacy_one(self):
+        symbols = OBJC + "_OBJC_CLASS_$_CBCentralManager\n"
+        _, legacy = run({**BASE, "NSBluetoothPeripheralUsageDescription": "legacy"}, symbols)
+        self.assertEqual(len(legacy), 1)
+        self.assertIn("NSBluetoothAlwaysUsageDescription", legacy[0])
+        _, modern = run({**BASE, "NSBluetoothAlwaysUsageDescription": "why"}, symbols)
+        self.assertEqual(modern, [])
+
+    def test_a_statically_linked_dev_client_is_found_in_the_defined_symbols(self):
+        # Static layout: the executable DEFINES the dev launcher's classes (nm prints them with a type letter, no `U`), and the
+        # undefined list has nothing of them. The production check must still fail.
+        undefined = {"KanafEFB": OBJC}
+        defined = {
+            "KanafEFB": OBJC
+            + "0000000100a1b2c0 S _OBJC_CLASS_$_EXDevLauncherController\n0000000100a1b2d0 T _$s16EXDevMenuManagerCMa\n"
+        }
+        _, problems = c.check(BASE, undefined, True, defined)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("EXDevLauncher", problems[0])
+        _, clean = c.check(BASE, undefined, True, {"KanafEFB": OBJC + "0000000100a1b2c0 S _OBJC_CLASS_$_RCTDevMenu\n"})
+        self.assertEqual(clean, [])
+        _, development = c.check(BASE, undefined, False, defined)
+        self.assertEqual(development, [])
+
     def test_react_native_core_dev_menu_is_not_the_development_client(self):
         # RN links RCTDevMenu and RCTDevSettings in every build; the first CI run matched a bare "DevMenu" and failed on them.
         _, problems = run(BASE, OBJC + "_OBJC_CLASS_$_RCTDevMenu\n_OBJC_CLASS_$_RCTDevSettings\n_OBJC_CLASS_$_RCTDevLoadingView\n", production=True)
