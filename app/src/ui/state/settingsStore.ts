@@ -200,6 +200,7 @@ export function createSettingsStore(deps: SettingsDeps) {
     ) => {
       const show = (message: string | null) => {
         if (message === null && errorOwner !== owner) return; // another setting's failure stays
+        if (message !== null) prefFailures += 1;
         errorOwner = message === null ? null : owner;
         set({ preferenceError: message, preferenceErrorFor: message === null ? null : owner });
       };
@@ -236,7 +237,9 @@ export function createSettingsStore(deps: SettingsDeps) {
     /** Bumped by every region choice or retry: only the newest save may report back (A, then B, then A again, is three). */
     let regionGeneration = 0;
     /** A saved region whose restart waits for the preference saves still pending (Settings stays open meanwhile). */
-    let restartAfter: { region: Region; generation: number } | null = null;
+    let restartAfter: { region: Region; generation: number; failures: number } | null = null;
+    /** Preference saves that failed so far: a restart is held back only by one that failed after the region was saved. */
+    let prefFailures = 0;
     const restartWhenPrefsSettle = () => {
       const due = restartAfter;
       if (!due) return;
@@ -246,7 +249,7 @@ export function createSettingsStore(deps: SettingsDeps) {
       }
       if (pendingPrefWrites.displayMode > 0 || pendingPrefWrites.shareUsageData > 0) return; // called again as they finish
       restartAfter = null;
-      if (get().preferenceError !== null) return; // one failed: Settings keeps its error and Retry
+      if (prefFailures > due.failures) return; // one failed meanwhile: Settings keeps its error and Retry
       notify(() => deps.onRegionSaved?.(due.region));
     };
     const saveRegion = async (region: Region, applyFailure: string | null, write: boolean, generation: number) => {
@@ -275,7 +278,7 @@ export function createSettingsStore(deps: SettingsDeps) {
       if (saveFailure === null && applyFailure === null) {
         // Restarting removes Settings. A preference saved behind this save is still pending: the restart waits for it
         // (`restartWhenPrefsSettle`), so a failure of it keeps its error and Retry on screen.
-        restartAfter = { region, generation };
+        restartAfter = { region, generation, failures: prefFailures };
         restartWhenPrefsSettle();
       }
     };

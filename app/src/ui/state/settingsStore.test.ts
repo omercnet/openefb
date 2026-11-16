@@ -137,6 +137,22 @@ describe('onRegionSaved with a preference saved meanwhile', () => {
     expect(onRegionSaved).not.toHaveBeenCalled();
   });
 
+  it('an older, unrelated preference error does not hold the restart back', async () => {
+    const onRegionSaved = jest.fn();
+    const prefs = new FakePreferences();
+    const set = jest.spyOn(prefs, 'set').mockRejectedValueOnce(new Error('earlier failure'));
+    const { store } = setup({ onRegionSaved, prefs });
+    await store.getState().load();
+    await store.getState().setDisplayMode('night'); // fails: a preference error is showing
+    expect(store.getState().preferenceError).toContain('earlier failure');
+    set.mockRestore();
+    const region = store.getState().setRegion('us');
+    const pref = store.getState().setShareUsageData(false); // saves fine, behind the region save
+    await Promise.all([region, pref]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onRegionSaved).toHaveBeenCalledWith('us');
+  });
+
   it('restarts after a preference that saved fine', async () => {
     const onRegionSaved = jest.fn();
     const { store } = setup({ onRegionSaved });
