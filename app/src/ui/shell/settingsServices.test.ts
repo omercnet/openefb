@@ -44,7 +44,7 @@ const services = (rt: AppRuntime, extra: Partial<Parameters<typeof createSetting
   createSettingsServices({
     runtime: rt,
     files: new MemoryTextStorage(),
-    onRegionChange: jest.fn(),
+    onRegionSaved: jest.fn(),
     onDisplayModeChange: jest.fn(),
     now: () => 1_000,
     ...extra,

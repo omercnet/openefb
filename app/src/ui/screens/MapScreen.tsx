@@ -169,11 +169,13 @@ export function MapScreen() {
   // A tap: the Israel chart sheet, or the airport column (MapView.handleMapTap).
   const [chartSelection, setChartSelection] = useState<ChartSheetSelection | null>(null);
   const tapData = israelChart.tapData;
+  const tapGeneration = useRef(0);
   const onMapPress = useCallback(
     (tap: MapTap) => {
+      const generation = ++tapGeneration.current;
       void resolveMapTap(tap, tapData).then(
         (result) => {
-          if (!result) return;
+          if (!result || generation !== tapGeneration.current) return; // a later tap owns the selection
           if (result.kind === 'airport') appStore.getState().showAirport(result.icao);
           else setChartSelection(result.selection);
         },
@@ -182,12 +184,21 @@ export function MapScreen() {
     },
     [tapData],
   );
+  const diagramPacks = useMemo(
+    () =>
+      [runtime.chartPacks.israelDiagrams, runtime.chartPacks.usDiagrams].map((store) => ({
+        subscribe: store.subscribe,
+        edition: () => store.pack?.edition ?? null,
+      })),
+    [runtime.chartPacks.israelDiagrams, runtime.chartPacks.usDiagrams],
+  );
   const diagrams = useAirportDiagrams({
     source: runtime.chartPacks.diagramSource,
     region: model.snapshot.region,
     enabled: () => layersStore.getState().airportDiagrams,
     subscribeEnabled: (listener) =>
       layersStore.subscribe((s, p) => s.airportDiagrams !== p.airportDiagrams && listener()),
+    packs: diagramPacks,
     remote: runtime.started.remoteConfig,
   });
   const { onCamera: diagramCamera } = diagrams;

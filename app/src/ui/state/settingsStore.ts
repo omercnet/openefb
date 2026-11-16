@@ -31,9 +31,12 @@ export interface SettingsDeps {
   /** Region.dataUnavailableError: why the region's bundled data cannot be opened, or null. */
   regionDataUnavailable(region: Region): Promise<string | null>;
   /** Telemetry.setEnabled(enabled, region) (A5). */
-  setTelemetryEnabled(enabled: boolean, region: Region): void;
+  setTelemetryEnabled(enabled: boolean, region: Region): void | Promise<void>;
   /** AppState.region and AppState.displayMode follow. Called at once, before the change is saved. Must not throw. */
   onRegionChange?(region: Region): void;
+  /** The region was saved (nothing failed): the shell may restart on it. Not called while a save or the app's change failed, so
+   * Settings stays open with the error and its Retry. */
+  onRegionSaved?(region: Region): void;
   onDisplayModeChange?(mode: DisplayMode): void;
   now(): number;
 }
@@ -125,6 +128,19 @@ function notify(call: () => void): string | null {
   }
 }
 
+/** Like `notify`, for a call that may finish later (the telemetry opt-out clears its backlog): started at once, its failure,
+ * thrown or rejected, is what the promise resolves to. */
+function notifyAsync(call: () => void | Promise<void>): Promise<string | null> {
+  try {
+    return Promise.resolve(call()).then(
+      () => null,
+      (error) => describeError(error),
+    );
+  } catch (error) {
+    return Promise.resolve(describeError(error));
+  }
+}
+
 export function createSettingsStore(deps: SettingsDeps) {
   // Everything that reads or writes storage runs here, one job at a time in call order, so a slow earlier write can never
   // land after a later one and a load cannot overwrite a change made while it was reading.
@@ -200,16 +216,16 @@ export function createSettingsStore(deps: SettingsDeps) {
     /** The two preferences share one path: apply it to the app now, save it in order, and record what failed. */
     const changePreference = (
       owner: 'displayMode' | 'shareUsageData',
-      apply: (() => void) | null,
+      apply: (() => void | Promise<void>) | null,
       write: (() => Promise<void>) | null,
     ) => {
-      const applyFailure = apply === null ? null : notify(apply);
+      const applyResult = apply === null ? Promise.resolve(null) : notifyAsync(apply);
       // The failure flags belong to the operation that set them: queuing a change or retry takes and clears them, so a later
       // operation never reads (or leaves) an earlier one's state.
       prefFailed[owner] = { apply: false, save: false };
       pendingPrefWrites[owner] += 1;
-      return enqueue(() =>
-        persist(owner, write, applyFailure).finally(() => {
+      return enqueue(async () =>
+        persist(owner, write, await applyResult).finally(() => {
           pendingPrefWrites[owner] -= 1;
         }),
       );
@@ -236,6 +252,8 @@ export function createSettingsStore(deps: SettingsDeps) {
         dataAttribution: await attributionFor(region),
         regionDataError: await unavailableFor(region),
       });
+      if (saveFailure === null && applyFailure === null && get().region === region)
+        notify(() => deps.onRegionSaved?.(region));
     };
 
     return {

@@ -285,6 +285,24 @@ describe('airport column loader', () => {
     stop();
   });
 
+  it('PIREPs that were waiting on a failed airport lookup load once a refresh finds the airport', async () => {
+    let calls = 0;
+    const fetchPireps = jest.fn(async () => []);
+    const { app, column, settle, stop } = setup({
+      log: () => undefined,
+      pireps: { fetchPireps },
+      aviation: { airport: () => (++calls === 1 ? Promise.reject(new Error('db closed')) : Promise.resolve(KSQL)) },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    expect(fetchPireps).not.toHaveBeenCalled();
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    expect(fetchPireps).toHaveBeenCalledTimes(1);
+    expect(column.getState().columns.KSQL!.pireps?.loading).toBe(false);
+    stop();
+  });
+
   describe('charts and the NOTAM key', () => {
     const CYCLE = { code: '2611', effectiveMs: 1, expirationMs: 2 };
     const chart = {

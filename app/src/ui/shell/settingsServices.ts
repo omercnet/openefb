@@ -35,7 +35,8 @@ export interface SettingsServicesDeps {
   runtime: AppRuntime;
   files: TextStorage;
   /** AppState.region follows (the shell reloads the map for it). */
-  onRegionChange: (region: Region) => void;
+  /** The region was saved: the shell restarts the live app on it. */
+  onRegionSaved: (region: Region) => void;
   onDisplayModeChange: (mode: DisplayMode) => void;
   now?: () => number;
 }
@@ -61,8 +62,9 @@ export function createSettingsServices(deps: SettingsServicesDeps): SettingsServ
       const open = region === 'israel' ? started.israel !== null : started.aviation !== null;
       return open ? null : errorDescription({ kind: 'regionDataUnavailable', region });
     },
-    setTelemetryEnabled: (enabled) => void runtime.telemetry.setEnabled(enabled).catch((e) => console.warn(e)),
-    onRegionChange: deps.onRegionChange,
+    // The rejection reaches Settings: an opt-out whose backlog could not be cleared must not read as saved.
+    setTelemetryEnabled: (enabled) => runtime.telemetry.setEnabled(enabled),
+    onRegionSaved: deps.onRegionSaved,
     onDisplayModeChange: deps.onDisplayModeChange,
     now,
     appInfo: { version: Constants.expoConfig?.version ?? '1.0.0', build: Constants.nativeBuildVersion ?? '1' },

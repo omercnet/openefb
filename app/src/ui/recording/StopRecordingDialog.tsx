@@ -35,12 +35,21 @@ export function popoverPosition(button: WindowFrame | null, window: { width: num
   return { left, top: button.y + button.height + POPOVER_GAP };
 }
 
-/** Swift: End Recording runs confirmStop, then the success haptic. */
-const confirmAnd = (store: RecordingViewStore, onConfirmed?: () => void) => () =>
+/**
+ * Swift: End Recording runs confirmStop, then the success haptic. confirmStop records a failed stop as lastError and resolves,
+ * so a stop that failed (a new recordingFailed) is not announced as a success.
+ */
+const confirmAnd = (store: RecordingViewStore, onConfirmed?: () => void) => () => {
+  const before = store.getState().lastError;
   void store
     .getState()
     .confirmStop()
-    .then(() => onConfirmed?.());
+    .then(() => {
+      const after = store.getState().lastError;
+      if (after !== before && after?.kind === 'recordingFailed') return;
+      onConfirmed?.();
+    });
+};
 
 export function StopRecordingDialog({ store, onConfirmed }: { store: RecordingViewStore; onConfirmed?: () => void }) {
   const visible = useStore(store, (s) => s.showStopConfirmation);

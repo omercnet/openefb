@@ -14,11 +14,13 @@ export interface AirportDiagramsDeps {
   enabled: () => boolean;
   subscribeEnabled: (listener: () => void) => () => void;
   /** The remote kill switch of the Israel overlay; null without remote config. */
+  /** The diagram packs behind the source (CAAI, FAA): `edition` says which one is installed, null for none. */
+  packs?: readonly { subscribe(listener: () => void): () => void; edition(): string | null }[];
   remote: { isDisabled(feature: 'israelDiagramOverlay'): boolean; subscribe(listener: () => void): () => void } | null;
 }
 
 export function useAirportDiagrams(deps: AirportDiagramsDeps) {
-  const { source, region, enabled, subscribeEnabled, remote } = deps;
+  const { source, region, enabled, subscribeEnabled, remote, packs } = deps;
   const controller: DiagramOverlayController = useMemo(
     () =>
       new DiagramOverlayController({
@@ -38,6 +40,20 @@ export function useAirportDiagrams(deps: AirportDiagramsDeps) {
     const stops = [subscribeEnabled(() => void controller.refresh()), remote?.subscribe(() => void controller.refresh())];
     return () => stops.forEach((stop) => stop?.());
   }, [controller, subscribeEnabled, remote]);
+  // A pack installed, replaced by another edition or removed in Settings: drop what was loaded from the old one. The stores
+  // notify on every progress tick, so only a change of edition counts.
+  useEffect(() => {
+    const stops = (packs ?? []).map((pack) => {
+      let last = pack.edition();
+      return pack.subscribe(() => {
+        const now = pack.edition();
+        if (now === last) return;
+        last = now;
+        void controller.invalidate();
+      });
+    });
+    return () => stops.forEach((stop) => stop());
+  }, [controller, packs]);
   useEffect(() => () => controller.dispose(), [controller]);
   const view = useDiagramOverlay(controller);
   const onCamera = useCallback(

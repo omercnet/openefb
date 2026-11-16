@@ -26,6 +26,10 @@ describe('the official chart pack on the map', () => {
       present: true,
       url: 'mbtiles:///data/Application%20Support/israel-cvfr.mbtiles',
     });
+    // An Expo file URI names the same file; the scheme must not end up inside the mbtiles URL.
+    expect(officialChartOf({ packPath: 'file:///data/Application%20Support/israel-cvfr.mbtiles' }).url).toBe(
+      'mbtiles:///data/Application%20Support/israel-cvfr.mbtiles',
+    );
     expect(officialChartOf({ packPath: null })).toEqual({ present: false, url: null });
     expect(officialChartOf(null).present).toBe(false);
   });

@@ -98,9 +98,12 @@ export function startAlerts(deps: AlertsBindingDeps): { alerts: AlertsRuntime; s
   // The TFR list for the proximity check: read while the TFR layer is on.
   let tfrTimer: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
+  /** Bumped by every load and by the layer going off: a response from before that is dropped. */
+  let tfrGeneration = 0;
   const loadTfrs = () => {
+    const generation = ++tfrGeneration;
     runtime.tfr.currentTFRs().then(
-      (snapshot) => !stopped && alerts.setTfrs(snapshot.tfrs as Tfr[], true),
+      (snapshot) => !stopped && generation === tfrGeneration && alerts.setTfrs(snapshot.tfrs as Tfr[], true),
       (error) => log(`TFR list for alerts failed: ${String(error)}`),
     );
   };
@@ -112,6 +115,7 @@ export function startAlerts(deps: AlertsBindingDeps): { alerts: AlertsRuntime; s
     } else if (!on && tfrTimer !== null) {
       clearInterval(tfrTimer);
       tfrTimer = null;
+      tfrGeneration += 1; // a request still in flight must not turn the hidden layer back on
       alerts.setTfrs([], false);
     }
   };

@@ -37,6 +37,9 @@ function fakeAlerts() {
   };
 }
 
+const bindings: { stop: () => void }[] = [];
+afterEach(() => bindings.splice(0).forEach((b) => b.stop()));
+
 function setup(layers: string[] = ['tfrs']) {
   const fake = fakeAlerts();
   const log = flightLog.make({ ...EMPTY_FLIGHT_LOG, region: 'israel' });
@@ -52,6 +55,7 @@ function setup(layers: string[] = ['tfrs']) {
     subscribeLayers: (l) => ((layerListener = l), () => undefined),
     alerts: fake.alerts,
   });
+  bindings.push(binding);
   return { ...fake, log, own, binding, tfr, layers, changeLayers: () => layerListener() };
 }
 
@@ -124,5 +128,33 @@ describe('alerts binding', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('a TFR answer that arrives after the layer went off does not turn it back on', async () => {
+    let answer: (v: { tfrs: unknown[]; fetchedAt: number }) => void = () => undefined;
+    const fake = fakeAlerts();
+    const layers = ['tfrs'];
+    let notify: () => void = () => undefined;
+    const binding = startAlerts({
+      runtime: {
+        started: { aviation: null, israel: null },
+        israelNotam: {},
+        tfr: { currentTFRs: () => new Promise((resolve) => (answer = resolve as never)) },
+      } as never,
+      haptics: { warning: jest.fn() },
+      flightLog: flightLog.make({ ...EMPTY_FLIGHT_LOG, region: 'us' }),
+      ownship: ownship.make(),
+      visibleLayers: () => layers,
+      subscribeLayers: (l) => ((notify = l), () => undefined),
+      alerts: fake.alerts,
+    });
+    bindings.push(binding);
+    layers.length = 0;
+    notify(); // the layer is switched off while the request is pending
+    expect(fake.alerts.setTfrs).toHaveBeenLastCalledWith([], false);
+    answer({ tfrs: [{ id: 'late' }], fetchedAt: 1 });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(fake.alerts.setTfrs).not.toHaveBeenCalledWith([{ id: 'late' }], true);
   });
 });

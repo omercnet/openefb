@@ -19,7 +19,9 @@ export interface OfficialChart {
 const NONE: OfficialChart = { present: false, url: null };
 
 export function officialChartOf(source: Pick<OfficialChartSource, 'packPath'> | null): OfficialChart {
-  const path = source?.packPath ?? null;
+  // An Expo file URI (`file:///data/x`) names the same file as its path: mbtiles:// takes the absolute path only.
+  const raw = source?.packPath ?? null;
+  const path = raw?.startsWith('file://') ? decodeURI(raw.slice('file://'.length)) : raw;
   return path ? { present: true, url: israelOfficialChartUrl(path) } : NONE;
 }
 

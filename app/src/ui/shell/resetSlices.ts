@@ -23,6 +23,9 @@ export function resetLiveSlices(region: Region, saved?: Partial<LayersData>): vo
     stripColumn: 'log',
     selectedScreen: 'map',
     overlay: null,
+    // The previous region's view: Offline Maps must not offer it until the new map reports its own.
+    mapBounds: null,
+    mapFrameRequest: null,
     selectedAirportId: null,
     databaseError: null,
     isPresentingBriefing: false,

@@ -171,7 +171,7 @@ export function LiveApp({
       createSettingsServices({
         runtime,
         files: fileTextStorage,
-        onRegionChange: (region) => onRegionChange?.(region),
+        onRegionSaved: (region) => onRegionChange?.(region),
         onDisplayModeChange: (mode) => layers.store.setState({ displayMode: mode }),
       }),
     [runtime, onRegionChange],

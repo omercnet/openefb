@@ -127,9 +127,24 @@ describe('StopRecordingDialog', () => {
     const lab = captureRecordingLab();
     const done = jest.fn();
     const view = await render(<StopRecordingDialog store={lab.store} onConfirmed={done} />);
+    await act(async () => lab.store.getState().startRecording());
     await act(async () => lab.store.getState().requestStop());
     await press(view.byTestId('stop-recording-confirm'));
+    expect(lab.store.getState().activeFlightId).toBeNull(); // the recording really stopped
     expect(done).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stop that failed is not announced as a success', async () => {
+    setPlatform('android');
+    const lab = captureRecordingLab();
+    jest.spyOn(lab.coordinator, 'stopRecording').mockRejectedValue(new Error('audio stuck'));
+    const done = jest.fn();
+    const view = await render(<StopRecordingDialog store={lab.store} onConfirmed={done} />);
+    await act(async () => lab.store.getState().startRecording());
+    await act(async () => lab.store.getState().requestStop());
+    await press(view.byTestId('stop-recording-confirm'));
+    expect(lab.store.getState().lastError?.kind).toBe('recordingFailed');
+    expect(done).not.toHaveBeenCalled();
   });
 
   it('Android keeps the in-app dialog with Cancel', async () => {

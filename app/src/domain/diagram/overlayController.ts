@@ -154,6 +154,20 @@ export class DiagramOverlayController {
     return this.refresh();
   }
 
+  /**
+   * The pack behind the source changed (installed, replaced by another edition, removed): what was loaded came from the old
+   * one, so everything is dropped, the "unavailable" and retry bookkeeping with it, and the camera asked again.
+   */
+  invalidate(): Promise<void> {
+    this.epoch += 1;
+    this.entries.clear();
+    this.loading.clear();
+    this.unavailable.clear();
+    this.failedAt.clear();
+    this.emit();
+    return this.refresh();
+  }
+
   /** The user toggled the overlay or the kill switch changed. */
   refresh(): Promise<void> {
     return this.onCamera(this.camera);

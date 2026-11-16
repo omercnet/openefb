@@ -45,6 +45,24 @@ function withSettings(inner: UserData, over: Partial<UserData['settings']>): Use
   return { ...inner, settings: { ...inner.settings, ...over } };
 }
 
+describe('onRegionSaved', () => {
+  it('is told once the region is saved, and not while the save failed (Settings stays open with its Retry)', async () => {
+    const onRegionSaved = jest.fn();
+    const { store } = setup({ onRegionSaved });
+    await store.getState().load();
+    await store.getState().setRegion('us');
+    expect(onRegionSaved).toHaveBeenCalledWith('us');
+    const failing = jest.fn();
+    const base = createMemoryUserData();
+    const broken = withSettings(base, { update: () => Promise.reject(new Error('disk full')) });
+    const second = setup({ onRegionSaved: failing }, broken);
+    await second.store.getState().load();
+    await second.store.getState().setRegion('us');
+    expect(failing).not.toHaveBeenCalled();
+    expect(second.store.getState().regionSaveError).toContain('disk full');
+  });
+});
+
 describe('load', () => {
   it('a fresh install reads the defaults', async () => {
     const { store } = setup();
@@ -300,6 +318,14 @@ describe('setDisplayMode (AppState.displayMode didSet)', () => {
 });
 
 describe('setShareUsageData (Privacy toggle)', () => {
+  it('an opt-out whose telemetry call rejects (the backlog could not be cleared) is not reported as saved', async () => {
+    const { store } = setup({ setTelemetryEnabled: () => Promise.reject(new Error('backlog stuck')) });
+    await store.getState().load();
+    await store.getState().setShareUsageData(false);
+    expect(store.getState().preferenceErrorFor).toBe('shareUsageData');
+    expect(store.getState().preferenceError).toContain('backlog stuck');
+  });
+
   it('saves the flag and tells telemetry with the current region', async () => {
     const { store, prefs, setTelemetryEnabled } = setup();
     await store.getState().load();

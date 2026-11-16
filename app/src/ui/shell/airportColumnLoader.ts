@@ -329,7 +329,15 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
       // The cache is cleared so the fetch goes to the network; the report on screen stays the fallback if it fails.
       const shown = column.getState().columns[icao]?.weather.metar ?? weather.cachedWeather(icao);
       weather.clearCache(icao);
-      if (lookupFailed.has(icao)) void resolveAirport(icao);
+      if (lookupFailed.has(icao)) {
+        // The reports that were waiting on the airport (their first load returned without one) start now it is found.
+        void resolveAirport(icao).then(() => {
+          const data = column.getState().columns[icao];
+          if (stopped || !data?.airport) return;
+          if (data.pireps?.loading && data.pireps.pireps === null) void loadPireps(icao);
+          if (data.winds?.loading && data.winds.report === null) void loadWinds(icao);
+        });
+      }
       void loadWeather(icao, shown);
     },
   });

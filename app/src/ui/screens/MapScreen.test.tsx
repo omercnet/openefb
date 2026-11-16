@@ -109,7 +109,7 @@ function fakeRuntime(
       refresh: async () => undefined,
     },
     layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
-    chartPacks: { diagramSource, israelChart: official.store },
+    chartPacks: { diagramSource, israelChart: official.store, israelDiagrams: noPack, usDiagrams: noPack },
     location,
     network,
   } as unknown as AppRuntime;
@@ -133,6 +133,7 @@ const official = (() => {
     },
   };
 })();
+const noPack = { pack: null, subscribe: () => () => undefined };
 const diagramSource = { candidates: jest.fn(async () => []), diagramFor: jest.fn() };
 
 const mountLive = async (runtime: AppRuntime) =>
@@ -208,6 +209,25 @@ describe('live MapScreen (MapContainerView)', () => {
     });
     expect(appStore.getState().selectedAirportId).toBe('KSQL');
     expect(appStore.getState().stripColumn).toBe('airport');
+  });
+
+  it('a slow answer to an earlier tap does not overwrite the later tap', async () => {
+    const { runtime } = fakeRuntime();
+    appStore.setState({ selectedAirportId: null, stripColumn: 'log' });
+    await mountLive(runtime);
+    const hit = (icao: string) => [{ properties: { icao }, geometry: { type: 'Point', coordinates: [-122.25, 37.5] } }];
+    let slow: (v: ReturnType<typeof hit>) => void = () => undefined;
+    await act(async () => {
+      lastSurface!.onMapPress({
+        lngLat: { lng: -122.25, lat: 37.5 },
+        query: () => new Promise((r) => (slow = r)) as never,
+      });
+      lastSurface!.onMapPress({ lngLat: { lng: -122.25, lat: 37.5 }, query: async () => hit('KSQL') as never });
+      await new Promise((r) => setTimeout(r, 0));
+      slow(hit('KOAK'));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(appStore.getState().selectedAirportId).toBe('KSQL');
   });
 
   it('a tap on empty map opens nothing', async () => {

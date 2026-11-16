@@ -27,22 +27,23 @@ describe('the US planner on the live app', () => {
   });
 
   it('a saved plan survives in the user database and is restored when the planner opens again', async () => {
-    const { store, userDb, app } = await setup();
+    const { store, userDb } = await setup();
     await store.getState().configure();
     store.getState().selectDeparture(KPAO);
     store.getState().selectDestination(KSQL);
     store.getState().calculateAndDrawRoute();
     await store.getState().savePlan();
+    const secondApp = createAppStore();
     const again = createLiveFlightPlanStore({
       aviation: createFakeAviationDatabase(),
       userDb,
       aircraft: () => [],
-      app: createAppStore(),
+      app: secondApp,
       now: () => 2_000,
     });
     await again.getState().configure();
     expect(again.getState().savedPlans).toHaveLength(1);
-    expect(app.getState().navigation.activeFlightPlan).not.toBeNull();
+    expect(secondApp.getState().navigation.activeFlightPlan).not.toBeNull();
   });
 
   it('without the aviation database the fields simply find nothing', async () => {

@@ -14,7 +14,7 @@ const view = (zoom: number) => ({
   animated: false,
 });
 
-function harness(over: { region: Region; remoteDisabled?: boolean }) {
+function harness(over: { region: Region; remoteDisabled?: boolean; packs?: NonNullable<Parameters<typeof useAirportDiagrams>[0]['packs']> }) {
   const source: DiagramPackSource = { candidates: jest.fn(async () => []), diagramFor: jest.fn() };
   const remoteListeners = new Set<() => void>();
   const remote = {
@@ -28,6 +28,7 @@ function harness(over: { region: Region; remoteDisabled?: boolean }) {
       region: over.region,
       enabled: () => true,
       subscribeEnabled: () => () => undefined,
+      packs: over.packs,
       remote,
     });
     return null;
@@ -68,5 +69,23 @@ describe('useAirportDiagrams', () => {
     h.remote.isDisabled = () => true;
     await act(async () => h.remoteListeners.forEach((l) => l()));
     expect(h.api.snapshot.visible).toBe(false);
+  });
+
+  it('a pack installed or replaced in Settings drops what was loaded and asks the source again; progress ticks do not', async () => {
+    let edition: string | null = null;
+    const listeners = new Set<() => void>();
+    const pack = { subscribe: (l: () => void) => (listeners.add(l), () => void listeners.delete(l)), edition: () => edition };
+    const h = harness({ region: 'israel', packs: [pack] });
+    await render(<h.Probe />);
+    await act(async () => h.api.onCamera(view(15)));
+    expect(h.source.candidates).toHaveBeenCalledTimes(1);
+    await act(async () => listeners.forEach((l) => l())); // a download progress tick: same edition (none)
+    expect(h.source.candidates).toHaveBeenCalledTimes(1);
+    edition = '2026-02';
+    await act(async () => listeners.forEach((l) => l()));
+    expect(h.source.candidates).toHaveBeenCalledTimes(2);
+    edition = null; // removed
+    await act(async () => listeners.forEach((l) => l()));
+    expect(h.source.candidates).toHaveBeenCalledTimes(3);
   });
 });
