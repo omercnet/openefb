@@ -93,6 +93,29 @@ describe('onRegionSaved with overlapping choices', () => {
   });
 });
 
+describe('onRegionSaved while the data lookups are pending', () => {
+  it('an older save still reading its attribution does not restart over a newer choice', async () => {
+    const onRegionSaved = jest.fn();
+    const slowAttribution = Promise.withResolvers<ReturnType<typeof fallbackDataAttribution>>();
+    let calls = -1; // armed after load
+    const { store } = setup({
+      onRegionSaved,
+      dataAttribution: (r) =>
+        calls >= 0 && ++calls === 1 ? slowAttribution.promise : Promise.resolve(fallbackDataAttribution(r)),
+    });
+    await store.getState().load();
+    calls = 0;
+    const first = store.getState().setRegion('us'); // its save finishes, then it waits on the attribution
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(calls).toBe(1); // it is inside the attribution lookup
+    const away = store.getState().setRegion('israel');
+    const back = store.getState().setRegion('us'); // the first region again: a newer save owns the restart
+    slowAttribution.resolve(fallbackDataAttribution('us'));
+    await Promise.all([first, away, back]);
+    expect(onRegionSaved).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('load', () => {
   it('a fresh install reads the defaults', async () => {
     const { store } = setup();

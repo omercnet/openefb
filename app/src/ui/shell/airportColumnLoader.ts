@@ -155,7 +155,8 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
   }
 
   /** Finds the airport record; a failed lookup is remembered so the refresh buttons retry it. */
-  async function resolveAirport(icao: string): Promise<void> {
+  /** Resolves true when this lookup's result was the one applied (false: a newer lookup owns the airport). */
+  async function resolveAirport(icao: string): Promise<boolean> {
     const request = (lookupRequest.get(icao) ?? 0) + 1;
     lookupRequest.set(icao, request);
     let found: { airport: Airport | null; elevationPublished: boolean; aerodrome?: IsraelAerodrome };
@@ -169,10 +170,11 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     }
     // Overlapping lookups (two refresh taps): only the newest may write, the retry marker included, so a late failure
     // neither blanks a newer result nor makes a good airport look retryable.
-    if (lookupRequest.get(icao) !== request) return;
+    if (lookupRequest.get(icao) !== request) return false;
     if (failed) lookupFailed.add(icao);
     else lookupFailed.delete(icao);
     patchColumn(icao, (d) => ({ ...d, ...found }));
+    return true;
   }
 
   const notamRequest = new Map<string, number>();
@@ -331,7 +333,8 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
       weather.clearCache(icao);
       if (lookupFailed.has(icao)) {
         // The reports that were waiting on the airport (their first load returned without one) start now it is found.
-        void resolveAirport(icao).then(() => {
+        void resolveAirport(icao).then((applied) => {
+          if (!applied) return; // an overlapping lookup finished later and owns the reports
           const data = column.getState().columns[icao];
           if (stopped || !data?.airport) return;
           if (data.pireps?.loading && data.pireps.pireps === null) void loadPireps(icao);

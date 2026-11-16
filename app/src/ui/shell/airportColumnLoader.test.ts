@@ -303,6 +303,38 @@ describe('airport column loader', () => {
     stop();
   });
 
+  it('a stale lookup finishing after a newer one does not restart the reports it already started', async () => {
+    const slow = Promise.withResolvers<DataAirport | null>();
+    let calls = 0;
+    const reports = Promise.withResolvers<never[]>();
+    const fetchPireps = jest.fn(() => reports.promise);
+    const { app, column, settle, stop } = setup({
+      log: () => undefined,
+      pireps: { fetchPireps },
+      aviation: {
+        airport: () => {
+          calls += 1;
+          if (calls === 1) return Promise.reject(new Error('db closed'));
+          if (calls === 2) return slow.promise; // the older refresh hangs
+          return Promise.resolve(KSQL); // the newer one resolves first
+        },
+      },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    column.getState().refreshWeather('KSQL');
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    expect(fetchPireps).toHaveBeenCalledTimes(1);
+    slow.resolve(KSQL); // the report is still loading when the stale lookup finishes
+    await settle();
+    expect(fetchPireps).toHaveBeenCalledTimes(1); // the stale completion starts nothing
+    reports.resolve([]);
+    await settle();
+    expect(column.getState().columns.KSQL!.pireps?.loading).toBe(false);
+    stop();
+  });
+
   describe('charts and the NOTAM key', () => {
     const CYCLE = { code: '2611', effectiveMs: 1, expirationMs: 2 };
     const chart = {

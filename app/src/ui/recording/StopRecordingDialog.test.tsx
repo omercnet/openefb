@@ -134,6 +134,28 @@ describe('StopRecordingDialog', () => {
     expect(done).toHaveBeenCalledTimes(1);
   });
 
+  it('a second confirmation while the first stop is pending waits for it, and a failure reaches both', async () => {
+    setPlatform('android');
+    const lab = captureRecordingLab();
+    const gate = Promise.withResolvers<never>();
+    jest.spyOn(lab.coordinator, 'stopRecording').mockReturnValue(gate.promise);
+    const done = jest.fn();
+    await render(<StopRecordingDialog store={lab.store} onConfirmed={done} />);
+    await act(async () => lab.store.getState().startRecording());
+    const first = lab.store.getState().confirmStop();
+    let secondDone = false;
+    const second = lab.store
+      .getState()
+      .confirmStop()
+      .then(() => (secondDone = true));
+    await act(async () => Promise.resolve());
+    expect(secondDone).toBe(false); // it did not return ahead of the stop that is running
+    gate.reject(new Error('audio stuck'));
+    await act(async () => Promise.all([first, second]));
+    expect(lab.store.getState().lastError?.kind).toBe('recordingFailed');
+    expect(done).not.toHaveBeenCalled();
+  });
+
   it('a stop that failed is not announced as a success', async () => {
     setPlatform('android');
     const lab = captureRecordingLab();

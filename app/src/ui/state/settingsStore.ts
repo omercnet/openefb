@@ -245,17 +245,19 @@ export function createSettingsStore(deps: SettingsDeps) {
       }
       // A newer choice owns the shared state; this older save must not overwrite its error, attribution or availability.
       if (get().region !== region || generation !== regionGeneration) return;
+      const [dataAttribution, regionDataError] = [await attributionFor(region), await unavailableFor(region)];
+      // Those awaits are a window too: a choice made during them (us, israel, us again) owns the state and the restart.
+      if (get().region !== region || generation !== regionGeneration) return;
       regionFailed = { region, apply: applyFailure !== null, save: saveFailure !== null };
       set({
         regionSaveError:
           saveFailure !== null
             ? `Region changed, but it could not be saved: ${saveFailure}`
             : applyFailure && `Region changed, but the app could not apply it: ${applyFailure}`,
-        dataAttribution: await attributionFor(region),
-        regionDataError: await unavailableFor(region),
+        dataAttribution,
+        regionDataError,
       });
-      if (saveFailure === null && applyFailure === null && get().region === region)
-        notify(() => deps.onRegionSaved?.(region));
+      if (saveFailure === null && applyFailure === null) notify(() => deps.onRegionSaved?.(region));
     };
 
     return {
