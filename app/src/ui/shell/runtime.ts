@@ -1,7 +1,7 @@
 // The production composition root: builds the services from the platform adapters and runs the launch sequence
 // (startup.ts). Imported only by the live app route, never by tests or capture routes, because it requires the bundled
 // databases. Tests build the same pieces with fakes (startup.test.ts, liveData.test.ts).
-import Constants from 'expo-constants';
+import { appBuildNumber } from '../../adapters/appBuild';
 import { createLocationSource } from '../../adapters/location';
 import { createNetworkStatusSource, type NetworkStatusSource } from '../../adapters/network';
 import baseStyle from '../../../assets/base-style.json';
@@ -21,12 +21,15 @@ import { AirSigmetService } from '../../services/airSigmetService';
 import { createRemoteConfigService } from '../../services/remoteConfigService';
 import { RemoteConfigStore } from '../../services/remoteConfigStore';
 import { NotamReadStateStore } from '../../services/notamReadStateStore';
+import { PirepService } from '../../services/pirepService';
+import { WindsAloftService } from '../../services/windsAloftService';
 import { IsraelNotamService } from '../../services/israelNotamService';
 import { TfrService } from '../../services/tfrService';
 import { WeatherService } from '../../services/weatherService';
 import { loadLayerSettings, type LayerSettings } from './layersSettings';
 import { asCoordinatorAudio } from '../../adapters/coordinatorAudio';
 import { createAudioRecorder } from '../../adapters/audioRecorder';
+import { createHaptics, type Haptics } from '../../adapters/haptics';
 import { createLowPowerMode, type LowPowerSource } from '../../adapters/lowPower';
 import { createMicrophonePermission } from '../../adapters/microphonePermission';
 import type { Preferences } from '../../domain/ports/preferences';
@@ -42,6 +45,7 @@ import { createTranscriptionService } from '../../adapters/transcription';
 import type { Telemetry } from '../../domain/telemetry/telemetry';
 import { appStore } from '../state/appStore';
 import { regionSlice } from '../state/region';
+import { openChartPacks, type ChartPacks } from './chartPacks';
 import { createProfiles, type Profiles } from './profiles';
 import { createRecordingRuntime, type RecordingRuntime } from './recordingRuntime';
 import { runStartup, type StartedApp } from './startup';
@@ -64,21 +68,26 @@ export interface AppRuntime {
   preferences: Preferences;
   /** Low Power Mode doubles the data refresh intervals. */
   lowPower: LowPowerSource;
+  /** Haptics (Swift `Haptics`): alerts, recording start and stop, strip taps. */
+  haptics: Haptics;
+  /** The chart packs: CAAI CVFR chart, CAAI and FAA airport diagrams. Settings drives them, the diagram overlay reads them. */
+  chartPacks: ChartPacks;
   telemetry: Telemetry;
   notamConfigured: () => Promise<boolean>;
   /** The FAA NOTAM service (free key from Settings); the airport column's NOTAM list. */
   notams: NotamService;
   offline: OfflineMapService;
   advisories: AirSigmetService;
+  /** Pilot reports near the airport (airport column, regions with the layer). */
+  pirep: PirepService;
+  /** Winds aloft forecast (airport column, regions with the layer). */
+  windsAloft: WindsAloftService;
   layerSettings: LayerSettings;
   location: LocationSource;
   network: NetworkStatusSource;
 }
 
 const log = (message: string) => console.warn(message);
-
-/** CFBundleVersion / versionCode as the remote config compares it; 0 when the build has none. */
-const buildNumber = (): number => Number(Constants.nativeBuildVersion) || 0;
 
 export async function startRuntime(): Promise<AppRuntime> {
   const fetchLike = globalThis.fetch as unknown as import('../../services/ports').FetchLike;
@@ -90,8 +99,9 @@ export async function startRuntime(): Promise<AppRuntime> {
     openAviation: openAviationDatabase,
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- a Metro asset module, as aviationDb.ts does
     openIsrael: () => openIsraelDatabase(require('../../../assets/israel-aviation.sqlite')),
+    // The build comes from expo-application; null (unreadable) means the update banner is never raised for it.
     openRemoteConfig: () =>
-      RemoteConfigStore.open({ service: remote, storage: fileTextStorage, buildNumber: buildNumber(), log }),
+      RemoteConfigStore.open({ service: remote, storage: fileTextStorage, buildNumber: appBuildNumber(), log }),
     log,
   });
   const notamReadStore = await NotamReadStateStore.open(fileTextStorage, log);
@@ -101,6 +111,17 @@ export async function startRuntime(): Promise<AppRuntime> {
   // iOS has no SFSpeechRecognizer fallback: fetch the on-device speech model now, so a flight can be transcribed.
   void prepareSpeechAssets().catch((e) => log(`Speech assets: ${String(e)}`));
   startTelemetry(telemetry); // counts the launch; nothing is sent unless EXPO_PUBLIC_TELEMETRY_URL is set
+  const chartPacks = await openChartPacks({
+    fetch: fetchLike,
+    fs: chartFileSystem,
+    downloader: fileDownloader,
+    storage: fileTextStorage,
+    root: chartRoot('charts'),
+    aviation: started.aviation,
+    israel: started.israel,
+    allowUnpublished: () => false, // the developer setting is not exposed in this build
+    log,
+  });
   const debriefModel = createDebriefModel();
   const debrief = debriefModel.offered ? new DomainDebriefEngine({ model: debriefModel, telemetry }) : null;
   return {
@@ -109,6 +130,8 @@ export async function startRuntime(): Promise<AppRuntime> {
     notamReadStore,
     preferences,
     lowPower: createLowPowerMode(),
+    haptics: createHaptics(),
+    chartPacks,
     profiles: createProfiles(started.userDb, preferences),
     telemetry,
     debrief,
@@ -135,6 +158,8 @@ export async function startRuntime(): Promise<AppRuntime> {
     }),
     israelNotam: new IsraelNotamService({ fetch: fetchLike, storage: fileTextStorage, log }),
     advisories: new AirSigmetService({ fetch: fetchLike, log }),
+    pirep: new PirepService({ fetch: fetchLike, log }),
+    windsAloft: new WindsAloftService({ fetch: fetchLike, log }),
     location: createLocationSource(),
     network: createNetworkStatusSource(),
   };

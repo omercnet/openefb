@@ -1,4 +1,10 @@
 import { StyleSheet, View } from 'react-native';
+import type { MapLayer } from '../../domain/core';
+import { ISRAEL_OFFICIAL_CHART_SOURCE_ID, israelOfficialChartOverrides } from '../../domain/map/israel/layers';
+import { withIsraelOfficialChart } from '../../domain/map/israel/officialChart';
+import type { OfficialChart } from './useOfficialChart';
+import type { MapTap } from './mapTap';
+import type { DiagramSources } from '../../domain/diagram/layers';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { layerSpecsFor } from '../../domain/map/registry';
 import { useLocalGlyphs } from '../../adapters/glyphInstall';
@@ -25,6 +31,9 @@ export function MapLayout({
   sectionalOpacity,
   model,
   initialView,
+  diagrams,
+  official,
+  onMapPress,
 }: {
   screen?: StripScreen;
   night?: boolean;
@@ -34,6 +43,12 @@ export function MapLayout({
   sectionalOpacity?: number;
   model: ReturnType<typeof useMapModel>;
   initialView: { center: { lat: number; lon: number }; zoom: number };
+  /** The airport diagram overlay's sources: backing polygons, images and forced layer visibility (live app only). */
+  diagrams?: DiagramSources;
+  /** The installed official CAAI chart (Israel): the base raster, with the vector duplicates hidden. */
+  official?: OfficialChart;
+  /** A tap on the map (live app only). */
+  onMapPress?: (tap: MapTap) => void;
 }) {
   const { widthClass, width } = useWidthClass();
   const showsFlightLog = panels.useData((s) => s.showsFlightLog);
@@ -53,11 +68,15 @@ export function MapLayout({
         sectionalOpacity={sectionalOpacity}
         region={model.snapshot.region}
         visibleLayers={model.snapshot.visibleLayers}
-        layers={layerSpecsFor(model.snapshot.region)}
-        sources={model.sources}
+        layers={withIsraelOfficialChart(layerSpecsFor(model.snapshot.region), official?.present ?? false)}
+        sources={diagrams ? { ...model.sources, ...diagrams.geojson } : model.sources}
+        imageSources={diagrams?.images}
+        rasterSources={official?.url ? { [ISRAEL_OFFICIAL_CHART_SOURCE_ID]: { url: official.url } } : undefined}
+        overrides={overridesFor(diagrams, official?.present ?? false, model.snapshot.visibleLayers, night)}
         initialView={initialView}
         camera={model.camera}
         onViewChange={model.onViewChange}
+        onMapPress={onMapPress}
         onStyleLoaded={model.onStyleLoaded}
         onTileHealth={model.onTileHealth}
       />
@@ -83,3 +102,15 @@ const styles = StyleSheet.create({
   row: { flex: 1, flexDirection: 'row' },
   map: { flex: 1 },
 });
+
+/** The diagram overlay's forced layer visibility and the official chart's overrides (hidden duplicates, tap targets), merged. */
+function overridesFor(
+  diagrams: DiagramSources | undefined,
+  officialPresent: boolean,
+  visible: ReadonlySet<MapLayer>,
+  night: boolean,
+) {
+  const official = israelOfficialChartOverrides(officialPresent, visible, night);
+  if (!diagrams && !officialPresent) return undefined;
+  return { visibility: { ...diagrams?.visibility, ...official.visibility }, paint: official.paint };
+}

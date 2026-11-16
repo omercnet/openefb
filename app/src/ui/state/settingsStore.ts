@@ -31,9 +31,12 @@ export interface SettingsDeps {
   /** Region.dataUnavailableError: why the region's bundled data cannot be opened, or null. */
   regionDataUnavailable(region: Region): Promise<string | null>;
   /** Telemetry.setEnabled(enabled, region) (A5). */
-  setTelemetryEnabled(enabled: boolean, region: Region): void;
+  setTelemetryEnabled(enabled: boolean, region: Region): void | Promise<void>;
   /** AppState.region and AppState.displayMode follow. Called at once, before the change is saved. Must not throw. */
   onRegionChange?(region: Region): void;
+  /** The region was saved (nothing failed): the shell may restart on it. Not called while a save or the app's change failed, so
+   * Settings stays open with the error and its Retry. */
+  onRegionSaved?(region: Region): void;
   onDisplayModeChange?(mode: DisplayMode): void;
   now(): number;
 }
@@ -125,6 +128,19 @@ function notify(call: () => void): string | null {
   }
 }
 
+/** Like `notify`, for a call that may finish later (the telemetry opt-out clears its backlog): started at once, its failure,
+ * thrown or rejected, is what the promise resolves to. */
+function notifyAsync(call: () => void | Promise<void>): Promise<string | null> {
+  try {
+    return Promise.resolve(call()).then(
+      () => null,
+      (error) => describeError(error),
+    );
+  } catch (error) {
+    return Promise.resolve(describeError(error));
+  }
+}
+
 export function createSettingsStore(deps: SettingsDeps) {
   // Everything that reads or writes storage runs here, one job at a time in call order, so a slow earlier write can never
   // land after a later one and a load cannot overwrite a change made while it was reading.
@@ -184,6 +200,7 @@ export function createSettingsStore(deps: SettingsDeps) {
     ) => {
       const show = (message: string | null) => {
         if (message === null && errorOwner !== owner) return; // another setting's failure stays
+        if (message !== null) prefFailures += 1;
         errorOwner = message === null ? null : owner;
         set({ preferenceError: message, preferenceErrorFor: message === null ? null : owner });
       };
@@ -200,23 +217,42 @@ export function createSettingsStore(deps: SettingsDeps) {
     /** The two preferences share one path: apply it to the app now, save it in order, and record what failed. */
     const changePreference = (
       owner: 'displayMode' | 'shareUsageData',
-      apply: (() => void) | null,
+      apply: (() => void | Promise<void>) | null,
       write: (() => Promise<void>) | null,
     ) => {
-      const applyFailure = apply === null ? null : notify(apply);
+      const applyResult = apply === null ? Promise.resolve(null) : notifyAsync(apply);
       // The failure flags belong to the operation that set them: queuing a change or retry takes and clears them, so a later
       // operation never reads (or leaves) an earlier one's state.
       prefFailed[owner] = { apply: false, save: false };
       pendingPrefWrites[owner] += 1;
-      return enqueue(() =>
-        persist(owner, write, applyFailure).finally(() => {
+      return enqueue(async () =>
+        persist(owner, write, await applyResult).finally(() => {
           pendingPrefWrites[owner] -= 1;
+          restartWhenPrefsSettle();
         }),
       );
     };
 
     /** Saves the region (when `write`) and records what failed. `applyFailure` is what notifying the app threw, if anything. */
-    const saveRegion = async (region: Region, applyFailure: string | null, write: boolean) => {
+    /** Bumped by every region choice or retry: only the newest save may report back (A, then B, then A again, is three). */
+    let regionGeneration = 0;
+    /** A saved region whose restart waits for the preference saves still pending (Settings stays open meanwhile). */
+    let restartAfter: { region: Region; generation: number; failures: number } | null = null;
+    /** Preference saves that failed so far: a restart is held back only by one that failed after the region was saved. */
+    let prefFailures = 0;
+    const restartWhenPrefsSettle = () => {
+      const due = restartAfter;
+      if (!due) return;
+      if (due.generation !== regionGeneration) {
+        restartAfter = null; // a newer choice owns the restart
+        return;
+      }
+      if (pendingPrefWrites.displayMode > 0 || pendingPrefWrites.shareUsageData > 0) return; // called again as they finish
+      restartAfter = null;
+      if (prefFailures > due.failures) return; // one failed meanwhile: Settings keeps its error and Retry
+      notify(() => deps.onRegionSaved?.(due.region));
+    };
+    const saveRegion = async (region: Region, applyFailure: string | null, write: boolean, generation: number) => {
       let saveFailure: string | null = null;
       if (write) {
         try {
@@ -226,16 +262,25 @@ export function createSettingsStore(deps: SettingsDeps) {
         }
       }
       // A newer choice owns the shared state; this older save must not overwrite its error, attribution or availability.
-      if (get().region !== region) return;
+      if (get().region !== region || generation !== regionGeneration) return;
+      const [dataAttribution, regionDataError] = [await attributionFor(region), await unavailableFor(region)];
+      // Those awaits are a window too: a choice made during them (us, israel, us again) owns the state and the restart.
+      if (get().region !== region || generation !== regionGeneration) return;
       regionFailed = { region, apply: applyFailure !== null, save: saveFailure !== null };
       set({
         regionSaveError:
           saveFailure !== null
             ? `Region changed, but it could not be saved: ${saveFailure}`
             : applyFailure && `Region changed, but the app could not apply it: ${applyFailure}`,
-        dataAttribution: await attributionFor(region),
-        regionDataError: await unavailableFor(region),
+        dataAttribution,
+        regionDataError,
       });
+      if (saveFailure === null && applyFailure === null) {
+        // Restarting removes Settings. A preference saved behind this save is still pending: the restart waits for it
+        // (`restartWhenPrefsSettle`), so a failure of it keeps its error and Retry on screen.
+        restartAfter = { region, generation, failures: prefFailures };
+        restartWhenPrefsSettle();
+      }
     };
 
     return {
@@ -325,9 +370,10 @@ export function createSettingsStore(deps: SettingsDeps) {
         const applyFailure = !retry || failed.apply ? notify(() => deps.onRegionChange?.(region)) : null;
         const write = !retry || failed.save;
         pendingRegionWrites += 1;
+        const generation = ++regionGeneration;
         return enqueue(async () => {
           try {
-            await saveRegion(region, applyFailure, write);
+            await saveRegion(region, applyFailure, write, generation);
           } finally {
             pendingRegionWrites -= 1;
           }

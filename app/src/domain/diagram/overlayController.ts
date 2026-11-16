@@ -105,6 +105,11 @@ export class DiagramOverlayController {
     this.now = deps.now ?? Date.now;
   }
 
+  /** The region the overlay is currently serving. */
+  get currentRegion(): Region {
+    return this.region;
+  }
+
   subscribe = (l: () => void): (() => void) => {
     this.listeners.add(l);
     return () => this.listeners.delete(l);
@@ -140,6 +145,20 @@ export class DiagramOverlayController {
   setRegion(region: Region): Promise<void> {
     if (region === this.region) return Promise.resolve();
     this.region = region;
+    this.epoch += 1;
+    this.entries.clear();
+    this.loading.clear();
+    this.unavailable.clear();
+    this.failedAt.clear();
+    this.emit();
+    return this.refresh();
+  }
+
+  /**
+   * The pack behind the source changed (installed, replaced by another edition, removed): what was loaded came from the old
+   * one, so everything is dropped, the "unavailable" and retry bookkeeping with it, and the camera asked again.
+   */
+  invalidate(): Promise<void> {
     this.epoch += 1;
     this.entries.clear();
     this.loading.clear();

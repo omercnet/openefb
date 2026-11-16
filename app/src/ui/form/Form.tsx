@@ -30,10 +30,12 @@ export function NavBar({
   leading,
   trailing,
   largeTitle = false,
+  backTestID,
 }: {
   title: string;
   /** Shows a Back button in the bar's leading slot. */
   onBack?: () => void;
+  backTestID?: string;
   /** Replaces the Back button (a sheet's Cancel). */
   leading?: ReactNode;
   trailing?: ReactNode;
@@ -46,7 +48,7 @@ export function NavBar({
     <View style={{ paddingTop: insets.top }}>
       <View style={{ height: 44, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Space.s }}>
         <View style={{ flex: 1, alignItems: 'flex-start' }}>
-          {leading ?? (onBack ? <BackButton onPress={onBack} /> : null)}
+          {leading ?? (onBack ? <BackButton onPress={onBack} testID={backTestID} /> : null)}
         </View>
         {largeTitle ? null : (
           <Text accessibilityRole="header" numberOfLines={1} style={[FormType.headline, { color: t.primaryText }]}>
@@ -60,7 +62,7 @@ export function NavBar({
 }
 
 /** The large navigation title (.navigationBarTitleDisplayMode(.automatic) at the top of a stack): bold 34 pt under the bar. */
-function LargeTitle({ title }: { title: string }) {
+export function LargeTitle({ title }: { title: string }) {
   const t = useTheme();
   return (
     <View style={{ height: 49, paddingTop: 9, paddingHorizontal: FormMetrics.margin }}>
@@ -111,11 +113,12 @@ export function FormScreen({
   );
 }
 
-function BackButton({ onPress }: { onPress: () => void }) {
+function BackButton({ onPress, testID }: { onPress: () => void; testID?: string | undefined }) {
   const t = useTheme();
   return (
     <Pressy
       accessibilityLabel="Back"
+      testID={testID}
       onPress={onPress}
       style={{ minWidth: 44, minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8 }}
     >

@@ -35,19 +35,43 @@ export function popoverPosition(button: WindowFrame | null, window: { width: num
   return { left, top: button.y + button.height + POPOVER_GAP };
 }
 
-export function StopRecordingDialog({ store }: { store: RecordingViewStore }) {
+/**
+ * Swift: End Recording runs confirmStop, then the success haptic. confirmStop records a failed stop as lastError and resolves,
+ * so a stop that failed (a new recordingFailed) is not announced as a success.
+ */
+const confirmAnd = (store: RecordingViewStore, onConfirmed?: () => void) => () => {
+  const before = store.getState().lastError;
+  void store
+    .getState()
+    .confirmStop()
+    .then(() => {
+      const after = store.getState().lastError;
+      if (after !== before && after?.kind === 'recordingFailed') return;
+      onConfirmed?.();
+    });
+};
+
+export function StopRecordingDialog({ store, onConfirmed }: { store: RecordingViewStore; onConfirmed?: () => void }) {
   const visible = useStore(store, (s) => s.showStopConfirmation);
   if (Platform.OS === 'ios') {
     return Platform.isPad ? (
-      <PadPopover store={store} visible={visible} />
+      <PadPopover store={store} visible={visible} onConfirmed={onConfirmed} />
     ) : (
-      <PhoneSheet store={store} visible={visible} />
+      <PhoneSheet store={store} visible={visible} onConfirmed={onConfirmed} />
     );
   }
-  return <InAppDialog store={store} visible={visible} />;
+  return <InAppDialog store={store} visible={visible} onConfirmed={onConfirmed} />;
 }
 
-function PhoneSheet({ store, visible }: { store: RecordingViewStore; visible: boolean }) {
+function PhoneSheet({
+  store,
+  visible,
+  onConfirmed,
+}: {
+  store: RecordingViewStore;
+  visible: boolean;
+  onConfirmed?: () => void;
+}) {
   const shown = useRef(false);
   useEffect(() => {
     if (!visible) shown.current = false;
@@ -61,18 +85,26 @@ function PhoneSheet({ store, visible }: { store: RecordingViewStore; visible: bo
         destructiveButtonIndex: 0,
         cancelButtonIndex: 1,
       },
-      (index) => (index === 0 ? void store.getState().confirmStop() : store.getState().cancelStop()),
+      (index) => (index === 0 ? confirmAnd(store, onConfirmed)() : store.getState().cancelStop()),
     );
-  }, [visible, store]);
+  }, [visible, store, onConfirmed]);
   return null;
 }
 
 /** Mounted only while the question is open, so every opening starts unmeasured. */
-function PadPopover({ store, visible }: { store: RecordingViewStore; visible: boolean }) {
-  return visible ? <PadPopoverBody store={store} /> : null;
+function PadPopover({
+  store,
+  visible,
+  onConfirmed,
+}: {
+  store: RecordingViewStore;
+  visible: boolean;
+  onConfirmed?: () => void;
+}) {
+  return visible ? <PadPopoverBody store={store} onConfirmed={onConfirmed} /> : null;
 }
 
-function PadPopoverBody({ store }: { store: RecordingViewStore }) {
+function PadPopoverBody({ store, onConfirmed }: { store: RecordingViewStore; onConfirmed?: () => void }) {
   const t = useTheme();
   const window = useWindowDimensions();
   const button = useRecordButtonView();
@@ -126,7 +158,7 @@ function PadPopoverBody({ store }: { store: RecordingViewStore }) {
           </View>
           <Pressy
             accessibilityLabel={STOP_CONFIRMATION.confirm}
-            onPress={() => void store.getState().confirmStop()}
+            onPress={confirmAnd(store, onConfirmed)}
             testID="stop-recording-confirm"
             style={{
               minHeight: StripMetrics.cell,
@@ -144,7 +176,15 @@ function PadPopoverBody({ store }: { store: RecordingViewStore }) {
   );
 }
 
-function InAppDialog({ store, visible }: { store: RecordingViewStore; visible: boolean }) {
+function InAppDialog({
+  store,
+  visible,
+  onConfirmed,
+}: {
+  store: RecordingViewStore;
+  visible: boolean;
+  onConfirmed?: () => void;
+}) {
   const t = useTheme();
   const choice = (title: string, onPress: () => void, color: string, testID: string, bold?: boolean) => (
     <Pressy
@@ -187,12 +227,7 @@ function InAppDialog({ store, visible }: { store: RecordingViewStore; visible: b
               {STOP_CONFIRMATION.message}
             </Text>
           </View>
-          {choice(
-            STOP_CONFIRMATION.confirm,
-            () => void store.getState().confirmStop(),
-            t.warning,
-            'stop-recording-confirm',
-          )}
+          {choice(STOP_CONFIRMATION.confirm, confirmAnd(store, onConfirmed), t.warning, 'stop-recording-confirm')}
           {choice(
             STOP_CONFIRMATION.cancel,
             () => store.getState().cancelStop(),

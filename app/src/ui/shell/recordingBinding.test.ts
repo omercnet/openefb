@@ -68,3 +68,47 @@ describe('recording binding', () => {
     expect(slice.getState()).toMatchObject({ recording: null, recordingUnavailable: true });
   });
 });
+
+describe('record haptics', () => {
+  const press = async (outcome: 'problem' | 'started' | 'busy') => {
+    const slice = flightLog.make(EMPTY_FLIGHT_LOG);
+    const store = {
+      getState: () => ({
+        press: async () => outcome,
+        status: { kind: 'idle' },
+        elapsedTime: 0,
+        audioLevel: -160,
+        microphoneDenied: false,
+      }),
+      subscribe: () => () => undefined,
+    };
+    const haptics = { warning: jest.fn(), success: jest.fn() };
+    const stop = bindRecording(
+      {
+        store,
+        coordinator: { startAutoStartMonitoring: () => undefined, stopAutoStartMonitoring: () => undefined },
+      } as never,
+      slice,
+      { addEventListener: () => ({ remove: () => undefined }) } as never,
+      haptics,
+    );
+    slice.getState().actions.record();
+    await new Promise((r) => setTimeout(r, 0));
+    stop();
+    return haptics;
+  };
+
+  it('a start with a problem (microphone off, an error) warns', async () => {
+    const h = await press('problem');
+    expect(h.warning).toHaveBeenCalledTimes(1);
+    expect(h.success).not.toHaveBeenCalled();
+  });
+
+  it('a clean start confirms, a busy tap plays nothing', async () => {
+    const clean = await press('started');
+    expect(clean.success).toHaveBeenCalledTimes(1);
+    const busy = await press('busy');
+    expect(busy.warning).not.toHaveBeenCalled();
+    expect(busy.success).not.toHaveBeenCalled();
+  });
+});

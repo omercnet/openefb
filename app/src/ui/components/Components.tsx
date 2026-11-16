@@ -111,7 +111,7 @@ export function DataAgeBadge({
 }
 
 /** DatabaseUnavailableBanner: shown while the airport database failed to open. */
-export function DatabaseUnavailableBanner({ visible }: { visible: boolean }) {
+export function DatabaseUnavailableBanner({ visible, topInset = 0 }: { visible: boolean; topInset?: number }) {
   if (!visible) return null;
   return (
     <View
@@ -125,6 +125,7 @@ export function DatabaseUnavailableBanner({ visible }: { visible: boolean }) {
         gap: 10,
         paddingHorizontal: 12,
         paddingVertical: 8,
+        paddingTop: 8 + topInset, // the colour runs up under the status bar; the text starts below it
         alignSelf: 'stretch',
         backgroundColor: DATABASE_UNAVAILABLE_BACKGROUND,
       }}
@@ -231,11 +232,20 @@ export interface BannerItem {
 }
 
 /** RemoteConfigBanner: stacked, dismissible notices (update request first, then region notices). */
-export function RemoteConfigBanner({ items, onDismiss }: { items: BannerItem[]; onDismiss: (id: string) => void }) {
+export function RemoteConfigBanner({
+  items,
+  onDismiss,
+  topInset = 0,
+}: {
+  items: BannerItem[];
+  onDismiss: (id: string) => void;
+  /** The top safe-area inset when this is the first thing on screen: the banners sit below the status bar and Dynamic Island. */
+  topInset?: number;
+}) {
   const t = useTheme();
   if (items.length === 0) return null;
   return (
-    <View style={{ gap: 6, paddingHorizontal: 16 }} testID="remoteConfigBanner">
+    <View style={{ gap: 6, paddingHorizontal: 16, paddingTop: topInset }} testID="remoteConfigBanner">
       {items.map((item) => (
         <View
           key={item.id}

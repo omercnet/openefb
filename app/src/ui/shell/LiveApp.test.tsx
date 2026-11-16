@@ -1,4 +1,8 @@
 import { act } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Linking, StyleSheet } from 'react-native';
+import { FlightPlanSheet } from '../sheets/flightPlan/FlightPlanSheet';
+import { haptic } from '../haptics';
 import { press, render } from '../../../tests/support/ui';
 import { createFakeNetworkStatus } from '../../adapters/network';
 import { FakePreferences } from '../../domain/ports/preferences';
@@ -22,6 +26,9 @@ import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
 
 // The map is a native view and the screen is covered by its own tests; here it only marks that it is mounted.
+jest.mock('./LiveSettings', () => ({ LiveSettings: () => null })); // its screens are covered by LiveSettings.test
+jest.mock('../../adapters/secretStore', () => ({ createSecretStore: () => ({}) }));
+jest.mock('../sheets/flightPlan/FlightPlanSheet', () => ({ FlightPlanSheet: jest.fn(() => null) }));
 jest.mock('../sheets/israelPlan/IsraelFlightPlanSheet', () => ({
   IsraelFlightPlanSheet: () => null,
 }));
@@ -72,11 +79,18 @@ function runtime(over: Partial<AppRuntime['started']> = {}) {
     },
     telemetry: { signal: () => undefined },
     weather: {},
-    tfr: {},
     advisories: {},
     layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
     location,
     network,
+    haptics: { warning: jest.fn(), success: jest.fn(), light: jest.fn() },
+    preferences: new FakePreferences(),
+    chartPacks: {
+      israelChart: { subscribe: () => () => undefined, getVersion: () => 0, status: { kind: 'notDownloaded' } },
+      israelDiagrams: { subscribe: () => () => undefined, getVersion: () => 0 },
+    },
+    israelNotam: { fetchFeed: async () => Promise.reject(new Error('offline')) },
+    tfr: { currentTFRs: async () => ({ tfrs: [], fetchedAt: 0 }) },
     profiles: { load: async () => undefined, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) },
   } as unknown as AppRuntime;
   return { rt, network, location, remote };
@@ -87,6 +101,8 @@ beforeEach(() => {
   flightLog.store.setState(EMPTY_FLIGHT_LOG);
   gps.store.setState({ status: { kind: 'lost', ageSeconds: null }, failure: null });
 });
+
+const flightPlanSheet = jest.mocked(FlightPlanSheet);
 
 describe('LiveApp (ContentView)', () => {
   afterEach(() => jest.useRealTimers());
@@ -113,6 +129,32 @@ describe('LiveApp (ContentView)', () => {
     expect(view.text()).toContain('Open the App Store');
     await act(async () => remote.dismissBanner(UPDATE_BANNER_ID));
     expect(view.text()).not.toContain('Please update Kanaf');
+  });
+
+  it('draws the banners below the status bar and Dynamic Island, the first one only (iPhone 17 inset 59)', async () => {
+    const iphone = {
+      frame: { x: 0, y: 0, width: 393, height: 852 },
+      insets: { top: 59, left: 0, right: 0, bottom: 34 },
+    };
+    const { rt, remote } = runtime();
+    remote.updateRequest = { kind: 'required', message: 'A newer version of Kanaf is available.' };
+    const view = await render(
+      <SafeAreaProvider initialMetrics={iphone}>
+        <LiveApp runtime={rt} />
+      </SafeAreaProvider>,
+    );
+    const top = (id: string) => StyleSheet.flatten(view.byTestId(id).props.style).paddingTop;
+    expect(top('remoteConfigBanner')).toBe(59);
+    // With the red database banner first, it takes the inset and the notices under it add none.
+    const failed = runtime({ databaseError: { kind: 'databaseCorrupted' } });
+    failed.remote.updateRequest = { kind: 'required', message: 'A newer version of Kanaf is available.' };
+    const both = await render(
+      <SafeAreaProvider initialMetrics={iphone}>
+        <LiveApp runtime={failed.rt} />
+      </SafeAreaProvider>,
+    );
+    expect(StyleSheet.flatten(both.byTestId('databaseUnavailableBanner').props.style).paddingTop).toBe(8 + 59);
+    expect(StyleSheet.flatten(both.byTestId('remoteConfigBanner').props.style).paddingTop).toBe(0);
   });
 
   it('checks the remote config at launch, with no recording', async () => {
@@ -198,6 +240,53 @@ describe('LiveApp (ContentView)', () => {
     applyCaptureSeeds();
     resetLiveSlices('us');
     expect(layers.store.getState().displayMode).toBe('auto');
+  });
+
+  describe('settings', () => {
+    it('the settings overlay shows Settings over the log, and closing it goes back to the log', async () => {
+      const { rt } = runtime();
+      const view = await render(<LiveApp runtime={rt} />);
+      await act(async () => appStore.getState().setScreen('log'));
+      await act(async () => appStore.getState().openOverlay({ kind: 'settings' }));
+      expect(view.all((n) => n.props?.testID === 'live-settings')).toHaveLength(1);
+      await act(async () => appStore.getState().openOverlay(null));
+      expect(view.all((n) => n.props?.testID === 'live-settings')).toHaveLength(0);
+      await act(async () => appStore.getState().setScreen('map'));
+    });
+  });
+
+  describe('strip callbacks', () => {
+    it('the LOG cell opens the log, and the GPS notice opens the system Settings for this app', async () => {
+      const { rt } = runtime();
+      const open = jest.spyOn(Linking, 'openSettings').mockResolvedValue();
+      await render(<LiveApp runtime={rt} />);
+      await act(async () => flightLog.store.getState().actions.openLog());
+      expect(appStore.getState().selectedScreen).toBe('log');
+      await act(async () => flightLog.store.getState().actions.openSettings());
+      expect(open).toHaveBeenCalledTimes(1);
+      await act(async () => appStore.getState().setScreen('map'));
+      open.mockRestore();
+    });
+  });
+
+  describe('haptics and alerts', () => {
+    it('installs the haptics for the views while the app is live, and takes them away after', async () => {
+      const { rt } = runtime();
+      const view = await render(<LiveApp runtime={rt} />);
+      haptic.light();
+      expect(rt.haptics.light).toHaveBeenCalledTimes(1);
+      await view.unmount();
+      haptic.light();
+      expect(rt.haptics.light).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the Israel alerts banner and the suspended notice from the alerts runtime', async () => {
+      const { rt } = runtime({ region: 'israel' });
+      await render(<LiveApp runtime={rt} />);
+      // No fix yet in Israel: the position-based alerts are not running, and the strip says so.
+      await act(async () => new Promise((r) => setTimeout(r, 20)));
+      expect(flightLog.store.getState().israelAlertsSuspended).toBe(true);
+    });
   });
 
   describe('recording services', () => {
@@ -354,11 +443,16 @@ describe('LiveApp (ContentView)', () => {
       expect(appStore.getState().overlay).toBeNull();
     });
 
-    it('the US planner is not mounted here (U4c): no Israel planner outside Israel', async () => {
+    it('Plan a flight opens the US planner outside Israel (FlightPlanSheet on a plan store), and Back closes it', async () => {
       const view = await render(<LiveApp runtime={plannerRuntime('us')} />);
       await act(async () => appStore.setState({ selectedScreen: 'log', overlay: { kind: 'planner' } }));
       await settle();
+      expect(has(view, 'live-us-planner')).toBe(true);
       expect(has(view, 'live-israel-planner')).toBe(false);
+      expect(view.text()).toContain('Flight Plans');
+      expect(flightPlanSheet).toHaveBeenCalled();
+      await press(view.byTestId('planner-back'));
+      expect(appStore.getState().overlay).toBeNull();
     });
   });
 });

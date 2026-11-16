@@ -4,7 +4,9 @@
 // loop, so the React child count is fixed (one source per registry source, one layer per spec) whatever is on screen.
 // The surface is presentational: data comes from MapDataController (hooks in useMapData.ts), camera moves from the
 // camera reducer, and navigation is wired by I1.
-import { Camera, GeoJSONSource, ImageSource, Images, Layer, Map, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
+import { ISRAEL_OFFICIAL_CHART_SOURCE_ID } from '../../domain/map/israel/layers';
+import type { MapTap } from './mapTap';
+import { Camera, GeoJSONSource, ImageSource, Images, Layer, Map, RasterSource, type CameraRef, type MapRef } from '@maplibre/maplibre-react-native';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Coordinate, MapLayer, Region } from '../../domain/core';
 import type { CameraCommand } from '../../domain/map/camera';
@@ -43,12 +45,16 @@ export interface MapSurfaceProps {
   sources: Readonly<Record<string, FeatureCollection>>;
   /** Per-layer overrides that win over the toggle and the spec paint (the official Israel chart base uses them). */
   overrides?: LayerOverrides;
+  /** Raster tile sources by id (the official CAAI chart pack, `mbtiles://`); a layer whose source has no entry renders nothing. */
+  rasterSources?: Readonly<Record<string, { url: string }>>;
   /** Image sources by id (airport diagram slots); a slot id without an entry renders nothing. */
   imageSources?: Readonly<Record<string, DiagramImageSource>>;
   initialView: { center: Coordinate; zoom: number };
   /** Applied when `seq` changes; null means no pending move. */
   camera: { seq: number; command: CameraCommand | null };
   onViewChange?: (change: MapViewChange) => void;
+  /** A tap on the map: where, and a query for the rendered features near it (what opens an airport or a chart sheet). */
+  onMapPress?: (tap: MapTap) => void;
   onStyleLoaded?: () => void;
   /** Basemap tile health: 'error' for a native log line that looks like a failed request, 'ok' once the map is fully rendered. */
   onTileHealth?: (event: 'error' | 'ok') => void;
@@ -84,6 +90,8 @@ export function MapSurface({
   sources,
   overrides,
   imageSources,
+  rasterSources,
+  onMapPress,
   initialView,
   camera,
   onViewChange,
@@ -146,6 +154,24 @@ export function MapSurface({
       style={{ flex: 1 }}
       mapStyle={mapStyle}
       compass={false}
+      onPress={(e) => {
+        if (!onMapPress) return;
+        const { lngLat, point } = e.nativeEvent;
+        const [x, y] = point;
+        onMapPress({
+          lngLat: { lng: lngLat[0], lat: lngLat[1] },
+          query: async (reach, layers) => {
+            const map = mapRef.current;
+            if (!map) return [];
+            const options = { layers: [...layers] };
+            return (
+              (await (reach === 0
+                ? map.queryRenderedFeatures([x, y], options)
+                : map.queryRenderedFeatures([[x - reach, y - reach], [x + reach, y + reach]], options))) ?? []
+            );
+          },
+        });
+      }}
       onWillStartLoadingMap={() => reporter.report('willStartLoadingMap')}
       onDidFinishLoadingStyle={() => reporter.report('didFinishLoadingStyle')}
       onDidFailLoadingMap={() => reporter.report('didFailLoadingMap')}
@@ -214,6 +240,15 @@ export function MapSurface({
             paintOverride={overrides?.paint[spec.id]}
           />
         ));
+        if (g.source === ISRAEL_OFFICIAL_CHART_SOURCE_ID) {
+          const raster = rasterSources?.[g.source];
+          if (!raster) return null;
+          return (
+            <RasterSource key={`${g.source}:${raster.url}`} id={g.source} url={raster.url} tileSize={256}>
+              {layers}
+            </RasterSource>
+          );
+        }
         if (DIAGRAM_IMAGE_SOURCE_IDS.includes(g.source)) {
           const img = imageSources?.[g.source];
           const [tl, tr, br, bl] = img?.coordinates ?? [];

@@ -34,7 +34,20 @@ const referenceFile = (screen: string) => `reference/${referenceNames[screen] ??
 // rule that both platforms gate the same screens cannot hold for it; and the flight screens whose Swift reference seeds a different
 // flight than the RN fixture (cvfr and flightdetail show another route, replay and replayfast another track), so the score would
 // measure the data, not the layout. Gate them once the fixtures are aligned.
-const NOT_GATED = ['sheet', 'map-layers', 'flightdetail', 'cvfr', 'replay', 'replayfast'];
+const NOT_GATED = [
+  'sheet',
+  'map-layers',
+  'flightdetail',
+  'cvfr',
+  'replay',
+  'replayfast',
+  // I1d: screens with no SwiftUI counterpart (the U4c screens and the alert banner); captured for the PR and the device checks.
+  'usplan',
+  'chartsheet',
+  'chartairspace',
+  'aloft',
+  'alerts',
+];
 // The AI debrief exists on iOS only (Q8): gated there, with no Android capture or floor.
 const IOS_ONLY = ['debrief'];
 

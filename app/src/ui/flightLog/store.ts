@@ -2,6 +2,7 @@
 // SwiftUI views in Views/Log/FlightLogStrip.swift and FlightLogRows.swift read). GPS quality comes from state/gps.ts,
 // the panel toggles from state/panels.ts and the nearest airport from columns/nearest/store.ts. The app shell
 // (ui/shell/liveData.ts) feeds ownship, navigation, region and network; capture routes provide their fixture stores.
+import type { IsraelAlert } from '../../domain/israel/alertEvaluator';
 import type { Region } from '../../domain/core';
 import type { GpsFix } from '../../domain/location/gpsStatus';
 import type { PredictedEvent } from '../../domain/prediction';
@@ -75,6 +76,8 @@ export interface FlightLogData extends NavState {
   isOffline: boolean;
   airspaceCheckUnavailable: boolean;
   israelAlertsSuspended: boolean;
+  /** Israel in-flight alerts, highest priority first; shown only while not suspended. */
+  israelAlerts: readonly IsraelAlert[];
   actions: FlightLogActions;
 }
 
@@ -107,6 +110,7 @@ export const EMPTY_FLIGHT_LOG: FlightLogData = {
   isOffline: false,
   airspaceCheckUnavailable: false,
   israelAlertsSuspended: false,
+  israelAlerts: [],
   actions: { clear: noop, sequenceRoute: noop, openLog: noop, openBriefing: noop, record: noop, openSettings: noop },
 };
 

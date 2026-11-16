@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AppFailure } from '../../domain/errors';
+import type { MapLayer, Region } from '../../domain/core';
 import { regionContains, regionDefaultCenter, regionDefaultZoom } from '../../domain/core';
 import type { MapDataSource } from '../../domain/map/mapDataController';
 import type { IsraelClosureStatus } from '../../domain/map/israel';
@@ -8,6 +9,11 @@ import { useNearestAirports } from '../columns/nearest/refresh';
 import { footer } from '../flightLog/footerStore';
 import { MapLayout } from '../map/MapLayout';
 import { navigationRoute } from '../map/navigationRoute';
+import { resolveMapTap, type MapTap } from '../map/mapTap';
+import { IsraelChartSheetHost, type ChartSheetSelection } from '../shell/IsraelChartSheetHost';
+import { officialChartOf, useOfficialChart } from '../map/useOfficialChart';
+import { withOfficialChartDefaults } from '../../domain/map/israel/officialChart';
+import { useAirportDiagrams } from '../map/useAirportDiagrams';
 import { useIsraelChart } from '../map/useIsraelChart';
 import { offlineStatusFor } from '../map/offlineStatus';
 import { useOfflineMaps } from '../map/useOfflineMaps';
@@ -48,13 +54,16 @@ export function MapScreen() {
   // The region the launch sequence restored, not the slice: LiveApp writes the slice in an effect, after this first render.
   const region = runtime.started.region;
   const [initial] = useState(() => ({ center: regionDefaultCenter(region), zoom: regionDefaultZoom(region) }));
+  // The official CAAI chart pack (Israel): installed or not is known before the first render (the store reads it at launch).
+  const officialSource = region === 'israel' ? runtime.chartPacks.israelChart : null;
   const [appState] = useState(() => ({
     region,
-    visibleLayers: initialVisibleLayers(region),
+    visibleLayers: initialLayersFor(region, officialChartOf(officialSource).present),
     mapCenter: initial.center,
     mapZoom: initial.zoom,
     mapVisibleBounds: null,
   }));
+  const official = useOfficialChart(officialSource, region === 'israel');
   const controller = useMapController({
     appState,
     db: runtime.started.aviation ?? closedDb,
@@ -71,6 +80,14 @@ export function MapScreen() {
   const navigation = useAppStore((s) => s.navigation);
   const route = useMemo(() => navigationRoute(navigation, ownship.position), [navigation, ownship.position]);
   const layersStore = layers.useStoreApi();
+  // A pack downloaded, updated into view or removed while the map is open: the CVFR vector layers take the defaults for it
+  // (IsraelChartOverlay.setOfficialChartPresent).
+  const officialWas = useRef(official.present);
+  useEffect(() => {
+    if (officialWas.current === official.present) return;
+    officialWas.current = official.present;
+    layersStore.setState((s) => ({ visibleLayers: withOfficialChartDefaults(s.visibleLayers, official.present) }));
+  }, [layersStore, official.present]);
   const onClosureStatus = useCallback(
     (status: IsraelClosureStatus) =>
       layersStore.setState({
@@ -137,17 +154,62 @@ export function MapScreen() {
   const trackedViewChange = useCallback(
     (change: Parameters<typeof onViewChange>[0]) => {
       footerStore.setState({ zoom: change.zoom });
-      setBounds({
+      const visible = {
         south: change.southWest.lat,
         west: change.southWest.lon,
         north: change.northEast.lat,
         east: change.northEast.lon,
-      });
+      };
+      setBounds(visible);
+      appStore.getState().setMapBounds(visible);
       onViewChange(change);
     },
     [footerStore, onViewChange],
   );
-  const modelWithZoom = useMemo(() => ({ ...model, onViewChange: trackedViewChange }), [model, trackedViewChange]);
+  // A tap: the Israel chart sheet, or the airport column (MapView.handleMapTap).
+  const [chartSelection, setChartSelection] = useState<ChartSheetSelection | null>(null);
+  const tapData = israelChart.tapData;
+  const tapGeneration = useRef(0);
+  const onMapPress = useCallback(
+    (tap: MapTap) => {
+      const generation = ++tapGeneration.current;
+      void resolveMapTap(tap, tapData).then(
+        (result) => {
+          if (!result || generation !== tapGeneration.current) return; // a later tap owns the selection
+          if (result.kind === 'airport') appStore.getState().showAirport(result.icao);
+          else setChartSelection(result.selection);
+        },
+        (error) => console.warn('Map tap could not be resolved', error),
+      );
+    },
+    [tapData],
+  );
+  const diagramPacks = useMemo(
+    () =>
+      [runtime.chartPacks.israelDiagrams, runtime.chartPacks.usDiagrams].map((store) => ({
+        subscribe: store.subscribe,
+        edition: () => store.pack?.edition ?? null,
+      })),
+    [runtime.chartPacks.israelDiagrams, runtime.chartPacks.usDiagrams],
+  );
+  const diagrams = useAirportDiagrams({
+    source: runtime.chartPacks.diagramSource,
+    region: model.snapshot.region,
+    enabled: () => layersStore.getState().airportDiagrams,
+    subscribeEnabled: (listener) =>
+      layersStore.subscribe((s, p) => s.airportDiagrams !== p.airportDiagrams && listener()),
+    packs: diagramPacks,
+    remote: runtime.started.remoteConfig,
+  });
+  const { onCamera: diagramCamera } = diagrams;
+  const viewAndDiagrams = useCallback(
+    (change: Parameters<typeof onViewChange>[0]) => {
+      trackedViewChange(change);
+      diagramCamera(change);
+    },
+    [trackedViewChange, diagramCamera],
+  );
+  const modelWithZoom = useMemo(() => ({ ...model, onViewChange: viewAndDiagrams }), [model, viewAndDiagrams]);
 
   // The NRST cell refreshes on every fix while another column is open (MapContainerView's onChange(ownshipPosition)).
   useNearestAirports();
@@ -161,6 +223,15 @@ export function MapScreen() {
   const briefingRoute = useAppStore((s) => s.briefingRoute);
   const dismissBriefing = useCallback(() => appStore.getState().setPresentingBriefing(false), []);
   const { frame } = model;
+  // The planner (and anything else off the map) asks the camera to fit a box.
+  const frameRequest = useAppStore((s) => s.mapFrameRequest);
+  // A request left from before this mount (a remount on a region change) is not replayed.
+  const framed = useRef(appStore.getState().mapFrameRequest?.seq ?? 0);
+  useEffect(() => {
+    if (!frameRequest || frameRequest.seq <= framed.current) return;
+    framed.current = frameRequest.seq;
+    frame(frameRequest.box);
+  }, [frame, frameRequest]);
   const showHighlight = useCallback(
     (shown: Highlight) => {
       setHighlight(shown);
@@ -180,8 +251,12 @@ export function MapScreen() {
         liveNight={night}
         sectional={model.snapshot.visibleLayers.has('sectional')}
         sectionalOpacity={sectionalOpacity}
+        diagrams={diagrams.sources}
+        official={official}
+        onMapPress={onMapPress}
       />
       <ThemeContext.Provider value={night ? Night : Day}>
+        <IsraelChartSheetHost selection={chartSelection} onClose={() => setChartSelection(null)} />
         <LiveBriefing
           highlightActive={highlight !== null}
           fetcher={fetchFeed}
@@ -197,4 +272,10 @@ export function MapScreen() {
       </ThemeContext.Provider>
     </>
   );
+}
+
+/** The layers the map opens with: the region's defaults, with the CVFR chart layers set for an installed official chart. */
+function initialLayersFor(region: Region, officialPresent: boolean): Set<MapLayer> {
+  const layers = initialVisibleLayers(region);
+  return region === 'israel' && officialPresent ? new Set(withOfficialChartDefaults([...layers], true)) : layers;
 }

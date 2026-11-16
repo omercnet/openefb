@@ -39,8 +39,8 @@ export interface RemoteConfigStoreOptions {
   service: RemoteConfigServiceLike;
   /** Where the last good file is kept; omit for memory only (tests). */
   storage?: TextStorage;
-  /** The running build number (CFBundleVersion / versionCode). */
-  buildNumber: number;
+  /** The running build number (CFBundleVersion / versionCode); null when it cannot be read: nothing is then asked of the pilot. */
+  buildNumber: number | null;
   now?: Clock;
   /** The device's first preferred language tag, read each time a text is resolved. */
   preferredLanguage?: () => string;
@@ -65,7 +65,7 @@ export class RemoteConfigStore {
 
   private readonly service: RemoteConfigServiceLike;
   private readonly storage: TextStorage | undefined;
-  private readonly buildNumber: number;
+  private readonly buildNumber: number | null;
   private readonly now: Clock;
   private readonly preferredLanguage: () => string;
   private readonly log: Logger | undefined;
@@ -137,7 +137,7 @@ export class RemoteConfigStore {
   /** Whether the config asks the pilot to update. Wording falls back to a fixed text when the file has none. */
   get updateRequest(): UpdateRequest | null {
     const active = this.active;
-    if (!active) return null;
+    if (!active || this.buildNumber === null) return null; // unknown build: do not nag
     const message = active.updateMessage
       ? resolveText(active.updateMessage, this.preferredLanguage())
       : 'A newer version of Kanaf is available.';

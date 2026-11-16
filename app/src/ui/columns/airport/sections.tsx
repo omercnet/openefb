@@ -30,6 +30,8 @@ import {
   type TerminalChart,
 } from './logic';
 import { IsraelAerodromeEntry } from './israelAerodromeSection';
+import { PirepSection } from './sections/PirepSection';
+import { WindsAloftSection } from './sections/WindsAloftSection';
 import { NotamsSection } from './notamSection';
 import type { AirportColumnModel } from './store';
 
@@ -248,6 +250,90 @@ export function RetryButton({ onPress, testID }: { onPress: () => void; testID?:
     >
       <Text style={[Type.systemSubheadline, { color: t.accent, fontWeight: '600' }]}>Retry</Text>
     </Pressy>
+  );
+}
+
+/** `ProgressView().frame(maxWidth: .infinity, alignment: .leading)`. */
+export function LoadingRow({ testID, label }: { testID: string; label: string }) {
+  const t = useTheme();
+  return (
+    <View testID={testID} accessible accessibilityLabel={label} style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <ActivityIndicator size="small" color={t.secondaryText} />
+    </View>
+  );
+}
+
+/** Label with the filled warning triangle in the caution colour, subheadline (failures) or caption (notices). */
+export function CautionLabel({
+  text,
+  size,
+  testID,
+}: {
+  text: string;
+  size: 'subheadline' | 'caption';
+  testID?: string;
+}) {
+  const t = useTheme();
+  return (
+    <View
+      accessible
+      accessibilityLabel={text}
+      testID={testID}
+      style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}
+    >
+      <WarningTriangle color={t.caution} bang={t.night ? '#000000' : '#FFFFFF'} />
+      <Text
+        style={[size === 'subheadline' ? Type.systemSubheadline : Type.caption, { color: t.caution, flexShrink: 1 }]}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+}
+
+/** The failure state: the caution label, then Retry (`VStack(spacing: Space.xs)`). */
+export function FailureBlock({ text, onRetry, testID }: { text: string; onRetry: () => void; testID: string }) {
+  return (
+    <View testID={testID} style={{ gap: Space.xs }}>
+      <CautionLabel text={text} size="subheadline" />
+      <RetryButton onPress={onRetry} testID={`${testID}-retry`} />
+    </View>
+  );
+}
+
+/** PirepSection fed by the column's state. */
+function PirepsEntry({ model }: AirportSectionProps) {
+  const airport = model.data?.airport;
+  const state = model.data?.pireps;
+  if (!airport || !state) return null;
+  return (
+    <PirepSection
+      airport={airport}
+      loading={state.loading}
+      error={state.error}
+      pireps={state.pireps}
+      now={model.now}
+      onRetry={model.retryPireps}
+    />
+  );
+}
+
+/** WindsAloftSection fed by the column's state. */
+function WindsEntry({ model }: AirportSectionProps) {
+  const airport = model.data?.airport;
+  const state = model.data?.winds;
+  if (!airport || !state) return null;
+  return (
+    <WindsAloftSection
+      airport={airport}
+      forecast={state.forecast}
+      onSelectForecast={model.selectWindsForecast}
+      loading={state.loading}
+      error={state.error}
+      report={state.report}
+      now={model.now}
+      onRetry={model.retryWinds}
+    />
   );
 }
 
@@ -643,6 +729,19 @@ export const AIRPORT_SECTIONS: readonly AirportSection[] = [
     Component: (props) => <NotamsSection {...props} />,
   },
   { id: 'charts', layer: 'airportCharts', Component: ChartsSection },
+  // Swift: ... charts, israelDiagrams, pireps, windsAloft (AirportColumnView.swift:146-150), each by its region layer.
+  {
+    id: 'pireps',
+    layer: 'pireps',
+    isShown: (m) => m.data?.pireps !== undefined,
+    Component: (props) => <PirepsEntry {...props} />,
+  },
+  {
+    id: 'winds',
+    layer: 'windsAloft',
+    isShown: (m) => m.data?.winds !== undefined,
+    Component: (props) => <WindsEntry {...props} />,
+  },
 ];
 
 /** The sections shown for this model, in order. */

@@ -3,6 +3,7 @@
 // flight log hidden (`showsNextTime`, the full-width header of the compact layout) the title carries the next time-to, or
 // the soonest predicted entry in amber (red for a warning). `compact` (iPhone, iPad Split View): the record control shows
 // its glyph only.
+import { haptic } from '../haptics';
 import { Text, View } from 'react-native';
 import { ListBullet, Magnifier, Xmark } from '../Icons';
 import { useTheme } from '../Primitives';
@@ -115,7 +116,10 @@ export function FlightLogHeader({
           title="Brief"
           label="NOTAM briefing"
           icon={<DocMagnifier color={t.ink} />}
-          onPress={data.actions.openBriefing}
+          onPress={() => {
+            haptic.light();
+            data.actions.openBriefing();
+          }}
           testID="israel-briefing-button"
         />
       ) : null}

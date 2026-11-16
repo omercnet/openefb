@@ -20,7 +20,7 @@ import { withAlpha } from '../../../flights/alpha';
 import { ArrowClockwise, Chevron, WarningTriangle } from '../../../Icons';
 import { Pressy, useTheme } from '../../../Primitives';
 import { Radius, Space, Type, lineHeight } from '../../../tokens';
-import { FailureBlock, LoadingRow, SystemHeader } from './parts';
+import { FailureBlock, LoadingRow, SystemHeader } from '../sections';
 import {
   PIREP_REFRESH_LABEL,
   PIREP_SECTION_TITLE,

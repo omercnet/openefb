@@ -1,4 +1,5 @@
 import { createStore, useStore } from 'zustand';
+import type { OfflineRegionBounds } from '../../domain/offline/bounds';
 import type { TerminalChart } from '../columns/airport/logic';
 import type { BriefingRoute } from '../../domain/israel/briefingFilter';
 import type { AppError } from '../../domain/errors';
@@ -12,12 +13,19 @@ import type { StripColumnKind } from '../../domain/types';
 export type LiveScreen = 'map' | 'log';
 
 /** A screen pushed over the log stack (LogRoute); more kinds arrive as their screens are wired live. */
-export type LiveOverlay = { kind: 'entry'; id: string } | { kind: 'planner' } | { kind: 'flight'; id: string };
+export type LiveOverlay =
+  { kind: 'entry'; id: string } | { kind: 'planner' } | { kind: 'flight'; id: string } | { kind: 'settings' };
 
 export interface AppState {
   selectedScreen: LiveScreen;
   setScreen: (screen: LiveScreen) => void;
   overlay: LiveOverlay | null;
+  /** The map's visible area, kept for what needs it away from the map (Settings > Offline Maps downloads "this view"). */
+  mapBounds: OfflineRegionBounds | null;
+  /** Something away from the map asks it to fit this box (the planner's route); `seq` makes a repeat of the same box a new ask. */
+  mapFrameRequest: { seq: number; box: { south: number; west: number; north: number; east: number } } | null;
+  requestMapFrame: (box: { south: number; west: number; north: number; east: number }) => void;
+  setMapBounds: (bounds: OfflineRegionBounds | null) => void;
   openOverlay: (overlay: LiveOverlay | null) => void;
   stripColumn: StripColumnKind;
   selectedAirportId: string | null;
@@ -48,6 +56,10 @@ export const createAppStore = () =>
     selectedScreen: 'map',
     setScreen: (selectedScreen) => set({ selectedScreen }),
     overlay: null,
+    mapBounds: null,
+    mapFrameRequest: null,
+    requestMapFrame: (box) => set((s) => ({ mapFrameRequest: { seq: (s.mapFrameRequest?.seq ?? 0) + 1, box } })),
+    setMapBounds: (mapBounds) => set({ mapBounds }),
     openOverlay: (overlay) => set({ overlay }),
     stripColumn: 'log',
     selectedAirportId: null,

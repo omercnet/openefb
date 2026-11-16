@@ -17,9 +17,9 @@ OUT=${OUT:-/tmp/app-android}
 WAIT=${WAIT:-10}
 MAP_TIMEOUT=${MAP_TIMEOUT:-45}
 RESULT_TIMEOUT=${RESULT_TIMEOUT:-120}
-SCREENS=${SCREENS:-map map-layers airport night layers nearest search log sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr briefing israel-plan}
+SCREENS=${SCREENS:-map map-layers airport night layers nearest search log sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr briefing israel-plan usplan chartsheet chartairspace aloft alerts}
 # Screens with no map (a native sheet, the log, the settings forms) wait a fixed time instead of for the map status.
-NO_MAP=" sheet log settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop flightdetail cvfr israel-plan "
+NO_MAP=" sheet log settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop flightdetail cvfr israel-plan usplan chartsheet chartairspace aloft "
 FULL=${FULL:-1}
 PKG=io.omer.efb.dev
 GEO="-122.2289 37.4876"   # longitude latitude: ownship over Redwood City (src/fixtures/scenario.ts)

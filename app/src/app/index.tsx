@@ -38,6 +38,11 @@ const LAUNCH_SCREENS = [
   'flightdetail',
   'cvfr',
   'debrief',
+  'usplan',
+  'chartsheet',
+  'chartairspace',
+  'aloft',
+  'alerts',
 ];
 
 /** The screen requested at launch without a deep link (iOS launch argument, web query), if any. */

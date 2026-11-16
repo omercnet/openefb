@@ -29,6 +29,15 @@ let lastSurface: {
   sectional: boolean;
   sectionalOpacity?: number;
   sources: Record<string, { features: unknown[] }>;
+  onMapPress: (tap: {
+    lngLat: { lng: number; lat: number };
+    query: (reach: number, layers: readonly string[]) => Promise<unknown[]>;
+  }) => void;
+  camera: { seq: number; command: unknown };
+  layers: { id: string }[];
+  rasterSources?: Record<string, { url: string }>;
+  visibleLayers: Set<string>;
+  overrides?: { visibility: Record<string, boolean> };
 } | null = null;
 jest.mock('../map/MapSurface', () => ({
   MapSurface: (props: NonNullable<typeof lastSurface>) => <MockSurface {...props} />,
@@ -100,11 +109,32 @@ function fakeRuntime(
       refresh: async () => undefined,
     },
     layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
+    chartPacks: { diagramSource, israelChart: official.store, israelDiagrams: noPack, usDiagrams: noPack },
     location,
     network,
   } as unknown as AppRuntime;
   return { runtime, queries, location, network };
 }
+
+const official = (() => {
+  const listeners = new Set<() => void>();
+  let version = 0;
+  const store = {
+    packPath: null as string | null,
+    subscribe: (l: () => void) => (listeners.add(l), () => void listeners.delete(l)),
+    getVersion: () => version,
+  };
+  return {
+    store,
+    set(path: string | null) {
+      store.packPath = path;
+      version += 1;
+      listeners.forEach((l) => l());
+    },
+  };
+})();
+const noPack = { pack: null, subscribe: () => () => undefined };
+const diagramSource = { candidates: jest.fn(async () => []), diagramFor: jest.fn() };
 
 const mountLive = async (runtime: AppRuntime) =>
   render(
@@ -139,6 +169,130 @@ describe('live MapScreen (MapContainerView)', () => {
     expect(queries.nearestAirports).toHaveBeenCalled();
     expect(nearest.store.getState().entries.map((e) => e.airport.icao)).toEqual(['KPAO']);
     stop();
+  });
+
+  it('airport diagrams: a close camera asks the pack source for the region, a far one and the switch off do not', async () => {
+    const { runtime } = fakeRuntime();
+    diagramSource.candidates.mockClear();
+    layers.store.setState({ airportDiagrams: true });
+    await mountLive(runtime);
+    const view = (zoom: number) => ({
+      center: { lat: 37.5, lon: -122.25 },
+      zoom,
+      bearing: 0,
+      northEast: { lat: 37.51, lon: -122.24 },
+      southWest: { lat: 37.49, lon: -122.26 },
+      userInteraction: false,
+    });
+    await act(async () => lastSurface!.onViewChange(view(10)));
+    expect(diagramSource.candidates).not.toHaveBeenCalled();
+    await act(async () => lastSurface!.onViewChange(view(15)));
+    expect(diagramSource.candidates).toHaveBeenCalledWith('us', { lat: 37.5, lon: -122.25 }, expect.any(Number));
+    diagramSource.candidates.mockClear();
+    await act(async () => layers.store.setState({ airportDiagrams: false }));
+    await act(async () => lastSurface!.onViewChange(view(16)));
+    expect(diagramSource.candidates).not.toHaveBeenCalled();
+    layers.store.setState({ airportDiagrams: true });
+  });
+
+  it('a tap on an airport dot opens that airport in the column (MapView.handleMapTap)', async () => {
+    const { runtime } = fakeRuntime();
+    appStore.getState().showAirport('KOAK');
+    appStore.setState({ selectedAirportId: null, stripColumn: 'log' });
+    await mountLive(runtime);
+    const query = jest.fn(async () => [
+      { properties: { icao: 'KSQL' }, geometry: { type: 'Point', coordinates: [-122.25, 37.5] } },
+    ]);
+    await act(async () => {
+      lastSurface!.onMapPress({ lngLat: { lng: -122.25, lat: 37.5 }, query });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(appStore.getState().selectedAirportId).toBe('KSQL');
+    expect(appStore.getState().stripColumn).toBe('airport');
+  });
+
+  it('a slow answer to an earlier tap does not overwrite the later tap', async () => {
+    const { runtime } = fakeRuntime();
+    appStore.setState({ selectedAirportId: null, stripColumn: 'log' });
+    await mountLive(runtime);
+    const hit = (icao: string) => [{ properties: { icao }, geometry: { type: 'Point', coordinates: [-122.25, 37.5] } }];
+    let slow: (v: ReturnType<typeof hit>) => void = () => undefined;
+    await act(async () => {
+      lastSurface!.onMapPress({
+        lngLat: { lng: -122.25, lat: 37.5 },
+        query: () => new Promise((r) => (slow = r)) as never,
+      });
+      lastSurface!.onMapPress({ lngLat: { lng: -122.25, lat: 37.5 }, query: async () => hit('KSQL') as never });
+      await new Promise((r) => setTimeout(r, 0));
+      slow(hit('KOAK'));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(appStore.getState().selectedAirportId).toBe('KSQL');
+  });
+
+  it('a tap on empty map opens nothing', async () => {
+    const { runtime } = fakeRuntime();
+    appStore.setState({ selectedAirportId: null, stripColumn: 'log' });
+    await mountLive(runtime);
+    await act(async () => {
+      lastSurface!.onMapPress({ lngLat: { lng: 0, lat: 0 }, query: async () => [] });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(appStore.getState().selectedAirportId).toBeNull();
+  });
+
+  it('the planner asks the camera to fit its route: the map follows the frame request', async () => {
+    const { runtime } = fakeRuntime();
+    await mountLive(runtime);
+    const before = lastSurface!.camera.seq;
+    await act(async () => appStore.getState().requestMapFrame({ south: 37, west: -123, north: 38, east: -122 }));
+    expect(lastSurface!.camera.seq).toBeGreaterThan(before);
+    expect(lastSurface!.camera.command).toBeTruthy();
+  });
+
+  describe('the official CAAI chart', () => {
+    afterEach(() => official.set(null));
+    const israelLayers = () => [...lastSurface!.visibleLayers].filter((l) => l.startsWith('cvfr')).sort();
+
+    it('without a pack the Israel map draws the whole vector CVFR chart and no raster', async () => {
+      official.set(null);
+      const { runtime } = fakeRuntime({ region: 'israel' });
+      await mountLive(runtime);
+      expect(israelLayers().length).toBeGreaterThan(2);
+      expect(lastSurface!.layers.some((l) => l.id === 'israel-official-chart')).toBe(false);
+      expect(lastSurface!.rasterSources).toBeUndefined();
+    });
+
+    it('with a pack it is the base raster, and the vector layers it duplicates are hidden (closures and tap targets stay)', async () => {
+      official.set('/Application Support/israel-cvfr.mbtiles');
+      const { runtime } = fakeRuntime({ region: 'israel' });
+      await mountLive(runtime);
+      expect(lastSurface!.layers[0]!.id).toBe('israel-official-chart');
+      expect(lastSurface!.rasterSources!['israel-official-chart-source']!.url).toBe(
+        'mbtiles:///Application%20Support/israel-cvfr.mbtiles',
+      );
+      expect(israelLayers()).toEqual(['cvfrClosures', 'cvfrPoints']);
+      expect(lastSurface!.overrides!.visibility['il-point-labels-compulsory']).toBe(false);
+    });
+
+    it('a pack that arrives (or goes) while the map is open switches the vector layers to match', async () => {
+      official.set(null);
+      const { runtime } = fakeRuntime({ region: 'israel' });
+      await mountLive(runtime);
+      await act(async () => official.set('/p/israel-cvfr.mbtiles'));
+      expect(israelLayers()).toEqual(['cvfrClosures', 'cvfrPoints']);
+      expect(lastSurface!.layers[0]!.id).toBe('israel-official-chart');
+      await act(async () => official.set(null));
+      expect(israelLayers().length).toBeGreaterThan(2);
+      expect(lastSurface!.layers.some((l) => l.id === 'israel-official-chart')).toBe(false);
+    });
+
+    it('outside Israel a pack changes nothing', async () => {
+      official.set('/p/israel-cvfr.mbtiles');
+      const { runtime } = fakeRuntime({ region: 'us' });
+      await mountLive(runtime);
+      expect(lastSurface!.layers.some((l) => l.id === 'israel-official-chart')).toBe(false);
+    });
   });
 
   it('the footer follows the camera: the zoom it reports, and ZOOM + / RECENTER actions', async () => {

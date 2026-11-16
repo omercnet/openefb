@@ -45,6 +45,126 @@ function withSettings(inner: UserData, over: Partial<UserData['settings']>): Use
   return { ...inner, settings: { ...inner.settings, ...over } };
 }
 
+describe('onRegionSaved', () => {
+  it('is told once the region is saved, and not while the save failed (Settings stays open with its Retry)', async () => {
+    const onRegionSaved = jest.fn();
+    const { store } = setup({ onRegionSaved });
+    await store.getState().load();
+    await store.getState().setRegion('us');
+    expect(onRegionSaved).toHaveBeenCalledWith('us');
+    const failing = jest.fn();
+    const base = createMemoryUserData();
+    const broken = withSettings(base, { update: () => Promise.reject(new Error('disk full')) });
+    const second = setup({ onRegionSaved: failing }, broken);
+    await second.store.getState().load();
+    await second.store.getState().setRegion('us');
+    expect(failing).not.toHaveBeenCalled();
+    expect(second.store.getState().regionSaveError).toContain('disk full');
+  });
+});
+
+describe('onRegionSaved with overlapping choices', () => {
+  it('an earlier save of the same region does not restart over the newer one (us, israel, us again)', async () => {
+    const onRegionSaved = jest.fn();
+    const gates: (() => void)[] = [];
+    const base = createMemoryUserData();
+    const slow = withSettings(base, {
+      update: (patch) =>
+        new Promise((resolve, reject) => {
+          gates.push(() =>
+            gates.length === 3 ? reject(new Error('disk full')) : resolve(base.settings.update(patch)),
+          );
+        }) as never,
+    });
+    const { store } = setup({ onRegionSaved }, slow);
+    await store.getState().load();
+    const a = store.getState().setRegion('us');
+    const b = store.getState().setRegion('israel');
+    const c = store.getState().setRegion('us');
+    await new Promise((r) => setTimeout(r, 0));
+    while (gates.length < 3) {
+      gates[gates.length - 1]?.();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    gates.forEach((g) => g());
+    await Promise.all([a, b, c]);
+    expect(onRegionSaved).not.toHaveBeenCalled(); // the newest save failed: Settings stays with its Retry
+    expect(store.getState().regionSaveError).toContain('disk full');
+  });
+});
+
+describe('onRegionSaved while the data lookups are pending', () => {
+  it('an older save still reading its attribution does not restart over a newer choice', async () => {
+    const onRegionSaved = jest.fn();
+    const slowAttribution = Promise.withResolvers<ReturnType<typeof fallbackDataAttribution>>();
+    let calls = -1; // armed after load
+    const { store } = setup({
+      onRegionSaved,
+      dataAttribution: (r) =>
+        calls >= 0 && ++calls === 1 ? slowAttribution.promise : Promise.resolve(fallbackDataAttribution(r)),
+    });
+    await store.getState().load();
+    calls = 0;
+    const first = store.getState().setRegion('us'); // its save finishes, then it waits on the attribution
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(calls).toBe(1); // it is inside the attribution lookup
+    const away = store.getState().setRegion('israel');
+    const back = store.getState().setRegion('us'); // the first region again: a newer save owns the restart
+    slowAttribution.resolve(fallbackDataAttribution('us'));
+    await Promise.all([first, away, back]);
+    expect(onRegionSaved).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('onRegionSaved with a preference saved meanwhile', () => {
+  it('waits for the preference save, and stays out of the way when it failed (Settings keeps its error and Retry)', async () => {
+    const onRegionSaved = jest.fn();
+    const gate = Promise.withResolvers<void>();
+    const failing: Preferences = new FakePreferences();
+    jest
+      .spyOn(failing, 'set')
+      .mockImplementation(() => gate.promise.then(() => Promise.reject(new Error('disk full'))));
+    const { store } = setup({ onRegionSaved, prefs: failing });
+    await store.getState().load();
+    const region = store.getState().setRegion('us');
+    const pref = store.getState().setDisplayMode('night');
+    await region;
+    expect(onRegionSaved).not.toHaveBeenCalled(); // the preference save is still pending
+    gate.resolve();
+    await pref;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.getState().preferenceError).toContain('disk full');
+    expect(onRegionSaved).not.toHaveBeenCalled();
+  });
+
+  it('an older, unrelated preference error does not hold the restart back', async () => {
+    const onRegionSaved = jest.fn();
+    const prefs = new FakePreferences();
+    const set = jest.spyOn(prefs, 'set').mockRejectedValueOnce(new Error('earlier failure'));
+    const { store } = setup({ onRegionSaved, prefs });
+    await store.getState().load();
+    await store.getState().setDisplayMode('night'); // fails: a preference error is showing
+    expect(store.getState().preferenceError).toContain('earlier failure');
+    set.mockRestore();
+    const region = store.getState().setRegion('us');
+    const pref = store.getState().setShareUsageData(false); // saves fine, behind the region save
+    await Promise.all([region, pref]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onRegionSaved).toHaveBeenCalledWith('us');
+  });
+
+  it('restarts after a preference that saved fine', async () => {
+    const onRegionSaved = jest.fn();
+    const { store } = setup({ onRegionSaved });
+    await store.getState().load();
+    const region = store.getState().setRegion('us');
+    const pref = store.getState().setDisplayMode('night');
+    await Promise.all([region, pref]);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onRegionSaved).toHaveBeenCalledWith('us');
+  });
+});
+
 describe('load', () => {
   it('a fresh install reads the defaults', async () => {
     const { store } = setup();
@@ -300,6 +420,14 @@ describe('setDisplayMode (AppState.displayMode didSet)', () => {
 });
 
 describe('setShareUsageData (Privacy toggle)', () => {
+  it('an opt-out whose telemetry call rejects (the backlog could not be cleared) is not reported as saved', async () => {
+    const { store } = setup({ setTelemetryEnabled: () => Promise.reject(new Error('backlog stuck')) });
+    await store.getState().load();
+    await store.getState().setShareUsageData(false);
+    expect(store.getState().preferenceErrorFor).toBe('shareUsageData');
+    expect(store.getState().preferenceError).toContain('backlog stuck');
+  });
+
   it('saves the flag and tells telemetry with the current region', async () => {
     const { store, prefs, setTelemetryEnabled } = setup();
     await store.getState().load();

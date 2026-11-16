@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { AppState as NativeAppState, View } from 'react-native';
+import type { Region } from '../../domain/core';
+import { AppState as NativeAppState, Linking, View } from 'react-native';
 import { fileTextStorage } from '../../adapters/fileTextStorage';
 import { airport } from '../columns/airport/store';
 import { layers } from '../columns/layers/store';
 import { AirportQueriesContext } from '../columns/nearest/sources';
 import { nearest } from '../columns/nearest/store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DatabaseUnavailableBanner, RemoteConfigBanner } from '../components/Components';
 import { flightLog } from '../flightLog/store';
 import { MapScreen } from '../screens/MapScreen';
@@ -21,8 +23,10 @@ import { log, logActions } from '../log/store';
 import { createLogbookEntryStore } from '../state/logbookEntryStore';
 import { createLogFeed } from './logFeed';
 import { createPlannerNetworkStore } from './israelPlanner';
-import { PlannerHost } from './LivePlanner';
+import { PlannerHost, UsPlannerHost } from './LivePlanner';
 import { createFlightScreenStores } from './flightScreens';
+import { LiveSettings } from './LiveSettings';
+import { createSettingsServices } from './settingsServices';
 import { LiveFlight } from './LiveFlight';
 import { LiveScreens } from './LiveScreens';
 import { ChartViewer } from './ChartViewer';
@@ -31,12 +35,15 @@ import { airportQueriesFor } from './airportQueries';
 import { bannerItems } from './banners';
 import { bindNavigationTelemetry } from './navigationTelemetry';
 import { persistLayerSettings } from './layersSettings';
+import { setHaptics } from '../haptics';
+import { ownship } from '../state/ownship';
+import { startAlerts } from './alertsBinding';
 import { startLiveData } from './liveData';
 import { startRemoteConfigChecks } from './remoteConfigChecks';
 import type { AppRuntime } from './runtime';
 
 /** The remote config's notices, as the stacked banner (RemoteConfigBanner.swift). */
-function RemoteBanner({ runtime }: { runtime: AppRuntime }) {
+function RemoteBanner({ runtime, topInset }: { runtime: AppRuntime; topInset: number }) {
   const store = runtime.started.remoteConfig;
   const region = useRegion();
   const version = useSyncExternalStore(
@@ -53,7 +60,7 @@ function RemoteBanner({ runtime }: { runtime: AppRuntime }) {
   // The version changes whenever the store's notices or dismissals do; the items are derived from them.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const items = useMemo(() => (store ? bannerItems(store, region) : []), [store, region, version, minute]);
-  return <RemoteConfigBanner items={items} onDismiss={(id) => store?.dismissBanner(id)} />;
+  return <RemoteConfigBanner items={items} onDismiss={(id) => store?.dismissBanner(id)} topInset={topInset} />;
 }
 const noSubscribe = () => () => undefined;
 const zeroVersion = () => 0;
@@ -65,11 +72,15 @@ const zeroVersion = () => 0;
 export function LiveApp({
   runtime,
   startRecording,
+  onRegionChange,
 }: {
   runtime: AppRuntime;
+  /** Settings changed the region: the gate restarts the live app on it (the map, the data and the strip follow). */
+  onRegionChange?: (region: Region) => void;
   /** Builds the recording services (runtime.ts `startRecordingServices`); omitted: no recorder (tests). */
   startRecording?: (runtime: AppRuntime) => Promise<RecordingRuntime>;
 }) {
+  const insets = useSafeAreaInsets();
   const [recording, setRecording] = useState<RecordingRuntime | null>(null);
   // The Log (LogStackView): flights and entries from the user database, entry editor, and the actions the Log raises.
   const [logbookEntry] = useState(() => createLogbookEntryStore({ userData: userDataFromDb(runtime.started.userDb) }));
@@ -84,7 +95,13 @@ export function LiveApp({
   useEffect(() => {
     logActions.store.setState(feed.actions);
     flightLog.store.setState({
-      actions: { ...flightLog.store.getState().actions, openLog: () => appStore.getState().setScreen('log') },
+      actions: {
+        ...flightLog.store.getState().actions,
+        openLog: () => appStore.getState().setScreen('log'),
+        // The GPS-denied notice (Swift: UIApplication.openSettingsURLString): the system page of this app.
+        openSettings: () =>
+          void Linking.openSettings().catch((error) => console.warn('Could not open Settings', error)),
+      },
     });
     void feed.refresh();
     // The Log reads again whenever it opens, and when a recording has been saved.
@@ -122,19 +139,52 @@ export function LiveApp({
       />
     ) : null;
   const [networkStore] = useState(() => createPlannerNetworkStore(runtime.preferences));
-  const renderPlanner = (close: () => void) => (
-    <PlannerHost
-      deps={{
-        israel: started.israel,
-        notam: runtime.israelNotam,
-        profiles: () => ({
-          aircraft: runtime.profiles.aircraft.getState().profiles,
-          pilots: runtime.profiles.pilot.getState().profiles,
-        }),
-        app: appStore,
-        signal: (name, parameters) => (runtime.telemetry.signal as (n: string, p?: unknown) => void)(name, parameters),
-      }}
-      networkStore={networkStore}
+  const renderPlanner = (close: () => void) =>
+    started.region !== 'israel' ? (
+      <UsPlannerHost
+        deps={{
+          aviation: started.aviation,
+          userDb: started.userDb,
+          aircraft: () => runtime.profiles.aircraft.getState().profiles,
+          app: appStore,
+        }}
+        onClose={close}
+      />
+    ) : (
+      <PlannerHost
+        deps={{
+          israel: started.israel,
+          notam: runtime.israelNotam,
+          profiles: () => ({
+            aircraft: runtime.profiles.aircraft.getState().profiles,
+            pilots: runtime.profiles.pilot.getState().profiles,
+          }),
+          app: appStore,
+          signal: (name, parameters) =>
+            (runtime.telemetry.signal as (n: string, p?: unknown) => void)(name, parameters),
+        }}
+        networkStore={networkStore}
+        onClose={close}
+      />
+    );
+  // Settings (Swift: SettingsView over the log). The services keep their identity while the screen is open.
+  const settingsServices = useMemo(
+    () =>
+      createSettingsServices({
+        runtime,
+        files: fileTextStorage,
+        onRegionSaved: (region) => onRegionChange?.(region),
+        onDisplayModeChange: (mode) => layers.store.setState({ displayMode: mode }),
+      }),
+    [runtime, onRegionChange],
+  );
+  const renderSettings = (close: () => void) => (
+    <LiveSettings
+      services={settingsServices}
+      aircraft={runtime.profiles.aircraft}
+      pilot={runtime.profiles.pilot}
+      offline={runtime.offline}
+      mapBounds={() => appStore.getState().mapBounds}
       onClose={close}
     />
   );
@@ -158,6 +208,8 @@ export function LiveApp({
       directTo: (a) => nearest.store.getState().directTo(a),
       charts: runtime.terminal,
       notams: runtime.notams,
+      pireps: runtime.pirep,
+      windsAloft: runtime.windsAloft,
       notamConfigured: runtime.notamConfigured,
       openChart: (chart) => appStore.getState().openChartViewer(chart),
     });
@@ -174,8 +226,22 @@ export function LiveApp({
         })
       : () => undefined;
     const stopTelemetry = bindNavigationTelemetry(appStore, runtime.telemetry);
+    // Swift's global Haptics: the views tap through it; installed for the life of the live app.
+    setHaptics(runtime.haptics);
+    // Proximity and Israel alerts (MapContainerView.initializeServices): notices, banner and the warning haptic.
+    const alertsBinding = startAlerts({
+      runtime,
+      haptics: runtime.haptics,
+      flightLog: flightLog.store,
+      ownship: ownship.store,
+      visibleLayers: () => layers.store.getState().visibleLayers,
+      subscribeLayers: (listener) => layers.store.subscribe(listener),
+      log: console.warn,
+    });
     const stopSettings = persistLayerSettings(layers.store, started.userDb, fileTextStorage, console.warn);
     return () => {
+      alertsBinding.stop();
+      setHaptics(null);
       stopTelemetry();
       stopSettings();
       stopData();
@@ -198,7 +264,7 @@ export function LiveApp({
         // The services are the process's (startRecordingServices): a recording in progress outlives this screen, and a
         // remount binds to the same coordinator instead of starting a second one.
         if (cancelled) return;
-        stop = bindRecording(services, flightLog.store, NativeAppState);
+        stop = bindRecording(services, flightLog.store, NativeAppState, runtime.haptics);
         setRecording(services);
         // Crash recovery (Swift: FlightRecoveryService at launch): the profiles settle the active ids first.
         try {
@@ -228,19 +294,21 @@ export function LiveApp({
       <AirportQueriesContext.Provider value={queries}>
         <RecordingStoreContext.Provider value={recording?.store ?? null}>
           <View style={{ flex: 1 }}>
-            <DatabaseUnavailableBanner visible={databaseError !== null} />
-            <RemoteBanner runtime={runtime} />
+            {/* Edge to edge, so whatever is first at the top clears the status bar and Dynamic Island (Swift's VStack does by safe area). */}
+            <DatabaseUnavailableBanner visible={databaseError !== null} topInset={insets.top} />
+            <RemoteBanner runtime={runtime} topInset={databaseError !== null ? 0 : insets.top} />
             <View style={{ flex: 1 }}>
               <MapScreen />
             </View>
             <LiveScreens
               logbookEntry={logbookEntry}
               onOverlayClosed={() => void feed?.refresh()}
-              {...(started.region === 'israel' ? { renderPlanner } : {})}
+              renderPlanner={renderPlanner}
               {...(recording ? { renderFlight } : {})}
+              renderSettings={renderSettings}
             />
             <ChartViewer terminal={runtime.terminal} />
-            {recording ? <StopRecordingDialog store={recording.store} /> : null}
+            {recording ? <StopRecordingDialog store={recording.store} onConfirmed={runtime.haptics.success} /> : null}
           </View>
         </RecordingStoreContext.Provider>
       </AirportQueriesContext.Provider>

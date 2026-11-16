@@ -52,13 +52,13 @@ class FakeConfigService implements RemoteConfigServiceLike {
 
 async function makeStore(
   service: RemoteConfigServiceLike = FakeConfigService.offline(),
-  opts: { storage?: MemoryTextStorage; build?: number; clock?: TestClock; language?: string } = {},
+  opts: { storage?: MemoryTextStorage; build?: number | null; clock?: TestClock; language?: string } = {},
 ) {
   const clock = opts.clock ?? new TestClock(t0);
   return RemoteConfigStore.open({
     service,
     storage: opts.storage,
-    buildNumber: opts.build ?? 5,
+    buildNumber: opts.build === undefined ? 5 : opts.build,
     now: clock.now,
     preferredLanguage: () => opts.language ?? 'en',
   });
@@ -405,6 +405,21 @@ test.each([
   const request = store.updateRequest;
   if (expected === 'none') expect(request).toBeNull();
   else expect(request).toEqual({ kind: expected, message: 'Please update' });
+});
+
+test('anUnknownBuildNumberNeverRaisesTheUpdateBanner', async () => {
+  const store = await makeStore(undefined, { build: null });
+  store.apply(
+    file({
+      expiresIn: 3600,
+      mutate: (o) => {
+        o.minSupportedBuild = 2;
+        o.recommendedBuild = 3;
+        o.updateMessage = text('Please update');
+      },
+    }),
+  );
+  expect(store.updateRequest).toBeNull();
 });
 
 test('noticesFollowTheRegionTheExpiryAndDismissal', async () => {

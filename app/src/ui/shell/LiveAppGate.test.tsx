@@ -15,8 +15,10 @@ jest.mock('./runtime', () => ({
 jest.mock('./resetSlices', () => ({
   resetLiveSlices: (region: string) => void order.push(`reset:${region}`),
 }));
+let liveProps: { runtime: AppRuntime; onRegionChange?: (r: 'us' | 'israel') => void } | null = null;
 jest.mock('./LiveApp', () => ({
-  LiveApp: () => {
+  LiveApp: (props: typeof liveProps) => {
+    liveProps = props;
     order.push('mount');
     return null;
   },
@@ -56,5 +58,18 @@ describe('LiveAppGate', () => {
     expect(order).toEqual(['reset:israel', 'onboarding']);
     await act(async () => finishOnboarding!());
     expect(order.at(-1)).toBe('mount');
+  });
+
+  it('Settings > Region starts the live app again on the new region, from the launch state', async () => {
+    await render(<LiveAppGate />);
+    await act(async () => resolveRuntime(runtimeWith({ hasSeenOnboarding: 'true' })));
+    order.length = 0;
+    expect(liveProps!.runtime.started.region).toBe('israel');
+    await act(async () => liveProps!.onRegionChange!('us'));
+    expect(order).toEqual(['reset:us', 'mount']); // reset first, then a fresh mount (a new key)
+    expect(liveProps!.runtime.started.region).toBe('us');
+    order.length = 0;
+    await act(async () => liveProps!.onRegionChange!('us')); // no change, nothing restarts
+    expect(order).toEqual([]);
   });
 });

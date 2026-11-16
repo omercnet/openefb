@@ -285,6 +285,56 @@ describe('airport column loader', () => {
     stop();
   });
 
+  it('PIREPs that were waiting on a failed airport lookup load once a refresh finds the airport', async () => {
+    let calls = 0;
+    const fetchPireps = jest.fn(async () => []);
+    const { app, column, settle, stop } = setup({
+      log: () => undefined,
+      pireps: { fetchPireps },
+      aviation: { airport: () => (++calls === 1 ? Promise.reject(new Error('db closed')) : Promise.resolve(KSQL)) },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    expect(fetchPireps).not.toHaveBeenCalled();
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    expect(fetchPireps).toHaveBeenCalledTimes(1);
+    expect(column.getState().columns.KSQL!.pireps?.loading).toBe(false);
+    stop();
+  });
+
+  it('a stale lookup finishing after a newer one does not restart the reports it already started', async () => {
+    const slow = Promise.withResolvers<DataAirport | null>();
+    let calls = 0;
+    const reports = Promise.withResolvers<never[]>();
+    const fetchPireps = jest.fn(() => reports.promise);
+    const { app, column, settle, stop } = setup({
+      log: () => undefined,
+      pireps: { fetchPireps },
+      aviation: {
+        airport: () => {
+          calls += 1;
+          if (calls === 1) return Promise.reject(new Error('db closed'));
+          if (calls === 2) return slow.promise; // the older refresh hangs
+          return Promise.resolve(KSQL); // the newer one resolves first
+        },
+      },
+    });
+    app.getState().showAirport('KSQL');
+    await settle();
+    column.getState().refreshWeather('KSQL');
+    column.getState().refreshWeather('KSQL');
+    await settle();
+    expect(fetchPireps).toHaveBeenCalledTimes(1);
+    slow.resolve(KSQL); // the report is still loading when the stale lookup finishes
+    await settle();
+    expect(fetchPireps).toHaveBeenCalledTimes(1); // the stale completion starts nothing
+    reports.resolve([]);
+    await settle();
+    expect(column.getState().columns.KSQL!.pireps?.loading).toBe(false);
+    stop();
+  });
+
   describe('charts and the NOTAM key', () => {
     const CYCLE = { code: '2611', effectiveMs: 1, expirationMs: 2 };
     const chart = {
@@ -355,6 +405,103 @@ describe('airport column loader', () => {
       column.getState().openChart(chart as never);
       expect(openChart).toHaveBeenCalledWith(chart);
       expect(column.getState().columns.KSQL!.notamKeyConfigured).toBe(true);
+      stop();
+    });
+  });
+
+  describe('PIREPs and winds aloft', () => {
+    const pirep = { id: 'p1' } as never;
+    const windsReport = { stations: [] } as never;
+
+    it('loads the PIREPs within 50 NM of a US airport, and Retry loads them again after a failure', async () => {
+      let failing = true;
+      const fetchPireps = jest.fn(async () => {
+        if (failing) throw new Error('relay down');
+        return [pirep];
+      });
+      const { app, column, settle, stop } = setup({ pireps: { fetchPireps }, log: () => undefined });
+      app.getState().showAirport('KSQL');
+      expect(column.getState().columns.KSQL!.pireps).toEqual({ loading: true, error: null, pireps: null });
+      await settle();
+      expect(fetchPireps).toHaveBeenCalledWith({ lat: KSQL.latitude, lon: KSQL.longitude }, 50, expect.any(Number));
+      expect(column.getState().columns.KSQL!.pireps).toEqual({ loading: false, error: 'relay down', pireps: null });
+      failing = false;
+      column.getState().retryPireps('KSQL');
+      await settle();
+      expect(column.getState().columns.KSQL!.pireps).toEqual({ loading: false, error: null, pireps: [pirep] });
+      stop();
+    });
+
+    it('a refresh keeps the loaded PIREPs on screen while it runs', async () => {
+      let release: (v: never[]) => void = () => undefined;
+      const fetchPireps = jest
+        .fn()
+        .mockResolvedValueOnce([pirep])
+        .mockImplementationOnce(() => new Promise((r) => (release = r)));
+      const { app, column, settle, stop } = setup({ pireps: { fetchPireps } });
+      app.getState().showAirport('KSQL');
+      await settle();
+      column.getState().retryPireps('KSQL');
+      expect(column.getState().columns.KSQL!.pireps).toEqual({ loading: true, error: null, pireps: [pirep] });
+      release([]);
+      stop();
+    });
+
+    it('winds aloft: the 6 h forecast first, another period fetches that one, and the answer for an older period is dropped', async () => {
+      const calls: number[] = [];
+      let releaseFirst: (v: unknown) => void = () => undefined;
+      const fetchWindsAloft = jest.fn(async (_near: unknown, forecast: number) => {
+        calls.push(forecast);
+        if (calls.length === 1) await new Promise((r) => (releaseFirst = r));
+        return { ...(windsReport as object), forecast } as never;
+      });
+      const { app, column, settle, stop } = setup({ windsAloft: { fetchWindsAloft } });
+      app.getState().showAirport('KSQL');
+      await settle();
+      expect(column.getState().columns.KSQL!.winds).toMatchObject({ forecast: 6, loading: true });
+      column.getState().selectWindsForecast('KSQL', 12);
+      await settle();
+      expect(column.getState().columns.KSQL!.winds).toMatchObject({ forecast: 12, loading: false, error: null });
+      releaseFirst(undefined); // the 6 h answer arrives late: it must not overwrite the 12 h one
+      await settle();
+      expect(column.getState().columns.KSQL!.winds).toMatchObject({ forecast: 12 });
+      expect(calls).toEqual([6, 12]);
+      stop();
+    });
+
+    it('winds aloft failure keeps the picked period, and Retry fetches it again', async () => {
+      let failing = true;
+      const fetchWindsAloft = jest.fn(async () => {
+        if (failing) throw new Error('no forecast');
+        return windsReport;
+      });
+      const { app, column, settle, stop } = setup({ windsAloft: { fetchWindsAloft }, log: () => undefined });
+      app.getState().showAirport('KSQL');
+      await settle();
+      column.getState().selectWindsForecast('KSQL', 24);
+      await settle();
+      expect(column.getState().columns.KSQL!.winds).toMatchObject({ forecast: 24, error: 'no forecast', report: null });
+      failing = false;
+      column.getState().retryWinds('KSQL');
+      await settle();
+      expect(column.getState().columns.KSQL!.winds).toMatchObject({ forecast: 24, error: null, report: windsReport });
+      stop();
+    });
+
+    it('Israel has neither: nothing is requested', async () => {
+      const fetchPireps = jest.fn(async () => []);
+      const fetchWindsAloft = jest.fn(async () => windsReport);
+      const { app, settle, stop, column } = setup({
+        pireps: { fetchPireps },
+        windsAloft: { fetchWindsAloft },
+        region: () => 'israel',
+        israel: { aerodrome: async () => null },
+      });
+      app.getState().showAirport('LLHZ');
+      await settle();
+      expect(fetchPireps).not.toHaveBeenCalled();
+      expect(fetchWindsAloft).not.toHaveBeenCalled();
+      expect(column.getState().columns.LLHZ?.pireps).toBeUndefined();
       stop();
     });
   });

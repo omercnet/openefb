@@ -112,6 +112,8 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
 
     /** The start that is running, so a stop confirmed meanwhile waits for it instead of being dropped. */
     let starting: Promise<unknown> | null = null;
+    /** The stop that is running: a second confirmation waits for it, so its caller sees the same outcome. */
+    let stopping: Promise<void> | null = null;
 
     const startRecording = () => {
       const alone = get().busy === null;
@@ -150,7 +152,8 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
       set({ showStopConfirmation: false });
       // A stop confirmed while the recording is still starting waits for the start to finish, then stops it.
       if (get().busy === 'starting' && starting !== null) await starting.catch(() => undefined);
-      await exclusive<void>('stopping', undefined, async () => {
+      if (get().busy === 'stopping' && stopping !== null) return stopping;
+      const run = exclusive<void>('stopping', undefined, async () => {
         let summary;
         try {
           summary = await deps.coordinator.stopRecording();
@@ -178,6 +181,8 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
         if (result === 'savedTrackUnreadable') set({ lastError: recordingFailure('trackUnreadable') });
         else if (result === 'saveFailed') set({ lastError: recordingFailure('flightNotSaved') });
       });
+      stopping = run.finally(() => (stopping = null));
+      return stopping;
     };
 
     return {

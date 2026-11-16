@@ -20,7 +20,7 @@ import { DataAgeBadge } from '../../../components/Components';
 import { useTheme } from '../../../Primitives';
 import { Space, Type } from '../../../tokens';
 import { SegmentRow } from '../../layers/controls';
-import { CautionLabel, FailureBlock, LoadingRow, SystemHeader } from './parts';
+import { CautionLabel, FailureBlock, LoadingRow, SystemHeader } from '../sections';
 import type { SectionAirport } from './pirepLogic';
 import {
   FORECAST_OPTIONS,

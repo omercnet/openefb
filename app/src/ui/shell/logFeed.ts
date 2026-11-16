@@ -37,8 +37,7 @@ export function createLogFeed(deps: LogFeedDeps): LogFeed {
   const app = () => deps.app.getState();
   const actions: LogActions = {
     openMap: () => app().setScreen('map'),
-    // Settings and the planners are wired by their own screens; until then the buttons do nothing rather than lie.
-    openSettings: () => undefined,
+    openSettings: () => app().openOverlay({ kind: 'settings' }),
     openPlanner: () => app().openOverlay({ kind: 'planner' }),
     addEntry: () => {
       void addManualEntry(deps.userData).then(

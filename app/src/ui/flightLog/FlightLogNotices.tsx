@@ -11,6 +11,7 @@ import { useRecordingStore } from '../recording/RecordingStoreContext';
 import { Pressy, useTheme } from '../Primitives';
 import { MapControlMetrics, Space, Type } from '../tokens';
 import { useFlightLog } from './hooks';
+import { IsraelAlertBanner } from './IsraelAlertBanner';
 import { NoticeRow, Slashed } from './parts';
 
 export function FlightLogNotices() {
@@ -93,6 +94,8 @@ export function FlightLogNotices() {
         </View>
       </View>,
     );
+  } else if (data.israelAlerts.length > 0) {
+    notices.push(<IsraelAlertBanner key="israel-alerts" alerts={data.israelAlerts} />);
   }
   if (data.isOffline) {
     notices.push(
