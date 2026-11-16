@@ -22,7 +22,7 @@ import { log, logActions } from '../log/store';
 import { createLogbookEntryStore } from '../state/logbookEntryStore';
 import { createLogFeed } from './logFeed';
 import { createPlannerNetworkStore } from './israelPlanner';
-import { PlannerHost } from './LivePlanner';
+import { PlannerHost, UsPlannerHost } from './LivePlanner';
 import { createFlightScreenStores } from './flightScreens';
 import { LiveSettings } from './LiveSettings';
 import { createSettingsServices } from './settingsServices';
@@ -131,22 +131,34 @@ export function LiveApp({
       />
     ) : null;
   const [networkStore] = useState(() => createPlannerNetworkStore(runtime.preferences));
-  const renderPlanner = (close: () => void) => (
-    <PlannerHost
-      deps={{
-        israel: started.israel,
-        notam: runtime.israelNotam,
-        profiles: () => ({
-          aircraft: runtime.profiles.aircraft.getState().profiles,
-          pilots: runtime.profiles.pilot.getState().profiles,
-        }),
-        app: appStore,
-        signal: (name, parameters) => (runtime.telemetry.signal as (n: string, p?: unknown) => void)(name, parameters),
-      }}
-      networkStore={networkStore}
-      onClose={close}
-    />
-  );
+  const renderPlanner = (close: () => void) =>
+    started.region !== 'israel' ? (
+      <UsPlannerHost
+        deps={{
+          aviation: started.aviation,
+          userDb: started.userDb,
+          aircraft: () => runtime.profiles.aircraft.getState().profiles,
+          app: appStore,
+        }}
+        onClose={close}
+      />
+    ) : (
+      <PlannerHost
+        deps={{
+          israel: started.israel,
+          notam: runtime.israelNotam,
+          profiles: () => ({
+            aircraft: runtime.profiles.aircraft.getState().profiles,
+            pilots: runtime.profiles.pilot.getState().profiles,
+          }),
+          app: appStore,
+          signal: (name, parameters) =>
+            (runtime.telemetry.signal as (n: string, p?: unknown) => void)(name, parameters),
+        }}
+        networkStore={networkStore}
+        onClose={close}
+      />
+    );
   // Settings (Swift: SettingsView over the log). The services keep their identity while the screen is open.
   const settingsServices = useMemo(
     () =>
@@ -188,6 +200,8 @@ export function LiveApp({
       directTo: (a) => nearest.store.getState().directTo(a),
       charts: runtime.terminal,
       notams: runtime.notams,
+      pireps: runtime.pirep,
+      windsAloft: runtime.windsAloft,
       notamConfigured: runtime.notamConfigured,
       openChart: (chart) => appStore.getState().openChartViewer(chart),
     });
@@ -280,7 +294,7 @@ export function LiveApp({
             <LiveScreens
               logbookEntry={logbookEntry}
               onOverlayClosed={() => void feed?.refresh()}
-              {...(started.region === 'israel' ? { renderPlanner } : {})}
+              renderPlanner={renderPlanner}
               {...(recording ? { renderFlight } : {})}
               renderSettings={renderSettings}
             />

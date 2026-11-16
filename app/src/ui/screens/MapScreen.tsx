@@ -180,6 +180,11 @@ export function MapScreen() {
   const briefingRoute = useAppStore((s) => s.briefingRoute);
   const dismissBriefing = useCallback(() => appStore.getState().setPresentingBriefing(false), []);
   const { frame } = model;
+  // The planner (and anything else off the map) asks the camera to fit a box.
+  const frameRequest = useAppStore((s) => s.mapFrameRequest);
+  useEffect(() => {
+    if (frameRequest) frame(frameRequest.box);
+  }, [frame, frameRequest]);
   const showHighlight = useCallback(
     (shown: Highlight) => {
       setHighlight(shown);

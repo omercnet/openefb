@@ -7,6 +7,8 @@ import { weatherStation, type Airport, type Region, type WeatherStation } from '
 import { useAppStore } from '../../state/appStore';
 import { createStoreContext } from '../../state/storeContext';
 import type { IsraelAerodrome } from '../../../data/aviation/israelTypes';
+import type { Pirep } from '../../../services/pirep';
+import type { WindsAloftForecast, WindsAloftReport } from '../../../services/windsAloft';
 import type { NotamReport } from '../../../services/notam';
 import type { AirportWeather, ChartCycle, TerminalChart } from './logic';
 
@@ -24,6 +26,21 @@ export type NotamState =
   | { kind: 'failed'; message: string }
   | { kind: 'loaded'; report: NotamReport };
 
+/** PirepSection's state: the reports (null before the first load), whether a fetch runs, the last failure. */
+export interface PirepsState {
+  loading: boolean;
+  error: string | null;
+  pireps: readonly Pirep[] | null;
+}
+
+/** WindsAloftSection's state: the forecast period the pilot picked and what the last fetch for it returned. */
+export interface WindsState {
+  forecast: WindsAloftForecast;
+  loading: boolean;
+  error: string | null;
+  report: WindsAloftReport | null;
+}
+
 /** Everything the column shows for one selected airport. */
 export interface AirportColumnData {
   /** Null where the region has no airport data (the column then shows only the station's weather). */
@@ -38,6 +55,10 @@ export interface AirportColumnData {
   aerodrome?: IsraelAerodrome;
   /** The NOTAM list's state; see NotamState. */
   notams?: NotamState;
+  /** PIREPs within 50 NM; absent where the region has none (or no service). */
+  pireps?: PirepsState;
+  /** Winds aloft at the nearest forecast point; absent where the region has none (or no service). */
+  winds?: WindsState;
 }
 
 export interface AirportColumnState {
@@ -58,6 +79,10 @@ export interface AirportColumnState {
   retryCharts: (icao: string) => void;
   /** Download the airport's NOTAMs again (the Retry buttons of NotamSection). */
   retryNotams: (icao: string) => void;
+  retryPireps: (icao: string) => void;
+  retryWinds: (icao: string) => void;
+  /** The winds aloft period buttons: 6, 12 or 24 h; fetches the new one. */
+  selectWindsForecast: (icao: string, forecast: WindsAloftForecast) => void;
 }
 
 const noop = () => {};
@@ -72,6 +97,9 @@ export const airport = createStoreContext<AirportColumnState>({
   openChart: noop,
   retryCharts: noop,
   retryNotams: noop,
+  retryPireps: noop,
+  retryWinds: noop,
+  selectWindsForecast: noop,
 });
 
 /** What the column renders, plus its actions bound to the selected airport. */
@@ -91,6 +119,9 @@ export interface AirportColumnModel {
   openChart: (chart: TerminalChart) => void;
   retryCharts: () => void;
   retryNotams: () => void;
+  retryPireps: () => void;
+  retryWinds: () => void;
+  selectWindsForecast: (forecast: WindsAloftForecast) => void;
 }
 
 export function useAirportColumn(): AirportColumnModel {
@@ -120,6 +151,9 @@ export function useAirportColumn(): AirportColumnModel {
       openChart: (chart: TerminalChart) => api.getState().openChart(chart),
       retryCharts: () => api.getState().retryCharts(icao),
       retryNotams: () => api.getState().retryNotams(icao),
+      retryPireps: () => api.getState().retryPireps(icao),
+      retryWinds: () => api.getState().retryWinds(icao),
+      selectWindsForecast: (forecast) => api.getState().selectWindsForecast(icao, forecast),
     };
   }, [api, icao, data, region, now, rawMetarExpanded, setStripColumn]);
 }

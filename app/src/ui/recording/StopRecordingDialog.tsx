@@ -78,7 +78,7 @@ function PhoneSheet({
       },
       (index) => (index === 0 ? confirmAnd(store, onConfirmed)() : store.getState().cancelStop()),
     );
-  }, [visible, store]);
+  }, [visible, store, onConfirmed]);
   return null;
 }
 

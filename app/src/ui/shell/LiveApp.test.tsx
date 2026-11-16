@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { FlightPlanSheet } from '../sheets/flightPlan/FlightPlanSheet';
 import { haptic } from '../haptics';
 import { press, render } from '../../../tests/support/ui';
 import { createFakeNetworkStatus } from '../../adapters/network';
@@ -25,6 +26,7 @@ import type { AppRuntime } from './runtime';
 // The map is a native view and the screen is covered by its own tests; here it only marks that it is mounted.
 jest.mock('./LiveSettings', () => ({ LiveSettings: () => null })); // its screens are covered by LiveSettings.test
 jest.mock('../../adapters/secretStore', () => ({ createSecretStore: () => ({}) }));
+jest.mock('../sheets/flightPlan/FlightPlanSheet', () => ({ FlightPlanSheet: jest.fn(() => null) }));
 jest.mock('../sheets/israelPlan/IsraelFlightPlanSheet', () => ({
   IsraelFlightPlanSheet: () => null,
 }));
@@ -97,6 +99,8 @@ beforeEach(() => {
   flightLog.store.setState(EMPTY_FLIGHT_LOG);
   gps.store.setState({ status: { kind: 'lost', ageSeconds: null }, failure: null });
 });
+
+const flightPlanSheet = jest.mocked(FlightPlanSheet);
 
 describe('LiveApp (ContentView)', () => {
   afterEach(() => jest.useRealTimers());
@@ -397,11 +401,15 @@ describe('LiveApp (ContentView)', () => {
       expect(appStore.getState().overlay).toBeNull();
     });
 
-    it('the US planner is not mounted here (U4c): no Israel planner outside Israel', async () => {
+    it('Plan a flight opens the US planner outside Israel (FlightPlanSheet on a plan store), and Back closes it', async () => {
       const view = await render(<LiveApp runtime={plannerRuntime('us')} />);
       await act(async () => appStore.setState({ selectedScreen: 'log', overlay: { kind: 'planner' } }));
       await settle();
+      expect(has(view, 'live-us-planner')).toBe(true);
       expect(has(view, 'live-israel-planner')).toBe(false);
+      expect(flightPlanSheet).toHaveBeenCalled();
+      await press(view.byTestId('planner-back'));
+      expect(appStore.getState().overlay).toBeNull();
     });
   });
 });

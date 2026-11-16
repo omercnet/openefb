@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { SafeAreaView, Text, View } from 'react-native';
 import { Pressy, ThemeContext } from '../Primitives';
+import { FlightPlanSheet } from '../sheets/flightPlan/FlightPlanSheet';
+import { FlightPlanProvider, type FlightPlanState } from '../sheets/flightPlan/store';
+import { createLiveFlightPlanStore, type UsPlannerDeps } from './usPlanner';
 import { IsraelFlightPlanSheet } from '../sheets/israelPlan/IsraelFlightPlanSheet';
 import { IsraelPlanProvider, type IsraelPlanState } from '../sheets/israelPlan/store';
 import { useLiveTheme } from '../state/night';
@@ -29,6 +32,32 @@ export function LiveIsraelPlanner({ store, onClose }: { store: StoreApi<IsraelPl
       </SafeAreaView>
     </ThemeContext.Provider>
   );
+}
+
+/** The US planner pushed from the Log: FlightPlanView in the US region (U4c's FlightPlanSheet over a plan store). */
+export function LiveUsPlanner({ store, onClose }: { store: StoreApi<FlightPlanState>; onClose: () => void }) {
+  const theme = useLiveTheme();
+  return (
+    <ThemeContext.Provider value={theme}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: theme.paper }} testID="live-us-planner">
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: Space.m, gap: Space.m }}>
+          <Pressy accessibilityRole="button" accessibilityLabel="Back" onPress={onClose} testID="planner-back">
+            <Text style={[Type.title, { color: theme.accent }]}>Back</Text>
+          </Pressy>
+          <Text style={[Type.title, { color: theme.ink }]}>Flight Plans</Text>
+        </View>
+        <FlightPlanProvider store={store}>
+          <FlightPlanSheet region="us" />
+        </FlightPlanProvider>
+      </SafeAreaView>
+    </ThemeContext.Provider>
+  );
+}
+
+/** One fresh plan store for as long as the screen is open (Swift: a FlightPlanViewModel per presentation). */
+export function UsPlannerHost({ deps, onClose }: { deps: UsPlannerDeps; onClose: () => void }) {
+  const [store] = useState(() => createLiveFlightPlanStore(deps));
+  return <LiveUsPlanner store={store} onClose={onClose} />;
 }
 
 /**

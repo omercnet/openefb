@@ -21,6 +21,8 @@ import { AirSigmetService } from '../../services/airSigmetService';
 import { createRemoteConfigService } from '../../services/remoteConfigService';
 import { RemoteConfigStore } from '../../services/remoteConfigStore';
 import { NotamReadStateStore } from '../../services/notamReadStateStore';
+import { PirepService } from '../../services/pirepService';
+import { WindsAloftService } from '../../services/windsAloftService';
 import { IsraelNotamService } from '../../services/israelNotamService';
 import { TfrService } from '../../services/tfrService';
 import { WeatherService } from '../../services/weatherService';
@@ -76,6 +78,10 @@ export interface AppRuntime {
   notams: NotamService;
   offline: OfflineMapService;
   advisories: AirSigmetService;
+  /** Pilot reports near the airport (airport column, regions with the layer). */
+  pirep: PirepService;
+  /** Winds aloft forecast (airport column, regions with the layer). */
+  windsAloft: WindsAloftService;
   layerSettings: LayerSettings;
   location: LocationSource;
   network: NetworkStatusSource;
@@ -154,6 +160,8 @@ export async function startRuntime(): Promise<AppRuntime> {
     }),
     israelNotam: new IsraelNotamService({ fetch: fetchLike, storage: fileTextStorage, log }),
     advisories: new AirSigmetService({ fetch: fetchLike, log }),
+    pirep: new PirepService({ fetch: fetchLike, log }),
+    windsAloft: new WindsAloftService({ fetch: fetchLike, log }),
     location: createLocationSource(),
     network: createNetworkStatusSource(),
   };

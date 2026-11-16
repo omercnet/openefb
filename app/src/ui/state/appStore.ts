@@ -22,6 +22,9 @@ export interface AppState {
   overlay: LiveOverlay | null;
   /** The map's visible area, kept for what needs it away from the map (Settings > Offline Maps downloads "this view"). */
   mapBounds: OfflineRegionBounds | null;
+  /** Something away from the map asks it to fit this box (the planner's route); `seq` makes a repeat of the same box a new ask. */
+  mapFrameRequest: { seq: number; box: { south: number; west: number; north: number; east: number } } | null;
+  requestMapFrame: (box: { south: number; west: number; north: number; east: number }) => void;
   setMapBounds: (bounds: OfflineRegionBounds | null) => void;
   openOverlay: (overlay: LiveOverlay | null) => void;
   stripColumn: StripColumnKind;
@@ -54,6 +57,8 @@ export const createAppStore = () =>
     setScreen: (selectedScreen) => set({ selectedScreen }),
     overlay: null,
     mapBounds: null,
+    mapFrameRequest: null,
+    requestMapFrame: (box) => set((s) => ({ mapFrameRequest: { seq: (s.mapFrameRequest?.seq ?? 0) + 1, box } })),
     setMapBounds: (mapBounds) => set({ mapBounds }),
     openOverlay: (overlay) => set({ overlay }),
     stripColumn: 'log',

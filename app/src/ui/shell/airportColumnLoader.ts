@@ -10,8 +10,19 @@ import { describeError } from '../../domain/describeError';
 import { isLayerAvailable } from '../../domain/core';
 import type { TerminalProcedureServiceLike } from '../../services/terminal/terminalProcedureService';
 import type { WeatherServiceLike } from '../../services/weatherService';
+import { PIREP_MAX_AGE_SECONDS, PIREP_RADIUS_NM } from '../columns/airport/sections/pirepLogic';
+import { DEFAULT_FORECAST } from '../columns/airport/sections/windsAloftLogic';
+import type { PirepServiceLike } from '../../services/pirepService';
+import type { WindsAloftServiceLike } from '../../services/windsAloftService';
+import type { WindsAloftForecast } from '../../services/windsAloft';
 import { NotamError, type NotamServiceLike } from '../../services/notamService';
-import type { AirportColumnData, AirportColumnState, NotamState } from '../columns/airport/store';
+import type {
+  AirportColumnData,
+  AirportColumnState,
+  NotamState,
+  PirepsState,
+  WindsState,
+} from '../columns/airport/store';
 import type { AirportWeather, TerminalChart } from '../columns/airport/logic';
 import { israelAirport } from '../columns/nearest/israelAerodromeAdapter';
 import type { AppState } from '../state/appStore';
@@ -32,6 +43,10 @@ export interface AirportColumnLoaderDeps {
   charts?: Pick<TerminalProcedureServiceLike, 'charts' | 'currentCycle'> | null;
   /** The FAA NOTAM list; null: none (the column then shows only the key hint). */
   notams?: Pick<NotamServiceLike, 'fetchNotams'> | null;
+  /** PIREPs near the airport (50 NM, 2 h); null: none. */
+  pireps?: Pick<PirepServiceLike, 'fetchPireps'> | null;
+  /** Winds aloft at the nearest forecast point; null: none. */
+  windsAloft?: Pick<WindsAloftServiceLike, 'fetchWindsAloft'> | null;
   /** NotamService.isConfigured: a free FAA key is stored. */
   notamConfigured?: () => Promise<boolean>;
   /** Open the chart viewer (ChartPDFView). */
@@ -184,6 +199,61 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     patchColumn(icao, (d) => ({ ...d, notams }));
   }
 
+  const pirepRequest = new Map<string, number>();
+  /** PirepSection.load: a loaded list stays on screen while it refreshes; only the newest request for an airport writes. */
+  async function loadPireps(icao: string): Promise<void> {
+    const service = deps.pireps;
+    const airport = column.getState().columns[icao]?.airport;
+    if (!service || !airport || !isLayerAvailable(deps.region(), 'pireps')) return;
+    const request = (pirepRequest.get(icao) ?? 0) + 1;
+    pirepRequest.set(icao, request);
+    patchColumn(icao, (d) => ({ ...d, pireps: { pireps: d.pireps?.pireps ?? null, error: null, loading: true } }));
+    let next: PirepsState;
+    try {
+      const pireps = await service.fetchPireps(
+        { lat: airport.latitude, lon: airport.longitude },
+        PIREP_RADIUS_NM,
+        PIREP_MAX_AGE_SECONDS,
+      );
+      next = { pireps, error: null, loading: false };
+    } catch (error) {
+      (deps.log ?? console.warn)(`PIREPs for ${icao} failed: ${describeError(error)}`);
+      next = { pireps: null, error: describeError(error), loading: false };
+    }
+    if (stopped || pirepRequest.get(icao) !== request) return;
+    patchColumn(icao, (d) => ({ ...d, pireps: next }));
+  }
+
+  const windsRequest = new Map<string, number>();
+  /** WindsAloftSection.load for the picked period; only the newest request for an airport writes. */
+  async function loadWinds(icao: string, forecast?: WindsAloftForecast): Promise<void> {
+    const service = deps.windsAloft;
+    const airport = column.getState().columns[icao]?.airport;
+    if (!service || !airport || !isLayerAvailable(deps.region(), 'windsAloft')) return;
+    const period = forecast ?? column.getState().columns[icao]?.winds?.forecast ?? DEFAULT_FORECAST;
+    const request = (windsRequest.get(icao) ?? 0) + 1;
+    windsRequest.set(icao, request);
+    patchColumn(icao, (d) => ({
+      ...d,
+      winds: {
+        forecast: period,
+        report: d.winds?.forecast === period ? d.winds.report : null,
+        error: null,
+        loading: true,
+      },
+    }));
+    let next: WindsState;
+    try {
+      const report = await service.fetchWindsAloft({ lat: airport.latitude, lon: airport.longitude }, period);
+      next = { forecast: period, report, error: null, loading: false };
+    } catch (error) {
+      (deps.log ?? console.warn)(`Winds aloft for ${icao} failed: ${describeError(error)}`);
+      next = { forecast: period, report: null, error: describeError(error), loading: false };
+    }
+    if (stopped || windsRequest.get(icao) !== request) return;
+    patchColumn(icao, (d) => ({ ...d, winds: next }));
+  }
+
   const chartRequest = new Map<string, number>();
   /** AirportChartsSection.loadCharts: the index and the cycle; only the newest request for an airport may write. */
   async function loadCharts(icao: string): Promise<void> {
@@ -224,12 +294,20 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
               : CHARTS_PENDING,
           notamKeyConfigured: false,
           ...(deps.notams && isLayerAvailable(deps.region(), 'notams') ? { notams: { kind: 'loading' as const } } : {}),
+          ...(deps.pireps && isLayerAvailable(deps.region(), 'pireps')
+            ? { pireps: { loading: true, error: null, pireps: null } }
+            : {}),
+          ...(deps.windsAloft && isLayerAvailable(deps.region(), 'windsAloft')
+            ? { winds: { forecast: DEFAULT_FORECAST, loading: true, error: null, report: null } }
+            : {}),
         },
       },
     });
     await resolveAirport(icao);
     void loadCharts(icao);
     void loadNotams(icao);
+    void loadPireps(icao);
+    void loadWinds(icao);
     void deps.notamConfigured?.().then(
       (notamKeyConfigured) => patchColumn(icao, (d) => ({ ...d, notamKeyConfigured })),
       () => undefined,
@@ -244,6 +322,9 @@ export function startAirportColumnLoader(deps: AirportColumnLoaderDeps): () => v
     openChart: (chart) => deps.openChart?.(chart),
     retryCharts: (icao) => void loadCharts(icao),
     retryNotams: (icao) => void loadNotams(icao),
+    retryPireps: (icao) => void loadPireps(icao),
+    retryWinds: (icao) => void loadWinds(icao),
+    selectWindsForecast: (icao, forecast) => void loadWinds(icao, forecast),
     refreshWeather: (icao) => {
       // The cache is cleared so the fetch goes to the network; the report on screen stays the fallback if it fails.
       const shown = column.getState().columns[icao]?.weather.metar ?? weather.cachedWeather(icao);
