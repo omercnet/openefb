@@ -1,7 +1,7 @@
 // The production composition root: builds the services from the platform adapters and runs the launch sequence
 // (startup.ts). Imported only by the live app route, never by tests or capture routes, because it requires the bundled
 // databases. Tests build the same pieces with fakes (startup.test.ts, liveData.test.ts).
-import Constants from 'expo-constants';
+import { appBuildNumber } from '../../adapters/appBuild';
 import { createLocationSource } from '../../adapters/location';
 import { createNetworkStatusSource, type NetworkStatusSource } from '../../adapters/network';
 import baseStyle from '../../../assets/base-style.json';
@@ -90,7 +90,6 @@ export interface AppRuntime {
 const log = (message: string) => console.warn(message);
 
 /** CFBundleVersion / versionCode as the remote config compares it; 0 when the build has none. */
-const buildNumber = (): number => Number(Constants.nativeBuildVersion) || 0;
 
 export async function startRuntime(): Promise<AppRuntime> {
   const fetchLike = globalThis.fetch as unknown as import('../../services/ports').FetchLike;
@@ -103,7 +102,7 @@ export async function startRuntime(): Promise<AppRuntime> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports -- a Metro asset module, as aviationDb.ts does
     openIsrael: () => openIsraelDatabase(require('../../../assets/israel-aviation.sqlite')),
     openRemoteConfig: () =>
-      RemoteConfigStore.open({ service: remote, storage: fileTextStorage, buildNumber: buildNumber(), log }),
+      RemoteConfigStore.open({ service: remote, storage: fileTextStorage, buildNumber: appBuildNumber(), log }),
     log,
   });
   const notamReadStore = await NotamReadStateStore.open(fileTextStorage, log);

@@ -1,6 +1,7 @@
 // What Settings reads and changes on the real device (SettingsView.swift's environment): the user database, the keychain,
 // the aviation databases, the chart packs, the remote configuration and the telemetry choice. The screen and its store are
 // ui/screens/SettingsScreen and ui/state/settingsStore; this builds their services from the runtime.
+import { appBuildLabel } from '../../adapters/appBuild';
 import Constants from 'expo-constants';
 import { createSecretStore } from '../../adapters/secretStore';
 import { fallbackDataAttribution, type Region } from '../../domain/core/region';
@@ -66,7 +67,7 @@ export function createSettingsServices(deps: SettingsServicesDeps): SettingsServ
     onRegionSaved: deps.onRegionSaved,
     onDisplayModeChange: deps.onDisplayModeChange,
     now,
-    appInfo: { version: Constants.expoConfig?.version ?? '1.0.0', build: Constants.nativeBuildVersion ?? '1' },
+    appInfo: { version: Constants.expoConfig?.version ?? '1.0.0', build: appBuildLabel() },
     // Read live: the store changes after a check, and the screen keeps this object for as long as it is open.
     remoteConfig: {
       get sourceDescription() {

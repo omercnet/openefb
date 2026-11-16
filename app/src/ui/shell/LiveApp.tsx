@@ -6,6 +6,7 @@ import { airport } from '../columns/airport/store';
 import { layers } from '../columns/layers/store';
 import { AirportQueriesContext } from '../columns/nearest/sources';
 import { nearest } from '../columns/nearest/store';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DatabaseUnavailableBanner, RemoteConfigBanner } from '../components/Components';
 import { flightLog } from '../flightLog/store';
 import { MapScreen } from '../screens/MapScreen';
@@ -42,7 +43,7 @@ import { startRemoteConfigChecks } from './remoteConfigChecks';
 import type { AppRuntime } from './runtime';
 
 /** The remote config's notices, as the stacked banner (RemoteConfigBanner.swift). */
-function RemoteBanner({ runtime }: { runtime: AppRuntime }) {
+function RemoteBanner({ runtime, topInset }: { runtime: AppRuntime; topInset: number }) {
   const store = runtime.started.remoteConfig;
   const region = useRegion();
   const version = useSyncExternalStore(
@@ -59,7 +60,7 @@ function RemoteBanner({ runtime }: { runtime: AppRuntime }) {
   // The version changes whenever the store's notices or dismissals do; the items are derived from them.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const items = useMemo(() => (store ? bannerItems(store, region) : []), [store, region, version, minute]);
-  return <RemoteConfigBanner items={items} onDismiss={(id) => store?.dismissBanner(id)} />;
+  return <RemoteConfigBanner items={items} onDismiss={(id) => store?.dismissBanner(id)} topInset={topInset} />;
 }
 const noSubscribe = () => () => undefined;
 const zeroVersion = () => 0;
@@ -79,6 +80,7 @@ export function LiveApp({
   /** Builds the recording services (runtime.ts `startRecordingServices`); omitted: no recorder (tests). */
   startRecording?: (runtime: AppRuntime) => Promise<RecordingRuntime>;
 }) {
+  const insets = useSafeAreaInsets();
   const [recording, setRecording] = useState<RecordingRuntime | null>(null);
   // The Log (LogStackView): flights and entries from the user database, entry editor, and the actions the Log raises.
   const [logbookEntry] = useState(() => createLogbookEntryStore({ userData: userDataFromDb(runtime.started.userDb) }));
@@ -292,8 +294,9 @@ export function LiveApp({
       <AirportQueriesContext.Provider value={queries}>
         <RecordingStoreContext.Provider value={recording?.store ?? null}>
           <View style={{ flex: 1 }}>
-            <DatabaseUnavailableBanner visible={databaseError !== null} />
-            <RemoteBanner runtime={runtime} />
+            {/* Edge to edge, so whatever is first at the top clears the status bar and Dynamic Island (Swift's VStack does by safe area). */}
+            <DatabaseUnavailableBanner visible={databaseError !== null} topInset={insets.top} />
+            <RemoteBanner runtime={runtime} topInset={databaseError !== null ? 0 : insets.top} />
             <View style={{ flex: 1 }}>
               <MapScreen />
             </View>

@@ -1,5 +1,6 @@
 import { act } from 'react';
-import { Linking } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Linking, StyleSheet } from 'react-native';
 import { FlightPlanSheet } from '../sheets/flightPlan/FlightPlanSheet';
 import { haptic } from '../haptics';
 import { press, render } from '../../../tests/support/ui';
@@ -128,6 +129,32 @@ describe('LiveApp (ContentView)', () => {
     expect(view.text()).toContain('Open the App Store');
     await act(async () => remote.dismissBanner(UPDATE_BANNER_ID));
     expect(view.text()).not.toContain('Please update Kanaf');
+  });
+
+  it('draws the banners below the status bar and Dynamic Island, the first one only (iPhone 17 inset 59)', async () => {
+    const iphone = {
+      frame: { x: 0, y: 0, width: 393, height: 852 },
+      insets: { top: 59, left: 0, right: 0, bottom: 34 },
+    };
+    const { rt, remote } = runtime();
+    remote.updateRequest = { kind: 'required', message: 'A newer version of Kanaf is available.' };
+    const view = await render(
+      <SafeAreaProvider initialMetrics={iphone}>
+        <LiveApp runtime={rt} />
+      </SafeAreaProvider>,
+    );
+    const top = (id: string) => StyleSheet.flatten(view.byTestId(id).props.style).paddingTop;
+    expect(top('remoteConfigBanner')).toBe(59);
+    // With the red database banner first, it takes the inset and the notices under it add none.
+    const failed = runtime({ databaseError: { kind: 'databaseCorrupted' } });
+    failed.remote.updateRequest = { kind: 'required', message: 'A newer version of Kanaf is available.' };
+    const both = await render(
+      <SafeAreaProvider initialMetrics={iphone}>
+        <LiveApp runtime={failed.rt} />
+      </SafeAreaProvider>,
+    );
+    expect(StyleSheet.flatten(both.byTestId('databaseUnavailableBanner').props.style).paddingTop).toBe(8 + 59);
+    expect(StyleSheet.flatten(both.byTestId('remoteConfigBanner').props.style).paddingTop).toBe(0);
   });
 
   it('checks the remote config at launch, with no recording', async () => {
