@@ -105,6 +105,11 @@ export class DiagramOverlayController {
     this.now = deps.now ?? Date.now;
   }
 
+  /** The region the overlay is currently serving. */
+  get currentRegion(): Region {
+    return this.region;
+  }
+
   subscribe = (l: () => void): (() => void) => {
     this.listeners.add(l);
     return () => this.listeners.delete(l);

@@ -1,4 +1,5 @@
 import { StyleSheet, View } from 'react-native';
+import type { DiagramSources } from '../../domain/diagram/layers';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { layerSpecsFor } from '../../domain/map/registry';
 import { useLocalGlyphs } from '../../adapters/glyphInstall';
@@ -25,6 +26,7 @@ export function MapLayout({
   sectionalOpacity,
   model,
   initialView,
+  diagrams,
 }: {
   screen?: StripScreen;
   night?: boolean;
@@ -34,6 +36,8 @@ export function MapLayout({
   sectionalOpacity?: number;
   model: ReturnType<typeof useMapModel>;
   initialView: { center: { lat: number; lon: number }; zoom: number };
+  /** The airport diagram overlay's sources: backing polygons, images and forced layer visibility (live app only). */
+  diagrams?: DiagramSources;
 }) {
   const { widthClass, width } = useWidthClass();
   const showsFlightLog = panels.useData((s) => s.showsFlightLog);
@@ -54,7 +58,9 @@ export function MapLayout({
         region={model.snapshot.region}
         visibleLayers={model.snapshot.visibleLayers}
         layers={layerSpecsFor(model.snapshot.region)}
-        sources={model.sources}
+        sources={diagrams ? { ...model.sources, ...diagrams.geojson } : model.sources}
+        imageSources={diagrams?.images}
+        overrides={diagrams ? { visibility: diagrams.visibility, paint: {} } : undefined}
         initialView={initialView}
         camera={model.camera}
         onViewChange={model.onViewChange}

@@ -100,11 +100,14 @@ function fakeRuntime(
       refresh: async () => undefined,
     },
     layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
+    chartPacks: { diagramSource },
     location,
     network,
   } as unknown as AppRuntime;
   return { runtime, queries, location, network };
 }
+
+const diagramSource = { candidates: jest.fn(async () => []), diagramFor: jest.fn() };
 
 const mountLive = async (runtime: AppRuntime) =>
   render(
@@ -139,6 +142,30 @@ describe('live MapScreen (MapContainerView)', () => {
     expect(queries.nearestAirports).toHaveBeenCalled();
     expect(nearest.store.getState().entries.map((e) => e.airport.icao)).toEqual(['KPAO']);
     stop();
+  });
+
+  it('airport diagrams: a close camera asks the pack source for the region, a far one and the switch off do not', async () => {
+    const { runtime } = fakeRuntime();
+    diagramSource.candidates.mockClear();
+    layers.store.setState({ airportDiagrams: true });
+    await mountLive(runtime);
+    const view = (zoom: number) => ({
+      center: { lat: 37.5, lon: -122.25 },
+      zoom,
+      bearing: 0,
+      northEast: { lat: 37.51, lon: -122.24 },
+      southWest: { lat: 37.49, lon: -122.26 },
+      userInteraction: false,
+    });
+    await act(async () => lastSurface!.onViewChange(view(10)));
+    expect(diagramSource.candidates).not.toHaveBeenCalled();
+    await act(async () => lastSurface!.onViewChange(view(15)));
+    expect(diagramSource.candidates).toHaveBeenCalledWith('us', { lat: 37.5, lon: -122.25 }, expect.any(Number));
+    diagramSource.candidates.mockClear();
+    await act(async () => layers.store.setState({ airportDiagrams: false }));
+    await act(async () => lastSurface!.onViewChange(view(16)));
+    expect(diagramSource.candidates).not.toHaveBeenCalled();
+    layers.store.setState({ airportDiagrams: true });
   });
 
   it('the footer follows the camera: the zoom it reports, and ZOOM + / RECENTER actions', async () => {

@@ -8,6 +8,7 @@ import { useNearestAirports } from '../columns/nearest/refresh';
 import { footer } from '../flightLog/footerStore';
 import { MapLayout } from '../map/MapLayout';
 import { navigationRoute } from '../map/navigationRoute';
+import { useAirportDiagrams } from '../map/useAirportDiagrams';
 import { useIsraelChart } from '../map/useIsraelChart';
 import { offlineStatusFor } from '../map/offlineStatus';
 import { useOfflineMaps } from '../map/useOfflineMaps';
@@ -147,7 +148,23 @@ export function MapScreen() {
     },
     [footerStore, onViewChange],
   );
-  const modelWithZoom = useMemo(() => ({ ...model, onViewChange: trackedViewChange }), [model, trackedViewChange]);
+  const diagrams = useAirportDiagrams({
+    source: runtime.chartPacks.diagramSource,
+    region: model.snapshot.region,
+    enabled: () => layersStore.getState().airportDiagrams,
+    subscribeEnabled: (listener) =>
+      layersStore.subscribe((s, p) => s.airportDiagrams !== p.airportDiagrams && listener()),
+    remote: runtime.started.remoteConfig,
+  });
+  const { onCamera: diagramCamera } = diagrams;
+  const viewAndDiagrams = useCallback(
+    (change: Parameters<typeof onViewChange>[0]) => {
+      trackedViewChange(change);
+      diagramCamera(change);
+    },
+    [trackedViewChange, diagramCamera],
+  );
+  const modelWithZoom = useMemo(() => ({ ...model, onViewChange: viewAndDiagrams }), [model, viewAndDiagrams]);
 
   // The NRST cell refreshes on every fix while another column is open (MapContainerView's onChange(ownshipPosition)).
   useNearestAirports();
@@ -180,6 +197,7 @@ export function MapScreen() {
         liveNight={night}
         sectional={model.snapshot.visibleLayers.has('sectional')}
         sectionalOpacity={sectionalOpacity}
+        diagrams={diagrams.sources}
       />
       <ThemeContext.Provider value={night ? Night : Day}>
         <LiveBriefing
