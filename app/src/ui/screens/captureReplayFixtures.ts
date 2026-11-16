@@ -124,7 +124,7 @@ export const CAPTURE_FLIGHT: ReplayFlight & { departureICAO: string; arrivalICAO
   id: 'capture-flight-replay',
   audioFileURL: null,
   departureICAO: 'LLHA',
-  arrivalICAO: 'LLHA',
+  arrivalICAO: 'LLMG',
 };
 
 export type ReplayScene = 'replay' | 'fast';

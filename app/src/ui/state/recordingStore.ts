@@ -53,6 +53,8 @@ export interface RecordingViewState {
   microphoneDenied: boolean;
   /** What happened to the last stopped recording. */
   lastPersistenceResult: FlightPersistenceResult | null;
+  /** Counts finished saves: two stops that both end 'saved' are still two changes for whoever follows the log. */
+  persistenceSerial: number;
   /** A start or a stop is running; a second one is refused (JS-only: a double tap). */
   busy: 'starting' | 'stopping' | null;
 
@@ -167,7 +169,11 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
         } catch {
           result = 'saveFailed'; // the recording data is untouched, so launch-time recovery rebuilds the flight
         }
-        set({ lastPersistenceResult: result, showDiscardedNotice: shouldShowDiscardedNotice(result) });
+        set({
+          lastPersistenceResult: result,
+          persistenceSerial: get().persistenceSerial + 1,
+          showDiscardedNotice: shouldShowDiscardedNotice(result),
+        });
         // A kept-but-damaged flight and an unsaved one must reach the pilot, not just the log.
         if (result === 'savedTrackUnreadable') set({ lastError: recordingFailure('trackUnreadable') });
         else if (result === 'saveFailed') set({ lastError: recordingFailure('flightNotSaved') });
@@ -186,6 +192,7 @@ export function createRecordingStore(deps: RecordingViewDeps): RecordingViewStor
       showDiscardedNotice: false,
       microphoneDenied: false,
       lastPersistenceResult: null,
+      persistenceSerial: 0,
       busy: null,
 
       startRecording,

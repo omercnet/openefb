@@ -6,6 +6,8 @@ import { useMemo } from 'react';
 import { weatherStation, type Airport, type Region, type WeatherStation } from '../../../domain/core';
 import { useAppStore } from '../../state/appStore';
 import { createStoreContext } from '../../state/storeContext';
+import type { IsraelAerodrome } from '../../../data/aviation/israelTypes';
+import type { NotamReport } from '../../../services/notam';
 import type { AirportWeather, ChartCycle, TerminalChart } from './logic';
 
 /** AirportChartsSection's load state. */
@@ -13,6 +15,14 @@ export type AirportCharts =
   | { state: 'loading' }
   | { state: 'failed'; message: string }
   | { state: 'loaded'; cycle: ChartCycle; charts: TerminalChart[] };
+
+/** NotamSection's load state. Absent on a column that never asks for NOTAMs (the capture fixture): the key hint then shows. */
+export type NotamState =
+  | { kind: 'loading' }
+  | { kind: 'notConfigured' }
+  | { kind: 'credentialsRejected'; message: string }
+  | { kind: 'failed'; message: string }
+  | { kind: 'loaded'; report: NotamReport };
 
 /** Everything the column shows for one selected airport. */
 export interface AirportColumnData {
@@ -24,6 +34,10 @@ export interface AirportColumnData {
   charts: AirportCharts;
   /** NotamService.isConfigured: false shows the "free FAA API key" hint instead of the NOTAM list. */
   notamKeyConfigured: boolean;
+  /** The curated Israeli aerodrome record behind `airport` (Israel region): its section replaces the generic runways. */
+  aerodrome?: IsraelAerodrome;
+  /** The NOTAM list's state; see NotamState. */
+  notams?: NotamState;
 }
 
 export interface AirportColumnState {
@@ -42,6 +56,8 @@ export interface AirportColumnState {
   openChart: (chart: TerminalChart) => void;
   /** Reload the chart list after a failure. */
   retryCharts: (icao: string) => void;
+  /** Download the airport's NOTAMs again (the Retry buttons of NotamSection). */
+  retryNotams: (icao: string) => void;
 }
 
 const noop = () => {};
@@ -55,6 +71,7 @@ export const airport = createStoreContext<AirportColumnState>({
   refreshWeather: noop,
   openChart: noop,
   retryCharts: noop,
+  retryNotams: noop,
 });
 
 /** What the column renders, plus its actions bound to the selected airport. */
@@ -73,6 +90,7 @@ export interface AirportColumnModel {
   toggleRawMetar: () => void;
   openChart: (chart: TerminalChart) => void;
   retryCharts: () => void;
+  retryNotams: () => void;
 }
 
 export function useAirportColumn(): AirportColumnModel {
@@ -101,6 +119,7 @@ export function useAirportColumn(): AirportColumnModel {
         api.setState((s) => ({ rawMetarExpandedFor: s.rawMetarExpandedFor === icao ? null : icao })),
       openChart: (chart: TerminalChart) => api.getState().openChart(chart),
       retryCharts: () => api.getState().retryCharts(icao),
+      retryNotams: () => api.getState().retryNotams(icao),
     };
   }, [api, icao, data, region, now, rawMetarExpanded, setStripColumn]);
 }

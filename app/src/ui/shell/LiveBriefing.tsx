@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Linking, View } from 'react-native';
 import { useFonts } from 'expo-font';
 import type { Coordinate } from '../../domain/core';
+import type { BriefingRoute } from '../../domain/israel/briefingFilter';
 import type { IsraelNotam } from '../../domain/israel/notamTypes';
 import { highlightFor, type Highlight } from '../sheets/briefing/briefingHighlight';
 import { BriefingPresentation } from '../sheets/briefing/BriefingPresentation';
@@ -21,6 +22,8 @@ export interface LiveBriefingProps {
   fetcher: BriefingFetcher;
   readStore: BriefingReadStore;
   ownship: Coordinate | null;
+  /** The planned route the briefing filters to (the planner's Brief button); null: no route. */
+  route?: BriefingRoute | null;
   pointLookup: (code: string) => Coordinate | null;
   presented: boolean;
   /** The map still shows a highlight from an earlier "Show on map": the sheet offers to clear it. */
@@ -40,6 +43,7 @@ export function LiveBriefing({
   fetcher,
   readStore,
   ownship,
+  route = null,
   pointLookup,
   presented,
   highlightActive,
@@ -54,12 +58,12 @@ export function LiveBriefing({
     () =>
       presented
         ? new IsraelBriefingViewModel(
-            briefing.make(emptyBriefingData(null, ownship ? { lat: ownship.lat, lon: ownship.lon } : null)),
+            briefing.make(emptyBriefingData(route, ownship ? { lat: ownship.lat, lon: ownship.lon } : null)),
             { fetcher, readStore, ...(now ? { now } : {}) },
           )
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a new model per presentation; the position is read when it opens
-    [presented, fetcher, readStore, now],
+    [presented, fetcher, readStore, now, route],
   );
   const [fontsLoaded, fontError] = useFonts(FontFiles);
   const actions: BriefingActions = useMemo(

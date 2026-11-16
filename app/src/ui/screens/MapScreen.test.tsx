@@ -92,13 +92,14 @@ function fakeRuntime(
     weather: { fetchWeatherForStations: async () => [] },
     tfr: { currentTFRs: async () => ({ tfrs: [], fetchedAt: Date.now() }) },
     advisories: { currentAdvisories: async () => ({ advisories: [], fetchedAt: Date.now() }) },
+    lowPower: { isEnabled: () => false, stop: () => undefined },
     offline: {
       status: () => 'notDownloaded',
       subscribe: () => () => undefined,
       getSnapshot: () => offlineSnapshot,
       refresh: async () => undefined,
     },
-    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7 },
+    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
     location,
     network,
   } as unknown as AppRuntime;

@@ -32,6 +32,7 @@ function setup(over: Overrides = {}, state: Partial<AirportColumnState> = {}, ic
     refreshWeather: jest.fn(),
     openChart: jest.fn(),
     retryCharts: jest.fn(),
+    retryNotams: jest.fn(),
   };
   const store = airport.make({
     region: 'us',

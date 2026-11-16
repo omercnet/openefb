@@ -98,7 +98,7 @@ export interface DebriefLab {
 }
 
 export function captureDebriefLab(): DebriefLab {
-  const engine = new FakeDebriefEngine({ kind: 'available' }, CAPTURE_DEBRIEF, streaming);
+  const engine = new FakeDebriefEngine({ kind: 'available' }, null, streaming);
   const store = createDebriefStore({
     engine,
     flightId: CAPTURE_DETAIL_FLIGHT.id,

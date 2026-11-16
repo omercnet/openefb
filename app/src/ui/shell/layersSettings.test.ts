@@ -31,7 +31,7 @@ describe('layer settings', () => {
     const db = await freshDb();
     await settingsRepository(db).update({ defaultMapMode: 'trackUp', sectionalOpacity: 0.4 });
     const loaded = await loadLayerSettings(db, memoryStorage({ 'Preferences/displayMode': 'night' }));
-    expect(loaded).toEqual({ displayMode: 'night', mapMode: 'northUp', sectionalOpacity: 0.7 });
+    expect(loaded).toEqual({ displayMode: 'night', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true });
   });
 
   it('ignores a display mode it does not know', async () => {
@@ -89,6 +89,21 @@ describe('layer settings', () => {
     await new Promise((r) => setTimeout(r, 60));
     expect(order).toEqual(['night', 'day', 'auto']);
     expect(overlapped).toBe(false);
+    stop();
+  });
+
+  it('the diagrams switch is on by default, restored when saved, and saved when it changes', async () => {
+    expect((await loadLayerSettings(await freshDb(), memoryStorage())).airportDiagrams).toBe(true);
+    expect(
+      (await loadLayerSettings(await freshDb(), memoryStorage({ 'Preferences/showAirportDiagrams': 'false' })))
+        .airportDiagrams,
+    ).toBe(false);
+    const storage = memoryStorage();
+    const store = layers.make();
+    const stop = persistLayerSettings(store, await freshDb(), storage);
+    store.setState({ airportDiagrams: false });
+    await settle();
+    expect(storage.data['Preferences/showAirportDiagrams']).toBe('false');
     stop();
   });
 });

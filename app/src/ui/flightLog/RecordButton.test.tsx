@@ -1,5 +1,6 @@
 import { press, render } from '../../../tests/support/ui';
 import { formattedElapsedTime, litSegments, RecordButton } from './RecordButton';
+import { recordButtonView, registerRecordButtonAnchor } from '../recording/stopAnchor';
 
 describe('RecordButton', () => {
   it('at rest: Start recording, no time, no meter', async () => {
@@ -75,5 +76,17 @@ describe('RecordButton taps', () => {
       expect(pressableOnPress(button)).toBeUndefined();
       expect(button.props.accessibilityState?.disabled ?? false).toBe(kind === 'stopping');
     }
+  });
+});
+
+describe('RecordButton anchor', () => {
+  it('registers its native view for the End recording popover, and gives it up when it goes away', async () => {
+    registerRecordButtonAnchor(null);
+    const view = await render(
+      <RecordButton status={{ kind: 'recording' } as never} elapsed={3} level={-30} onPress={() => undefined} />,
+    );
+    expect(recordButtonView()).not.toBeNull();
+    await view.unmount();
+    expect(recordButtonView()).toBeNull();
   });
 });

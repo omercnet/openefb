@@ -1,5 +1,6 @@
 import { createStore, useStore } from 'zustand';
 import type { TerminalChart } from '../columns/airport/logic';
+import type { BriefingRoute } from '../../domain/israel/briefingFilter';
 import type { AppError } from '../../domain/errors';
 import { NO_NAVIGATION, type ActiveNavigation } from '../../domain/route/navigation';
 import type { StripColumnKind } from '../../domain/types';
@@ -7,7 +8,17 @@ import type { StripColumnKind } from '../../domain/types';
 // App-wide state, the port of the navigation and error parts of AppState.swift. UI-only state stays in components.
 // High-rate streams (GPS at about 1 Hz, map follow mode) must not go through here per tick: they feed a domain reducer
 // and only the resulting camera props reach the map (plan section 3.2). Add slices here as tracks need them.
+/** AppState.selectedScreen: the map, or the log stack over it (the map stays mounted underneath). */
+export type LiveScreen = 'map' | 'log';
+
+/** A screen pushed over the log stack (LogRoute); more kinds arrive as their screens are wired live. */
+export type LiveOverlay = { kind: 'entry'; id: string } | { kind: 'planner' } | { kind: 'flight'; id: string };
+
 export interface AppState {
+  selectedScreen: LiveScreen;
+  setScreen: (screen: LiveScreen) => void;
+  overlay: LiveOverlay | null;
+  openOverlay: (overlay: LiveOverlay | null) => void;
   stripColumn: StripColumnKind;
   selectedAirportId: string | null;
   /** Why the aviation database could not be opened (AppState.databaseError): drives the red banner. */
@@ -21,6 +32,9 @@ export interface AppState {
   /** The Israel NOTAM briefing sheet is up (AppState.isPresentingIsraelBriefing). */
   isPresentingBriefing: boolean;
   setPresentingBriefing: (presenting: boolean) => void;
+  /** The planned route the briefing filters to (the planner's Brief button); null: the whole feed around ownship. */
+  briefingRoute: BriefingRoute | null;
+  openBriefing: (route: BriefingRoute | null) => void;
   /** The terminal chart open full screen (ChartPDFView), if any. */
   chartViewer: TerminalChart | null;
   openChartViewer: (chart: TerminalChart | null) => void;
@@ -31,14 +45,21 @@ export interface AppState {
 /** A fresh store; tests create their own so state never leaks between them. */
 export const createAppStore = () =>
   createStore<AppState>()((set) => ({
+    selectedScreen: 'map',
+    setScreen: (selectedScreen) => set({ selectedScreen }),
+    overlay: null,
+    openOverlay: (overlay) => set({ overlay }),
     stripColumn: 'log',
     selectedAirportId: null,
     databaseError: null,
     navigation: NO_NAVIGATION,
     isPresentingBriefing: false,
+    briefingRoute: null,
+    openBriefing: (briefingRoute) => set({ briefingRoute, isPresentingBriefing: true }),
     chartViewer: null,
     openChartViewer: (chartViewer) => set({ chartViewer }),
-    setPresentingBriefing: (isPresentingBriefing) => set({ isPresentingBriefing }),
+    setPresentingBriefing: (isPresentingBriefing) =>
+      set(isPresentingBriefing ? { isPresentingBriefing } : { isPresentingBriefing, briefingRoute: null }),
     setStripColumn: (stripColumn) => set({ stripColumn }),
     showAirport: (icao) => set({ selectedAirportId: icao, stripColumn: 'airport' }),
     reportDatabaseError: (databaseError) => set({ databaseError }),

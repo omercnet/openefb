@@ -1,5 +1,5 @@
-// The Layers column's persisted choice: the display mode, in a small preference (Swift: UserDefaults "displayMode",
-// AppState.swift:75-77). Orientation and sectional opacity stay in memory and reset to north up and 70% at every launch,
+// The Layers column's persisted choices: the display mode and the airport diagrams switch, in small preferences (Swift:
+// UserDefaults "displayMode", AppState.swift:75-77, and "showAirportDiagrams", AirportDiagramOverlay.swift:30). Orientation and sectional opacity stay in memory and reset to north up and 70% at every launch,
 // as in Swift (UserSettings.defaultMapMode/sectionalOpacity are never read by the app).
 import type { StoreApi } from 'zustand';
 import type { Db } from '../../data/db';
@@ -7,12 +7,19 @@ import { DISPLAY_MODE_DEFAULTS_KEY, DISPLAY_MODES, type DisplayMode } from '../.
 import type { TextStorage } from '../../services/ports';
 import type { LayersData } from '../columns/layers/store';
 
-export type LayerSettings = Pick<LayersData, 'displayMode' | 'mapMode' | 'sectionalOpacity'>;
+export type LayerSettings = Pick<LayersData, 'displayMode' | 'mapMode' | 'sectionalOpacity' | 'airportDiagrams'>;
 
 const STORAGE_KEY = `Preferences/${DISPLAY_MODE_DEFAULTS_KEY}`;
+/** Swift AirportDiagramOverlay.enabledDefaultsKey: on unless the pilot switched it off. */
+const DIAGRAMS_KEY = 'Preferences/showAirportDiagrams';
 
 /** AppState's defaults: auto display mode, north up, 70% sectional. A value that cannot be read falls back to its default. */
-export const DEFAULT_LAYER_SETTINGS: LayerSettings = { displayMode: 'auto', mapMode: 'northUp', sectionalOpacity: 0.7 };
+export const DEFAULT_LAYER_SETTINGS: LayerSettings = {
+  displayMode: 'auto',
+  mapMode: 'northUp',
+  sectionalOpacity: 0.7,
+  airportDiagrams: true,
+};
 
 export async function loadLayerSettings(
   _db: Db,
@@ -26,10 +33,16 @@ export async function loadLayerSettings(
   } catch (error) {
     log(`Could not read the display mode, using auto: ${String(error)}`); // an I/O failure, not a missing preference
   }
+  try {
+    const raw = await storage.read(DIAGRAMS_KEY);
+    if (raw === 'true' || raw === 'false') result.airportDiagrams = raw === 'true';
+  } catch (error) {
+    log(`Could not read the diagrams switch, using on: ${String(error)}`);
+  }
   return result;
 }
 
-/** Writes each change of the display mode back; failures are logged, never thrown into the UI. */
+/** Writes each change of the display mode and the diagrams switch back; failures are logged, never thrown into the UI. */
 export function persistLayerSettings(
   store: StoreApi<LayersData>,
   _db: Db,
@@ -46,6 +59,12 @@ export function persistLayerSettings(
       const mode = state.displayMode;
       chain = chain.then(() =>
         storage.write(STORAGE_KEY, mode).catch((e) => log(`Could not save the display mode: ${String(e)}`)),
+      );
+    }
+    if (state.airportDiagrams !== previous.airportDiagrams) {
+      const on = String(state.airportDiagrams);
+      chain = chain.then(() =>
+        storage.write(DIAGRAMS_KEY, on).catch((e) => log(`Could not save the diagrams switch: ${String(e)}`)),
       );
     }
   });

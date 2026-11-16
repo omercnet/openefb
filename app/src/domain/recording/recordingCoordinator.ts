@@ -134,6 +134,10 @@ export class RecordingCoordinator {
   private autoStartTask: Cancellable | null = null;
   private autoStopTask: Cancellable | null = null;
   private currentFlightID: string | null = null;
+  /** The flight being recorded right now, however it was started (button or auto-start); null when idle. */
+  get activeFlightID(): string | null {
+    return this.currentFlightID;
+  }
   private startSession: symbol | null = null;
   /** Identity of the current auto-start countdown; bumped when one begins or is canceled. */
   private countdownGeneration = 0;

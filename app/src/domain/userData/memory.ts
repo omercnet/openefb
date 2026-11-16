@@ -100,7 +100,17 @@ export function createMemoryUserData(seed: MemoryUserDataSeed = {}): UserData {
     settings,
     aircraft: repository(aircraft),
     pilots: repository(pilots),
-    logbook: { ...logbookBase, byFlightId: (flightID) => logbookBase.listWhere('flight_id', flightID) },
+    logbook: {
+      ...logbookBase,
+      byFlightId: (flightID) => logbookBase.listWhere('flight_id', flightID),
+      // Check and delete in one synchronous step on the rows, like the single SQL statement: no confirm can land between.
+      removeUnconfirmed: (id) => {
+        const entry = logbook.rows.get(id);
+        if (!entry || entry.isConfirmed) return Promise.resolve(false);
+        logbook.rows.delete(id);
+        return Promise.resolve(true);
+      },
+    },
   };
 
   // Like the expo adapter's exclusive transaction, atomically calls run one after the other: a second waits for the first, so

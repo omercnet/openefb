@@ -29,6 +29,8 @@ import {
   type InfoChipIcon,
   type TerminalChart,
 } from './logic';
+import { IsraelAerodromeEntry } from './israelAerodromeSection';
+import { NotamsSection } from './notamSection';
 import type { AirportColumnModel } from './store';
 
 /** minWidth of the label column of label/value rows, points. */
@@ -192,7 +194,7 @@ function Row({
 }
 
 /** SectionHeader (DesignTokens.swift): Archivo SemiBold 12 in the system secondary color. */
-function SystemHeader({ title }: { title: string }) {
+export function SystemHeader({ title }: { title: string }) {
   const t = useTheme();
   return (
     <Text accessibilityRole="header" style={[Type.sectionHeader, { color: t.secondaryText }]}>
@@ -202,7 +204,7 @@ function SystemHeader({ title }: { title: string }) {
 }
 
 /** A caption-size note in the secondary ink ("No runway data available"). */
-function Note({ children, testID }: { children: string; testID?: string }) {
+export function Note({ children, testID }: { children: string; testID?: string }) {
   const t = useTheme();
   return (
     <Text testID={testID} style={[Type.caption, { color: t.inkSecondary }]}>
@@ -212,7 +214,7 @@ function Note({ children, testID }: { children: string; testID?: string }) {
 }
 
 /** Label with the filled warning triangle, in the caution colour (TAF not loaded, TAF refresh failed). */
-function CautionLine({ text, testID }: { text: string; testID?: string }) {
+export function CautionLine({ text, testID }: { text: string; testID?: string }) {
   const t = useTheme();
   return (
     <View
@@ -228,7 +230,7 @@ function CautionLine({ text, testID }: { text: string; testID?: string }) {
 }
 
 /** `.bordered` `.controlSize(.large)` Retry button. */
-function RetryButton({ onPress, testID }: { onPress: () => void; testID?: string }) {
+export function RetryButton({ onPress, testID }: { onPress: () => void; testID?: string }) {
   const t = useTheme();
   return (
     <Pressy
@@ -628,8 +630,18 @@ export interface AirportSection {
  */
 export const AIRPORT_SECTIONS: readonly AirportSection[] = [
   { id: 'frequencies', Component: FrequenciesSection },
-  { id: 'runways', Component: RunwaysSection },
-  { id: 'notams', layer: 'notams', isShown: (m) => m.data?.notamKeyConfigured === false, Component: NotamKeySection },
+  { id: 'runways', isShown: (m) => m.data?.aerodrome === undefined, Component: RunwaysSection },
+  {
+    id: 'israel-aerodrome',
+    isShown: (m) => m.data?.aerodrome !== undefined,
+    Component: (props) => <IsraelAerodromeEntry {...props} />,
+  },
+  {
+    id: 'notams',
+    layer: 'notams',
+    isShown: (m) => m.data?.notams !== undefined || m.data?.notamKeyConfigured === false,
+    Component: (props) => <NotamsSection {...props} />,
+  },
   { id: 'charts', layer: 'airportCharts', Component: ChartsSection },
 ];
 

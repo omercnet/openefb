@@ -1,5 +1,6 @@
 import type { Airport as DataAirport } from '../../data/aviation/types';
 import type { Airport } from '../../domain/core';
+import { NotamError } from '../../services/notamService';
 import { AppFailure } from '../../domain/errors';
 import { createAppStore } from '../state/appStore';
 import { airport as airportSlice } from '../columns/airport/store';
@@ -356,5 +357,84 @@ describe('airport column loader', () => {
       expect(column.getState().columns.KSQL!.notamKeyConfigured).toBe(true);
       stop();
     });
+  });
+
+  describe('NOTAMs', () => {
+    const report = { location: 'SQL', notams: [], fetchedAt: 1, refreshFailed: false, isIncomplete: false };
+
+    it('loads the FAA NOTAMs for a US airport, and Retry loads them again', async () => {
+      let failing = true;
+      const fetchNotams = jest.fn(async () => {
+        if (failing) throw new Error('timeout');
+        return report;
+      });
+      const { app, column, settle, stop } = setup({ notams: { fetchNotams }, log: () => undefined });
+      app.getState().showAirport('KSQL');
+      expect(column.getState().columns.KSQL!.notams).toEqual({ kind: 'loading' });
+      await settle();
+      expect(column.getState().columns.KSQL!.notams).toMatchObject({ kind: 'failed', message: expect.any(String) });
+      failing = false;
+      column.getState().retryNotams('KSQL');
+      await settle();
+      expect(column.getState().columns.KSQL!.notams).toEqual({ kind: 'loaded', report });
+      stop();
+    });
+
+    it('no key and a rejected key are states of their own, not failures', async () => {
+      const { app, column, settle, stop } = setup({
+        notams: {
+          fetchNotams: async () => {
+            throw new NotamError('notConfigured');
+          },
+        },
+      });
+      app.getState().showAirport('KSQL');
+      await settle();
+      expect(column.getState().columns.KSQL!.notams).toEqual({ kind: 'notConfigured' });
+      stop();
+      const second = setup({
+        notams: {
+          fetchNotams: async () => {
+            throw new NotamError('credentialsRejected');
+          },
+        },
+      });
+      second.app.getState().showAirport('KSQL');
+      await second.settle();
+      expect(second.column.getState().columns.KSQL!.notams).toMatchObject({ kind: 'credentialsRejected' });
+      second.stop();
+    });
+
+    it('Israel has no FAA NOTAM list here: nothing is requested', async () => {
+      const fetchNotams = jest.fn(async () => report);
+      const { app, settle, stop } = setup({
+        notams: { fetchNotams },
+        region: () => 'israel',
+        israel: { aerodrome: async () => null },
+      });
+      app.getState().showAirport('LLHZ');
+      await settle();
+      expect(fetchNotams).not.toHaveBeenCalled();
+      stop();
+    });
+  });
+
+  it('an Israeli aerodrome record is kept for its section', async () => {
+    const record = {
+      code: 'LLHZ',
+      nameEnglish: 'Herzliya',
+      latitude: 32,
+      longitude: 34.8,
+      elevationFeet: 135,
+      type: 'airport',
+      use: 'civil',
+      runways: [],
+      frequencies: [],
+    } as never;
+    const { app, column, settle, stop } = setup({ region: () => 'israel', israel: { aerodrome: async () => record } });
+    app.getState().showAirport('LLHZ');
+    await settle();
+    expect(column.getState().columns.LLHZ!.aerodrome).toBe(record);
+    stop();
   });
 });

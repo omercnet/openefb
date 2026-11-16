@@ -46,11 +46,30 @@ export class FlightRecoveryService {
 
   /**
    * Recover every orphaned recording. Returns the flight ids that got a FlightRecord.
-   * activeFlightID: a recording in progress right now; never touched.
+   * activeFlightID: a recording in progress right now; never touched. A function is read again before every candidate,
+   * because a recording can start while the scans are awaited.
    */
   async recoverOrphans(
-    options: { activeFlightID?: string | null; aircraftProfileID?: string | null; pilotProfileID?: string | null } = {},
+    options: {
+      activeFlightID?: string | null | (() => string | null);
+      aircraftProfileID?: string | null;
+      pilotProfileID?: string | null;
+    } = {},
   ): Promise<string[]> {
+    // Every flight that was active at any point of this run stays excluded: one that stops while the scans are awaited
+    // has its data in the recording database and is about to be saved by its own stop, so it must not be saved here too.
+    const everActive = new Set<string>();
+    const activeID = (): string | null => {
+      const raw = typeof options.activeFlightID === 'function' ? options.activeFlightID() : options.activeFlightID;
+      const id = raw ? raw.toLowerCase() : null;
+      if (id) everActive.add(id);
+      return id;
+    };
+    const excluded = (flightID: string): boolean => {
+      activeID();
+      return everActive.has(flightID);
+    };
+    activeID(); // at entry, before anything is awaited
     let existing: Set<string>;
     try {
       existing = new Set((await this.deps.flights.list()).map((f) => f.id.toLowerCase()));
@@ -74,13 +93,16 @@ export class FlightRecoveryService {
       if (candidates.get(key) == null) candidates.set(key, id);
     }
     existing.forEach((id) => candidates.delete(id));
-    if (options.activeFlightID) candidates.delete(options.activeFlightID.toLowerCase());
+    const activeNow = activeID();
+    if (activeNow) candidates.delete(activeNow);
 
     const recovered: string[] = [];
     for (const flightID of [...candidates.keys()].sort()) {
+      if (excluded(flightID)) continue; // active at some point since the scan began
       try {
         const summary = await this.summaryFor(flightID, candidates.get(flightID) ?? flightID);
         if (!summary) continue;
+        if (excluded(flightID)) continue; // started or stopped while its data was read
         const result = await this.deps.persistence.store(
           summary,
           options.aircraftProfileID ?? null,

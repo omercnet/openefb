@@ -99,7 +99,10 @@ export default ({ config }: ConfigContext): ExpoConfig => withOnlyLocationAudioB
   updates: OTA_URL ? {
     url: OTA_URL,
     enabled: true,
-    checkAutomatically: 'NEVER', // the ota screen drives the check, so the smoke scenario is deterministic
+    // Cold start only (plan 6.3): download at launch, run the new bundle from the next cold start; never reload mid-session.
+    // The CI smoke build drives the check from the ota screen instead, so that scenario stays deterministic.
+    checkAutomatically: OTA_SMOKE ? 'NEVER' : 'ON_LOAD',
+    fallbackToCacheTimeout: 0,
     requestHeaders: { 'expo-channel-name': process.env.KANAF_OTA_CHANNEL ?? 'production' },
     codeSigningCertificate: OTA_CERT,
     codeSigningMetadata: { keyid: 'main', alg: 'rsa-v1_5-sha256' },

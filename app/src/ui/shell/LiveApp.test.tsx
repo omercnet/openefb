@@ -1,6 +1,7 @@
 import { act } from 'react';
-import { render } from '../../../tests/support/ui';
+import { press, render } from '../../../tests/support/ui';
 import { createFakeNetworkStatus } from '../../adapters/network';
+import { FakePreferences } from '../../domain/ports/preferences';
 import { FakeLocationSource } from '../../domain/ports/location';
 import type { RemoteNotice } from '../../services/remoteConfig';
 import { UPDATE_BANNER_ID } from '../../services/remoteConfigStore';
@@ -12,10 +13,24 @@ import { gps } from '../state/gps';
 import { regionSlice } from '../state/region';
 import { applyCaptureSeeds } from '../capture/seeds';
 import { resetLiveSlices } from './resetSlices';
+import { openNodeSqliteDb } from '../../../tests/support/nodeSqliteDb';
+import { migrate } from '../../data/migrate';
+import { FakeMicrophonePermission } from '../../domain/ports/microphonePermission';
+import { MockAudioRecorder, MockTranscriptionService } from '../../domain/recording/testSupport';
+import { createRecordingRuntime } from './recordingRuntime';
 import { LiveApp } from './LiveApp';
 import type { AppRuntime } from './runtime';
 
 // The map is a native view and the screen is covered by its own tests; here it only marks that it is mounted.
+jest.mock('../sheets/israelPlan/IsraelFlightPlanSheet', () => ({
+  IsraelFlightPlanSheet: () => null,
+}));
+jest.mock(
+  'react-native-safe-area-context',
+  () => jest.requireActual('react-native-safe-area-context/jest/mock').default,
+);
+jest.mock('./LiveFlight', () => ({ LiveFlight: () => null }));
+jest.mock('../screens/LogScreen', () => ({ LogScreen: () => null }));
 jest.mock('../map/ChartPdfView', () => ({ ChartPdfView: () => null }));
 jest.mock('../screens/MapScreen', () => ({ MapScreen: () => null }));
 
@@ -55,12 +70,14 @@ function runtime(over: Partial<AppRuntime['started']> = {}) {
       remoteConfig: remote,
       ...over,
     },
+    telemetry: { signal: () => undefined },
     weather: {},
     tfr: {},
     advisories: {},
-    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7 },
+    layerSettings: { displayMode: 'day', mapMode: 'northUp', sectionalOpacity: 0.7, airportDiagrams: true },
     location,
     network,
+    profiles: { load: async () => undefined, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) },
   } as unknown as AppRuntime;
   return { rt, network, location, remote };
 }
@@ -181,5 +198,167 @@ describe('LiveApp (ContentView)', () => {
     applyCaptureSeeds();
     resetLiveSlices('us');
     expect(layers.store.getState().displayMode).toBe('auto');
+  });
+
+  describe('recording services', () => {
+    const settle = () => act(async () => new Promise((r) => setTimeout(r, 20)));
+    const withProfiles = (rt: AppRuntime) =>
+      Object.assign(rt, {
+        profiles: { load: async () => undefined, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) },
+      });
+    const services = async () => {
+      const userDb = openNodeSqliteDb();
+      await migrate(userDb);
+      return createRecordingRuntime({
+        userDb,
+        openRecordingDb: async () => openNodeSqliteDb(),
+        aviation: null,
+        location: new FakeLocationSource(),
+        audio: new MockAudioRecorder(),
+        makeTranscription: () => new MockTranscriptionService(),
+        microphone: new FakeMicrophonePermission('granted'),
+        files: {
+          appSupportRoot: 'file:///support',
+          pathFor: (id) => `file:///support/Recordings/${id}.m4a`,
+          removeFile: async () => undefined,
+          listFileNames: async () => [],
+          exists: async () => true,
+          durationSeconds: async () => 60,
+          creationDate: async () => null,
+        },
+        activeProfileIds: () => ({ aircraftProfileID: null, pilotProfileID: null }),
+        activeRouteLegs: () => [],
+      });
+    };
+
+    it('puts the recorder on the strip and runs crash recovery once the profiles are known', async () => {
+      const { rt } = runtime();
+      withProfiles(rt);
+      let built: Awaited<ReturnType<typeof services>> | null = null;
+      const recover = jest.fn(async () => []);
+      await render(
+        <LiveApp
+          runtime={rt}
+          startRecording={async () => {
+            built = await services();
+            built.recoverOrphans = recover as never;
+            return built;
+          }}
+        />,
+      );
+      await settle();
+      expect(flightLog.store.getState().recording?.status).toEqual({ kind: 'idle' });
+      expect(flightLog.store.getState().recordingUnavailable).toBe(false);
+      expect(recover).toHaveBeenCalledWith({ aircraftProfileID: null, pilotProfileID: null });
+    });
+
+    it('leaving the screen does not tear the recording services down: they belong to the process', async () => {
+      const { rt } = runtime();
+      withProfiles(rt);
+      const shared = await services();
+      const dispose = jest.spyOn(shared, 'dispose');
+      const start = async () => shared;
+      const first = await render(<LiveApp runtime={rt} startRecording={start} />);
+      await settle();
+      await first.unmount();
+      expect(dispose).not.toHaveBeenCalled();
+      await render(<LiveApp runtime={rt} startRecording={start} />);
+      await settle();
+      expect(flightLog.store.getState().recording?.status).toEqual({ kind: 'idle' });
+      expect(dispose).not.toHaveBeenCalled();
+    });
+
+    it('crash recovery waits for a launch where the profiles load: nothing is saved with no aircraft or pilot', async () => {
+      const { rt } = runtime();
+      withProfiles(rt);
+      Object.assign(rt.profiles, { load: async () => Promise.reject(new Error('no profiles')) });
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const recover = jest.fn(async () => []);
+      await render(
+        <LiveApp
+          runtime={rt}
+          startRecording={async () => {
+            const built = await services();
+            built.recoverOrphans = recover as never;
+            return built;
+          }}
+        />,
+      );
+      await settle();
+      expect(recover).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Crash recovery postponed'), expect.anything());
+      warn.mockRestore();
+    });
+
+    it('the profiles load even when the recording database cannot open', async () => {
+      const { rt } = runtime();
+      const load = jest.fn(async () => undefined);
+      Object.assign(rt, { profiles: { load, activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }) } });
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      await render(
+        <LiveApp
+          runtime={rt}
+          startRecording={async () => {
+            throw new Error('cannot open');
+          }}
+        />,
+      );
+      await settle();
+      expect(load).toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('an unavailable recording database hides the record control', async () => {
+      const { rt } = runtime();
+      withProfiles(rt);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      await render(
+        <LiveApp
+          runtime={rt}
+          startRecording={async () => {
+            throw new Error('cannot open');
+          }}
+        />,
+      );
+      await settle();
+      expect(flightLog.store.getState()).toMatchObject({ recording: null, recordingUnavailable: true });
+      warn.mockRestore();
+    });
+  });
+
+  describe('planner', () => {
+    const plannerRuntime = (region: 'us' | 'israel') => {
+      const { rt } = runtime({ region });
+      Object.assign(rt, {
+        preferences: new FakePreferences(),
+        profiles: {
+          aircraft: { getState: () => ({ profiles: [{ id: 'a1' }] }) },
+          pilot: { getState: () => ({ profiles: [] }) },
+          load: async () => undefined,
+          activeIds: () => ({ aircraftProfileID: null, pilotProfileID: null }),
+        },
+        telemetry: { signal: jest.fn() },
+      });
+      return rt;
+    };
+    const has = (view: Awaited<ReturnType<typeof render>>, id: string) =>
+      view.all((n) => n.props?.testID === id).length > 0;
+    const settle = () => act(async () => new Promise((r) => setTimeout(r, 20)));
+
+    it('Plan a flight opens the Israel planner over the Log in the Israel region, and Back closes it', async () => {
+      const view = await render(<LiveApp runtime={plannerRuntime('israel')} />);
+      await act(async () => appStore.setState({ selectedScreen: 'log', overlay: { kind: 'planner' } }));
+      await settle();
+      expect(has(view, 'live-israel-planner')).toBe(true);
+      await press(view.byTestId('planner-back'));
+      expect(appStore.getState().overlay).toBeNull();
+    });
+
+    it('the US planner is not mounted here (U4c): no Israel planner outside Israel', async () => {
+      const view = await render(<LiveApp runtime={plannerRuntime('us')} />);
+      await act(async () => appStore.setState({ selectedScreen: 'log', overlay: { kind: 'planner' } }));
+      await settle();
+      expect(has(view, 'live-israel-planner')).toBe(false);
+    });
   });
 });

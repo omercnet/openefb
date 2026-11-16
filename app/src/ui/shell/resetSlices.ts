@@ -21,9 +21,12 @@ export function noteCaptureSeeded(): void {
 export function resetLiveSlices(region: Region, saved?: Partial<LayersData>): void {
   appStore.setState({
     stripColumn: 'log',
+    selectedScreen: 'map',
+    overlay: null,
     selectedAirportId: null,
     databaseError: null,
     isPresentingBriefing: false,
+    briefingRoute: null,
     chartViewer: null,
   });
   // The restored region is in place before the first render (the strip's Israel branch reads it).

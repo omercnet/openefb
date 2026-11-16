@@ -2,8 +2,10 @@
 // recording overlay, the stop confirmation and the notices. At rest the mic; recording: the accent disc with a stop
 // square and the level meter over the elapsed time "00:12:34"; the auto-start countdown in an amber ring. `compact`
 // (the iPhone header): the glyph only, no level meter or elapsed time (the time is still spoken).
+import { useMemo } from 'react';
 import { Text, View } from 'react-native';
 import type { RecordingStatus } from '../../domain/recording/recordingCoordinator';
+import { createRecordButtonAnchorRef } from '../recording/stopAnchor';
 import { Pressy, useTheme } from '../Primitives';
 import { Radius, Space, StripMetrics, Type } from '../tokens';
 import { MicFill } from './parts';
@@ -49,6 +51,7 @@ export function RecordButton({
   onPress: () => void;
 }) {
   const t = useTheme();
+  const anchorRef = useMemo(() => createRecordButtonAnchorRef(), []);
   const recording = status.kind === 'recording';
   const time = formattedElapsedTime(elapsed);
   let glyph;
@@ -108,7 +111,7 @@ export function RecordButton({
         justifyContent: 'center',
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xs }}>
+      <View ref={anchorRef} collapsable={false} style={{ flexDirection: 'row', alignItems: 'center', gap: Space.xs }}>
         {glyph}
         {recording && !compact && !microphoneDenied ? <AudioLevelMeter dBFS={level} /> : null}
       </View>

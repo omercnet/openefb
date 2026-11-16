@@ -6,6 +6,8 @@ import * as Updates from 'expo-updates';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { OTA_FILE, OTA_RELOAD_FILE, clearResult, readResult, writeResult } from '../../adapters/resultFile';
+import { otaReloadAllowed } from '../../domain/updates/reloadGuard';
+import { flightLog } from '../flightLog/store';
 
 type Phase = 'launch' | 'fetched' | 'settled';
 type Check = { isAvailable: boolean; isRollBackToEmbedded: boolean; reason?: string };
@@ -45,7 +47,18 @@ export function OtaScreen() {
         if (!reloaded && (c.isAvailable || c.isRollBackToEmbedded)) {
           await Updates.fetchUpdateAsync();
           await publish({ phase: 'fetched', running, check });
+          // Guardrail: never swap the running bundle while a flight is being recorded.
+          if (!otaReloadAllowed(flightLog.store.getState().recording?.status)) {
+            await publish({ phase: 'settled', running, check, error: 'reload deferred: a recording is active' });
+            return;
+          }
           await writeResult(OTA_RELOAD_FILE, { at: Date.now() });
+          // A recording can start during that write: look again right before the swap.
+          if (!otaReloadAllowed(flightLog.store.getState().recording?.status)) {
+            clearResult(OTA_RELOAD_FILE);
+            await publish({ phase: 'settled', running, check, error: 'reload deferred: a recording is active' });
+            return;
+          }
           await Updates.reloadAsync();
           return;
         }

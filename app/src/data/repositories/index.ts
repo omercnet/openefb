@@ -109,10 +109,17 @@ export const flightRecordRepository = (db: Db): Repository<FlightRecord> =>
 export interface LogbookRepository extends Repository<LogbookEntry> {
   /** Entries recorded from one flight, newest first. */
   byFlightId(flightID: string): Promise<LogbookEntry[]>;
+  /** Deletes the entry only while it is unsigned, in one statement: a confirm that lands meanwhile wins. */
+  removeUnconfirmed(id: string): Promise<boolean>;
 }
 export function logbookRepository(db: Db): LogbookRepository {
   const base = makeRepository<LogbookEntry>(db, 'logbook_entry', logbookFields, 'date DESC, rowid');
-  return { ...base, byFlightId: (flightID) => base.listWhere('flight_id', flightID) };
+  return {
+    ...base,
+    byFlightId: (flightID) => base.listWhere('flight_id', flightID),
+    removeUnconfirmed: async (id) =>
+      (await db.run('DELETE FROM logbook_entry WHERE id = ? AND is_confirmed = 0', [id])).changes > 0,
+  };
 }
 
 const settingsColumns = [

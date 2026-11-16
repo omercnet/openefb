@@ -294,6 +294,19 @@ describe('the stop confirmation', () => {
 });
 
 describe('confirmStop', () => {
+  it('counts every finished save, so two flights that both end saved are two changes', async () => {
+    const { store } = setup();
+    expect(store.getState().persistenceSerial).toBe(0);
+    await store.getState().startRecording();
+    await store.getState().confirmStop();
+    expect(store.getState().lastPersistenceResult).toBe('saved');
+    expect(store.getState().persistenceSerial).toBe(1);
+    await store.getState().startRecording();
+    await store.getState().confirmStop();
+    expect(store.getState().lastPersistenceResult).toBe('saved');
+    expect(store.getState().persistenceSerial).toBe(2);
+  });
+
   it('stops, persists with the active aircraft and pilot, and reports the result', async () => {
     const { store, persist, coordinator } = setup();
     await store.getState().startRecording();
