@@ -98,20 +98,48 @@ class PurposeStrings(unittest.TestCase):
         _, quiet = run(dev, OBJC + "_OBJC_CLASS_$_EXDevLauncherController\n", production=False)
         self.assertEqual(quiet, [])  # only a production build is held to it
 
-    def test_avcapturedevice_alone_counts_as_camera_use_unless_allowed_by_hand(self):
+    def test_avcapturedevice_alone_counts_as_camera_use_unless_the_binary_is_allowed_by_hand(self):
         # The symbol list cannot tell the camera from the microphone, so the safe reading is camera (a missing string crashes the app
-        # when it asks for the camera); a reviewed microphone-only dependency is allowed with the flag, nothing else is.
+        # when it asks for the camera); a reviewed microphone-only binary is allowed by NAME, and nothing else is.
         symbols = OBJC + "_OBJC_CLASS_$_AVCaptureDevice\n"
         _, problems = run(BASE, symbols)
         self.assertEqual(len(problems), 1)
         self.assertIn("Camera is linked", problems[0])
-        self.assertIn("--audio-only-capture-device", problems[0])
-        _, allowed = c.check(BASE, {"KanafEFB": symbols}, False, None, audio_only_capture_device=True)
-        self.assertEqual(allowed, [])
-        # the flag excuses AVCaptureDevice only: a session next to it is still camera use
-        _, still = c.check(BASE, {"KanafEFB": symbols + "_OBJC_CLASS_$_AVCaptureSession\n"}, False, None, True)
-        self.assertEqual(len(still), 1)
-        self.assertNotIn("--audio-only-capture-device", still[0])
+        self.assertIn("--audio-only-capture-device <its binary name>", problems[0])
+        _, allowed = c.check(BASE, {"KanafEFB": symbols}, False, None, ["KanafEFB"])
+        self.assertEqual(allowed, [])  # the microphone string (BASE has it) covers the reclassified use
+        # a different binary with the camera symbol is not excused by naming this one
+        _, other = c.check(BASE, {"KanafEFB": OBJC, "Other": symbols}, False, None, ["KanafEFB"])
+        self.assertEqual(len(other), 1)
+        self.assertIn("Other: AVCaptureDevice", other[0])
+
+    def test_the_allowance_turns_avcapturedevice_into_microphone_use_that_needs_its_string(self):
+        symbols = "_OBJC_CLASS_$_AVCaptureDevice\n"
+        info = {"CFBundleExecutable": "x"}
+        _, problems = c.check(info, {"x": symbols}, False, None, ["x"])
+        self.assertEqual(len(problems), 1)
+        self.assertIn("Microphone is linked", problems[0])
+        self.assertIn("NSMicrophoneUsageDescription", problems[0])
+        _, ok = c.check({**info, "NSMicrophoneUsageDescription": "why"}, {"x": symbols}, False, None, ["x"])
+        self.assertEqual(ok, [])
+
+    def test_the_allowance_does_not_excuse_a_session_next_to_avcapturedevice(self):
+        symbols = "_OBJC_CLASS_$_AVCaptureDevice\n_OBJC_CLASS_$_AVCaptureSession\n"
+        _, problems = c.check({"CFBundleExecutable": "x", "NSMicrophoneUsageDescription": "why"}, {"x": symbols}, False, None, ["x"])
+        self.assertEqual(len(problems), 1)
+        self.assertIn("Camera is linked", problems[0])
+        self.assertIn("AVCaptureSession", problems[0])
+
+    def test_avcapturedeviceinput_is_not_avcapturedevice_in_either_symbol_form(self):
+        # Objective-C and Swift-mangled references to the longer class must not read as the plain class, so the allowance cannot hide them.
+        for symbol in ("_OBJC_CLASS_$_AVCaptureDeviceInput", "_$sSo22AVCaptureDeviceInputCMa"):
+            _, problems = c.check({"CFBundleExecutable": "x", "NSMicrophoneUsageDescription": "why"}, {"x": symbol + "\n"}, False, None, ["x"])
+            self.assertEqual(len(problems), 1, symbol)
+            self.assertIn("Camera is linked", problems[0])
+        for symbol in ("_OBJC_CLASS_$_AVCaptureDevice", "_$sSo15AVCaptureDeviceCMa"):
+            hit, _ = c.check({"CFBundleExecutable": "x"}, {"x": symbol + "\n"}, False)
+            self.assertIn("AVCaptureDevice", hit[0], symbol)
+            self.assertNotIn("AVCaptureDeviceInput", hit[0], symbol)
 
     def test_camera_needs_its_string_for_a_session_or_the_picker(self):
         for symbol in ("AVCaptureSession", "UIImagePickerController", "AVCapturePhotoOutput"):

@@ -27,6 +27,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+# AVCaptureDevice as a whole class name, never as the start of AVCaptureDeviceInput: after `nm` an Objective-C reference ends the
+# line, and a Swift-mangled one carries the name's length (15) in front of it.
+AV_CAPTURE_DEVICE = r"(?:_OBJC_(?:META)?CLASS_\$_AVCaptureDevice(?![A-Za-z0-9_])|(?<![0-9])15AVCaptureDevice)"
+AV_CAPTURE_DEVICE_RE = re.compile(AV_CAPTURE_DEVICE)
+
 # Framework -> (a class-name pattern that proves the code uses it, the keys of which at least one must be a non-empty string).
 SENSITIVE = {
     "Photos": (
@@ -35,9 +40,10 @@ SENSITIVE = {
     ),
     # AVCaptureDevice is how the camera is asked for AND how the microphone is (media type audio); the symbol list cannot tell which.
     # The safe reading is camera use: a missing string would crash the app when it asks for the camera and be rejected by Apple.
-    # A dependency that uses it for audio only is allowed by hand with --audio-only-capture-device (a visible edit of the workflow).
+    # A dependency (a binary, named) reviewed to use it for audio only is allowed by hand with --audio-only-capture-device NAME: that
+    # binary's AVCaptureDevice then counts as MICROPHONE use instead (the Microphone string is required), and no other binary is excused.
     "Camera": (
-        re.compile(r"AVCaptureDevice|AVCaptureSession|AVCaptureVideoDataOutput|AVCapturePhotoOutput|UIImagePickerController"),
+        re.compile(AV_CAPTURE_DEVICE + r"|AVCaptureSession|AVCaptureDeviceInput|AVCaptureVideoDataOutput|AVCapturePhotoOutput|UIImagePickerController"),
         ("NSCameraUsageDescription",),
     ),
     "Contacts": (re.compile(r"CNContactStore|ABAddressBook"), ("NSContactsUsageDescription",)),
@@ -103,7 +109,7 @@ def check(
     symbols_by_binary: dict[str, str],
     production: bool,
     defined_by_binary: dict[str, str] | None = None,
-    audio_only_capture_device: bool = False,
+    audio_only_capture_device: tuple[str, ...] | list[str] = (),
 ) -> tuple[list[str], list[str]]:
     """Returns (report lines, problems)."""
     report: list[str] = []
@@ -111,10 +117,14 @@ def check(
     for framework, (pattern, keys) in SENSITIVE.items():
         users = {}
         for name, symbols in symbols_by_binary.items():
-            hits = sorted(set(pattern.findall(symbols)))
-            if framework == "Camera" and audio_only_capture_device:
-                # Reviewed by hand: the only camera-like symbol is AVCaptureDevice, used for the microphone.
-                hits = [hit for hit in hits if hit != "AVCaptureDevice"]
+            # AVCaptureDevice is matched with its prefix; report it by its plain name.
+            hits = sorted({"AVCaptureDevice" if AV_CAPTURE_DEVICE_RE.fullmatch(m.group(0)) else m.group(0) for m in pattern.finditer(symbols)})
+            if name in audio_only_capture_device and AV_CAPTURE_DEVICE_RE.search(symbols):
+                # Reviewed by hand: this binary asks AVCaptureDevice for the microphone only. That is microphone use, not camera use.
+                if framework == "Camera":
+                    hits = [hit for hit in hits if hit != "AVCaptureDevice"]
+                elif framework == "Microphone":
+                    hits = sorted(set(hits) | {"AVCaptureDevice (audio, by --audio-only-capture-device)"})
             if hits:
                 users[name] = hits
         if not users:
@@ -127,8 +137,8 @@ def check(
             report.append(f"FAIL {framework}: used ({where}); no purpose string")
             hint = (
                 " (AVCaptureDevice alone may be microphone-only use: if a dependency is reviewed to do only that, pass "
-                "--audio-only-capture-device)"
-                if framework == "Camera" and "AVCaptureDevice" in where
+                "--audio-only-capture-device <its binary name>)"
+                if framework == "Camera" and any("AVCaptureDevice" in hits for hits in users.values())
                 else ""
             )
             problems.append(f"{framework} is linked ({where}) but Info.plist has none of {', '.join(keys)}{hint}")
@@ -155,8 +165,10 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--production", action="store_true")
     parser.add_argument(
         "--audio-only-capture-device",
-        action="store_true",
-        help="AVCaptureDevice alone is not camera use (a reviewed, microphone-only dependency)",
+        action="append",
+        default=[],
+        metavar="BINARY",
+        help="the named binary (e.g. ExpoFoo) was reviewed to use AVCaptureDevice for the microphone only; repeatable",
     )
     parser.add_argument("--symbols-from", type=Path, help="symbol list for every binary (tests)")
     args = parser.parse_args(argv)
