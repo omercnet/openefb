@@ -172,6 +172,21 @@ def rn_build_number(api_key, version)
   [floor, newest + 1].max.to_s
 end
 
+# The development client (expo-dev-client with its launcher and menu) is for development builds only. Left installed it puts the
+# Dev Launcher's Bonjour service, a local-network usage string and the "exp+kanaf" URL scheme into the production Info.plist and
+# its code into the binary. Expo applies the package's config plugin and autolinks it whenever it is in node_modules and has no
+# per-variant switch, so the release lanes delete it from node_modules after `npm ci` (the lockfile and the dev variant, which
+# prebuilds elsewhere, are untouched). Checked after the build by tools/ci/check_purpose_strings.py --production.
+DEV_CLIENT_PACKAGES = %w[expo-dev-client expo-dev-launcher expo-dev-menu expo-dev-menu-interface].freeze
+
+def strip_dev_client
+  modules = File.join(RN_DIR, "node_modules")
+  DEV_CLIENT_PACKAGES.each { |name| FileUtils.rm_rf(File.join(modules, name)) }
+  left = DEV_CLIENT_PACKAGES.select { |name| File.exist?(File.join(modules, name)) }
+  UI.user_error!("the development client is still in node_modules: #{left.join(', ')}") unless left.empty?
+  UI.message("Removed the development client from node_modules: #{DEV_CLIENT_PACKAGES.join(', ')}")
+end
+
 # Generates ios/ and installs pods. The aviation database is not committed (app/assets/aviation.sqlite is ignored);
 # like app.yml they come from the Swift app's resources.
 def rn_prebuild(version, build)
@@ -184,7 +199,9 @@ def rn_prebuild(version, build)
   israel = File.join(RN_DIR, "assets/israel-aviation.sqlite")
   FileUtils.cp(File.join(ROOT, "efb-212/Resources/israel-aviation.sqlite"), israel) unless File.exist?(israel)
   # fastlane's sh runs from the fastlane/ folder, so each command changes directory itself.
-  sh("cd #{Shellwords.escape(RN_DIR)} && npm ci && npx expo prebuild -p ios --no-install --clean")
+  sh("cd #{Shellwords.escape(RN_DIR)} && npm ci")
+  strip_dev_client
+  sh("cd #{Shellwords.escape(RN_DIR)} && npx expo prebuild -p ios --no-install --clean")
   # CocoaPods is not in the Gemfile; under `bundle exec` it would inherit Bundler's environment (RUBYOPT=-rbundler/setup)
   # and the setup-ruby gem paths, which hide the Homebrew CocoaPods gems from its own Ruby. Run it without them.
   sh("cd #{Shellwords.escape(RN_IOS_DIR)} && env -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH -u BUNDLER_SETUP -u BUNDLER_VERSION -u RUBYOPT -u RUBYLIB -u GEM_HOME -u GEM_PATH -u GEM_ROOT pod install")
