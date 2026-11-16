@@ -67,11 +67,15 @@ jobs:
     # GitHub then rejects a run from another branch before this job starts. The first step below is the fallback without that
     # rule: it FAILS instead of skipping, so a run from a branch is never a silent green (docs/CI.md).
     if: ${{ !cancelled() && !failure() && (needs.release-please.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
-    runs-on: macos-26
+    # The runner follows the app that is built (the same selection as "Choose the app" below, checked by
+    # tools/ci/release_runner_test.py): the RN lane runs on macos-latest with its default Xcode, the image its PR-time archive job
+    # proves (app.yml); the Swift lane keeps macos-26 and Xcode 26.6. macos-26 alone often has no runner for hours.
+    runs-on: ${{ ((github.event_name == 'workflow_dispatch' && inputs.app != 'variable' && inputs.app) || vars.TESTFLIGHT_APP) == 'rn' && 'macos-latest' || 'macos-26' }}
     timeout-minutes: 120 # was 90: the 2026-11-15 preview run spent all 90 minutes waiting for a build that never appeared (now bounded in the lane); a slow runner needs about 25 minutes to archive and upload
     environment: testflight
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer # same pin as ci.yml
+      # Swift: Xcode 26.6 (same pin as ci.yml). RN: the image's default Xcode, as the PR-time archive job (app.yml) builds it.
+      DEVELOPER_DIR: ${{ ((github.event_name == 'workflow_dispatch' && inputs.app != 'variable' && inputs.app) || vars.TESTFLIGHT_APP) == 'rn' && '/Applications/Xcode.app/Contents/Developer' || '/Applications/Xcode_26.6.app/Contents/Developer' }}
       FASTLANE_SKIP_UPDATE_CHECK: "1"
       FASTLANE_OPT_OUT_USAGE: "1"
     steps:

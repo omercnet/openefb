@@ -109,6 +109,9 @@ jobs:
         # What release.yml builds, including the RN preview rules (tools/ci/resolve-testflight-target.sh). In the lint job so
         # the required gate enforces it on every pull request; it takes a second and needs no secrets.
         run: tools/ci/resolve-testflight-target.test.sh
+      - name: TestFlight runner selection (release.yml)
+        # The upload job's runner and Xcode follow the app it builds; evaluates the workflow's own expressions.
+        run: python3 tools/ci/release_runner_test.py
       - name: Purpose-string check (the archive job runs it on the built app)
         run: python3 tools/ci/check_purpose_strings_test.py
       - name: Pre-commit checks over the whole tree, full-history secret scan
