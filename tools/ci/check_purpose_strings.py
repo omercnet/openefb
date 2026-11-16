@@ -33,10 +33,11 @@ SENSITIVE = {
         re.compile(r"PHPhotoLibrary|PHAsset|ALAssetsLibrary"),
         ("NSPhotoLibraryUsageDescription", "NSPhotoLibraryAddUsageDescription"),
     ),
-    # A capture SESSION, its input or the picker: AVCaptureDevice alone is also how the microphone is asked for (media type audio), so it
-    # is no proof of camera use. (AVCaptureDeviceInput names the camera or microphone feeding a session: a session is there too.)
+    # AVCaptureDevice is how the camera is asked for AND how the microphone is (media type audio); the symbol list cannot tell which.
+    # The safe reading is camera use: a missing string would crash the app when it asks for the camera and be rejected by Apple.
+    # A dependency that uses it for audio only is allowed by hand with --audio-only-capture-device (a visible edit of the workflow).
     "Camera": (
-        re.compile(r"AVCaptureSession|AVCaptureDeviceInput|AVCaptureVideoDataOutput|AVCapturePhotoOutput|UIImagePickerController"),
+        re.compile(r"AVCaptureDevice|AVCaptureSession|AVCaptureVideoDataOutput|AVCapturePhotoOutput|UIImagePickerController"),
         ("NSCameraUsageDescription",),
     ),
     "Contacts": (re.compile(r"CNContactStore|ABAddressBook"), ("NSContactsUsageDescription",)),
@@ -98,7 +99,11 @@ def has_string(info: dict, key: str) -> bool:
 
 
 def check(
-    info: dict, symbols_by_binary: dict[str, str], production: bool, defined_by_binary: dict[str, str] | None = None
+    info: dict,
+    symbols_by_binary: dict[str, str],
+    production: bool,
+    defined_by_binary: dict[str, str] | None = None,
+    audio_only_capture_device: bool = False,
 ) -> tuple[list[str], list[str]]:
     """Returns (report lines, problems)."""
     report: list[str] = []
@@ -107,6 +112,9 @@ def check(
         users = {}
         for name, symbols in symbols_by_binary.items():
             hits = sorted(set(pattern.findall(symbols)))
+            if framework == "Camera" and audio_only_capture_device:
+                # Reviewed by hand: the only camera-like symbol is AVCaptureDevice, used for the microphone.
+                hits = [hit for hit in hits if hit != "AVCaptureDevice"]
             if hits:
                 users[name] = hits
         if not users:
@@ -117,7 +125,13 @@ def check(
             report.append(f"ok   {framework}: used ({where}); purpose string {present[0]}")
         else:
             report.append(f"FAIL {framework}: used ({where}); no purpose string")
-            problems.append(f"{framework} is linked ({where}) but Info.plist has none of {', '.join(keys)}")
+            hint = (
+                " (AVCaptureDevice alone may be microphone-only use: if a dependency is reviewed to do only that, pass "
+                "--audio-only-capture-device)"
+                if framework == "Camera" and "AVCaptureDevice" in where
+                else ""
+            )
+            problems.append(f"{framework} is linked ({where}) but Info.plist has none of {', '.join(keys)}{hint}")
 
     if production:
         # The dev client is in the binary that links it statically: look at every symbol, not only the undefined ones.
@@ -139,6 +153,11 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("app", type=Path)
     parser.add_argument("--production", action="store_true")
+    parser.add_argument(
+        "--audio-only-capture-device",
+        action="store_true",
+        help="AVCaptureDevice alone is not camera use (a reviewed, microphone-only dependency)",
+    )
     parser.add_argument("--symbols-from", type=Path, help="symbol list for every binary (tests)")
     args = parser.parse_args(argv)
 
@@ -153,7 +172,7 @@ def main(argv: list[str]) -> int:
 
     print(f"{info.get('CFBundleIdentifier')} {info.get('CFBundleShortVersionString')} ({info.get('CFBundleVersion')}): "
           f"{len(symbols)} binaries scanned")
-    report, problems = check(info, symbols, args.production, everything)
+    report, problems = check(info, symbols, args.production, everything, args.audio_only_capture_device)
     for line in report:
         print(line)
     if not report:

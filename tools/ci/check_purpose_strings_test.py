@@ -98,14 +98,28 @@ class PurposeStrings(unittest.TestCase):
         _, quiet = run(dev, OBJC + "_OBJC_CLASS_$_EXDevLauncherController\n", production=False)
         self.assertEqual(quiet, [])  # only a production build is held to it
 
-    def test_avcapturedevice_alone_is_not_camera_use_but_a_session_is(self):
-        # AVCaptureDevice also asks for the microphone (requestAccess for audio); no camera string for that.
-        _, problems = run(BASE, OBJC + "_OBJC_CLASS_$_AVCaptureDevice\n")
-        self.assertEqual(problems, [])
-        for symbol in ("AVCaptureSession", "AVCaptureDeviceInput", "UIImagePickerController"):
+    def test_avcapturedevice_alone_counts_as_camera_use_unless_allowed_by_hand(self):
+        # The symbol list cannot tell the camera from the microphone, so the safe reading is camera (a missing string crashes the app
+        # when it asks for the camera); a reviewed microphone-only dependency is allowed with the flag, nothing else is.
+        symbols = OBJC + "_OBJC_CLASS_$_AVCaptureDevice\n"
+        _, problems = run(BASE, symbols)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("Camera is linked", problems[0])
+        self.assertIn("--audio-only-capture-device", problems[0])
+        _, allowed = c.check(BASE, {"KanafEFB": symbols}, False, None, audio_only_capture_device=True)
+        self.assertEqual(allowed, [])
+        # the flag excuses AVCaptureDevice only: a session next to it is still camera use
+        _, still = c.check(BASE, {"KanafEFB": symbols + "_OBJC_CLASS_$_AVCaptureSession\n"}, False, None, True)
+        self.assertEqual(len(still), 1)
+        self.assertNotIn("--audio-only-capture-device", still[0])
+
+    def test_camera_needs_its_string_for_a_session_or_the_picker(self):
+        for symbol in ("AVCaptureSession", "UIImagePickerController", "AVCapturePhotoOutput"):
             _, problems = run(BASE, OBJC + f"_OBJC_CLASS_$_{symbol}\n")
             self.assertEqual(len(problems), 1, symbol)
             self.assertIn("Camera is linked", problems[0])
+            _, ok = run({**BASE, "NSCameraUsageDescription": "why"}, OBJC + f"_OBJC_CLASS_$_{symbol}\n")
+            self.assertEqual(ok, [], symbol)
 
     def test_bluetooth_needs_the_always_key_not_the_legacy_one(self):
         symbols = OBJC + "_OBJC_CLASS_$_CBCentralManager\n"
