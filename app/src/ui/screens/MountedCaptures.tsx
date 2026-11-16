@@ -4,8 +4,8 @@
 // device checks, never gated (there is no reference to score them against).
 import { useFonts } from 'expo-font';
 import { useState, type ReactNode } from 'react';
-import { ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MapCaptureScreen } from '../capture/MapCaptureScreen';
 import { PirepSection } from '../columns/airport/sections/PirepSection';
 import { WindsAloftSection } from '../columns/airport/sections/WindsAloftSection';
@@ -26,14 +26,15 @@ import { AIRSPACES_SELECTION, POINT_SELECTION } from '../sheets/israelChart/fixt
 import { FontFiles } from '../tokens';
 import { ScreenFrame } from './CaptureScreens';
 
+/** Below the status bar and above the home indicator, as the screens sit in the shell (they are not full-bleed). */
+function Insets({ children }: { children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  return <View style={{ flex: 1, paddingTop: insets.top, paddingBottom: insets.bottom }}>{children}</View>;
+}
+
 function Framed({ children }: { children: ReactNode }) {
   const [loaded, error] = useFonts(FontFiles);
-  // Below the status bar and above the home indicator, as the screens sit in the shell (they are not full-bleed).
-  return (
-    <ScreenFrame>
-      {loaded || error != null ? <SafeAreaView style={{ flex: 1 }}>{children}</SafeAreaView> : null}
-    </ScreenFrame>
-  );
+  return <ScreenFrame>{loaded || error != null ? <Insets>{children}</Insets> : null}</ScreenFrame>;
 }
 
 /** kanaf-dev://usplan: Flight Plans in the US, a KPAO to KSQL plan picked and the saved plans below. */
