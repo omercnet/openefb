@@ -2,10 +2,10 @@
 // reporting point or the airspaces under the finger open the chart sheet), then the airport and weather-station dots (the
 // airport column). The surface only queries the rendered features; the decisions are here.
 import type { Coordinate } from '../../domain/core';
-import type { IsraelChartClosureMark } from '../../domain/map/israel';
 import {
   israelAirspaceSelection,
   israelSelectionFromFeature,
+  type IsraelChartClosureMark,
   type IsraelChartSelection,
   type IsraelSelectionData,
 } from '../../domain/map/israel';

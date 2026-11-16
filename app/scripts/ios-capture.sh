@@ -72,8 +72,8 @@ wait_map() {
 }
 
 # Screens with no map (a native sheet, the log, the settings forms) wait a fixed time instead of for the map status.
-NO_MAP=" sheet log settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop flightdetail cvfr debrief israel-plan "
-for screen in map map-layers airport night layers nearest search log sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr debrief briefing israel-plan; do
+NO_MAP=" sheet log settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop flightdetail cvfr debrief israel-plan usplan chartsheet chartairspace aloft "
+for screen in map map-layers airport night layers nearest search log sheet settings onboarding disclaimers aircraft aircraftedit pilot logbookentry logbooklocked recording recordingstopped recordingstop replay replayfast flightdetail cvfr debrief briefing israel-plan usplan chartsheet chartairspace aloft alerts; do
   stamp "screen $screen"
   rm -f "$DOCS/map-status.json"
   launch -KanafScreen "$screen"

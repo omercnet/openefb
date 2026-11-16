@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import type { Region } from '../../domain/core';
-import { AppState as NativeAppState, View } from 'react-native';
+import { AppState as NativeAppState, Linking, View } from 'react-native';
 import { fileTextStorage } from '../../adapters/fileTextStorage';
 import { airport } from '../columns/airport/store';
 import { layers } from '../columns/layers/store';
@@ -93,7 +93,13 @@ export function LiveApp({
   useEffect(() => {
     logActions.store.setState(feed.actions);
     flightLog.store.setState({
-      actions: { ...flightLog.store.getState().actions, openLog: () => appStore.getState().setScreen('log') },
+      actions: {
+        ...flightLog.store.getState().actions,
+        openLog: () => appStore.getState().setScreen('log'),
+        // The GPS-denied notice (Swift: UIApplication.openSettingsURLString): the system page of this app.
+        openSettings: () =>
+          void Linking.openSettings().catch((error) => console.warn('Could not open Settings', error)),
+      },
     });
     void feed.refresh();
     // The Log reads again whenever it opens, and when a recording has been saved.

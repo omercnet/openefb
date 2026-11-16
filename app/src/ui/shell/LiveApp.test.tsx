@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { Linking } from 'react-native';
 import { FlightPlanSheet } from '../sheets/flightPlan/FlightPlanSheet';
 import { haptic } from '../haptics';
 import { press, render } from '../../../tests/support/ui';
@@ -224,6 +225,20 @@ describe('LiveApp (ContentView)', () => {
       await act(async () => appStore.getState().openOverlay(null));
       expect(view.all((n) => n.props?.testID === 'live-settings')).toHaveLength(0);
       await act(async () => appStore.getState().setScreen('map'));
+    });
+  });
+
+  describe('strip callbacks', () => {
+    it('the LOG cell opens the log, and the GPS notice opens the system Settings for this app', async () => {
+      const { rt } = runtime();
+      const open = jest.spyOn(Linking, 'openSettings').mockResolvedValue();
+      await render(<LiveApp runtime={rt} />);
+      await act(async () => flightLog.store.getState().actions.openLog());
+      expect(appStore.getState().selectedScreen).toBe('log');
+      await act(async () => flightLog.store.getState().actions.openSettings());
+      expect(open).toHaveBeenCalledTimes(1);
+      await act(async () => appStore.getState().setScreen('map'));
+      open.mockRestore();
     });
   });
 
