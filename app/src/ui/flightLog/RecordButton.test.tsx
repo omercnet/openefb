@@ -1,6 +1,6 @@
 import { press, render } from '../../../tests/support/ui';
 import { formattedElapsedTime, litSegments, RecordButton } from './RecordButton';
-import { recordButtonHandle, registerRecordButtonAnchor } from '../recording/stopAnchor';
+import { recordButtonView, registerRecordButtonAnchor } from '../recording/stopAnchor';
 
 describe('RecordButton', () => {
   it('at rest: Start recording, no time, no meter', async () => {
@@ -82,16 +82,11 @@ describe('RecordButton taps', () => {
 describe('RecordButton anchor', () => {
   it('registers its native view for the End recording popover, and gives it up when it goes away', async () => {
     registerRecordButtonAnchor(null);
-    // The test renderer has no native tags: any view the button hands over gets one.
-    const rn = require('react-native') as typeof import('react-native'); // eslint-disable-line @typescript-eslint/no-require-imports
-    const real = rn.findNodeHandle;
-    Object.defineProperty(rn, 'findNodeHandle', { value: () => 7, configurable: true, writable: true });
     const view = await render(
       <RecordButton status={{ kind: 'recording' } as never} elapsed={3} level={-30} onPress={() => undefined} />,
     );
-    expect(recordButtonHandle()).toBe(7);
+    expect(recordButtonView()).not.toBeNull();
     await view.unmount();
-    expect(recordButtonHandle()).toBeNull();
-    Object.defineProperty(rn, 'findNodeHandle', { value: real, configurable: true, writable: true });
+    expect(recordButtonView()).toBeNull();
   });
 });

@@ -1,89 +1,105 @@
 import { act } from 'react';
 import { ActionSheetIOS, Platform } from 'react-native';
-import { render } from '../../../tests/support/ui';
+import { press, render } from '../../../tests/support/ui';
 import { STOP_CONFIRMATION } from '../../domain/recording/recordingNotices';
 import { captureRecordingLab } from '../screens/captureRecordingFixtures';
-import { StopRecordingDialog } from './StopRecordingDialog';
-import { recordButtonHandle, registerRecordButtonAnchor } from './stopAnchor';
+import { POPOVER_WIDTH, popoverPosition, StopRecordingDialog } from './StopRecordingDialog';
+import { recordButtonView, registerRecordButtonAnchor } from './stopAnchor';
 
-const original = Platform.OS;
+const original = { os: Platform.OS, pad: (Platform as { isPad?: boolean }).isPad };
+const setPlatform = (os: 'ios' | 'android', isPad = false) => {
+  Object.defineProperty(Platform, 'OS', { value: os, configurable: true });
+  Object.defineProperty(Platform, 'isPad', { value: isPad, configurable: true });
+};
 afterEach(() => {
-  Object.defineProperty(ReactNative, 'findNodeHandle', {
-    value: realFindNodeHandle,
-    configurable: true,
-    writable: true,
-  });
+  setPlatform(original.os as 'ios' | 'android', original.pad === true);
   registerRecordButtonAnchor(null);
   jest.useRealTimers();
-  Object.defineProperty(Platform, 'OS', { value: original });
   jest.restoreAllMocks();
 });
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports -- the module object the code under test reads at call time
-const ReactNative = require('react-native') as typeof import('react-native');
-const button = { name: 'record button view' } as never;
-const tagOf = (view: unknown): number | null => (view === button ? 4242 : null);
-const realFindNodeHandle = ReactNative.findNodeHandle;
-const installTags = () =>
-  Object.defineProperty(ReactNative, 'findNodeHandle', { value: tagOf, configurable: true, writable: true });
+/** A record button that sits at x 300..376, y 30..74 in the window. */
+const button = {
+  measureInWindow: (done: (x: number, y: number, w: number, h: number) => void) => done(300, 30, 76, 44),
+} as never;
+const has = (view: Awaited<ReturnType<typeof render>>, id: string) =>
+  view.all((n) => n.props?.testID === id).length > 0;
+
+describe('popoverPosition', () => {
+  const window = { width: 1032, height: 1376 };
+  it('opens under the record button, with the same offset as the SwiftUI popover', () => {
+    expect(popoverPosition({ x: 300, y: 30, width: 76, height: 44 }, window)).toEqual({ left: 225, top: 82 });
+  });
+
+  it('stays inside the window at either edge', () => {
+    expect(popoverPosition({ x: 0, y: 30, width: 40, height: 44 }, window).left).toBe(8);
+    expect(popoverPosition({ x: 1000, y: 30, width: 40, height: 44 }, window).left).toBe(1032 - POPOVER_WIDTH - 8);
+  });
+
+  it('is centred in the window with no record button to point at', () => {
+    expect(popoverPosition(null, window).left).toBe((1032 - POPOVER_WIDTH) / 2);
+  });
+});
 
 describe('StopRecordingDialog', () => {
-  it('iOS: the sheet is anchored on the record button (its native tag), so iPad gets a popover under it', async () => {
-    Object.defineProperty(Platform, 'OS', { value: 'ios' });
-    installTags();
-    const show = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
+  it('iPad: a popover under the record button, End Recording only (no Cancel, no dim), tap outside cancels', async () => {
+    setPlatform('ios', true);
+    const sheet = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
     registerRecordButtonAnchor(button);
     const lab = captureRecordingLab();
-    await render(<StopRecordingDialog store={lab.store} />);
+    const view = await render(<StopRecordingDialog store={lab.store} />);
+    expect(has(view, 'stop-recording-popover')).toBe(false);
     await act(async () => lab.store.getState().requestStop());
-    expect(show.mock.calls[0]![0]).toMatchObject({ anchor: 4242 });
+    expect(sheet).not.toHaveBeenCalled();
+    const popover = view.byTestId('stop-recording-popover');
+    expect(JSON.stringify(popover.props.style)).toContain('"top":82');
+    expect(has(view, 'stop-recording-cancel')).toBe(false);
+    expect(view.text()).toContain(STOP_CONFIRMATION.message);
+    await press(view.byTestId('stop-recording-backdrop'));
+    expect(lab.store.getState().showStopConfirmation).toBe(false);
   });
 
-  it('iOS: a screen that opens on the question waits for the record button instead of opening unanchored', async () => {
-    Object.defineProperty(Platform, 'OS', { value: 'ios' });
-    installTags();
-    const show = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
+  it('iPad: End Recording confirms the stop', async () => {
+    setPlatform('ios', true);
+    registerRecordButtonAnchor(button);
+    const lab = captureRecordingLab();
+    const confirm = jest.spyOn(lab.store.getState(), 'confirmStop');
+    const view = await render(<StopRecordingDialog store={lab.store} />);
+    await act(async () => lab.store.getState().requestStop());
+    await press(view.byTestId('stop-recording-confirm'));
+    expect(confirm).toHaveBeenCalled();
+  });
+
+  it('iPad: a screen that opens on the question waits for the record button, then points at it', async () => {
+    setPlatform('ios', true);
     const lab = captureRecordingLab();
     lab.store.getState().requestStop(); // asked before the button exists
-    await render(<StopRecordingDialog store={lab.store} />);
-    expect(show).not.toHaveBeenCalled();
+    const view = await render(<StopRecordingDialog store={lab.store} />);
+    expect(has(view, 'stop-recording-popover')).toBe(false);
     await act(async () => registerRecordButtonAnchor(button));
-    expect(show).toHaveBeenCalledTimes(1);
-    expect(show.mock.calls[0]![0]).toMatchObject({ anchor: 4242 });
+    expect(JSON.stringify(view.byTestId('stop-recording-popover').props.style)).toContain('"top":82');
   });
 
-  it('iOS: with no record button at all the question still appears, after a short wait', async () => {
+  it('iPad: with no record button at all the question still appears, after a short wait', async () => {
     jest.useFakeTimers();
-    Object.defineProperty(Platform, 'OS', { value: 'ios' });
-    const show = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
+    setPlatform('ios', true);
     const lab = captureRecordingLab();
     lab.store.getState().requestStop();
-    await render(<StopRecordingDialog store={lab.store} />);
-    expect(show).not.toHaveBeenCalled();
+    const view = await render(<StopRecordingDialog store={lab.store} />);
+    expect(has(view, 'stop-recording-popover')).toBe(false);
     await act(async () => jest.advanceTimersByTime(1100));
-    expect(show).toHaveBeenCalledTimes(1);
-    expect(show.mock.calls[0]![0].anchor).toBeUndefined();
+    expect(has(view, 'stop-recording-popover')).toBe(true);
   });
 
-  it('a stale unmount does not clear a newer registration', async () => {
-    installTags();
-    registerRecordButtonAnchor(button);
-    registerRecordButtonAnchor(null);
-    registerRecordButtonAnchor(button);
-    expect(recordButtonHandle()).toBe(4242);
-  });
-
-  it('iOS: the system action sheet (a popover on iPad) with End Recording destructive and tap-outside as cancel', async () => {
-    Object.defineProperty(Platform, 'OS', { value: 'ios' });
-    installTags();
-    registerRecordButtonAnchor(button);
-    const show = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
+  it('iPhone: the system action sheet, End Recording destructive and tap-outside as cancel', async () => {
+    setPlatform('ios', false);
+    const sheet = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
     const lab = captureRecordingLab();
     await render(<StopRecordingDialog store={lab.store} />);
-    expect(show).not.toHaveBeenCalled();
+    expect(sheet).not.toHaveBeenCalled();
     await act(async () => lab.store.getState().requestStop());
-    expect(show).toHaveBeenCalledTimes(1);
-    const [options, callback] = show.mock.calls[0]!;
+    expect(sheet).toHaveBeenCalledTimes(1);
+    const [options, callback] = sheet.mock.calls[0]!;
     expect(options).toMatchObject({
       title: STOP_CONFIRMATION.title,
       message: STOP_CONFIRMATION.message,
@@ -95,26 +111,31 @@ describe('StopRecordingDialog', () => {
     expect(lab.store.getState().showStopConfirmation).toBe(false);
   });
 
-  it('iOS: End Recording confirms the stop', async () => {
-    Object.defineProperty(Platform, 'OS', { value: 'ios' });
-    installTags();
-    registerRecordButtonAnchor(button);
-    const show = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
+  it('iPhone: End Recording confirms the stop', async () => {
+    setPlatform('ios', false);
+    const sheet = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
     const lab = captureRecordingLab();
     const confirm = jest.spyOn(lab.store.getState(), 'confirmStop');
     await render(<StopRecordingDialog store={lab.store} />);
     await act(async () => lab.store.getState().requestStop());
-    await act(async () => show.mock.calls[0]![1](0));
+    await act(async () => sheet.mock.calls[0]![1](0));
     expect(confirm).toHaveBeenCalled();
   });
 
   it('Android keeps the in-app dialog with Cancel', async () => {
-    Object.defineProperty(Platform, 'OS', { value: 'android' });
-    const show = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
+    setPlatform('android');
+    const sheet = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => undefined);
     const lab = captureRecordingLab();
     const view = await render(<StopRecordingDialog store={lab.store} />);
     await act(async () => lab.store.getState().requestStop());
-    expect(show).not.toHaveBeenCalled();
+    expect(sheet).not.toHaveBeenCalled();
     expect(view.byTestId('stop-recording-cancel')).toBeTruthy();
+  });
+
+  it('a stale unmount does not clear a newer registration', () => {
+    registerRecordButtonAnchor(button);
+    registerRecordButtonAnchor(null);
+    registerRecordButtonAnchor(button);
+    expect(recordButtonView()).toBe(button);
   });
 });
