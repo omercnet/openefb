@@ -59,7 +59,7 @@ class PurposeStrings(unittest.TestCase):
             "Microphone": "_OBJC_CLASS_$_AVAudioRecorder",
             "Speech": "_OBJC_CLASS_$_SFSpeechRecognizer",
             "Bluetooth": "_OBJC_CLASS_$_CBCentralManager",
-            "Motion": "_OBJC_CLASS_$_CMMotionManager",
+            "Motion": "_OBJC_CLASS_$_CMMotionActivityManager",
             "Location": "_OBJC_CLASS_$_CLLocationManager",
         }
         self.assertEqual(set(cases), set(c.SENSITIVE))
@@ -70,6 +70,15 @@ class PurposeStrings(unittest.TestCase):
             keys = c.SENSITIVE[framework][1]
             _, ok = c.check({"CFBundleExecutable": "x", keys[0]: "why"}, {"x": symbol + "\n"}, False)
             self.assertEqual(ok, [], framework)
+
+    def test_raw_motion_sensors_need_no_string_but_activity_data_does(self):
+        # reanimated links CMMotionManager (accelerometer, gyroscope): no permission exists for it.
+        _, problems = run(BASE, OBJC + "_OBJC_CLASS_$_CMMotionManager\n")
+        self.assertEqual(problems, [])
+        for symbol in ("CMMotionActivityManager", "CMPedometer", "CMAltimeter"):
+            _, problems = run(BASE, OBJC + f"_OBJC_CLASS_$_{symbol}\n")
+            self.assertEqual(len(problems), 1, symbol)
+            self.assertIn("Motion is linked", problems[0])
 
     def test_the_message_names_the_binary_that_uses_the_class(self):
         _, problems = c.check(BASE, {"KanafEFB": OBJC, "Pods.framework": SWIFT_PHOTOS}, False)

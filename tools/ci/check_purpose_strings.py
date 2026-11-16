@@ -50,7 +50,9 @@ SENSITIVE = {
         re.compile(r"CBCentralManager|CBPeripheralManager"),
         ("NSBluetoothAlwaysUsageDescription", "NSBluetoothPeripheralUsageDescription"),
     ),
-    "Motion": (re.compile(r"CMMotionManager|CMAltimeter|CMPedometer|CMMotionActivityManager"), ("NSMotionUsageDescription",)),
+    # Motion & Fitness: activity, pedometer and altimeter data. NOT CMMotionManager (raw accelerometer and gyroscope), which needs
+    # no permission: react-native-reanimated links it, and the build that Apple accepted before did too.
+    "Motion": (re.compile(r"CMMotionActivityManager|CMPedometer|CMAltimeter"), ("NSMotionUsageDescription",)),
 }
 
 DEV_CLIENT_SYMBOLS = re.compile(r"EXDevLauncher|EXDevMenu|DevLauncher|DevMenu")
