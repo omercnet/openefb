@@ -232,7 +232,9 @@ export function createSettingsStore(deps: SettingsDeps) {
     };
 
     /** Saves the region (when `write`) and records what failed. `applyFailure` is what notifying the app threw, if anything. */
-    const saveRegion = async (region: Region, applyFailure: string | null, write: boolean) => {
+    /** Bumped by every region choice or retry: only the newest save may report back (A, then B, then A again, is three). */
+    let regionGeneration = 0;
+    const saveRegion = async (region: Region, applyFailure: string | null, write: boolean, generation: number) => {
       let saveFailure: string | null = null;
       if (write) {
         try {
@@ -242,7 +244,7 @@ export function createSettingsStore(deps: SettingsDeps) {
         }
       }
       // A newer choice owns the shared state; this older save must not overwrite its error, attribution or availability.
-      if (get().region !== region) return;
+      if (get().region !== region || generation !== regionGeneration) return;
       regionFailed = { region, apply: applyFailure !== null, save: saveFailure !== null };
       set({
         regionSaveError:
@@ -343,9 +345,10 @@ export function createSettingsStore(deps: SettingsDeps) {
         const applyFailure = !retry || failed.apply ? notify(() => deps.onRegionChange?.(region)) : null;
         const write = !retry || failed.save;
         pendingRegionWrites += 1;
+        const generation = ++regionGeneration;
         return enqueue(async () => {
           try {
-            await saveRegion(region, applyFailure, write);
+            await saveRegion(region, applyFailure, write, generation);
           } finally {
             pendingRegionWrites -= 1;
           }

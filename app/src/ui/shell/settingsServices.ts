@@ -34,7 +34,6 @@ export function settingsPreferences(kv: Preferences, files: TextStorage): Prefer
 export interface SettingsServicesDeps {
   runtime: AppRuntime;
   files: TextStorage;
-  /** AppState.region follows (the shell reloads the map for it). */
   /** The region was saved: the shell restarts the live app on it. */
   onRegionSaved: (region: Region) => void;
   onDisplayModeChange: (mode: DisplayMode) => void;

@@ -63,6 +63,36 @@ describe('onRegionSaved', () => {
   });
 });
 
+describe('onRegionSaved with overlapping choices', () => {
+  it('an earlier save of the same region does not restart over the newer one (us, israel, us again)', async () => {
+    const onRegionSaved = jest.fn();
+    const gates: (() => void)[] = [];
+    const base = createMemoryUserData();
+    const slow = withSettings(base, {
+      update: (patch) =>
+        new Promise((resolve, reject) => {
+          gates.push(() =>
+            gates.length === 3 ? reject(new Error('disk full')) : resolve(base.settings.update(patch)),
+          );
+        }) as never,
+    });
+    const { store } = setup({ onRegionSaved }, slow);
+    await store.getState().load();
+    const a = store.getState().setRegion('us');
+    const b = store.getState().setRegion('israel');
+    const c = store.getState().setRegion('us');
+    await new Promise((r) => setTimeout(r, 0));
+    while (gates.length < 3) {
+      gates[gates.length - 1]?.();
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    gates.forEach((g) => g());
+    await Promise.all([a, b, c]);
+    expect(onRegionSaved).not.toHaveBeenCalled(); // the newest save failed: Settings stays with its Retry
+    expect(store.getState().regionSaveError).toContain('disk full');
+  });
+});
+
 describe('load', () => {
   it('a fresh install reads the defaults', async () => {
     const { store } = setup();
